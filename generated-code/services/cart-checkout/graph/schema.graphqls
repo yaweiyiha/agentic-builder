@@ -1,0 +1,50 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
+
+type Query {
+  cart(id: ID!): Cart
+  cartByCustomer(customerId: ID!): Cart
+}
+
+type Mutation {
+  createCart(customerId: ID): Cart!
+  addToCart(cartId: ID!, productId: ID!, variantId: ID, quantity: Int!): Cart!
+  removeFromCart(cartId: ID!, itemId: ID!): Cart!
+  updateCartItemQuantity(cartId: ID!, itemId: ID!, quantity: Int!): Cart!
+  clearCart(cartId: ID!): Cart!
+  checkout(cartId: ID!, paymentMethodId: String!): CheckoutResult!
+}
+
+type Cart @key(fields: "id") {
+  id: ID!
+  customerId: ID
+  items: [CartItem!]!
+  subtotal: Float!
+  taxTotal: Float!
+  grandTotal: Float!
+  currency: String!
+  expiresAt: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type CartItem @key(fields: "id") {
+  id: ID!
+  product: Product!
+  variantId: ID
+  quantity: Int!
+  unitPrice: Float!
+  totalPrice: Float!
+}
+
+# External stub for Product from Catalog service
+type Product @key(fields: "id", resolvable: false) {
+  id: ID!
+}
+
+type CheckoutResult {
+  success: Boolean!
+  orderId: ID
+  paymentIntentId: String
+  errorMessage: String
+}

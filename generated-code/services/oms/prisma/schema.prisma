@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Vendor {
+  id              String       @id @default(uuid())
+  name            String
+  stripeAccountId String?      @unique
+  commissionRate  Float        @default(10.0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  orderItems      OrderItem[]
+  payouts         Payout[]
+}
+
+model Order {
+  id            String       @id @default(uuid())
+  customerId    String
+  customerEmail String
+  status        OrderStatus  @default(PENDING)
+  totalAmount   Float
+  currency      String       @default("USD")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  vendorId  String
+  productId String
+  variantId String
+  sku       String
+  quantity  Int
+  price     Float
+  order     Order    @relation(fields: [orderId], references: [id])
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payout {
+  id               String       @id @default(uuid())
+  vendorId         String
+  amount           Float
+  currency         String       @default("USD")
+  status           PayoutStatus @default(PENDING)
+  stripeTransferId String?
+  vendor           Vendor       @relation(fields: [vendorId], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  REFUNDED
+  CANCELED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

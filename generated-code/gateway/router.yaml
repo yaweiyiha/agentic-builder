@@ -1,0 +1,52 @@
+# Apollo Router Configuration for AeroCommerce
+# This configures the federated GraphQL gateway, CORS, and header propagation.
+
+supergraph:
+  # The listen address for the Apollo Router
+  listen: 0.0.0.0:4000
+
+cors:
+  # Allow requests from the AeroCommerce frontends
+  origins:
+    - http://localhost:3000 # Next.js Storefront
+    - http://localhost:5173 # React Admin Dashboard
+    - http://localhost:5174 # React Vendor Dashboard
+    - https://studio.apollographql.com # Apollo Studio for debugging
+  allow_credentials: true
+  methods:
+    - GET
+    - POST
+    - OPTIONS
+  headers:
+    - Content-Type
+    - Authorization
+    - apollo-require-preflight
+
+headers:
+  # Propagate specific headers from the client to all subgraphs
+  all:
+    request:
+      - propagate:
+          named: "Authorization"
+      - propagate:
+          named: "x-user-role"
+      - propagate:
+          named: "x-user-id"
+
+# Subgraph routing overrides (useful for local development and Docker Compose)
+# In production, these are typically managed by Apollo GraphOS, but can be overridden here.
+override_subgraph_url:
+  catalog: http://localhost:4001/graphql
+  cart: http://localhost:4002/graphql
+  oms: http://localhost:4003/graphql
+
+# Include subgraph errors in the router response for easier debugging
+include_subgraph_errors:
+  all: true
+
+telemetry:
+  metrics:
+    prometheus:
+      enabled: true
+      listen: 0.0.0.0:9090
+      path: /metrics

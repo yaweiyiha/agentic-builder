@@ -1,0 +1,102 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
+
+type Query {
+  order(id: ID!): Order
+  orders(customerId: ID, vendorId: ID, status: OrderStatus, limit: Int = 20, offset: Int = 0): [Order!]!
+}
+
+type Mutation {
+  createOrder(input: CreateOrderInput!): Order!
+  updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+  updateOrderItemFulfillment(itemId: ID!, status: FulfillmentStatus!, trackingNumber: String): OrderItem!
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+  customerId: ID!
+  status: OrderStatus!
+  items: [OrderItem!]!
+  totalAmount: Float!
+  taxAmount: Float!
+  shippingAmount: Float!
+  currency: String!
+  shippingAddress: Address!
+  billingAddress: Address!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type OrderItem @key(fields: "id") {
+  id: ID!
+  orderId: ID!
+  vendorId: ID!
+  product: Product!
+  variantId: ID
+  quantity: Int!
+  unitPrice: Float!
+  totalPrice: Float!
+  commissionRate: Float!
+  status: FulfillmentStatus!
+  trackingNumber: String
+}
+
+# External stub for Product from Catalog service
+type Product @key(fields: "id", resolvable: false) {
+  id: ID!
+}
+
+type Address @shareable {
+  street: String!
+  city: String!
+  state: String!
+  postalCode: String!
+  country: String!
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  RETURNED
+}
+
+input CreateOrderInput {
+  customerId: ID!
+  cartId: ID!
+  totalAmount: Float!
+  taxAmount: Float!
+  shippingAmount: Float!
+  currency: String!
+  shippingAddress: AddressInput!
+  billingAddress: AddressInput!
+  items: [OrderItemInput!]!
+}
+
+input OrderItemInput {
+  vendorId: ID!
+  productId: ID!
+  variantId: ID
+  quantity: Int!
+  unitPrice: Float!
+  commissionRate: Float!
+}
+
+input AddressInput {
+  street: String!
+  city: String!
+  state: String!
+  postalCode: String!
+  country: String!
+}

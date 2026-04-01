@@ -1,0 +1,105 @@
+name: Build and Push to AWS ECR
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+
+permissions:
+  id-token: write # Required for AWS OIDC connection
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build and Push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Frontends
+          - service: admin-dashboard
+            context: apps/admin-dashboard
+          - service: vendor-dashboard
+            context: apps/vendor-dashboard
+          - service: storefront
+            context: apps/storefront
+          # Microservices
+          - service: catalog-pim
+            context: services/catalog-pim
+          - service: cart-checkout
+            context: services/cart-checkout
+          - service: oms
+            context: services/oms
+          - service: vendor-finance
+            context: services/vendor-finance
+          # Workers
+          - service: search-sync
+            context: workers/search-sync
+          - service: webhook-dispatch
+            context: workers/webhook-dispatch
+          # API Gateway
+          - service: gateway
+            context: gateway
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: aerocommerce/${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build the Docker image
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            ${{ matrix.context }}
+          
+          # Push the images to AWS ECR
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # ---------------------------------------------------------------------------
+  # GitOps Deployment Trigger (ArgoCD)
+  # ---------------------------------------------------------------------------
+  update-manifests:
+    name: Update Kubernetes Manifests
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps Repository
+        uses: actions/checkout@v4
+        with:
+          repository: aerocommerce/gitops-manifests
+          token: ${{ secrets.GITOPS_PAT }}
+          path: gitops-manifests
+
+      - name: Update Image Tags
+        run: |
+          cd gitops-manifests
+          # Example script to update image tags in kustomize or helm values
+          # ./scripts/update-tags.sh ${{ github.sha }}
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: update image tags to ${{ github.sha }}" || echo "No changes to commit"
+          git push origin main
