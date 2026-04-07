@@ -1,5 +1,9 @@
 import { v4 as uuidv4 } from "uuid";
-import type { ChatMessage, OpenRouterResponse } from "@/lib/llm-types";
+import type {
+  ChatMessage,
+  OpenRouterResponse,
+  OpenRouterToolDefinition,
+} from "@/lib/llm-types";
 
 export const GPT5_MODEL_ID = "gpt-5.4-2026-03-05";
 
@@ -35,6 +39,12 @@ function buildBody(
     temperature?: number;
     max_tokens?: number;
     stream?: boolean;
+    tools?: OpenRouterToolDefinition[];
+    tool_choice?:
+      | "auto"
+      | "none"
+      | "required"
+      | { type: "function"; function: { name: string } };
     response_format?: { type: string; json_schema?: Record<string, unknown> };
   },
   sessionId: string,
@@ -51,6 +61,8 @@ function buildBody(
       thinking_effort: "medium",
       verbosity: "medium",
     },
+    ...(opts.tools?.length ? { tools: opts.tools } : {}),
+    ...(opts.tool_choice ? { tool_choice: opts.tool_choice } : {}),
     ...(opts.response_format ? { response_format: opts.response_format } : {}),
   };
 }
@@ -114,6 +126,12 @@ export async function gpt5ChatCompletion(
   options: {
     temperature?: number;
     max_tokens?: number;
+    tools?: OpenRouterToolDefinition[];
+    tool_choice?:
+      | "auto"
+      | "none"
+      | "required"
+      | { type: "function"; function: { name: string } };
     response_format?: { type: string; json_schema?: Record<string, unknown> };
   } = {},
 ): Promise<OpenRouterResponse> {
@@ -148,6 +166,11 @@ export async function gpt5ChatCompletion(
     model?: string;
     choices?: {
       message?: ChatMessage;
+      tool_calls?: {
+        id?: string;
+        type?: "function";
+        function?: { name?: string; arguments?: string };
+      }[];
       finish_reason?: string;
     }[];
     usage?: {
@@ -167,7 +190,21 @@ export async function gpt5ChatCompletion(
     model: data.model ?? GPT5_MODEL_ID,
     choices: [
       {
-        message: { role: "assistant", content },
+        message: {
+          role: "assistant",
+          content,
+          tool_calls:
+            choice?.tool_calls
+              ?.filter((call) => call.id && call.function?.name)
+              .map((call) => ({
+                id: call.id!,
+                type: "function" as const,
+                function: {
+                  name: call.function!.name!,
+                  arguments: call.function?.arguments ?? "{}",
+                },
+              })) ?? [],
+        },
         finish_reason: finishReason,
       },
     ],

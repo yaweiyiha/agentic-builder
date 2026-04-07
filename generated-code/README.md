@@ -1,5 +1,4 @@
-# Browser Forum Monorepo
+# Scaffold
 
-A workspace-based monorepo for a browser-only forum app (localStorage persistence).
-
-## Repo Structure
+Generated via Agentic Builder quick path (PRD → kick-off only).
+Implement the product from PRD.md.

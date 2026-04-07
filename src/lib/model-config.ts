@@ -58,6 +58,9 @@ export const MODEL_CONFIG = {
   /** Pencil (.pen file) design generation — needs structured batch_design output. */
   pencil: "gpt-5.2",
 
+  /** Pencil live MCP tool-use loop. Prefer a model with stable tool calling. */
+  pencilToolUse: "gpt-4o",
+
   /** Static mockup generation. Disabled by default. */
   mockup: "gpt-4o-mini",
 
