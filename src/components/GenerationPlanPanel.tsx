@@ -35,6 +35,15 @@ export interface ParallelDocResult {
 
 type GenerationStatus = "planning" | "generating" | "completed";
 
+/** Live snapshot for parent UI (tab dots + per-tab body during parallel generation). */
+export type ParallelGenLiveSnapshot = {
+  docStatuses: Record<string, "pending" | "generating" | "completed" | "error">;
+  docResults: Record<string, ParallelDocResult>;
+  panelStatus: GenerationStatus;
+  totalCostUsd: number;
+  totalTokens: number;
+};
+
 interface GenerationPlanPanelProps {
   tier: ProjectTier;
   prdContent: string;
@@ -51,6 +60,14 @@ interface GenerationPlanPanelProps {
   prdMetadata?: Record<string, unknown>;
   /** Code output directory — forwarded to the API so Pencil can save .pen files to disk. */
   codeOutputDir?: string;
+  /** When false, the generation plan table is hidden (e.g. user is on another prep tab). */
+  showPlanTable?: boolean;
+  /** When false, the document list / progress cards are hidden; status moves to prep tabs. */
+  showProgressList?: boolean;
+  /** When false, structured PRD spec is not rendered here (shown under PRD tab in parent). */
+  showPrdSpecSection?: boolean;
+  /** Fired whenever parallel doc statuses or results change (for tab indicators + tab panels). */
+  onParallelStateChange?: (snapshot: ParallelGenLiveSnapshot) => void;
 }
 
 export default function GenerationPlanPanel({
@@ -64,6 +81,10 @@ export default function GenerationPlanPanel({
   onGenerationStreamFinished,
   prdMetadata,
   codeOutputDir,
+  showPlanTable = true,
+  showProgressList = true,
+  showPrdSpecSection = true,
+  onParallelStateChange,
 }: GenerationPlanPanelProps) {
   const docs: DocPlan[] = parallelDocBlueprintsForTier(tier).map((b) => ({
     ...b,
@@ -82,6 +103,23 @@ export default function GenerationPlanPanel({
   const streamResultsRef = useRef<Record<string, ParallelDocResult>>({});
 
   docResultsRef.current = docResults;
+
+  useEffect(() => {
+    onParallelStateChange?.({
+      docStatuses,
+      docResults,
+      panelStatus: status,
+      totalCostUsd: totalCost,
+      totalTokens: totalTokens,
+    });
+  }, [
+    docStatuses,
+    docResults,
+    status,
+    totalCost,
+    totalTokens,
+    onParallelStateChange,
+  ]);
 
   const toggleDoc = (id: string) => {
     onToggleParallelDoc(id as PipelineStepId);
@@ -306,11 +344,13 @@ export default function GenerationPlanPanel({
 
   return (
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-6">
-      <PrdSpecWireframesSection
-        prdSpec={prdSpec}
-        intro="Shown after PRD confirmation. Use pages and CMP-* IDs to align parallel docs and coding tasks."
-      />
-      {status === "planning" && (
+      {showPrdSpecSection && (
+        <PrdSpecWireframesSection
+          prdSpec={prdSpec}
+          intro="Shown after PRD confirmation. Use pages and CMP-* IDs to align parallel docs and coding tasks."
+        />
+      )}
+      {status === "planning" && showPlanTable && (
         <PlanView
           docs={docs}
           tier={tier}
@@ -321,7 +361,7 @@ export default function GenerationPlanPanel({
         />
       )}
 
-      {(status === "generating" || status === "completed") && (
+      {(status === "generating" || status === "completed") && showProgressList && (
         <ProgressView
           docs={docs.filter((d) => d.selected)}
           docStatuses={docStatuses}
@@ -340,7 +380,7 @@ export default function GenerationPlanPanel({
   );
 }
 
-function PlanView({
+export function PlanView({
   docs,
   tier,
   skippedLabels,

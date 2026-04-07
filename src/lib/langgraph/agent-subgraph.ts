@@ -113,6 +113,103 @@ For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.`,
 };
 
+// ─── Version constraint injection (prevent LLM from using deprecated APIs) ───
+
+const KNOWN_BREAKING_CHANGES: Record<
+  string,
+  { sinceVersion: string; notes: string }
+> = {
+  msw: {
+    sinceVersion: "2.0.0",
+    notes:
+      "v2+: use `http.get/post/put/patch/delete` from 'msw', NOT `rest.*`. " +
+      "Use `HttpResponse.json(data)` instead of `res(ctx.json(data))`.",
+  },
+  "react-router-dom": {
+    sinceVersion: "6.0.0",
+    notes:
+      "v6+: use `useNavigate()` NOT `useHistory()`. " +
+      "Use `<Routes>` NOT `<Switch>`. " +
+      "Route `component` prop is now `element={<Component />}`.",
+  },
+  "@tanstack/react-query": {
+    sinceVersion: "5.0.0",
+    notes:
+      "v5+: `useQuery` takes a single object param `{ queryKey, queryFn }`. " +
+      "No more `onSuccess/onError` callbacks in useQuery options. " +
+      "Use `isPending` instead of `isLoading`.",
+  },
+  "next-auth": {
+    sinceVersion: "4.0.0",
+    notes:
+      "v4+: config is in `app/api/auth/[...nextauth]/route.ts`. " +
+      "Use `getServerSession(authOptions)` NOT `getSession()`.",
+  },
+  prisma: {
+    sinceVersion: "5.0.0",
+    notes:
+      "v5+: `findUnique` throws if not found when using `findUniqueOrThrow`. " +
+      "`rejectOnNotFound` option removed.",
+  },
+  "framer-motion": {
+    sinceVersion: "11.0.0",
+    notes:
+      "v11+: `motion` components import from 'framer-motion' directly. " +
+      "AnimatePresence `exitBeforeEnter` renamed to `mode='wait'`.",
+  },
+  "react-hook-form": {
+    sinceVersion: "7.0.0",
+    notes:
+      "v7+: `register` returns an object to spread: `{...register('field')}`. " +
+      "No more `ref={register}` pattern.",
+  },
+};
+
+async function buildVersionConstraints(outputDir: string): Promise<string> {
+  const content = await fsRead("package.json", outputDir);
+  if (content.startsWith("FILE_NOT_FOUND")) return "";
+
+  let pkg: {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  try {
+    pkg = JSON.parse(content);
+  } catch {
+    return "";
+  }
+
+  const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+  if (Object.keys(allDeps).length === 0) return "";
+
+  const constraints: string[] = [];
+
+  for (const [pkgName, version] of Object.entries(allDeps)) {
+    const breaking = KNOWN_BREAKING_CHANGES[pkgName];
+    if (!breaking) continue;
+
+    const installedMajor = parseInt(
+      version.replace(/^[\^~>=<]/, "").split(".")[0],
+      10,
+    );
+    const breakingMajor = parseInt(breaking.sinceVersion.split(".")[0], 10);
+
+    if (!isNaN(installedMajor) && installedMajor >= breakingMajor) {
+      constraints.push(
+        `- **${pkgName}** (installed: ${version}): ${breaking.notes}`,
+      );
+    }
+  }
+
+  if (constraints.length === 0) return "";
+
+  return [
+    "## Installed package versions — use these APIs (not older ones)",
+    "",
+    ...constraints,
+  ].join("\n");
+}
+
 function parseFileOutput(raw: string): Record<string, string> {
   const files: Record<string, string> = {};
   const regex = /```file:([^\n]+)\n([\s\S]*?)```/g;
@@ -169,6 +266,11 @@ async function generateCode(state: WorkerState) {
     contextParts.push(`## Available API endpoints\n${apis}`);
   }
 
+  const versionConstraints = await buildVersionConstraints(state.outputDir);
+  if (versionConstraints) {
+    contextParts.push(versionConstraints);
+  }
+
   const fileHint =
     task.files && task.files.length > 0
       ? `\nKey files to create/modify:\n${task.files.map((f) => `- ${f}`).join("\n")}`
@@ -222,6 +324,215 @@ async function generateCode(state: WorkerState) {
   };
 }
 
+// ─── Verify helpers: error classification + auto dep install ───
+
+interface TscErrorClassification {
+  missingDeps: string[];
+  crossRefErrors: string[];
+  realErrors: string[];
+  hasMissingDeps: boolean;
+  hasCrossRefOnly: boolean;
+  hasRealErrors: boolean;
+}
+
+function classifyTscErrors(output: string): TscErrorClassification {
+  const lines = output.split("\n").filter((l) => l.includes("error TS"));
+
+  const missingDeps: string[] = [];
+  const crossRefErrors: string[] = [];
+  const realErrors: string[] = [];
+
+  for (const line of lines) {
+    if (
+      line.includes("Cannot find module") ||
+      line.includes("Could not find a declaration file")
+    ) {
+      const moduleMatch = line.match(/['"]([^'"]+)['"]/);
+      const modulePath = moduleMatch?.[1] ?? "";
+      if (
+        modulePath.startsWith(".") ||
+        modulePath.startsWith("/") ||
+        isPathAlias(modulePath)
+      ) {
+        crossRefErrors.push(line);
+      } else {
+        missingDeps.push(line);
+      }
+    } else if (line.includes("Cannot find name")) {
+      if (
+        /describe|it\b|expect|test\b|beforeEach|afterEach|afterAll|beforeAll|vi\b/.test(
+          line,
+        )
+      ) {
+        missingDeps.push(line);
+      } else if (
+        /toBeInTheDocument|toHaveTextContent|toBeVisible|toBeDisabled|toHaveClass|toHaveStyle|toBeChecked|toHaveFocus/.test(
+          line,
+        )
+      ) {
+        missingDeps.push(line);
+      } else {
+        realErrors.push(line);
+      }
+    } else {
+      realErrors.push(line);
+    }
+  }
+
+  return {
+    missingDeps,
+    crossRefErrors,
+    realErrors,
+    hasMissingDeps: missingDeps.length > 0,
+    hasCrossRefOnly:
+      crossRefErrors.length > 0 &&
+      realErrors.length === 0 &&
+      missingDeps.length === 0,
+    hasRealErrors: realErrors.length > 0,
+  };
+}
+
+function isPathAlias(specifier: string): boolean {
+  return (
+    specifier.startsWith("@/") ||
+    specifier.startsWith("~/") ||
+    specifier.startsWith("#/")
+  );
+}
+
+function extractMissingPackages(tscOutput: string): string[] {
+  const pkgs = new Set<string>();
+  const moduleRe = /Cannot find module ['"]([^'"]+)['"]/g;
+  let m;
+  while ((m = moduleRe.exec(tscOutput)) !== null) {
+    const mod = m[1];
+    if (mod.startsWith(".") || mod.startsWith("/")) continue;
+    if (isPathAlias(mod)) continue;
+    const pkg = mod.startsWith("@")
+      ? mod.split("/").slice(0, 2).join("/")
+      : mod.split("/")[0];
+    pkgs.add(pkg);
+  }
+  const declRe = /Could not find a declaration file for module ['"]([^'"]+)['"]/g;
+  while ((m = declRe.exec(tscOutput)) !== null) {
+    const mod = m[1];
+    if (mod.startsWith(".") || mod.startsWith("/")) continue;
+    if (isPathAlias(mod)) continue;
+    const pkg = mod.startsWith("@")
+      ? mod.split("/").slice(0, 2).join("/")
+      : mod.split("/")[0];
+    pkgs.add(`@types/${pkg.replace(/^@/, "").replace(/\//, "__")}`);
+  }
+  if (
+    /Cannot find name.*(describe|it\b|expect|test\b|beforeEach|afterEach|afterAll|beforeAll|vi)\b/.test(
+      tscOutput,
+    )
+  ) {
+    pkgs.add("vitest");
+  }
+  if (
+    /toBeInTheDocument|toHaveTextContent|toBeVisible|toBeDisabled|toHaveClass/.test(
+      tscOutput,
+    )
+  ) {
+    pkgs.add("@testing-library/jest-dom");
+  }
+  return [...pkgs];
+}
+
+async function installMissingDeps(
+  tscOutput: string,
+  outputDir: string,
+): Promise<void> {
+  const pkgs = extractMissingPackages(tscOutput);
+
+  const needsJestDom =
+    /toBeInTheDocument|toHaveTextContent|toBeVisible/.test(tscOutput);
+
+  if (needsJestDom) {
+    pkgs.push("@testing-library/jest-dom");
+    const setupPath = "src/test/setup.ts";
+    const existingSetup = await fsRead(setupPath, outputDir);
+    if (existingSetup.startsWith("FILE_NOT_FOUND")) {
+      await fsWrite(
+        setupPath,
+        `import '@testing-library/jest-dom';\n`,
+        outputDir,
+      );
+      console.log(`[Verify] Created test setup file: ${setupPath}`);
+
+      const vitestConfig = await fsRead("vitest.config.ts", outputDir);
+      if (
+        !vitestConfig.startsWith("FILE_NOT_FOUND") &&
+        !vitestConfig.includes("setupFiles")
+      ) {
+        const updated = vitestConfig.replace(
+          /test:\s*\{/,
+          `test: {\n    setupFiles: ['./src/test/setup.ts'],`,
+        );
+        if (updated !== vitestConfig) {
+          await fsWrite("vitest.config.ts", updated, outputDir);
+          console.log(`[Verify] Updated vitest.config.ts with setupFiles`);
+        }
+      }
+    }
+  }
+
+  const unique = [...new Set(pkgs)];
+  if (unique.length === 0) return;
+  console.log(
+    `[Verify] Installing ${unique.length} missing package(s): ${unique.join(", ")}`,
+  );
+  await shellExec(
+    `npm install --save ${unique.join(" ")} 2>&1 | tail -5`,
+    outputDir,
+    { timeout: 60_000 },
+  );
+}
+
+async function findBestTsconfigForFiles(
+  taskFiles: string[],
+  outputDir: string,
+): Promise<string | null> {
+  if (taskFiles.length === 0) return null;
+
+  const dirs = new Set(
+    taskFiles
+      .map((f) => f.split("/").slice(0, -1).join("/"))
+      .filter((d) => d.length > 0),
+  );
+
+  const commonPrefix =
+    dirs.size === 1
+      ? [...dirs][0]
+      : taskFiles[0]
+          .split("/")
+          .slice(0, -1)
+          .reduce((prefix, part, i) => {
+            if (
+              taskFiles.every(
+                (f) => f.split("/")[i] === part,
+              )
+            ) {
+              return prefix ? `${prefix}/${part}` : part;
+            }
+            return prefix;
+          }, "");
+
+  const parts = commonPrefix ? commonPrefix.split("/") : [];
+  for (let i = parts.length; i >= 1; i--) {
+    const candidate = parts.slice(0, i).join("/") + "/tsconfig.json";
+    const content = await fsRead(candidate, outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+// ─── Verify node ───
+
 async function verifyCode(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
 
@@ -231,40 +542,119 @@ async function verifyCode(state: WorkerState) {
     .filter((p) => /\.(ts|tsx)$/.test(p));
 
   if (taskFiles.length === 0) {
-    console.log(`[Worker:${state.workerLabel}] Verify: no TS files to check for "${task.title}"`);
+    console.log(
+      `[Worker:${state.workerLabel}] Verify: no TS files to check for "${task.title}"`,
+    );
     return { verifyErrors: "", fixAttempts: state.fixAttempts };
   }
 
-  console.log(`[Worker:${state.workerLabel}] Verify: running tsc on ${taskFiles.length} file(s) for "${task.title}"...`);
-
-  const result = await shellExec(
-    `npx tsc --noEmit --pretty false --skipLibCheck 2>&1`,
-    state.outputDir,
-    { timeout: 30_000 },
+  console.log(
+    `[Worker:${state.workerLabel}] Verify: running tsc on ${taskFiles.length} file(s) for "${task.title}"...`,
   );
 
-  const rawOutput = (result.stderr || result.stdout || "").trim();
+  const tscProject = await findBestTsconfigForFiles(taskFiles, state.outputDir);
+  const tscCmd = tscProject
+    ? `npx tsc --noEmit --pretty false --skipLibCheck --project ${tscProject} 2>&1`
+    : `npx tsc --noEmit --pretty false --skipLibCheck 2>&1`;
 
-  const relevantLines = rawOutput
-    .split("\n")
-    .filter((line) => {
-      if (!line.includes("error TS")) return false;
-      return taskFiles.some((f) => line.includes(f));
-    })
-    .slice(0, 50);
-
-  if (relevantLines.length > 0) {
-    const errors = relevantLines.join("\n");
-    const errorPreview = errors.slice(0, 200).replace(/\n/g, " | ");
-    console.log(`[Worker:${state.workerLabel}] Verify FAILED (attempt ${state.fixAttempts + 1}/${MAX_FIX_ATTEMPTS}): ${errorPreview}`);
-    return {
-      verifyErrors: errors.slice(0, 2000),
-      fixAttempts: state.fixAttempts,
-    };
+  if (tscProject) {
+    console.log(
+      `[Worker:${state.workerLabel}] Verify: using --project ${tscProject}`,
+    );
   }
 
-  console.log(`[Worker:${state.workerLabel}] Verify PASSED for "${task.title}"`);
-  return { verifyErrors: "", fixAttempts: state.fixAttempts };
+  const runTsc = async (): Promise<{ output: string; exitCode: number }> => {
+    const result = await shellExec(tscCmd, state.outputDir, {
+      timeout: 30_000,
+    });
+    return {
+      output: (result.stderr || result.stdout || "").trim(),
+      exitCode: result.exitCode,
+    };
+  };
+
+  const filterForTask = (raw: string): string =>
+    raw
+      .split("\n")
+      .filter(
+        (line) =>
+          line.includes("error TS") &&
+          taskFiles.some((f) => line.includes(f)),
+      )
+      .slice(0, 50)
+      .join("\n");
+
+  let { output, exitCode } = await runTsc();
+
+  if (exitCode === 0 || !output.includes("error TS")) {
+    console.log(
+      `[Worker:${state.workerLabel}] Verify PASSED for "${task.title}"`,
+    );
+    return { verifyErrors: "", fixAttempts: state.fixAttempts };
+  }
+
+  const relevantOutput = filterForTask(output);
+  if (!relevantOutput) {
+    console.log(
+      `[Worker:${state.workerLabel}] Verify: errors exist but none in task files, PASSED for "${task.title}"`,
+    );
+    return { verifyErrors: "", fixAttempts: state.fixAttempts };
+  }
+
+  const classification = classifyTscErrors(relevantOutput);
+
+  // Type A: missing deps → install first, re-run tsc, no fixAttempts consumed
+  if (classification.hasMissingDeps) {
+    console.log(
+      `[Worker:${state.workerLabel}] Verify: missing deps detected, installing before fix cycle...`,
+    );
+    await installMissingDeps(relevantOutput, state.outputDir);
+    const retry = await runTsc();
+
+    if (retry.exitCode === 0 || !retry.output.includes("error TS")) {
+      console.log(
+        `[Worker:${state.workerLabel}] Verify PASSED after dep install for "${task.title}"`,
+      );
+      return { verifyErrors: "", fixAttempts: state.fixAttempts };
+    }
+
+    const retryRelevant = filterForTask(retry.output);
+    if (!retryRelevant) {
+      console.log(
+        `[Worker:${state.workerLabel}] Verify PASSED after dep install for "${task.title}"`,
+      );
+      return { verifyErrors: "", fixAttempts: state.fixAttempts };
+    }
+
+    const afterInstall = classifyTscErrors(retryRelevant);
+    if (!afterInstall.hasRealErrors) {
+      console.log(
+        `[Worker:${state.workerLabel}] Verify: only cross-ref errors remain after dep install, skipping for "${task.title}"`,
+      );
+      return { verifyErrors: "", fixAttempts: state.fixAttempts };
+    }
+    output = afterInstall.realErrors.join("\n").slice(0, 2000);
+  }
+  // Type B: cross-ref only → skip, other files not generated yet
+  else if (classification.hasCrossRefOnly) {
+    console.log(
+      `[Worker:${state.workerLabel}] Verify: cross-ref errors only (other files not generated yet), skipping for "${task.title}"`,
+    );
+    return { verifyErrors: "", fixAttempts: state.fixAttempts };
+  }
+  // Type C: real code errors → enter fix loop
+  else {
+    output = classification.realErrors.join("\n").slice(0, 2000);
+  }
+
+  const errorPreview = output.slice(0, 200).replace(/\n/g, " | ");
+  console.log(
+    `[Worker:${state.workerLabel}] Verify FAILED (attempt ${state.fixAttempts + 1}/${MAX_FIX_ATTEMPTS}): ${errorPreview}`,
+  );
+  return {
+    verifyErrors: output,
+    fixAttempts: state.fixAttempts,
+  };
 }
 
 function shouldFixOrProceed(state: WorkerState): string {
@@ -277,13 +667,46 @@ async function fixErrors(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
 
   const errFiles = extractErrorFiles(state.verifyErrors);
+  const taskFiles = state.generatedFiles
+    .filter((f) => f.role === state.role)
+    .map((f) => f.path);
+
   const fileContents: string[] = [];
+  const addedPaths = new Set<string>();
+
   for (const ef of errFiles.slice(0, 5)) {
     const content = await fsRead(ef, state.outputDir);
     if (!content.startsWith("FILE_NOT_FOUND")) {
       fileContents.push(`### ${ef}\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``);
+      addedPaths.add(ef);
     }
   }
+
+  const configFiles = await inferRelatedConfigFiles(
+    state.verifyErrors,
+    state.outputDir,
+    taskFiles,
+  );
+  for (const cf of configFiles) {
+    if (addedPaths.has(cf)) continue;
+    const content = await fsRead(cf, state.outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND")) {
+      fileContents.push(
+        `### ${cf} (config)\n\`\`\`json\n${content.slice(0, 2000)}\n\`\`\``,
+      );
+      addedPaths.add(cf);
+    }
+  }
+
+  const isConfigError = hasConfigErrors(state.verifyErrors);
+  const configHint = isConfigError
+    ? "**IMPORTANT**: These errors are likely caused by tsconfig.json misconfiguration " +
+      '(e.g. missing `"jsx": "react-jsx"` or wrong `compilerOptions`). ' +
+      "If the fix requires changing tsconfig.json or other config files, " +
+      "output the corrected config file(s) as well.\n"
+    : "";
+
+  const versionConstraints = await buildVersionConstraints(state.outputDir);
 
   const messages: ChatMessage[] = [
     { role: "system", content: ROLE_PROMPTS[state.role] },
@@ -297,12 +720,18 @@ async function fixErrors(state: WorkerState) {
         state.verifyErrors,
         "```",
         "",
+        configHint,
+        versionConstraints
+          ? `### Installed package versions (use these APIs, not older ones)\n${versionConstraints}`
+          : "",
         fileContents.length > 0
           ? `### Current file contents\n${fileContents.join("\n\n")}`
           : "",
         "",
         "Output ONLY the corrected files using ```file:<path> format.",
-      ].join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n"),
     },
   ];
 
@@ -312,7 +741,6 @@ async function fixErrors(state: WorkerState) {
     max_tokens: MAX_OUTPUT_TOKENS,
     openRouterVariant: "codeFix",
   });
-  const durationMs = Date.now() - startMs;
 
   const content = response.choices[0]?.message?.content ?? "";
   const costUsd = estimateCost(response.model, response.usage);
@@ -374,6 +802,70 @@ function extractErrorFiles(stderr: string): string[] {
     fileSet.add(match[1]);
   }
   return [...fileSet];
+}
+
+const CONFIG_ERROR_PATTERNS: {
+  pattern: RegExp;
+  configFiles: string[];
+}[] = [
+  {
+    pattern: /TS17004|TS1484|--jsx/,
+    configFiles: ["tsconfig.json", "tsconfig.node.json", "tsconfig.app.json"],
+  },
+  {
+    pattern: /TS5023|TS5024|TS6046/,
+    configFiles: ["tsconfig.json", "tsconfig.node.json"],
+  },
+  {
+    pattern: /TS2307.*Cannot find module/,
+    configFiles: ["package.json", "tsconfig.json"],
+  },
+];
+
+async function inferRelatedConfigFiles(
+  errors: string,
+  outputDir: string,
+  taskFiles: string[],
+): Promise<string[]> {
+  const candidates = new Set<string>();
+
+  for (const { pattern, configFiles } of CONFIG_ERROR_PATTERNS) {
+    if (pattern.test(errors)) {
+      for (const cf of configFiles) candidates.add(cf);
+    }
+  }
+
+  candidates.add("package.json");
+
+  const taskDirs = new Set(
+    taskFiles
+      .map((f) => f.split("/").slice(0, -1).join("/"))
+      .filter((d) => d.length > 0),
+  );
+
+  for (const dir of taskDirs) {
+    candidates.add(`${dir}/tsconfig.json`);
+    candidates.add(`${dir}/package.json`);
+    const parts = dir.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      const parent = parts.slice(0, i).join("/");
+      candidates.add(`${parent}/tsconfig.json`);
+      candidates.add(`${parent}/package.json`);
+    }
+  }
+
+  const found: string[] = [];
+  for (const candidate of candidates) {
+    const content = await fsRead(candidate, outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+      found.push(candidate);
+    }
+  }
+  return found;
+}
+
+function hasConfigErrors(errors: string): boolean {
+  return /TS17004|TS1484|TS5023|TS5024|TS6046|--jsx/.test(errors);
 }
 
 // ─── Build the subgraph ───

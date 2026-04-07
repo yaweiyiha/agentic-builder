@@ -13,7 +13,11 @@ import PrdReviewPanel, {
 } from "@/components/PrdReviewPanel";
 import GenerationPlanPanel, {
   type ParallelDocResult,
+  type ParallelGenLiveSnapshot,
 } from "@/components/GenerationPlanPanel";
+import PrdSpecWireframesSection, {
+  parsePrdStepMetadata,
+} from "@/components/PrdSpecWireframesSection";
 import Loading from "@/components/Loading";
 import type { PipelineStepId, StepResult } from "@/lib/pipeline/types";
 import type { ProjectTier } from "@/lib/agents/project-classifier";
@@ -105,6 +109,8 @@ export default function PipelinePage() {
     string,
     ParallelDocResult
   > | null>(null);
+  const [parallelGenLive, setParallelGenLive] =
+    useState<ParallelGenLiveSnapshot | null>(null);
   const [selectedParallelDocIds, setSelectedParallelDocIds] = useState<
     PipelineStepId[]
   >([]);
@@ -234,6 +240,7 @@ export default function PipelinePage() {
       setGenPhase("planning");
       setStartGenNonce(0);
       setParallelGenResults(null);
+      setParallelGenLive(null);
       const st = usePipelineStore.getState().steps;
       if (st.prd) {
         updateSteps({
@@ -251,6 +258,7 @@ export default function PipelinePage() {
     setPrdChatHistory([]);
     setStartGenNonce(0);
     setParallelGenResults(null);
+    setParallelGenLive(null);
     const brief =
       lastRunBriefRef.current.trim() || "PRD-driven code generation.";
     startPipeline(brief);
@@ -782,6 +790,12 @@ export default function PipelinePage() {
             const isActive = effectivePrepSub === sub.id;
             const subResult = steps[sub.id];
             const subStatus = subResult?.status;
+            const dotKind = resolvePrepSubTabDot(sub.id, {
+              steps,
+              parallelGenLive,
+              genPhase,
+              selectedParallelDocIds,
+            });
             return (
               <button
                 key={sub.id}
@@ -795,7 +809,7 @@ export default function PipelinePage() {
                       : "text-zinc-400 hover:text-zinc-600"
                 }`}
               >
-                <SubStepDot status={subStatus} />
+                <PrepSubTabIndicator kind={dotKind} />
                 {sub.label}
                 {isActive && (
                   <span className="absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-indigo-500" />
@@ -820,20 +834,46 @@ export default function PipelinePage() {
             classification={classification}
           />
         ) : showGenerationPlan ? (
-          <GenerationPlanPanel
-            tier={projectTier}
-            prdContent={confirmedPrd || prdResult?.content || ""}
-            sessionId={steps.intent?.timestamp ?? "session"}
-            selectedParallelDocIds={selectedParallelDocIds}
-            onToggleParallelDoc={handleToggleParallelDoc}
-            startGenerationNonce={startGenNonce}
-            onBusyChange={setParallelGenBusy}
-            onGenerationStreamFinished={handleParallelStreamFinished}
-            prdMetadata={
-              prdResult?.metadata as Record<string, unknown> | undefined
-            }
-            codeOutputDir={codeOutputDir}
-          />
+          <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-6">
+            {/* Always mounted to drive SSE + state syncing */}
+            <GenerationPlanPanel
+              tier={projectTier}
+              prdContent={confirmedPrd || prdResult?.content || ""}
+              sessionId={steps.intent?.timestamp ?? "session"}
+              selectedParallelDocIds={selectedParallelDocIds}
+              onToggleParallelDoc={handleToggleParallelDoc}
+              startGenerationNonce={startGenNonce}
+              onBusyChange={setParallelGenBusy}
+              onGenerationStreamFinished={handleParallelStreamFinished}
+              prdMetadata={
+                prdResult?.metadata as Record<string, unknown> | undefined
+              }
+              codeOutputDir={codeOutputDir}
+              showPlanTable={genPhase === "planning"}
+              showProgressList={false}
+              showPrdSpecSection={false}
+              onParallelStateChange={setParallelGenLive}
+            />
+            {/* After generation starts: show per-tab content, no plan table */}
+            {(genPhase === "generating" || genPhase === "awaiting_kickoff") && (
+              <>
+                {parallelGenLive &&
+                  (parallelGenLive.panelStatus === "generating" ||
+                    parallelGenLive.panelStatus === "completed") && (
+                    <ParallelGenSummaryStrip live={parallelGenLive} />
+                  )}
+                <ParallelGenerationTabBody
+                  stepId={effectivePrepSub}
+                  live={parallelGenLive}
+                  fallbackResults={parallelGenResults}
+                  confirmedPrd={confirmedPrd}
+                  prdResult={prdResult}
+                  steps={steps}
+                  selectedParallelDocIds={selectedParallelDocIds}
+                />
+              </>
+            )}
+          </div>
         ) : (
           <AnimatePresence mode="wait">
             <motion.div
@@ -975,28 +1015,6 @@ export default function PipelinePage() {
                       Start coding
                     </motion.button>
                   )}
-                </div>
-              )}
-
-              {showPrdReview && (
-                <div className="w-full max-w-[680px] rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3.5 shadow-md">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400">
-                    Action required
-                  </p>
-                  <p className="mt-1 text-base font-semibold text-white">
-                    Confirm or refine this PRD
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-zinc-300">
-                    Use{" "}
-                    <span className="font-semibold text-white">
-                      Approve &amp; continue
-                    </span>{" "}
-                    to proceed, or describe changes below.{" "}
-                    <span className="font-semibold text-white">
-                      Regenerate PRD
-                    </span>{" "}
-                    re-runs PRD from your brief.
-                  </p>
                 </div>
               )}
 
@@ -1184,6 +1202,7 @@ export default function PipelinePage() {
                   setPrdDraft("");
                   setStartGenNonce(0);
                   setParallelGenResults(null);
+                  setParallelGenLive(null);
                   setParallelGenBusy(false);
                 }}
                 disabled={isRunning}
@@ -1243,6 +1262,288 @@ export default function PipelinePage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Parallel generation: prep tab dot + tab bodies ─── */
+
+type PrepTabDotKind =
+  | "idle"
+  | "running"
+  | "completed"
+  | "failed"
+  | "generating";
+
+function resolvePrepSubTabDot(
+  stepId: PipelineStepId,
+  ctx: {
+    steps: Record<PipelineStepId, StepResult | null>;
+    parallelGenLive: ParallelGenLiveSnapshot | null;
+    genPhase: "idle" | "planning" | "generating" | "awaiting_kickoff" | "done";
+    selectedParallelDocIds: PipelineStepId[];
+  },
+): PrepTabDotKind {
+  const { steps, parallelGenLive, genPhase, selectedParallelDocIds } = ctx;
+  const r = steps[stepId];
+
+  if (
+    (genPhase === "generating" || genPhase === "awaiting_kickoff") &&
+    selectedParallelDocIds.includes(stepId)
+  ) {
+    const st = parallelGenLive?.docStatuses[stepId];
+    if (st === "generating") return "generating";
+    if (st === "completed") return "completed";
+    if (st === "error") return "failed";
+    if (st === "pending") return "idle";
+  }
+
+  if (r?.status === "running") return "running";
+  if (r?.status === "completed") return "completed";
+  if (r?.status === "failed") return "failed";
+  return "idle";
+}
+
+function PrepSubTabIndicator({ kind }: { kind: PrepTabDotKind }) {
+  if (kind === "generating") {
+    return (
+      <span
+        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center"
+        aria-hidden
+      >
+        <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-600" />
+      </span>
+    );
+  }
+  if (kind === "completed") {
+    return (
+      <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-emerald-500" />
+    );
+  }
+  if (kind === "running") {
+    return (
+      <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-zinc-900 animate-pulse" />
+    );
+  }
+  if (kind === "failed") {
+    return <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-red-500" />;
+  }
+  return <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-zinc-300" />;
+}
+
+function ParallelGenSummaryStrip({ live }: { live: ParallelGenLiveSnapshot }) {
+  const done = Object.values(live.docStatuses).filter((s) => s === "completed")
+    .length;
+  const total = Object.keys(live.docStatuses).length;
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200/90 bg-white px-4 py-3 text-[12px] text-zinc-600 shadow-sm">
+      <span className="font-semibold text-zinc-800">
+        {live.panelStatus === "generating"
+          ? "Generating documents"
+          : "Generation complete"}
+      </span>
+      {total > 0 && (
+        <span className="tabular-nums">
+          {done}/{total} documents
+        </span>
+      )}
+      {live.totalTokens > 0 && (
+        <span className="tabular-nums">
+          {live.totalTokens.toLocaleString()} tokens
+        </span>
+      )}
+      {live.totalCostUsd > 0 && (
+        <span className="tabular-nums text-emerald-700">
+          ${live.totalCostUsd.toFixed(4)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const PARALLEL_TAB_LABELS: Partial<Record<PipelineStepId, string>> = {
+  trd: "TRD",
+  sysdesign: "System Design",
+  implguide: "Implementation Guide",
+  design: "Design Spec",
+  pencil: "Pencil Design",
+  qa: "QA Test Cases",
+  verify: "Verification",
+};
+
+function ParallelGenerationTabBody({
+  stepId,
+  live,
+  fallbackResults,
+  confirmedPrd,
+  prdResult,
+  steps,
+  selectedParallelDocIds,
+}: {
+  stepId: PipelineStepId;
+  live: ParallelGenLiveSnapshot | null;
+  fallbackResults: Record<string, ParallelDocResult> | null;
+  confirmedPrd: string;
+  prdResult: StepResult | null;
+  steps: Record<PipelineStepId, StepResult | null>;
+  selectedParallelDocIds: PipelineStepId[];
+}) {
+  const resultFor = (id: PipelineStepId): ParallelDocResult | undefined =>
+    live?.docResults[id] ?? fallbackResults?.[id];
+
+  if (stepId === "intent") {
+    const r = steps.intent;
+    if (!r) {
+      return (
+        <p className="text-[13px] text-zinc-500">No intent result yet.</p>
+      );
+    }
+    if (r.status === "completed") {
+      return <CompletedStepContent result={r} />;
+    }
+    return <RunningState stepId="intent" />;
+  }
+
+  if (stepId === "prd") {
+    const { prdSpec } = parsePrdStepMetadata(prdResult?.metadata);
+    const md = confirmedPrd || prdResult?.content || "";
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-zinc-200/90 bg-white p-7 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.08)]">
+          <h2 className="text-[18px] font-semibold tracking-tight text-zinc-900">
+            PRD
+          </h2>
+          <div className="prose prose-sm prose-zinc mt-4 max-w-none">
+            <MarkdownRenderer content={md} />
+          </div>
+        </div>
+        <PrdSpecWireframesSection
+          prdSpec={prdSpec}
+          intro="Structured spec extracted from the PRD. Switch tabs to follow TRD, Design, and other parallel outputs."
+        />
+        {live?.panelStatus === "generating" && (
+          <p className="text-[12px] text-zinc-500">
+            Parallel documents are generating — follow progress on each tab.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (!selectedParallelDocIds.includes(stepId)) {
+    return (
+      <div className="rounded-2xl border border-zinc-200/90 bg-white p-7 text-[13px] text-zinc-500 shadow-sm">
+        {PARALLEL_TAB_LABELS[stepId] ?? stepId} was not included in this run.
+        Toggle it in the Generation Plan on the Intent tab before starting.
+      </div>
+    );
+  }
+
+  const label = PARALLEL_TAB_LABELS[stepId] ?? stepId;
+  const st = live?.docStatuses[stepId];
+  const res = resultFor(stepId);
+
+  if (st === "generating") {
+    return (
+      <div className="flex min-h-[220px] flex-col items-center justify-center gap-4">
+        <Loading
+          size="md"
+          text={
+            stepId === "pencil"
+              ? "Drawing Pencil design…"
+              : `Generating ${label}…`
+          }
+        />
+        {res?.progressLog && res.progressLog.length > 0 && (
+          <div className="max-h-36 w-full overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-[11px] leading-relaxed text-zinc-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
+            {res.progressLog.slice(-16).map((line, i) => (
+              <div key={`${i}-${line.slice(0, 24)}`}>{line}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (st === "pending" && live?.panelStatus === "generating") {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center">
+        <Loading size="md" text={`Waiting in queue · ${label}`} />
+      </div>
+    );
+  }
+
+  if (st === "error") {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50/80 p-6 text-[13px] text-red-800">
+        {res?.error ?? "Generation failed."}
+      </div>
+    );
+  }
+
+  if (st === "completed" && res?.content) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-zinc-200/90 bg-white p-7 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-wrap gap-4 text-[11px] text-zinc-500">
+            {res.tokens > 0 && (
+              <span className="tabular-nums">{res.tokens.toLocaleString()} tok</span>
+            )}
+            {res.costUsd !== undefined && res.costUsd > 0 && (
+              <span className="tabular-nums text-emerald-700">
+                ${res.costUsd.toFixed(4)}
+              </span>
+            )}
+            {res.durationMs !== undefined && res.durationMs > 0 && (
+              <span className="tabular-nums">
+                {(res.durationMs / 1000).toFixed(1)}s
+              </span>
+            )}
+          </div>
+          <div className="prose prose-sm prose-zinc mt-4 max-w-none">
+            <MarkdownRenderer content={res.content} />
+          </div>
+        </div>
+        {res.artifactUrls && res.artifactUrls.length > 0 && (
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-[12px] text-zinc-700">
+            <p className="font-semibold text-zinc-900">Artifacts</p>
+            <ul className="mt-2 list-inside list-disc space-y-1">
+              {res.artifactUrls.map((u) => (
+                <li key={u}>
+                  <a
+                    href={u}
+                    className="text-indigo-600 underline-offset-2 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {u}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (
+    st === "completed" &&
+    !res?.content &&
+    res?.progressLog?.length
+  ) {
+    return (
+      <div className="rounded-2xl border border-zinc-200/90 bg-white p-7">
+        <MarkdownRenderer
+          content={["# Output", "", ...(res.progressLog ?? [])].join("\n")}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-[200px] items-center justify-center">
+      <Loading size="md" text={`Loading ${label}…`} />
     </div>
   );
 }

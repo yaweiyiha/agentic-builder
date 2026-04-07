@@ -157,7 +157,14 @@ export async function openRouterChatCompletion(
     throw new Error(`OpenRouter API error: ${response.status} - ${detail}`);
   }
 
-  return response.json() as Promise<OpenRouterResponse>;
+  const raw = await response.text();
+  try {
+    return JSON.parse(raw) as OpenRouterResponse;
+  } catch {
+    throw new Error(
+      `OpenRouter returned non-JSON response (${raw.length} chars): ${raw.slice(0, 300)}`,
+    );
+  }
 }
 
 export async function openRouterStreamChatCompletion(

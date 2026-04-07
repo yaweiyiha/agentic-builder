@@ -198,11 +198,7 @@ export class PipelineEngine {
       run = this.applyStaticPrdStep(run, staticPrd);
     } else {
       run = await this.executeStep(run, "prd", () =>
-        pmAgent.generatePRD(
-          run.featureBrief,
-          undefined,
-          run.sessionId,
-        ),
+        pmAgent.generatePRD(run.featureBrief, undefined, run.sessionId),
       );
       if (run.status === "failed") return run;
     }
@@ -750,7 +746,9 @@ export class PipelineEngine {
    * LLM-based structured PRD extraction. Attaches `prdSpec` to `steps.prd.metadata`.
    * Non-blocking — errors are logged but never fail the pipeline.
    */
-  private async attachPrdStructuredSpec(run: PipelineRun): Promise<PipelineRun> {
+  private async attachPrdStructuredSpec(
+    run: PipelineRun,
+  ): Promise<PipelineRun> {
     const prd = run.steps.prd;
     if (!prd?.content || prd.status !== "completed") return run;
 
@@ -758,7 +756,10 @@ export class PipelineEngine {
     try {
       prdSpec = await extractPrdSpec(prd.content, run.sessionId);
     } catch (e) {
-      console.warn("[Pipeline] PrdSpec extraction failed:", e instanceof Error ? e.message : e);
+      console.warn(
+        "[Pipeline] PrdSpec extraction failed:",
+        e instanceof Error ? e.message : e,
+      );
     }
 
     if (!prdSpec) return run;

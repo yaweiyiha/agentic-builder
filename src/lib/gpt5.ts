@@ -161,7 +161,7 @@ export async function gpt5ChatCompletion(
     throw new Error(`GPT5 API error: ${response.status} - ${detail}`);
   }
 
-  const data = JSON.parse(raw) as {
+  let data: {
     id?: string;
     model?: string;
     choices?: {
@@ -179,6 +179,14 @@ export async function gpt5ChatCompletion(
       total_tokens?: number;
     };
   };
+
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `GPT5 API returned non-JSON response (${raw.length} chars): ${raw.slice(0, 300)}`,
+    );
+  }
 
   const choice = data.choices?.[0];
   const content = choice?.message?.content ?? "";

@@ -115,7 +115,9 @@ async function chatCompletionsOpenAICompatible(
   try {
     json = JSON.parse(raw) as typeof json;
   } catch {
-    throw new Error("Codegen API returned non-JSON response");
+    throw new Error(
+      `Codegen API returned non-JSON response (${raw.length} chars): ${raw.slice(0, 300)}`,
+    );
   }
 
   const content = json.choices?.[0]?.message?.content ?? "";

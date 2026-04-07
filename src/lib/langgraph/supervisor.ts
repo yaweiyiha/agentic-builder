@@ -39,9 +39,13 @@ function inferRole(task: KickoffWorkItem): CodingAgentRole {
   if (PHASE_TO_ROLE[task.phase]) return PHASE_TO_ROLE[task.phase];
   const lower = `${task.phase} ${task.title} ${task.description}`.toLowerCase();
   if (/test|spec|e2e|vitest|playwright|k6|coverage/.test(lower)) return "test";
-  if (/scaffold|infra|docker|helm|ci\/cd|deploy|config|schema|migrat/.test(lower))
+  if (
+    /scaffold|infra|docker|helm|ci\/cd|deploy|config|schema|migrat/.test(lower)
+  )
     return "architect";
-  if (/frontend|react|component|page|ui|css|tailwind|hook|store|vite/.test(lower))
+  if (
+    /frontend|react|component|page|ui|css|tailwind|hook|store|vite/.test(lower)
+  )
     return "frontend";
   return "backend";
 }
@@ -80,7 +84,9 @@ function classifyTasks(state: SupervisorState) {
 
   const frontendOnly = byRole.backend.length === 0;
   if (frontendOnly) {
-    console.log("[Supervisor] Detected frontend-only project (no backend tasks).");
+    console.log(
+      "[Supervisor] Detected frontend-only project (no backend tasks).",
+    );
   }
   console.log(
     `[Supervisor] Task classification: architect=${byRole.architect.length}, backend=${byRole.backend.length}, frontend=${byRole.frontend.length}, test=${byRole.test.length} (all parallel after scaffold)`,
@@ -110,7 +116,9 @@ async function runArchitectPhase(state: SupervisorState) {
     return {};
   }
 
-  console.log(`[Supervisor] Architect phase: starting ${state.architectTasks.length} tasks...`);
+  console.log(
+    `[Supervisor] Architect phase: starting ${state.architectTasks.length} tasks...`,
+  );
   const result = await workerGraph.invoke(
     {
       role: "architect" as CodingAgentRole,
@@ -133,7 +141,9 @@ async function runArchitectPhase(state: SupervisorState) {
     totalCostUsd: workerState.workerCostUsd,
   };
 
-  console.log(`[Supervisor] Architect phase done: ${workerState.taskResults.length} task results, ${workerState.generatedFiles.length} files.`);
+  console.log(
+    `[Supervisor] Architect phase done: ${workerState.taskResults.length} task results, ${workerState.generatedFiles.length} files.`,
+  );
 
   return {
     phaseResults: [phaseResult],
@@ -158,12 +168,20 @@ async function scaffoldVerify(state: SupervisorState) {
   );
 
   if (installResult.exitCode !== 0) {
-    const errorMsg = `npm install failed (exit ${installResult.exitCode}):\n${installResult.stderr || installResult.stdout}`.slice(0, 2000);
-    console.log(`[Supervisor] Scaffold verify: npm install FAILED.\n${errorMsg.slice(0, 300)}`);
+    const errorMsg =
+      `npm install failed (exit ${installResult.exitCode}):\n${installResult.stderr || installResult.stdout}`.slice(
+        0,
+        2000,
+      );
+    console.log(
+      `[Supervisor] Scaffold verify: npm install FAILED.\n${errorMsg.slice(0, 300)}`,
+    );
     return { scaffoldErrors: errorMsg };
   }
 
-  console.log("[Supervisor] Scaffold verify: npm install OK. Running npm run build...");
+  console.log(
+    "[Supervisor] Scaffold verify: npm install OK. Running npm run build...",
+  );
   const buildResult = await shellExec(
     "npm run build 2>&1 | tail -40",
     state.outputDir,
@@ -171,8 +189,14 @@ async function scaffoldVerify(state: SupervisorState) {
   );
 
   if (buildResult.exitCode !== 0) {
-    const errorMsg = `npm run build failed (exit ${buildResult.exitCode}):\n${buildResult.stderr || buildResult.stdout}`.slice(0, 2000);
-    console.log(`[Supervisor] Scaffold verify: build FAILED.\n${errorMsg.slice(0, 300)}`);
+    const errorMsg =
+      `npm run build failed (exit ${buildResult.exitCode}):\n${buildResult.stderr || buildResult.stdout}`.slice(
+        0,
+        2000,
+      );
+    console.log(
+      `[Supervisor] Scaffold verify: build FAILED.\n${errorMsg.slice(0, 300)}`,
+    );
     return { scaffoldErrors: errorMsg };
   }
 
@@ -183,7 +207,9 @@ async function scaffoldVerify(state: SupervisorState) {
 function shouldFixScaffoldOrContinue(state: SupervisorState): string {
   if (!state.scaffoldErrors) return "dispatch";
   if (state.scaffoldFixAttempts >= MAX_SCAFFOLD_FIX_ATTEMPTS) {
-    console.log(`[Supervisor] Scaffold fix: max attempts (${MAX_SCAFFOLD_FIX_ATTEMPTS}) reached, proceeding anyway.`);
+    console.log(
+      `[Supervisor] Scaffold fix: max attempts (${MAX_SCAFFOLD_FIX_ATTEMPTS}) reached, proceeding anyway.`,
+    );
     return "dispatch";
   }
   return "scaffold_fix";
@@ -203,7 +229,9 @@ function parseFileOutput(raw: string): Record<string, string> {
 
 async function scaffoldFix(state: SupervisorState) {
   const attempt = state.scaffoldFixAttempts + 1;
-  console.log(`[Supervisor] Scaffold fix: attempt ${attempt}/${MAX_SCAFFOLD_FIX_ATTEMPTS}...`);
+  console.log(
+    `[Supervisor] Scaffold fix: attempt ${attempt}/${MAX_SCAFFOLD_FIX_ATTEMPTS}...`,
+  );
 
   const errorFiles = extractBuildErrorFiles(state.scaffoldErrors);
   const fileContents: string[] = [];
@@ -214,7 +242,14 @@ async function scaffoldFix(state: SupervisorState) {
     }
   }
 
-  const configFiles = ["package.json", "vite.config.ts", "tsconfig.json", "index.html", "next.config.mjs", "next.config.ts"];
+  const configFiles = [
+    "package.json",
+    "vite.config.ts",
+    "tsconfig.json",
+    "index.html",
+    "next.config.mjs",
+    "next.config.ts",
+  ];
   for (const cf of configFiles) {
     if (errorFiles.includes(cf)) continue;
     const content = await fsRead(cf, state.outputDir);
@@ -242,7 +277,9 @@ Rules:
         state.scaffoldErrors,
         "```",
         "",
-        fileContents.length > 0 ? `## Current Files\n${fileContents.join("\n\n")}` : "",
+        fileContents.length > 0
+          ? `## Current Files\n${fileContents.join("\n\n")}`
+          : "",
         "",
         "Fix all errors so npm install && npm run build passes. Output corrected files.",
       ].join("\n"),
@@ -269,7 +306,9 @@ Rules:
     });
   }
 
-  console.log(`[Supervisor] Scaffold fix: wrote ${fixedFiles.length} files (cost: $${costUsd.toFixed(4)})`);
+  console.log(
+    `[Supervisor] Scaffold fix: wrote ${fixedFiles.length} files (cost: $${costUsd.toFixed(4)})`,
+  );
 
   return {
     scaffoldFixAttempts: attempt,
@@ -317,30 +356,41 @@ Each element has this shape:
 
 async function generateApiContracts(state: SupervisorState) {
   if (state.backendTasks.length === 0) {
-    console.log("[Supervisor] generateApiContracts: no backend tasks, skipping.");
+    console.log(
+      "[Supervisor] generateApiContracts: no backend tasks, skipping.",
+    );
     return {};
   }
 
-  console.log("[Supervisor] generateApiContracts: generating API contract from PRD + scaffold...");
+  console.log(
+    "[Supervisor] generateApiContracts: generating API contract from PRD + scaffold...",
+  );
 
   const contextParts: string[] = [];
 
   if (state.projectContext) {
-    contextParts.push(`## Project Context (PRD / TRD)\n${state.projectContext.slice(0, 8000)}`);
+    contextParts.push(
+      `## Project Context (PRD / TRD)\n${state.projectContext.slice(0, 8000)}`,
+    );
   }
 
   const typeFiles = state.fileRegistry
-    .filter((f) =>
-      f.role === "architect" &&
-      (f.path.includes("type") || f.path.includes("model") || f.path.includes("schema")) &&
-      /\.(ts|tsx)$/.test(f.path),
+    .filter(
+      (f) =>
+        f.role === "architect" &&
+        (f.path.includes("type") ||
+          f.path.includes("model") ||
+          f.path.includes("schema")) &&
+        /\.(ts|tsx)$/.test(f.path),
     )
     .slice(0, 5);
 
   for (const tf of typeFiles) {
     const content = await fsRead(tf.path, state.outputDir);
     if (!content.startsWith("FILE_NOT_FOUND")) {
-      contextParts.push(`## Type definitions: ${tf.path}\n\`\`\`typescript\n${content.slice(0, 2000)}\n\`\`\``);
+      contextParts.push(
+        `## Type definitions: ${tf.path}\n\`\`\`typescript\n${content.slice(0, 2000)}\n\`\`\``,
+      );
     }
   }
 
@@ -392,7 +442,9 @@ async function generateApiContracts(state: SupervisorState) {
       parsed = JSON.parse(cleaned);
       if (!Array.isArray(parsed)) parsed = [];
     } catch {
-      console.warn("[Supervisor] generateApiContracts: failed to parse LLM output as JSON, skipping.");
+      console.warn(
+        "[Supervisor] generateApiContracts: failed to parse LLM output as JSON, skipping.",
+      );
       return { totalCostUsd: costUsd };
     }
 
@@ -410,7 +462,10 @@ async function generateApiContracts(state: SupervisorState) {
     }));
 
     const contractJson = JSON.stringify(
-      parsed.map((item, i) => ({ ...item, id: `API-${String(i + 1).padStart(3, "0")}` })),
+      parsed.map((item, i) => ({
+        ...item,
+        id: `API-${String(i + 1).padStart(3, "0")}`,
+      })),
       null,
       2,
     );
@@ -426,7 +481,9 @@ async function generateApiContracts(state: SupervisorState) {
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`[Supervisor] generateApiContracts: error — ${msg}. Continuing without contracts.`);
+    console.warn(
+      `[Supervisor] generateApiContracts: error — ${msg}. Continuing without contracts.`,
+    );
     return {};
   }
 }
@@ -517,17 +574,18 @@ function dispatchFrontendWorkers(state: SupervisorState): Send[] {
     ? `${state.projectContext}\n\n---\n\n${state.frontendDesignContext}`
     : state.projectContext;
 
-  return feChunks.map((tasks, i) =>
-    new Send("fe_worker", {
-      role: "frontend" as CodingAgentRole,
-      workerLabel: feCount > 1 ? `Frontend Dev #${i + 1}` : "Frontend Dev",
-      tasks,
-      outputDir: state.outputDir,
-      projectContext: feContext,
-      fileRegistrySnapshot: state.fileRegistry,
-      apiContractsSnapshot: state.apiContracts,
-      currentTaskIndex: 0,
-    }),
+  return feChunks.map(
+    (tasks, i) =>
+      new Send("fe_worker", {
+        role: "frontend" as CodingAgentRole,
+        workerLabel: feCount > 1 ? `Frontend Dev #${i + 1}` : "Frontend Dev",
+        tasks,
+        outputDir: state.outputDir,
+        projectContext: feContext,
+        fileRegistrySnapshot: state.fileRegistry,
+        apiContractsSnapshot: state.apiContracts,
+        currentTaskIndex: 0,
+      }),
   );
 }
 
@@ -551,7 +609,9 @@ async function extractRealContracts(state: SupervisorState) {
     return {};
   }
 
-  console.log(`[Supervisor] extractRealContracts: scanning ${beFiles.length} BE file(s)...`);
+  console.log(
+    `[Supervisor] extractRealContracts: scanning ${beFiles.length} BE file(s)...`,
+  );
 
   const newContracts: ApiContract[] = [];
 
@@ -669,11 +729,15 @@ async function parallelWorkerNode(
   input: WorkerState,
 ): Promise<Partial<SupervisorState>> {
   if (input.tasks.length === 0) {
-    console.log(`[Supervisor] Parallel worker ${input.workerLabel}: no tasks, skipping.`);
+    console.log(
+      `[Supervisor] Parallel worker ${input.workerLabel}: no tasks, skipping.`,
+    );
     return {};
   }
 
-  console.log(`[Supervisor] Parallel worker ${input.workerLabel}: starting ${input.tasks.length} tasks...`);
+  console.log(
+    `[Supervisor] Parallel worker ${input.workerLabel}: starting ${input.tasks.length} tasks...`,
+  );
   const result = await workerGraph.invoke(input, { recursionLimit: 150 });
   const workerState = result as WorkerState;
 
@@ -684,7 +748,9 @@ async function parallelWorkerNode(
     totalCostUsd: workerState.workerCostUsd,
   };
 
-  console.log(`[Supervisor] Parallel worker ${input.workerLabel} done: ${workerState.taskResults.length} results.`);
+  console.log(
+    `[Supervisor] Parallel worker ${input.workerLabel} done: ${workerState.taskResults.length} results.`,
+  );
 
   return {
     phaseResults: [phaseResult],
@@ -696,12 +762,46 @@ async function parallelWorkerNode(
 // ─── Dependency sync: scan imports → install missing packages ───
 
 const NODE_BUILTINS = new Set([
-  "assert", "buffer", "child_process", "cluster", "console", "constants",
-  "crypto", "dgram", "dns", "domain", "events", "fs", "http", "http2",
-  "https", "inspector", "module", "net", "os", "path", "perf_hooks",
-  "process", "punycode", "querystring", "readline", "repl", "stream",
-  "string_decoder", "sys", "timers", "tls", "trace_events", "tty", "url",
-  "util", "v8", "vm", "wasi", "worker_threads", "zlib",
+  "assert",
+  "buffer",
+  "child_process",
+  "cluster",
+  "console",
+  "constants",
+  "crypto",
+  "dgram",
+  "dns",
+  "domain",
+  "events",
+  "fs",
+  "http",
+  "http2",
+  "https",
+  "inspector",
+  "module",
+  "net",
+  "os",
+  "path",
+  "perf_hooks",
+  "process",
+  "punycode",
+  "querystring",
+  "readline",
+  "repl",
+  "stream",
+  "string_decoder",
+  "sys",
+  "timers",
+  "tls",
+  "trace_events",
+  "tty",
+  "url",
+  "util",
+  "v8",
+  "vm",
+  "wasi",
+  "worker_threads",
+  "zlib",
 ]);
 
 function extractPackageName(specifier: string): string | null {
@@ -724,14 +824,15 @@ async function syncDeps(state: SupervisorState) {
   console.log("[Supervisor] syncDeps: scanning imports...");
 
   const files = await listFiles(".", state.outputDir);
-  const sourceFiles = files.filter((f) =>
-    /\.(tsx?|jsx?|mjs|cjs)$/.test(f) && !f.includes("node_modules"),
+  const sourceFiles = files.filter(
+    (f) => /\.(tsx?|jsx?|mjs|cjs)$/.test(f) && !f.includes("node_modules"),
   );
 
   const importedPkgs = new Set<string>();
   for (const file of sourceFiles) {
     const content = await fsRead(file, state.outputDir);
-    if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED")) continue;
+    if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED"))
+      continue;
 
     const patterns = [
       /(?:import|export)\s+.*?\s+from\s+["']([^"']+)["']/g,
@@ -787,15 +888,23 @@ async function syncDeps(state: SupervisorState) {
     return {};
   }
 
-  console.log(`[Supervisor] syncDeps: ${missing.length} missing → ${missing.join(", ")}`);
+  console.log(
+    `[Supervisor] syncDeps: ${missing.length} missing → ${missing.join(", ")}`,
+  );
 
   const installCmd = `npm install --save ${missing.join(" ")} 2>&1 | tail -10`;
-  const { stdout, stderr, exitCode } = await shellExec(installCmd, state.outputDir, {
-    timeout: 120_000,
-  });
+  const { stdout, stderr, exitCode } = await shellExec(
+    installCmd,
+    state.outputDir,
+    {
+      timeout: 120_000,
+    },
+  );
 
   if (exitCode === 0) {
-    console.log(`[Supervisor] syncDeps: installed ${missing.length} packages OK.`);
+    console.log(
+      `[Supervisor] syncDeps: installed ${missing.length} packages OK.`,
+    );
   } else {
     console.warn(
       `[Supervisor] syncDeps: npm install exited ${exitCode}. stderr: ${(stderr || stdout).slice(0, 300)}`,
@@ -878,17 +987,16 @@ export function createSupervisorGraph() {
     .addEdge(START, "classify_tasks")
     .addEdge("classify_tasks", "architect_phase")
     .addEdge("architect_phase", "scaffold_verify")
-    .addConditionalEdges(
-      "scaffold_verify",
-      shouldFixScaffoldOrContinue,
-      {
-        dispatch: "dispatch_gate",
-        scaffold_fix: "scaffold_fix",
-      },
-    )
+    .addConditionalEdges("scaffold_verify", shouldFixScaffoldOrContinue, {
+      dispatch: "dispatch_gate",
+      scaffold_fix: "scaffold_fix",
+    })
     .addEdge("scaffold_fix", "scaffold_verify")
     .addEdge("dispatch_gate", "generate_api_contracts")
-    .addConditionalEdges("generate_api_contracts", dispatchBackendAndTestWorkers)
+    .addConditionalEdges(
+      "generate_api_contracts",
+      dispatchBackendAndTestWorkers,
+    )
     .addEdge("be_worker", "extract_real_contracts")
     .addEdge("extract_real_contracts", "fe_dispatch_gate")
     .addConditionalEdges("fe_dispatch_gate", dispatchFrontendWorkers)
