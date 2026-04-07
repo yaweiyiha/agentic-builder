@@ -1,0 +1,92 @@
+[
+  {
+    "service": "health",
+    "endpoint": "/api/health",
+    "method": "GET",
+    "requestSchema": "none",
+    "responseSchema": "{ ok: boolean; service: string; }",
+    "auth": "none",
+    "description": "Check the health status of the service.",
+    "id": "API-001"
+  },
+  {
+    "service": "users",
+    "endpoint": "/api/users/register",
+    "method": "POST",
+    "requestSchema": "{ username: string; password: string; email: string; }",
+    "responseSchema": "{ userId: string; username: string; email: string; }",
+    "auth": "none",
+    "description": "Register a new user account.",
+    "id": "API-002"
+  },
+  {
+    "service": "users",
+    "endpoint": "/api/users/login",
+    "method": "POST",
+    "requestSchema": "{ username: string; password: string; }",
+    "responseSchema": "{ token: string; userId: string; username: string; }",
+    "auth": "none",
+    "description": "Authenticate a user and return a session token.",
+    "id": "API-003"
+  },
+  {
+    "service": "users",
+    "endpoint": "/api/users/:id",
+    "method": "GET",
+    "requestSchema": "none",
+    "responseSchema": "{ userId: string; username: string; email: string; settings: UserSettings; }",
+    "auth": "bearer",
+    "description": "Retrieve user profile and settings.",
+    "id": "API-004"
+  },
+  {
+    "service": "users",
+    "endpoint": "/api/users/:id/settings",
+    "method": "PUT",
+    "requestSchema": "{ workDuration: number; breakDuration: number; soundEnabled: boolean; }",
+    "responseSchema": "{ userId: string; settings: UserSettings; }",
+    "auth": "bearer",
+    "description": "Update user settings.",
+    "id": "API-005"
+  },
+  {
+    "service": "sessions",
+    "endpoint": "/api/sessions",
+    "method": "POST",
+    "requestSchema": "{ type: SessionType; startedAt: string; endedAt: string; }",
+    "responseSchema": "{ sessionId: string; type: SessionType; startedAt: string; endedAt: string; }",
+    "auth": "bearer",
+    "description": "Record a new session.",
+    "id": "API-006"
+  },
+  {
+    "service": "sessions",
+    "endpoint": "/api/sessions/:id",
+    "method": "GET",
+    "requestSchema": "none",
+    "responseSchema": "{ sessionId: string; type: SessionType; startedAt: string; endedAt: string; }",
+    "auth": "bearer",
+    "description": "Retrieve details of a specific session.",
+    "id": "API-007"
+  },
+  {
+    "service": "analytics",
+    "endpoint": "/api/analytics/summary",
+    "method": "GET",
+    "requestSchema": "none",
+    "responseSchema": "{ completedWorkSessions: number; completedBreakSessions: number; }",
+    "auth": "bearer",
+    "description": "Get a summary of completed work and break sessions.",
+    "id": "API-008"
+  },
+  {
+    "service": "analytics",
+    "endpoint": "/api/analytics/reports",
+    "method": "GET",
+    "requestSchema": "{ period: 'weekly' | 'monthly'; }",
+    "responseSchema": "{ period: string; data: Array<{ date: string; workSessions: number; breakSessions: number; }> }",
+    "auth": "bearer",
+    "description": "Generate productivity reports for a specified period.",
+    "id": "API-009"
+  }
+]

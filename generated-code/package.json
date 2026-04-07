@@ -20,6 +20,7 @@
     "@pomodoro/shared-types": "^0.1.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "react-router-dom": "^7.14.0"
+    "react-router-dom": "^7.14.0",
+    "vitest": "^4.1.3"
   }
 }
