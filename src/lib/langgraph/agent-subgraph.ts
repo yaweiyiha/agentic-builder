@@ -1,3 +1,4 @@
+import path from "path";
 import { StateGraph, START, END } from "@langchain/langgraph";
 import {
   WorkerStateAnnotation,
@@ -222,9 +223,47 @@ async function generateCode(state: WorkerState) {
 }
 
 async function verifyCode(state: WorkerState) {
-  // Verification is skipped during code generation to avoid slow tsc
-  // cycles on partial codebases. Integration verify runs at the end.
-  console.log(`[Worker:${state.workerLabel}] Verify skipped (deferred to integration phase)`);
+  const task = state.tasks[state.currentTaskIndex];
+
+  const taskFiles = state.generatedFiles
+    .filter((f) => f.role === state.role)
+    .map((f) => f.path)
+    .filter((p) => /\.(ts|tsx)$/.test(p));
+
+  if (taskFiles.length === 0) {
+    console.log(`[Worker:${state.workerLabel}] Verify: no TS files to check for "${task.title}"`);
+    return { verifyErrors: "", fixAttempts: state.fixAttempts };
+  }
+
+  console.log(`[Worker:${state.workerLabel}] Verify: running tsc on ${taskFiles.length} file(s) for "${task.title}"...`);
+
+  const result = await shellExec(
+    `npx tsc --noEmit --pretty false --skipLibCheck 2>&1`,
+    state.outputDir,
+    { timeout: 30_000 },
+  );
+
+  const rawOutput = (result.stderr || result.stdout || "").trim();
+
+  const relevantLines = rawOutput
+    .split("\n")
+    .filter((line) => {
+      if (!line.includes("error TS")) return false;
+      return taskFiles.some((f) => line.includes(f));
+    })
+    .slice(0, 50);
+
+  if (relevantLines.length > 0) {
+    const errors = relevantLines.join("\n");
+    const errorPreview = errors.slice(0, 200).replace(/\n/g, " | ");
+    console.log(`[Worker:${state.workerLabel}] Verify FAILED (attempt ${state.fixAttempts + 1}/${MAX_FIX_ATTEMPTS}): ${errorPreview}`);
+    return {
+      verifyErrors: errors.slice(0, 2000),
+      fixAttempts: state.fixAttempts,
+    };
+  }
+
+  console.log(`[Worker:${state.workerLabel}] Verify PASSED for "${task.title}"`);
   return { verifyErrors: "", fixAttempts: state.fixAttempts };
 }
 
@@ -293,6 +332,7 @@ async function fixErrors(state: WorkerState) {
     generatedFiles: updatedFiles,
     workerCostUsd: costUsd,
     verifyErrors: "",
+    fixAttempts: state.fixAttempts + 1,
   };
 }
 
@@ -300,7 +340,7 @@ function taskDone(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
   console.log(`[Worker:${state.workerLabel}] Task done: "${task.title}" (${state.currentTaskIndex + 1}/${state.tasks.length})`);
   const filesForTask = state.generatedFiles
-    .filter((f) => f.role === state.role)
+    .filter((f) => f.summary.includes(task.title) || f.summary.includes(task.id))
     .map((f) => f.path);
 
   const result: TaskResult = {

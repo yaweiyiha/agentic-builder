@@ -5,6 +5,7 @@ import {
   type WorkerState,
   type PhaseResult,
   type GeneratedFile,
+  type ApiContract,
 } from "./state";
 import { createWorkerSubGraph } from "./agent-subgraph";
 import { shellExec, fsWrite, fsRead, listFiles } from "./tools";
@@ -295,7 +296,301 @@ function extractBuildErrorFiles(errors: string): string[] {
   return [...fileSet];
 }
 
-// ─── Parallel dispatch ───
+// ─── API Contract generation ───
+
+const API_CONTRACT_SYSTEM_PROMPT = `You are a Senior API Architect.
+Your job is to produce a precise, machine-readable API contract based on the PRD and scaffolding.
+This contract will be used by BOTH the backend (to implement) and frontend (to consume).
+Everyone must follow this contract exactly.
+
+Output a JSON array only — no markdown, no explanation, no code fences.
+Each element has this shape:
+{
+  "service": "string (service or module name, e.g. auth, orders, users)",
+  "endpoint": "string (path with leading slash, e.g. /api/users/:id)",
+  "method": "GET|POST|PUT|PATCH|DELETE",
+  "requestSchema": "string (TypeScript type literal for request body/params, or 'none')",
+  "responseSchema": "string (TypeScript type literal for success response body)",
+  "auth": "none|bearer|session",
+  "description": "string (one sentence)"
+}`;
+
+async function generateApiContracts(state: SupervisorState) {
+  if (state.backendTasks.length === 0) {
+    console.log("[Supervisor] generateApiContracts: no backend tasks, skipping.");
+    return {};
+  }
+
+  console.log("[Supervisor] generateApiContracts: generating API contract from PRD + scaffold...");
+
+  const contextParts: string[] = [];
+
+  if (state.projectContext) {
+    contextParts.push(`## Project Context (PRD / TRD)\n${state.projectContext.slice(0, 8000)}`);
+  }
+
+  const typeFiles = state.fileRegistry
+    .filter((f) =>
+      f.role === "architect" &&
+      (f.path.includes("type") || f.path.includes("model") || f.path.includes("schema")) &&
+      /\.(ts|tsx)$/.test(f.path),
+    )
+    .slice(0, 5);
+
+  for (const tf of typeFiles) {
+    const content = await fsRead(tf.path, state.outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND")) {
+      contextParts.push(`## Type definitions: ${tf.path}\n\`\`\`typescript\n${content.slice(0, 2000)}\n\`\`\``);
+    }
+  }
+
+  const taskList = state.backendTasks
+    .map((t) => `- ${t.title}: ${t.description.slice(0, 200)}`)
+    .join("\n");
+  contextParts.push(`## Backend tasks to implement\n${taskList}`);
+
+  const model = resolveModel(MODEL_CONFIG.codeFix);
+  const messages: ChatMessage[] = [
+    { role: "system", content: API_CONTRACT_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: [
+        ...contextParts,
+        "",
+        "Generate the complete API contract for this project.",
+        "Output a JSON array only. No markdown fences, no explanation.",
+      ].join("\n\n"),
+    },
+  ];
+
+  try {
+    const response = await chatCompletion(messages, {
+      model,
+      temperature: 0.1,
+      max_tokens: 4096,
+    });
+
+    const raw = (response.choices[0]?.message?.content ?? "").trim();
+    const costUsd = estimateCost(response.model, response.usage);
+
+    let parsed: Array<{
+      service: string;
+      endpoint: string;
+      method: string;
+      requestSchema?: string;
+      responseSchema?: string;
+      auth?: string;
+      description?: string;
+    }> = [];
+
+    try {
+      const cleaned = raw
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/```\s*$/i, "")
+        .trim();
+      parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed)) parsed = [];
+    } catch {
+      console.warn("[Supervisor] generateApiContracts: failed to parse LLM output as JSON, skipping.");
+      return { totalCostUsd: costUsd };
+    }
+
+    const contracts: ApiContract[] = parsed.map((item) => ({
+      service: item.service ?? "unknown",
+      endpoint: item.endpoint ?? "/",
+      method: (item.method ?? "GET").toUpperCase(),
+      schema: [
+        item.requestSchema ? `request: ${item.requestSchema}` : "",
+        item.responseSchema ? `response: ${item.responseSchema}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
+      generatedBy: "api_contract_phase",
+    }));
+
+    const contractJson = JSON.stringify(
+      parsed.map((item, i) => ({ ...item, id: `API-${String(i + 1).padStart(3, "0")}` })),
+      null,
+      2,
+    );
+    await fsWrite("API_CONTRACTS.json", contractJson, state.outputDir);
+
+    console.log(
+      `[Supervisor] generateApiContracts: generated ${contracts.length} contracts, written to API_CONTRACTS.json (cost: $${costUsd.toFixed(4)})`,
+    );
+
+    return {
+      apiContracts: contracts,
+      totalCostUsd: costUsd,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[Supervisor] generateApiContracts: error — ${msg}. Continuing without contracts.`);
+    return {};
+  }
+}
+
+// ─── Phased dispatch (BE first, then FE) ───
+
+/**
+ * Phase 1 dispatch: only Backend and Test Workers.
+ * Frontend waits for BE to complete so it can see BE's real output.
+ */
+function dispatchBackendAndTestWorkers(state: SupervisorState): Send[] {
+  const sends: Send[] = [];
+
+  const beCount = workersForRole("backend", state.backendTasks.length);
+  const beChunks = chunkTasks(state.backendTasks, beCount);
+  beChunks.forEach((tasks, i) => {
+    sends.push(
+      new Send("be_worker", {
+        role: "backend" as CodingAgentRole,
+        workerLabel: beCount > 1 ? `Backend Dev #${i + 1}` : "Backend Dev",
+        tasks,
+        outputDir: state.outputDir,
+        projectContext: state.projectContext,
+        fileRegistrySnapshot: state.fileRegistry,
+        apiContractsSnapshot: state.apiContracts,
+        currentTaskIndex: 0,
+      }),
+    );
+  });
+
+  if (state.testTasks.length > 0) {
+    sends.push(
+      new Send("be_worker", {
+        role: "test" as CodingAgentRole,
+        workerLabel: "Test Engineer",
+        tasks: state.testTasks,
+        outputDir: state.outputDir,
+        projectContext: state.projectContext,
+        fileRegistrySnapshot: state.fileRegistry,
+        apiContractsSnapshot: state.apiContracts,
+        currentTaskIndex: 0,
+      }),
+    );
+  }
+
+  if (sends.length === 0) {
+    sends.push(
+      new Send("be_worker", {
+        role: "backend" as CodingAgentRole,
+        workerLabel: "No-op",
+        tasks: [],
+        outputDir: state.outputDir,
+        projectContext: "",
+        fileRegistrySnapshot: [],
+        apiContractsSnapshot: [],
+        currentTaskIndex: 0,
+      }),
+    );
+  }
+
+  return sends;
+}
+
+/**
+ * Phase 2 dispatch: Frontend Workers run after BE completes.
+ * fileRegistry now contains BE's real output; apiContracts contains real endpoints.
+ */
+function dispatchFrontendWorkers(state: SupervisorState): Send[] {
+  if (state.frontendTasks.length === 0) {
+    return [
+      new Send("fe_worker", {
+        role: "frontend" as CodingAgentRole,
+        workerLabel: "No-op",
+        tasks: [],
+        outputDir: state.outputDir,
+        projectContext: "",
+        fileRegistrySnapshot: [],
+        apiContractsSnapshot: [],
+        currentTaskIndex: 0,
+      }),
+    ];
+  }
+
+  const feCount = workersForRole("frontend", state.frontendTasks.length);
+  const feChunks = chunkTasks(state.frontendTasks, feCount);
+
+  const feContext = state.frontendDesignContext
+    ? `${state.projectContext}\n\n---\n\n${state.frontendDesignContext}`
+    : state.projectContext;
+
+  return feChunks.map((tasks, i) =>
+    new Send("fe_worker", {
+      role: "frontend" as CodingAgentRole,
+      workerLabel: feCount > 1 ? `Frontend Dev #${i + 1}` : "Frontend Dev",
+      tasks,
+      outputDir: state.outputDir,
+      projectContext: feContext,
+      fileRegistrySnapshot: state.fileRegistry,
+      apiContractsSnapshot: state.apiContracts,
+      currentTaskIndex: 0,
+    }),
+  );
+}
+
+/**
+ * After BE Workers complete, extract real routes from generated files
+ * to supplement/correct the api_contract_phase contracts.
+ */
+async function extractRealContracts(state: SupervisorState) {
+  const beFiles = state.fileRegistry.filter(
+    (f) =>
+      f.role === "backend" &&
+      (f.path.includes("route") ||
+        f.path.includes("controller") ||
+        f.path.includes("handler") ||
+        f.path.includes("api")) &&
+      /\.(ts|js)$/.test(f.path),
+  );
+
+  if (beFiles.length === 0) {
+    console.log("[Supervisor] extractRealContracts: no BE route files found.");
+    return {};
+  }
+
+  console.log(`[Supervisor] extractRealContracts: scanning ${beFiles.length} BE file(s)...`);
+
+  const newContracts: ApiContract[] = [];
+
+  for (const file of beFiles.slice(0, 8)) {
+    const content = await fsRead(file.path, state.outputDir);
+    if (content.startsWith("FILE_NOT_FOUND")) continue;
+
+    const routePattern =
+      /\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi;
+    let match;
+    while ((match = routePattern.exec(content)) !== null) {
+      const method = match[1].toUpperCase();
+      const endpoint = match[2];
+
+      const exists = newContracts.some(
+        (c) => c.method === method && c.endpoint === endpoint,
+      );
+      if (!exists) {
+        newContracts.push({
+          service: file.path.split("/").slice(-2, -1)[0] ?? "api",
+          endpoint: endpoint.startsWith("/") ? endpoint : `/${endpoint}`,
+          method,
+          schema: "extracted from source",
+          generatedBy: "extract_real_contracts",
+        });
+      }
+    }
+  }
+
+  if (newContracts.length > 0) {
+    console.log(
+      `[Supervisor] extractRealContracts: found ${newContracts.length} real route(s).`,
+    );
+  }
+
+  return { apiContracts: newContracts };
+}
+
+// ─── (legacy) Parallel dispatch — kept for reference, replaced by phased dispatch ───
 
 function dispatchParallelWorkers(state: SupervisorState): Send[] {
   const sends: Send[] = [];
@@ -562,13 +857,19 @@ function dispatchGate(_state: SupervisorState) {
 }
 
 export function createSupervisorGraph() {
+  const feDispatchGate = (_state: SupervisorState) => ({});
+
   const graph = new StateGraph(SupervisorStateAnnotation)
     .addNode("classify_tasks", classifyTasks)
     .addNode("architect_phase", runArchitectPhase)
     .addNode("scaffold_verify", scaffoldVerify)
     .addNode("scaffold_fix", scaffoldFix)
     .addNode("dispatch_gate", dispatchGate)
-    .addNode("parallel_worker", parallelWorkerNode)
+    .addNode("generate_api_contracts", generateApiContracts)
+    .addNode("be_worker", parallelWorkerNode)
+    .addNode("extract_real_contracts", extractRealContracts)
+    .addNode("fe_dispatch_gate", feDispatchGate)
+    .addNode("fe_worker", parallelWorkerNode)
     .addNode("sync_deps", syncDeps)
     .addNode("integration_verify", integrationVerify)
     .addNode("integration_fix", integrationFix)
@@ -586,8 +887,12 @@ export function createSupervisorGraph() {
       },
     )
     .addEdge("scaffold_fix", "scaffold_verify")
-    .addConditionalEdges("dispatch_gate", dispatchParallelWorkers)
-    .addEdge("parallel_worker", "sync_deps")
+    .addEdge("dispatch_gate", "generate_api_contracts")
+    .addConditionalEdges("generate_api_contracts", dispatchBackendAndTestWorkers)
+    .addEdge("be_worker", "extract_real_contracts")
+    .addEdge("extract_real_contracts", "fe_dispatch_gate")
+    .addConditionalEdges("fe_dispatch_gate", dispatchFrontendWorkers)
+    .addEdge("fe_worker", "sync_deps")
     .addEdge("sync_deps", "integration_verify")
     .addConditionalEdges(
       "integration_verify",

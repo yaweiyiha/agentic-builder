@@ -623,7 +623,38 @@ export class PipelineEngine {
           prdExcerpt: prdBody,
         });
 
-      const gitBlock = "";
+      const prdIndexForTasks =
+        (run.steps.prd?.metadata?.prdRequirementIndex as
+          | PrdRequirementIndex
+          | undefined) ?? extractPrdRequirementIndex(prdBody);
+      const taskCoverageGate = runTaskCoverageGate(
+        prdIndexForTasks,
+        taskBreakdown,
+      );
+
+      let coverageWarningBlock = "";
+      if (!taskCoverageGate.passed && taskCoverageGate.missingIds.length > 0) {
+        const missingList = taskCoverageGate.missingIds
+          .slice(0, 10)
+          .map((id) => `- \`${id}\``)
+          .join("\n");
+        const moreCount =
+          taskCoverageGate.missingIds.length > 10
+            ? `\n- ...and ${taskCoverageGate.missingIds.length - 10} more`
+            : "";
+        coverageWarningBlock = [
+          "",
+          "### Coverage Gate Warning",
+          "",
+          `**${taskCoverageGate.missingIds.length}** PRD requirement(s) not referenced by any task:`,
+          "",
+          missingList + moreCount,
+          "",
+          "These requirements may not be implemented. Consider adding tasks that reference these IDs,",
+          "or verify the task breakdown covers them implicitly.",
+        ].join("\n");
+      }
+
       const tbSummary =
         taskBreakdown.length > 0
           ? `Task breakdown generated: **${taskBreakdown.length}** coding tasks (see sub-tab).`
@@ -642,18 +673,10 @@ export class PipelineEngine {
           ? `#### Path warnings\n\n${errors.map((e) => `- ${e}`).join("\n")}`
           : "",
         integrationMd,
+        coverageWarningBlock,
       ]
         .filter(Boolean)
         .join("\n\n");
-
-      const prdIndexForTasks =
-        (run.steps.prd?.metadata?.prdRequirementIndex as
-          | PrdRequirementIndex
-          | undefined) ?? extractPrdRequirementIndex(prdBody);
-      const taskCoverageGate = runTaskCoverageGate(
-        prdIndexForTasks,
-        taskBreakdown,
-      );
 
       const stepResult = this.buildStepResult("kickoff", "completed", {
         content: summary,

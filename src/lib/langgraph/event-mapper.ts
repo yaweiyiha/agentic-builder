@@ -38,6 +38,8 @@ export class EventMapper {
   private taskIdToAgentId = new Map<string, string>();
   private roleToAgentIds = new Map<string, string[]>();
   private nsRoleMap = new Map<string, string>();
+  private namespaceAgentMap = new Map<string, string>();
+  private agentCurrentTaskId = new Map<string, string>();
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -60,14 +62,38 @@ export class EventMapper {
       } else if (nodeName === "scaffold_fix") {
         events.push(...this.handleScaffoldFix(u));
       } else if (nodeName === "dispatch_gate") {
-        events.push(...this.emitPhaseWorkingStatus(["backend", "frontend"]));
+        events.push(...this.emitPhaseWorkingStatus(["backend"]));
+      } else if (nodeName === "generate_api_contracts") {
+        const architectIds = this.roleToAgentIds.get("architect");
+        const agentId = architectIds?.[0];
+        if (agentId) {
+          events.push({
+            type: "agent_log" as CodingSessionEvent["type"],
+            sessionId: this.sessionId,
+            agentId,
+            data: { message: "API contract generated. Starting backend development..." },
+          });
+        }
       } else if (nodeName === "test_phase") {
         events.push(...this.handleSinglePhaseComplete(u));
       } else if (nodeName === "parallel_worker") {
         events.push(...this.handleParallelWorkerComplete(u, namespace));
+      } else if (nodeName === "be_worker") {
+        events.push(...this.handleParallelWorkerComplete(u, namespace));
+        events.push(...this.emitPhaseWorkingStatus(["frontend"]));
+      } else if (nodeName === "fe_worker") {
+        events.push(...this.handleParallelWorkerComplete(u, namespace));
         events.push(...this.emitPhaseWorkingStatus(["test"]));
+      } else if (nodeName === "extract_real_contracts") {
+        // silent — no UI event needed
+      } else if (nodeName === "fe_dispatch_gate") {
+        events.push(...this.emitPhaseWorkingStatus(["frontend"]));
       } else if (nodeName === "generate_code") {
         events.push(...this.handleGenerateCode(u, namespace));
+      } else if (nodeName === "verify") {
+        events.push(...this.handleVerify(u, namespace));
+      } else if (nodeName === "fix_errors") {
+        events.push(...this.handleFixErrors(u, namespace));
       } else if (nodeName === "task_done") {
         events.push(...this.handleTaskDone(u, namespace));
       } else if (nodeName === "integration_verify") {
@@ -131,6 +157,37 @@ export class EventMapper {
     return events;
   }
 
+  private detectRoleFromNamespace(namespace: string[]): string | null {
+    const joined = namespace.join(",");
+    if (joined.includes("architect_phase")) return "architect";
+    if (joined.includes("backend_phase")) return "backend";
+    if (joined.includes("frontend_phase")) return "frontend";
+    if (joined.includes("test_phase")) return "test";
+    return null;
+  }
+
+  private resolveAgentIdForNamespace(namespace: string[]): string | null {
+    const nsKey = namespace.join(",");
+    const existing = this.namespaceAgentMap.get(nsKey);
+    if (existing) return existing;
+
+    const role = this.detectRoleFromNamespace(namespace);
+    if (!role) return null;
+
+    const candidateIds = this.roleToAgentIds.get(role) ?? [];
+    if (candidateIds.length === 0) return null;
+
+    const assignedForRole = new Set(
+      [...this.namespaceAgentMap.values()].filter((id) =>
+        candidateIds.includes(id),
+      ),
+    );
+    const resolved =
+      candidateIds.find((id) => !assignedForRole.has(id)) ?? candidateIds[0];
+    this.namespaceAgentMap.set(nsKey, resolved);
+    return resolved;
+  }
+
   /**
    * Pre-create agents with labels that exactly match supervisor's dispatch,
    * and build precise taskId → agentId mappings.
@@ -185,6 +242,9 @@ export class EventMapper {
     const architectIds = this.roleToAgentIds.get("architect");
     if (architectIds && architectIds.length > 0) {
       const firstArchTask = (u["architectTasks"] as Array<{ id: string; title: string }> | undefined)?.[0];
+      if (firstArchTask?.id) {
+        this.agentCurrentTaskId.set(architectIds[0], firstArchTask.id);
+      }
       events.push({
         type: "agent_task_start" as CodingSessionEvent["type"],
         sessionId: this.sessionId,
@@ -225,6 +285,7 @@ export class EventMapper {
 
         if (!this.emittedTaskStarts.has(tr.taskId)) {
           this.emittedTaskStarts.add(tr.taskId);
+          this.agentCurrentTaskId.set(agentId, tr.taskId);
           events.push({
             type: "agent_task_start" as CodingSessionEvent["type"],
             sessionId: this.sessionId,
@@ -236,6 +297,7 @@ export class EventMapper {
 
         if (!this.emittedTaskCompletes.has(tr.taskId)) {
           this.emittedTaskCompletes.add(tr.taskId);
+          this.agentCurrentTaskId.delete(agentId);
           events.push({
             type: "agent_task_complete",
             sessionId: this.sessionId,
@@ -248,6 +310,7 @@ export class EventMapper {
               verifyPassed: tr.verifyPassed,
               fixCycles: tr.fixCycles,
               status: tr.status,
+              verifyErrors: tr.warnings?.[0],
             },
           });
         }
@@ -280,12 +343,156 @@ export class EventMapper {
     u: Record<string, unknown>,
     namespace: string[],
   ): CodingSessionEvent[] {
+    const events: CodingSessionEvent[] = [];
     const nsKey = namespace.join(",");
     const files = u.generatedFiles as GeneratedFile[] | undefined;
     if (files?.[0]?.role && !this.nsRoleMap.has(nsKey)) {
       this.nsRoleMap.set(nsKey, files[0].role);
     }
-    return [];
+    const agentId = this.resolveAgentIdForNamespace(namespace);
+    const taskId = agentId ? this.agentCurrentTaskId.get(agentId) : undefined;
+    const tsFileCount =
+      files?.filter((file) => /\.(ts|tsx)$/.test(file.path)).length ?? 0;
+
+    if (!agentId || !taskId || tsFileCount === 0) return events;
+
+    events.push({
+      type: "agent_task_progress",
+      sessionId: this.sessionId,
+      agentId,
+      taskId,
+      data: {
+        stage: "verifying",
+        tsFileCount,
+      },
+    });
+    events.push({
+      type: "agent_log",
+      sessionId: this.sessionId,
+      agentId,
+      taskId,
+      data: {
+        logType: "task_verify",
+        message: `Verify started · ${tsFileCount} TS files`,
+      },
+    });
+
+    return events;
+  }
+
+  private handleVerify(
+    u: Record<string, unknown>,
+    namespace: string[],
+  ): CodingSessionEvent[] {
+    const agentId = this.resolveAgentIdForNamespace(namespace);
+    const taskId = agentId ? this.agentCurrentTaskId.get(agentId) : undefined;
+    if (!agentId || !taskId) return [];
+
+    const verifyErrors =
+      typeof u.verifyErrors === "string" ? u.verifyErrors.trim() : "";
+    const fixAttempts =
+      typeof u.fixAttempts === "number" ? u.fixAttempts : 0;
+
+    if (verifyErrors) {
+      const attempt = fixAttempts + 1;
+      return [
+        {
+          type: "agent_task_progress",
+          sessionId: this.sessionId,
+          agentId,
+          taskId,
+          data: {
+            stage: "fixing",
+            fixAttempt: attempt,
+            verifyErrors: verifyErrors.slice(0, 2000),
+            errorPreview: verifyErrors.slice(0, 200),
+          },
+        },
+        {
+          type: "agent_log",
+          sessionId: this.sessionId,
+          agentId,
+          taskId,
+          data: {
+            logType: "task_verify",
+            message: `Verify FAILED · attempt ${attempt}/3`,
+            details: verifyErrors.slice(0, 2000),
+          },
+        },
+      ];
+    }
+
+    return [
+      {
+        type: "agent_task_progress",
+        sessionId: this.sessionId,
+        agentId,
+        taskId,
+        data: {
+          stage: "verifying",
+          verifyPassed: true,
+        },
+      },
+      {
+        type: "agent_log",
+        sessionId: this.sessionId,
+        agentId,
+        taskId,
+        data: {
+          logType: "task_verify",
+          message: "Verify passed.",
+        },
+      },
+    ];
+  }
+
+  private handleFixErrors(
+    u: Record<string, unknown>,
+    namespace: string[],
+  ): CodingSessionEvent[] {
+    const agentId = this.resolveAgentIdForNamespace(namespace);
+    const taskId = agentId ? this.agentCurrentTaskId.get(agentId) : undefined;
+    if (!agentId || !taskId) return [];
+
+    const fixAttempt =
+      typeof u.fixAttempts === "number" ? u.fixAttempts : undefined;
+    const generatedFiles = (u.generatedFiles as GeneratedFile[] | undefined) ?? [];
+    const details = generatedFiles.length
+      ? generatedFiles.map((file) => `Updated: ${file.path}`).join("\n")
+      : undefined;
+
+    return [
+      {
+        type: "agent_task_progress",
+        sessionId: this.sessionId,
+        agentId,
+        taskId,
+        data: {
+          stage: "fixing",
+          fixAttempt,
+        },
+      },
+      {
+        type: "agent_log",
+        sessionId: this.sessionId,
+        agentId,
+        taskId,
+        data: {
+          logType: "task_fix",
+          message: "Fix applied · regenerating affected files",
+          details,
+        },
+      },
+      {
+        type: "agent_log",
+        sessionId: this.sessionId,
+        agentId,
+        taskId,
+        data: {
+          message: "Re-running verify...",
+        },
+      },
+    ];
   }
 
   /**
@@ -306,6 +513,7 @@ export class EventMapper {
     const { taskId } = completedResult;
     const agentId = this.taskIdToAgentId.get(taskId);
     if (!agentId) return events;
+    this.namespaceAgentMap.set(namespace.join(","), agentId);
 
     if (this.completedAgents.has(agentId)) return events;
 
@@ -324,6 +532,7 @@ export class EventMapper {
 
     if (!this.emittedTaskCompletes.has(taskId)) {
       this.emittedTaskCompletes.add(taskId);
+      this.agentCurrentTaskId.delete(agentId);
       events.push({
         type: "agent_task_complete",
         sessionId: this.sessionId,
@@ -336,6 +545,7 @@ export class EventMapper {
           verifyPassed: completedResult.verifyPassed,
           fixCycles: completedResult.fixCycles,
           status: completedResult.status,
+          verifyErrors: completedResult.warnings?.[0],
         },
       });
     }
@@ -350,6 +560,7 @@ export class EventMapper {
         const nextTitle = this.taskMap.get(nextTaskId)?.title ?? nextTaskId;
         if (!this.emittedTaskStarts.has(nextTaskId)) {
           this.emittedTaskStarts.add(nextTaskId);
+          this.agentCurrentTaskId.set(agentId, nextTaskId);
           events.push({
             type: "agent_task_start",
             sessionId: this.sessionId,

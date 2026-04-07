@@ -214,7 +214,7 @@ export default function CodingAgentGraph() {
       if (roleAgents.length === 0) return null;
 
       const roleTasks = tasks.filter((task) => resolveTaskRole(task, agentById) === role);
-      const doneCount = roleTasks.filter((task) => task.codingStatus === "completed").length;
+      const doneCount = roleTasks.filter((task) => isCompletedTask(task)).length;
       const failedCount = roleTasks.filter((task) => task.codingStatus === "failed").length;
       const hasWorking = roleAgents.some((agent) => agent.status === "working");
       const hasFailed = roleAgents.some((agent) => agent.status === "failed") || failedCount > 0;
@@ -279,9 +279,23 @@ export default function CodingAgentGraph() {
       ? `${selectedGroup.label} · All workers`
       : null;
 
-  const completedTasks = tasks.filter((task) => task.codingStatus === "completed").length;
+  const completedTasks = tasks.filter((task) => isCompletedTask(task)).length;
   const failedTasks = tasks.filter((task) => task.codingStatus === "failed").length;
+  const verifyingTasks = tasks.filter(
+    (task) =>
+      task.codingStatus === "in_progress" && task.progressStage === "verifying",
+  ).length;
+  const fixingTasks = tasks.filter(
+    (task) =>
+      task.codingStatus === "in_progress" && task.progressStage === "fixing",
+  ).length;
   const totalTasks = tasks.length;
+  const latestDetailedLog = [...visibleLogs]
+    .reverse()
+    .find((entry) => !!entry.details);
+  const latestDetailedLogContent = latestDetailedLog?.details
+    ? splitLogDetails(latestDetailedLog.details)
+    : null;
 
   if (status === "idle") {
     return (
@@ -392,7 +406,7 @@ export default function CodingAgentGraph() {
                         const isAgentSelected = selectedAgent?.id === agent.id;
                         const agentTasks = tasks.filter((task) => task.assignedAgentId === agent.id);
                         const doneCount = agentTasks.filter(
-                          (task) => task.codingStatus === "completed",
+                          (task) => isCompletedTask(task),
                         ).length;
 
                         return (
@@ -479,6 +493,13 @@ export default function CodingAgentGraph() {
                 <span className="h-[5px] w-[5px] rounded-full bg-emerald-500" />
                 {completedTasks}/{totalTasks} completed
               </span>
+              {(verifyingTasks > 0 || fixingTasks > 0) && (
+                <span className="flex items-center gap-1 rounded-[10px] bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] text-amber-700">
+                  <span className="h-[5px] w-[5px] rounded-full bg-amber-500" />
+                  {verifyingTasks} verifying · {fixingTasks} fix loop
+                  {fixingTasks === 1 ? "" : "s"}
+                </span>
+              )}
               {failedTasks > 0 && (
                 <span className="rounded-[10px] bg-red-50 px-2.5 py-0.5 font-mono text-[11px] text-red-500">
                   {failedTasks} failed
@@ -508,7 +529,8 @@ export default function CodingAgentGraph() {
           ) : (
             visibleTasks.map((task) => {
               const isRunning = task.codingStatus === "in_progress";
-              const isDone = task.codingStatus === "completed";
+              const isDone = isCompletedTask(task);
+              const isWarning = task.codingStatus === "completed_with_warnings";
               const isFailed = task.codingStatus === "failed";
               const agent = task.assignedAgentId ? agentById.get(task.assignedAgentId) ?? null : null;
               const role = resolveTaskRole(task, agentById);
@@ -538,7 +560,13 @@ export default function CodingAgentGraph() {
                         : "bg-zinc-50 hover:bg-zinc-100/70"
                     }`}
                   >
-                    {isDone ? (
+                    {isWarning ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-amber-500">
+                        <path d="M12 9v4" />
+                        <path d="M12 17h.01" />
+                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      </svg>
+                    ) : isDone ? (
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="flex-shrink-0 text-emerald-500">
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                         <polyline points="22 4 12 14.01 9 11.01" />
@@ -578,12 +606,10 @@ export default function CodingAgentGraph() {
                           </motion.span>
                         )}
                       </div>
-                      <p className={`font-mono text-[10px] ${isRunning ? "text-zinc-500" : "text-zinc-400"}`}>
-                        {agent?.label ?? meta.label}
-                        {hasSubSteps ? ` · ${taskSubStepDone}/${taskSubStepTotal} steps` : ""}
-                        {isDone && task.generatedFiles ? ` · ${task.generatedFiles.length} files` : ""}
-                        {isRunning && !hasSubSteps ? " · Generating..." : ""}
-                        {isFailed ? ` · ${task.error ?? "Error"}` : ""}
+                      <p
+                        className={`font-mono text-[10px] ${taskMetaColorClass(task)}`}
+                      >
+                        {formatTaskMeta(task, agent?.label ?? meta.label, hasSubSteps ? `${taskSubStepDone}/${taskSubStepTotal} steps` : undefined)}
                       </p>
 
                       {/* Per-task progress bar */}
@@ -600,16 +626,20 @@ export default function CodingAgentGraph() {
 
                     <span
                       className={`shrink-0 font-mono text-[10px] ${
-                        isDone
+                        isWarning
+                          ? "text-amber-600"
+                          : isDone
                           ? "text-emerald-600"
                           : isRunning
-                            ? "font-semibold text-zinc-900"
+                            ? task.progressStage === "fixing"
+                              ? "font-semibold text-amber-700"
+                              : "font-semibold text-zinc-900"
                             : isFailed
                               ? "text-red-500"
                               : "text-zinc-400"
                       }`}
                     >
-                      {isDone ? "Done" : isRunning ? "Running" : isFailed ? "Failed" : "Pending"}
+                      {formatTaskStatus(task)}
                     </span>
                   </button>
 
@@ -642,13 +672,25 @@ export default function CodingAgentGraph() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.12 }}
-              className="flex max-h-[240px] min-h-[140px] flex-col gap-2 overflow-y-auto rounded-lg bg-zinc-50 p-3.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-200 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5"
+              className="flex min-h-[220px] flex-1 flex-col gap-2 overflow-y-auto rounded-lg bg-zinc-50 p-3.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-200 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5"
             >
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-zinc-500">Agent Output</p>
+                <p className="text-xs font-semibold text-zinc-500">Agent Log</p>
                 <p className="font-mono text-[11px] text-zinc-900">{logPanelLabel}</p>
               </div>
               <div className="h-px bg-zinc-200" />
+              {latestDetailedLogContent && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                  <p className="text-[11px] font-semibold text-red-800">
+                    {latestDetailedLogContent.title}
+                  </p>
+                  {latestDetailedLogContent.body && (
+                    <p className="mt-1 font-mono text-[10px] leading-5 text-red-900">
+                      {latestDetailedLogContent.body}
+                    </p>
+                  )}
+                </div>
+              )}
               {visibleLogs.length === 0 ? (
                 <p className="font-mono text-[11px] text-zinc-400">No activity yet.</p>
               ) : (
@@ -703,25 +745,107 @@ function formatWorkerStatus(
   return `${doneCount}/${totalTasks} done`;
 }
 
+function isCompletedTask(task: CodingTask): boolean {
+  return (
+    task.codingStatus === "completed" ||
+    task.codingStatus === "completed_with_warnings"
+  );
+}
+
+function countTaskTsFiles(task: CodingTask): number {
+  return (task.generatedFiles ?? []).filter((file) => /\.(ts|tsx)$/.test(file))
+    .length;
+}
+
+function formatTaskMeta(
+  task: CodingTask,
+  agentLabel: string,
+  subStepSummary?: string,
+): string {
+  if (task.codingStatus === "failed") {
+    return `${agentLabel} · ${task.error ?? "Error"}`;
+  }
+
+  if (task.codingStatus === "in_progress") {
+    const tsFileCount = countTaskTsFiles(task);
+    if (task.progressStage === "fixing") {
+      return `${agentLabel} · verify failed · attempt ${task.fixAttempts ?? 1}/3 · ${tsFileCount} TS files`;
+    }
+    if (task.progressStage === "verifying") {
+      return `${agentLabel} · verifying${tsFileCount > 0 ? ` · ${tsFileCount} TS files` : ""}`;
+    }
+    return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""} · Generating...`;
+  }
+
+  if (task.codingStatus === "completed_with_warnings") {
+    return `${agentLabel} · completed with warnings${task.fixAttempts ? ` · ${task.fixAttempts} fix attempt${task.fixAttempts === 1 ? "" : "s"}` : ""}`;
+  }
+
+  if (task.codingStatus === "completed") {
+    return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""}${task.generatedFiles ? ` · ${task.generatedFiles.length} files` : ""}`;
+  }
+
+  return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""} · Queued`;
+}
+
+function formatTaskStatus(task: CodingTask): string {
+  if (task.codingStatus === "completed_with_warnings") return "Warning";
+  if (task.codingStatus === "completed") return "Done";
+  if (task.codingStatus === "failed") return "Failed";
+  if (task.progressStage === "fixing") return "Fixing";
+  if (task.progressStage === "verifying") return "Verifying";
+  if (task.codingStatus === "in_progress") return "Running";
+  return "Pending";
+}
+
+function taskMetaColorClass(task: CodingTask): string {
+  if (task.codingStatus === "failed") return "text-red-500";
+  if (task.codingStatus === "completed_with_warnings") return "text-amber-600";
+  if (task.progressStage === "fixing") return "text-amber-700";
+  if (task.progressStage === "verifying") return "text-zinc-500";
+  if (task.codingStatus === "in_progress") return "text-zinc-500";
+  return "text-zinc-400";
+}
+
+function splitLogDetails(details: string): { title: string; body: string } {
+  const lines = details
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return {
+    title: lines[0] ?? details,
+    body: lines.slice(1).join("\n"),
+  };
+}
+
 function LogLine({ entry }: { entry: DisplayLogEntry }) {
   const time = new Date(entry.timestamp).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
-  const color: Record<string, string> = {
-    info: "text-zinc-400",
-    task_start: "text-zinc-400",
-    task_progress: "text-zinc-500",
-    task_complete: "text-zinc-500",
-    task_error: "text-red-500",
-  };
+  const color =
+    entry.type === "task_error"
+      ? "text-red-500"
+      : entry.type === "task_fix"
+        ? "text-zinc-800"
+        : entry.type === "task_verify"
+          ? entry.message.includes("FAILED")
+            ? "text-red-600"
+            : entry.message.includes("passed")
+              ? "text-emerald-600"
+              : "text-zinc-500"
+          : entry.type === "task_complete"
+            ? "text-zinc-500"
+            : entry.type === "task_progress"
+              ? "text-zinc-500"
+              : "text-zinc-400";
 
   return (
     <p className="font-mono text-[11px]">
       <span className="text-zinc-400">[{time}]</span>{" "}
       {entry.agentLabel && <span className="text-zinc-500">[{entry.agentLabel}] </span>}
-      <span className={color[entry.type] ?? "text-zinc-400"}>{entry.message}</span>
+      <span className={color}>{entry.message}</span>
     </p>
   );
 }

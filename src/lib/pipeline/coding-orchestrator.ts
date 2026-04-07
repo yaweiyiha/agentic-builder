@@ -9,6 +9,9 @@ import type {
   CodingAgentRole,
   CodingTask,
   KickoffWorkItem,
+  AgentLogType,
+  FileRegistryEntry,
+  AgentWorkingMemory,
 } from "./types";
 
 type EventHandler = (event: CodingSessionEvent) => void;
@@ -166,6 +169,8 @@ export class CodingOrchestrator {
   private projectContext: string;
   private session!: CodingSession;
   private agentInstances: Map<string, CodeGenAgent> = new Map();
+  private fileRegistry: FileRegistryEntry[] = [];
+  private agentWorkingMemory = new Map<string, AgentWorkingMemory>();
 
   constructor(
     outputDir: string,
@@ -250,6 +255,7 @@ export class CodingOrchestrator {
       totalCostUsd: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      fileRegistry: [],
     };
 
     this.emit({
@@ -288,7 +294,9 @@ export class CodingOrchestrator {
           status: "completed",
           totalCostUsd: this.session.totalCostUsd,
           completedTasks: codingTasks.filter(
-            (t) => t.codingStatus === "completed",
+            (t) =>
+              t.codingStatus === "completed" ||
+              t.codingStatus === "completed_with_warnings",
           ).length,
           failedTasks: codingTasks.filter((t) => t.codingStatus === "failed")
             .length,
@@ -385,37 +393,89 @@ export class CodingOrchestrator {
         continue;
       }
 
+      const getContext = () =>
+        agent.role === "architect"
+          ? this.projectContext
+          : this.buildEnrichedContext(agent.role, agent.id);
+
       try {
         const result = await llmAgent.executeTask(
           task.title,
           task.description,
           task.files ?? [],
-          this.projectContext,
+          getContext(),
           this.session.id,
         );
 
         const generatedFiles = CodeGenAgent.parseFileOutput(result.content);
         const fileKeys = Object.keys(generatedFiles);
 
-        // Write files to disk
         for (const [filePath, content] of Object.entries(generatedFiles)) {
           const abs = path.join(this.outputDir, filePath);
           await fs.mkdir(path.dirname(abs), { recursive: true });
           await fs.writeFile(abs, content, "utf-8");
         }
 
-        task.codingStatus = "completed";
-        task.completedAt = new Date().toISOString();
         task.output = result.content;
         task.generatedFiles = fileKeys;
-        agent.completedTaskIds.push(task.id);
+        task.fixAttempts = 0;
         agent.totalCostUsd += result.costUsd;
         this.session.totalCostUsd += result.costUsd;
+
+        const MAX_FIX_ATTEMPTS = 3;
+        let verifyErrors = await this.verifyTaskOutput(task);
+
+        while (verifyErrors && task.fixAttempts! < MAX_FIX_ATTEMPTS) {
+          task.fixAttempts = (task.fixAttempts ?? 0) + 1;
+          task.verifyErrors = verifyErrors;
+
+          this.addLog(
+            agent,
+            "task_verify",
+            `tsc errors (attempt ${task.fixAttempts}/${MAX_FIX_ATTEMPTS}): ${verifyErrors.slice(0, 200)}`,
+            task.id,
+          );
+          this.emit({
+            type: "agent_task_progress",
+            sessionId: this.session.id,
+            agentId: agent.id,
+            taskId: task.id,
+            data: {
+              stage: "fixing",
+              fixAttempt: task.fixAttempts,
+              errorPreview: verifyErrors.slice(0, 200),
+            },
+          });
+
+          await this.fixTaskErrors(task, verifyErrors, llmAgent, agent);
+
+          this.addLog(
+            agent,
+            "task_fix",
+            `Fix applied (attempt ${task.fixAttempts}), re-verifying...`,
+            task.id,
+          );
+
+          verifyErrors = await this.verifyTaskOutput(task);
+        }
+
+        const hasRemainingErrors = !!verifyErrors;
+        task.codingStatus = hasRemainingErrors
+          ? "completed_with_warnings"
+          : "completed";
+        task.completedAt = new Date().toISOString();
+        if (hasRemainingErrors) {
+          task.verifyErrors = verifyErrors;
+        }
+
+        this.updateMemoryAfterTask(agent, task, task.generatedFiles ?? []);
+        agent.completedTaskIds.push(task.id);
 
         this.addLog(
           agent,
           "task_complete",
-          `Completed: ${task.title} (${fileKeys.length} files, $${result.costUsd.toFixed(4)})`,
+          `${hasRemainingErrors ? "Completed with warnings" : "Completed"}: ${task.title} ` +
+            `(${fileKeys.length} files, ${task.fixAttempts ?? 0} fix attempts, $${result.costUsd.toFixed(4)})`,
           task.id,
         );
         this.emit({
@@ -427,6 +487,11 @@ export class CodingOrchestrator {
             filesGenerated: fileKeys,
             costUsd: result.costUsd,
             durationMs: result.durationMs,
+            fixAttempts: task.fixAttempts ?? 0,
+            completedWithWarnings: hasRemainingErrors,
+            verifyErrors: hasRemainingErrors
+              ? verifyErrors?.slice(0, 500)
+              : undefined,
           },
         });
       } catch (e) {
@@ -488,7 +553,9 @@ export class CodingOrchestrator {
         const dep = this.session.tasks.find((t) => t.id === depId);
         if (!dep) return true;
         return (
-          dep.codingStatus === "completed" || dep.codingStatus === "failed"
+          dep.codingStatus === "completed" ||
+          dep.codingStatus === "completed_with_warnings" ||
+          dep.codingStatus === "failed"
         );
       });
       if (allDone) return;
@@ -502,9 +569,186 @@ export class CodingOrchestrator {
     }
   }
 
+  /**
+   * Build an enriched projectContext for non-architect agents.
+   * Appends the shared file registry (upstream outputs) and this agent's own working memory.
+   */
+  private buildEnrichedContext(
+    role: CodingAgentRole,
+    agentId: string,
+  ): string {
+    const parts: string[] = [this.projectContext];
+
+    const memory = this.agentWorkingMemory.get(agentId);
+    if (memory && memory.completedTaskSummaries.length > 0) {
+      parts.push(
+        "\n\n## Your completed tasks in this session",
+        memory.completedTaskSummaries
+          .map(
+            (s) =>
+              `- **${s.taskTitle}**: ${s.summary} (files: ${s.filesGenerated.join(", ")})`,
+          )
+          .join("\n"),
+      );
+    }
+
+    const otherFilesEntries = this.fileRegistry.filter(
+      (e) => e.role !== role,
+    );
+    if (otherFilesEntries.length > 0) {
+      parts.push(
+        "\n\n## Files already generated by upstream agents",
+        "Use these as reference — do not regenerate them.",
+        otherFilesEntries
+          .map((e) => {
+            const exportsNote =
+              e.exports.length > 0
+                ? ` | exports: ${e.exports.slice(0, 5).join(", ")}`
+                : "";
+            return `- \`${e.path}\` (${e.role}): ${e.summary}${exportsNote}`;
+          })
+          .join("\n"),
+      );
+    }
+
+    const full = parts.join("\n");
+    if (full.length <= 12000) return full;
+
+    const base = parts[0];
+    const rest = parts.slice(1).join("\n");
+    const allowed = 12000 - base.length - 100;
+    if (allowed <= 0) return base;
+    return base + "\n\n" + rest.slice(0, allowed) + "\n...(truncated)";
+  }
+
+  /**
+   * After a task completes, register its generated files in the shared registry
+   * and update the agent's working memory for subsequent tasks.
+   */
+  private updateMemoryAfterTask(
+    agent: CodingAgentInstance,
+    task: CodingTask,
+    generatedFiles: string[],
+  ): void {
+    for (const filePath of generatedFiles) {
+      if (this.fileRegistry.some((e) => e.path === filePath)) continue;
+
+      this.fileRegistry.push({
+        path: filePath,
+        role: agent.role,
+        summary: task.title,
+        exports: [],
+      });
+    }
+
+    this.session.fileRegistry = [...this.fileRegistry];
+
+    const memory = this.agentWorkingMemory.get(agent.id) ?? {
+      completedTaskSummaries: [],
+    };
+    memory.completedTaskSummaries.push({
+      taskId: task.id,
+      taskTitle: task.title,
+      filesGenerated: generatedFiles,
+      summary: `Generated ${generatedFiles.length} file(s)`,
+    });
+    if (memory.completedTaskSummaries.length > 8) {
+      memory.completedTaskSummaries = memory.completedTaskSummaries.slice(-8);
+    }
+    this.agentWorkingMemory.set(agent.id, memory);
+  }
+
+  private async verifyTaskOutput(task: CodingTask): Promise<string> {
+    const files = task.generatedFiles;
+    if (!files || files.length === 0) return "";
+
+    const tsFiles = files.filter((f) => /\.(ts|tsx)$/.test(f));
+    if (tsFiles.length === 0) return "";
+
+    try {
+      const { execFile } = await import("child_process");
+      const { promisify } = await import("util");
+      const execFileAsync = promisify(execFile);
+
+      const { stderr } = await execFileAsync(
+        "npx",
+        [
+          "tsc",
+          "--noEmit",
+          "--pretty",
+          "false",
+          ...tsFiles.map((f) => path.join(this.outputDir, f)),
+        ],
+        {
+          cwd: this.outputDir,
+          maxBuffer: 1024 * 1024,
+          timeout: 30000,
+        },
+      );
+
+      return stderr?.trim() ?? "";
+    } catch (e: unknown) {
+      const err = e as { stderr?: string; stdout?: string };
+      const errorOutput = (err.stderr ?? err.stdout ?? "").trim();
+      if (!errorOutput) return "";
+      if (errorOutput.includes("error TS")) {
+        return errorOutput.slice(0, 3000);
+      }
+      return "";
+    }
+  }
+
+  private async fixTaskErrors(
+    task: CodingTask,
+    errors: string,
+    llmAgent: CodeGenAgent,
+    agent: CodingAgentInstance,
+  ): Promise<void> {
+    const baseContext =
+      agent.role === "architect"
+        ? this.projectContext
+        : this.buildEnrichedContext(agent.role, agent.id);
+    const fixContext = [
+      baseContext,
+      "",
+      "## Previously generated files (need fixing)",
+      ...(task.generatedFiles ?? []).map((f) => `- ${f}`),
+      "",
+      "## TypeScript compilation errors to fix",
+      errors,
+      "",
+      "Fix ONLY the errors above. Output the corrected files using ```file:<path> format.",
+      "Do not rewrite files that have no errors.",
+    ].join("\n");
+
+    const fixTitle = `Fix TypeScript errors in: ${task.title}`;
+    const fixDescription = `Fix the following TypeScript errors:\n\n${errors}`;
+
+    const result = await llmAgent.executeTask(
+      fixTitle,
+      fixDescription,
+      task.generatedFiles ?? [],
+      fixContext,
+      this.session.id,
+    );
+
+    const fixedFiles = CodeGenAgent.parseFileOutput(result.content);
+
+    for (const [filePath, content] of Object.entries(fixedFiles)) {
+      const abs = path.join(this.outputDir, filePath);
+      try {
+        await fs.writeFile(abs, content, "utf-8");
+      } catch {
+        // ignore write errors during fix
+      }
+    }
+
+    this.session.totalCostUsd += result.costUsd;
+  }
+
   private addLog(
     agent: CodingAgentInstance,
-    type: "info" | "task_start" | "task_progress" | "task_complete" | "task_error",
+    type: AgentLogType,
     message: string,
     taskId?: string,
   ) {

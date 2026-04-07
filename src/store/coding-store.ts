@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type {
+  AgentLogEntry,
   CodingAgentInstance,
   CodingTask,
   KickoffWorkItem,
@@ -213,6 +214,10 @@ function handleCodingEvent(
           ...t,
           assignedAgentId: payload.agentId ?? t.assignedAgentId,
           codingStatus: "in_progress" as const,
+          progressStage: "generating" as const,
+          fixAttempts: 0,
+          verifyErrors: undefined,
+          errorPreview: undefined,
         };
       });
     } else {
@@ -230,6 +235,8 @@ function handleCodingEvent(
           priority: "P1" as const,
           assignedAgentId: payload.agentId ?? null,
           codingStatus: "in_progress" as const,
+          progressStage: "generating" as const,
+          fixAttempts: 0,
         },
       ];
     }
@@ -237,10 +244,37 @@ function handleCodingEvent(
     return;
   }
 
+  if (type === "agent_task_progress") {
+    const taskId = payload.taskId;
+    if (!taskId) return;
+
+    const stage = payload.data?.stage as CodingTask["progressStage"] | undefined;
+    const fixAttempt = payload.data?.fixAttempt as number | undefined;
+    const verifyErrors = payload.data?.verifyErrors as string | undefined;
+    const errorPreview = payload.data?.errorPreview as string | undefined;
+
+    const tasks = get().tasks.map((t) => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        progressStage: stage ?? t.progressStage,
+        fixAttempts: fixAttempt ?? t.fixAttempts,
+        verifyErrors: verifyErrors ?? t.verifyErrors,
+        errorPreview: errorPreview ?? t.errorPreview,
+      };
+    });
+
+    set({ tasks });
+    return;
+  }
+
   if (type === "agent_task_complete") {
     const agents = get().agents.map((a) => {
       if (a.id !== payload.agentId) return a;
       const costUsd = (payload.data?.costUsd as number) ?? 0;
+      const completedStatus =
+        (payload.data?.status as CodingTask["codingStatus"] | undefined) ??
+        "completed";
       return {
         ...a,
         currentTaskId: null,
@@ -252,7 +286,14 @@ function handleCodingEvent(
             timestamp: new Date().toISOString(),
             type: "task_complete" as const,
             taskId: payload.taskId,
-            message: `Completed (${((payload.data?.filesGenerated as string[]) ?? []).length} files, $${costUsd.toFixed(4)})`,
+            details:
+              typeof payload.data?.verifyErrors === "string"
+                ? (payload.data.verifyErrors as string)
+                : undefined,
+            message:
+              completedStatus === "completed_with_warnings"
+                ? `Completed with warnings (${((payload.data?.filesGenerated as string[]) ?? []).length} files, $${costUsd.toFixed(4)})`
+                : `Completed (${((payload.data?.filesGenerated as string[]) ?? []).length} files, $${costUsd.toFixed(4)})`,
           },
         ],
       };
@@ -267,8 +308,19 @@ function handleCodingEvent(
         return {
           ...t,
           assignedAgentId: payload.agentId ?? t.assignedAgentId,
-          codingStatus: "completed" as const,
+          codingStatus:
+            (payload.data?.status as CodingTask["codingStatus"] | undefined) ??
+            ("completed" as const),
           generatedFiles: filesGenerated,
+          progressStage: undefined,
+          fixAttempts:
+            (payload.data?.fixCycles as number | undefined) ?? t.fixAttempts,
+          verifyErrors:
+            (payload.data?.verifyErrors as string | undefined) ??
+            t.verifyErrors,
+          errorPreview:
+            (payload.data?.verifyErrors as string | undefined)?.slice(0, 200) ??
+            t.errorPreview,
         };
       });
     } else {
@@ -285,8 +337,16 @@ function handleCodingEvent(
           dependencies: [],
           priority: "P1" as const,
           assignedAgentId: payload.agentId ?? null,
-          codingStatus: "completed" as const,
+          codingStatus:
+            (payload.data?.status as CodingTask["codingStatus"] | undefined) ??
+            ("completed" as const),
           generatedFiles: filesGenerated,
+          fixAttempts: payload.data?.fixCycles as number | undefined,
+          verifyErrors: payload.data?.verifyErrors as string | undefined,
+          errorPreview: (payload.data?.verifyErrors as string | undefined)?.slice(
+            0,
+            200,
+          ),
         },
       ];
     }
@@ -309,6 +369,7 @@ function handleCodingEvent(
             timestamp: new Date().toISOString(),
             type: "task_error" as const,
             taskId: payload.taskId,
+            details: payload.data?.error as string | undefined,
             message: `Failed: ${payload.data?.error}`,
           },
         ],
@@ -320,6 +381,7 @@ function handleCodingEvent(
         ...t,
         codingStatus: "failed" as const,
         error: payload.data?.error as string,
+        progressStage: undefined,
       };
     });
     set({ agents, tasks });
@@ -335,8 +397,12 @@ function handleCodingEvent(
           ...a.logs,
           {
             timestamp: new Date().toISOString(),
-            type: "info" as const,
+            type:
+              ((payload.data?.logType as AgentLogEntry["type"] | undefined) ??
+                "info") as AgentLogEntry["type"],
+            taskId: payload.taskId,
             message: (payload.data?.message as string) ?? "",
+            details: payload.data?.details as string | undefined,
           },
         ],
       };
