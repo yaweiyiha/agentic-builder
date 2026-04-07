@@ -897,7 +897,9 @@ export default function PipelinePage() {
                           stiffness: 420,
                           damping: 28,
                         }}
-                        disabled={isRunning || prdRefining || parallelGenBusy}
+                        disabled={
+                          isRunning || prdRefining || parallelGenBusy
+                        }
                         onClick={() => void processCommandBarInput("continue")}
                         className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -939,25 +941,28 @@ export default function PipelinePage() {
                       Generate documents
                     </motion.button>
                   )}
-                  {showGenerationPlan && genPhase === "awaiting_kickoff" && (
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 28,
-                      }}
-                      disabled={
-                        !parallelGenResults || parallelGenBusy || prdRefining
-                      }
-                      onClick={() => void processCommandBarInput("continue")}
-                      className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Run kick-off
-                    </motion.button>
-                  )}
+                  {showGenerationPlan &&
+                    genPhase === "awaiting_kickoff" && (
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 420,
+                          damping: 28,
+                        }}
+                        disabled={
+                          !parallelGenResults ||
+                          parallelGenBusy ||
+                          prdRefining
+                        }
+                        onClick={() => void processCommandBarInput("continue")}
+                        className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Run kick-off
+                      </motion.button>
+                    )}
                   {kickoffAwaitingCodingContinue && (
                     <motion.button
                       type="button"
