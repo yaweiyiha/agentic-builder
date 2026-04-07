@@ -126,7 +126,9 @@ export class PencilMcpClient {
         await this.client.connect(this.transport, {
           timeout: MCP_INIT_TIMEOUT_MS,
         });
-        console.log("[PencilMCP] Stdio connected, waiting for WebSocket stabilization...");
+        console.log(
+          "[PencilMCP] Stdio connected, waiting for WebSocket stabilization...",
+        );
         await sleep(WS_STABILIZE_MS);
         const toolsResult = await this.client.listTools();
         this.toolNameMap.clear();
@@ -197,12 +199,20 @@ export class PencilMcpClient {
     return this.extractText(result);
   }
 
-  openDocument(filePathOrNew: string) {
-    return this.callTool("open_document", { filePathOrNew });
+  openDocument(filePathOrTemplate: string) {
+    return this.callTool("open_document", { filePathOrTemplate });
   }
 
   getGuidelines(topic: string) {
     return this.callTool("get_guidelines", { topic });
+  }
+
+  getEditorState(include_schema = false) {
+    return this.callTool("get_editor_state", { include_schema });
+  }
+
+  getScreenshot(nodeId?: string) {
+    return this.callTool("get_screenshot", nodeId ? { nodeId } : {});
   }
 
   batchDesign(operations: string, filePath = "") {

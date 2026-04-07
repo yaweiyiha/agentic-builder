@@ -8,8 +8,11 @@ import {
   VerifierAgent,
 } from "@/lib/agents";
 import type { AgentResult } from "@/lib/agents";
-import { PencilDesignAgent } from "@/lib/agents/design/pencil-agent";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
+import {
+  runPencilLiveSession,
+  type PencilLiveEvent,
+} from "@/lib/pencil-host/live-runner";
 
 /** Pencil step: LLM (up to 16k tokens) + many batch_design chunks can exceed 5 minutes. */
 export const maxDuration = 600;
@@ -20,23 +23,28 @@ interface DocSpec {
   estimatedTokens: number;
 }
 
-type DocAgentFn = (prd: string, trd: string, sysDesign: string, designSpec: string, sessionId: string) => Promise<AgentResult>;
+type DocAgentFn = (
+  prd: string,
+  trd: string,
+  sysDesign: string,
+  designSpec: string,
+  sessionId: string,
+) => Promise<AgentResult>;
 
-function buildAgentMap(
-  codeOutputDir: string,
-  pencilAugmentMarkdown?: string,
-): Record<string, DocAgentFn> {
-  const outputRoot = resolveCodeOutputRoot(process.cwd(), codeOutputDir);
-  const augment = pencilAugmentMarkdown?.trim() || undefined;
+function buildAgentMap(): Record<string, DocAgentFn> {
   return {
-    trd: (prd, _trd, _sys, _ds, sid) => new TRDAgent().generateTRD(prd, undefined, sid),
-    sysdesign: (prd, trd, _sys, _ds, sid) => new SysDesignAgent().generateSysDesign(prd, trd, sid),
-    implguide: (prd, trd, sys, _ds, sid) => new ImplGuideAgent().generateImplGuide(prd, trd, sys, sid),
-    design: (prd, _trd, _sys, _ds, sid) => new DesignAgent().generateDesign(prd, undefined, sid),
-    pencil: (prd, _trd, _sys, ds, sid) =>
-      new PencilDesignAgent().generateDesign(prd, ds, outputRoot, sid, augment),
-    qa: (prd, _trd, _sys, _ds, sid) => new QAAgent().generateAudit(prd, "", sid),
-    verify: (prd, _trd, _sys, _ds, sid) => new VerifierAgent().verifyAlignment(prd, "", sid),
+    trd: (prd, _trd, _sys, _ds, sid) =>
+      new TRDAgent().generateTRD(prd, undefined, sid),
+    sysdesign: (prd, trd, _sys, _ds, sid) =>
+      new SysDesignAgent().generateSysDesign(prd, trd, sid),
+    implguide: (prd, trd, sys, _ds, sid) =>
+      new ImplGuideAgent().generateImplGuide(prd, trd, sys, sid),
+    design: (prd, _trd, _sys, _ds, sid) =>
+      new DesignAgent().generateDesign(prd, undefined, sid),
+    qa: (prd, _trd, _sys, _ds, sid) =>
+      new QAAgent().generateAudit(prd, "", sid),
+    verify: (prd, _trd, _sys, _ds, sid) =>
+      new VerifierAgent().verifyAlignment(prd, "", sid),
   };
 }
 
@@ -62,15 +70,20 @@ const DOC_LABELS: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { prdContent, selectedDocs, sessionId, codeOutputDir, pencilAugmentMarkdown } =
-    body as {
-      prdContent: string;
-      selectedDocs: string[];
-      sessionId: string;
-      codeOutputDir?: string;
-      /** Structured PRD excerpt from client (steps.prd.metadata). */
-      pencilAugmentMarkdown?: string;
-    };
+  const {
+    prdContent,
+    selectedDocs,
+    sessionId,
+    codeOutputDir,
+    pencilAugmentMarkdown,
+  } = body as {
+    prdContent: string;
+    selectedDocs: string[];
+    sessionId: string;
+    codeOutputDir?: string;
+    /** Structured PRD excerpt from client (steps.prd.metadata). */
+    pencilAugmentMarkdown?: string;
+  };
 
   if (!prdContent || !selectedDocs || selectedDocs.length === 0) {
     return Response.json(
@@ -79,15 +92,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const agentMap = buildAgentMap(codeOutputDir ?? "", pencilAugmentMarkdown);
+  const outputRoot = resolveCodeOutputRoot(process.cwd(), codeOutputDir);
+  const agentMap = buildAgentMap();
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       function send(data: unknown) {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
-        );
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       }
 
       send({
@@ -100,7 +112,10 @@ export async function POST(request: NextRequest) {
         })),
       });
 
-      const results: Record<string, { content: string; costUsd: number; durationMs: number; tokens: number }> = {};
+      const results: Record<
+        string,
+        { content: string; costUsd: number; durationMs: number; tokens: number }
+      > = {};
 
       const hasSysDesign = selectedDocs.includes("sysdesign");
       const hasImplGuide = selectedDocs.includes("implguide");
@@ -111,12 +126,36 @@ export async function POST(request: NextRequest) {
         (id) => id !== "sysdesign" && id !== "implguide" && id !== "pencil",
       );
 
-      async function runDoc(docId: string, trd: string, sys: string, ds: string) {
+      async function runDoc(
+        docId: string,
+        trd: string,
+        sys: string,
+        ds: string,
+      ) {
         send({ type: "doc_start", docId, label: DOC_LABELS[docId] ?? docId });
         try {
-          const agentFn = agentMap[docId];
-          if (!agentFn) throw new Error(`Unknown doc: ${docId}`);
-          const result = await agentFn(prdContent, trd, sys, ds, sessionId);
+          let result: AgentResult;
+          if (docId === "pencil") {
+            result = await runPencilLiveSession({
+              prdContent,
+              designSpec: ds,
+              projectRoot: outputRoot,
+              sessionId,
+              augmentMarkdown: pencilAugmentMarkdown,
+              onEvent: (event: PencilLiveEvent) => {
+                send({
+                  type: "doc_progress",
+                  docId,
+                  label: DOC_LABELS[docId] ?? docId,
+                  event,
+                });
+              },
+            });
+          } else {
+            const agentFn = agentMap[docId];
+            if (!agentFn) throw new Error(`Unknown doc: ${docId}`);
+            result = await agentFn(prdContent, trd, sys, ds, sessionId);
+          }
           results[docId] = {
             content: result.content,
             costUsd: result.costUsd,
@@ -133,8 +172,14 @@ export async function POST(request: NextRequest) {
             tokens: result.usage.totalTokens,
           });
         } catch (error) {
-          const msg = error instanceof Error ? error.message : "Generation failed";
-          send({ type: "doc_error", docId, label: DOC_LABELS[docId] ?? docId, error: msg });
+          const msg =
+            error instanceof Error ? error.message : "Generation failed";
+          send({
+            type: "doc_error",
+            docId,
+            label: DOC_LABELS[docId] ?? docId,
+            error: msg,
+          });
         }
       }
 
@@ -143,29 +188,47 @@ export async function POST(request: NextRequest) {
       // Phase B: sysdesign (depends on trd) + pencil (depends on design)
       const phaseBPromises: Promise<void>[] = [];
       if (hasSysDesign) {
-        phaseBPromises.push(runDoc("sysdesign", results.trd?.content ?? "", "", ""));
+        phaseBPromises.push(
+          runDoc("sysdesign", results.trd?.content ?? "", "", ""),
+        );
       }
       if (hasPencil) {
-        phaseBPromises.push(runDoc("pencil", "", "", results.design?.content ?? ""));
+        phaseBPromises.push(
+          runDoc("pencil", "", "", results.design?.content ?? ""),
+        );
       }
       if (phaseBPromises.length > 0) await Promise.all(phaseBPromises);
 
       // Phase C: implguide (depends on trd + sysdesign)
       if (hasImplGuide) {
-        await runDoc("implguide", results.trd?.content ?? "", results.sysdesign?.content ?? "", "");
+        await runDoc(
+          "implguide",
+          results.trd?.content ?? "",
+          results.sysdesign?.content ?? "",
+          "",
+        );
       }
 
-      const totalCost = Object.values(results).reduce((s, r) => s + r.costUsd, 0);
-      const totalTokens = Object.values(results).reduce((s, r) => s + r.tokens, 0);
+      const totalCost = Object.values(results).reduce(
+        (s, r) => s + r.costUsd,
+        0,
+      );
+      const totalTokens = Object.values(results).reduce(
+        (s, r) => s + r.tokens,
+        0,
+      );
 
       send({
         type: "generation_complete",
         results: Object.fromEntries(
-          Object.entries(results).map(([k, v]) => [k, {
-            costUsd: v.costUsd,
-            durationMs: v.durationMs,
-            tokens: v.tokens,
-          }]),
+          Object.entries(results).map(([k, v]) => [
+            k,
+            {
+              costUsd: v.costUsd,
+              durationMs: v.durationMs,
+              tokens: v.tokens,
+            },
+          ]),
         ),
         totalCostUsd: totalCost,
         totalTokens,

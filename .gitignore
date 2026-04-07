@@ -2,6 +2,7 @@
 /node_modules
 generated-code/node_modules/
 generated-code/dist/
+generated-code/public/design/*.png
 /.pnp
 .pnp.*
 .yarn/*

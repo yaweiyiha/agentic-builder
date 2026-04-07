@@ -29,6 +29,8 @@ export interface ParallelDocResult {
   durationMs: number;
   tokens: number;
   error?: string;
+  progressLog?: string[];
+  artifactUrls?: string[];
 }
 
 type GenerationStatus = "planning" | "generating" | "completed";
@@ -105,6 +107,8 @@ export default function GenerationPlanPanel({
           costUsd: payload.costUsd as number,
           durationMs: payload.durationMs as number,
           tokens: payload.tokens as number,
+          progressLog: docResultsRef.current[docId]?.progressLog ?? [],
+          artifactUrls: docResultsRef.current[docId]?.artifactUrls ?? [],
         };
         streamResultsRef.current = { ...streamResultsRef.current, [docId]: entry };
         setDocStatuses((prev) => ({ ...prev, [docId]: "completed" }));
@@ -119,10 +123,53 @@ export default function GenerationPlanPanel({
           durationMs: 0,
           tokens: 0,
           error: payload.error as string,
+          progressLog: docResultsRef.current[docId]?.progressLog ?? [],
+          artifactUrls: docResultsRef.current[docId]?.artifactUrls ?? [],
         };
         streamResultsRef.current = { ...streamResultsRef.current, [docId]: entry };
         setDocStatuses((prev) => ({ ...prev, [docId]: "error" }));
         setParallelDocResults((prev) => ({ ...prev, [docId]: entry }));
+      }
+
+      if (type === "doc_progress") {
+        const docId = payload.docId as string;
+        const event = (payload.event ?? {}) as {
+          type?: string;
+          message?: string;
+          toolName?: string;
+          result?: string;
+          artifactUrl?: string;
+          artifactUrls?: string[];
+        };
+        const line =
+          event.type === "tool_call_start"
+            ? `→ ${event.toolName}: ${JSON.stringify((payload.event as { args?: unknown })?.args ?? {})}`
+            : event.type === "tool_call_result"
+              ? `${event.toolName} ${event.result ? `· ${event.result}` : ""}`
+              : event.message || event.result || event.type || "progress";
+        setParallelDocResults((prev) => {
+          const current = prev[docId] ?? {
+            content: "",
+            costUsd: 0,
+            durationMs: 0,
+            tokens: 0,
+            progressLog: [],
+            artifactUrls: [],
+          };
+          const next: ParallelDocResult = {
+            ...current,
+            progressLog: [...(current.progressLog ?? []), line].slice(-80),
+            artifactUrls: [
+              ...new Set([
+                ...(current.artifactUrls ?? []),
+                ...(event.artifactUrl ? [event.artifactUrl] : []),
+                ...((event.artifactUrls ?? []).filter(Boolean) as string[]),
+              ]),
+            ],
+          };
+          streamResultsRef.current = { ...streamResultsRef.current, [docId]: next };
+          return { ...prev, [docId]: next };
+        });
       }
 
       if (type === "generation_complete") {
@@ -248,7 +295,12 @@ export default function GenerationPlanPanel({
   const completedCount = Object.values(docStatuses).filter((s) => s === "completed").length;
   const totalCount = Object.keys(docStatuses).length;
   const allDone = status === "completed";
-  const previewContent = previewDocId ? docResults[previewDocId]?.content : null;
+  const previewContent = previewDocId
+    ? docResults[previewDocId]?.content ||
+      (docResults[previewDocId]?.progressLog?.length
+        ? ["# Live Progress", "", ...(docResults[previewDocId]?.progressLog ?? []).map((line) => `- ${line}`)].join("\n")
+        : null)
+    : null;
 
   const { prdSpec } = parsePrdStepMetadata(prdMetadata);
 
@@ -491,9 +543,11 @@ function ProgressView({
                   isSelected
                     ? "border-indigo-300 bg-indigo-50/60 ring-1 ring-indigo-200/60"
                     : "border-zinc-200/90 bg-white"
-                } ${st === "completed" ? "cursor-pointer hover:border-indigo-200" : ""}`}
+                } ${st === "completed" || st === "generating" ? "cursor-pointer hover:border-indigo-200" : ""}`}
                 onClick={() => {
-                  if (st === "completed") onSelectPreview(isSelected ? null : doc.id);
+                  if (st === "completed" || st === "generating") {
+                    onSelectPreview(isSelected ? null : doc.id);
+                  }
                 }}
               >
                 {st === "completed" && (
@@ -546,7 +600,7 @@ function ProgressView({
                 )}
                 {st === "generating" && (
                   <span className="shrink-0 text-[11px] font-medium text-indigo-600">
-                    Generating…
+                    {doc.id === "pencil" ? "Drawing…" : "Generating…"}
                   </span>
                 )}
                 {st === "error" && result?.error && (

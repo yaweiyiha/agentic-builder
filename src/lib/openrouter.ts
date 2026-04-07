@@ -7,6 +7,8 @@ import type {
   ChatMessage,
   OpenRouterOptions,
   OpenRouterResponse,
+  OpenRouterToolDefinition,
+  OpenRouterToolCall,
   OpenRouterUsage,
 } from "./llm-types";
 
@@ -15,6 +17,8 @@ export type {
   OpenRouterOptions,
   OpenRouterUsage,
   OpenRouterResponse,
+  OpenRouterToolDefinition,
+  OpenRouterToolCall,
 } from "./llm-types";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -118,6 +122,8 @@ export async function openRouterChatCompletion(
     temperature = 0.7,
     max_tokens = 4096,
     stream = false,
+    tools,
+    tool_choice,
     modalities,
     image_config,
     response_format,
@@ -132,6 +138,8 @@ export async function openRouterChatCompletion(
       temperature,
       max_tokens,
       stream,
+      ...(tools?.length ? { tools } : {}),
+      ...(tool_choice ? { tool_choice } : {}),
       ...(modalities?.length ? { modalities } : {}),
       ...(image_config ? { image_config } : {}),
       ...(response_format ? { response_format } : {}),
@@ -172,6 +180,8 @@ export async function openRouterStreamChatCompletion(
       temperature: options.temperature ?? 0.7,
       max_tokens: options.max_tokens ?? 4096,
       stream: true,
+      ...(options.tools?.length ? { tools: options.tools } : {}),
+      ...(options.tool_choice ? { tool_choice: options.tool_choice } : {}),
     }),
   });
 

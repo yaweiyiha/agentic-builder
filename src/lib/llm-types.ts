@@ -1,6 +1,29 @@
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: OpenRouterToolCall[];
+}
+
+export interface OpenRouterToolFunction {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface OpenRouterToolDefinition {
+  type: "function";
+  function: OpenRouterToolFunction;
+}
+
+export interface OpenRouterToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
 }
 
 export interface OpenRouterImageConfig {
@@ -13,6 +36,12 @@ export interface OpenRouterOptions {
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  tools?: OpenRouterToolDefinition[];
+  tool_choice?:
+    | "auto"
+    | "none"
+    | "required"
+    | { type: "function"; function: { name: string } };
   /** When set, enables image output (e.g. FLUX / Gemini image models on OpenRouter). */
   modalities?: ("image" | "text")[];
   image_config?: OpenRouterImageConfig;
@@ -35,6 +64,7 @@ export interface OpenRouterImagePart {
 
 export interface OpenRouterAssistantMessage extends ChatMessage {
   images?: OpenRouterImagePart[];
+  tool_calls?: OpenRouterToolCall[];
 }
 
 export interface OpenRouterResponse {

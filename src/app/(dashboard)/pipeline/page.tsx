@@ -365,109 +365,6 @@ export default function PipelinePage() {
     }
   }, [isRunning, codeOutputDir, updateSteps, runKickoff]);
 
-  const handleDebugPencil = useCallback(async () => {
-    if (isRunning) return;
-    const now = new Date().toISOString();
-    const stepUpdates: Partial<Record<PipelineStepId, StepResult>> = {};
-    stepUpdates.intent = {
-      stepId: "intent",
-      status: "completed",
-      content: "Debug: Pencil MCP direct test",
-      timestamp: now,
-    };
-    stepUpdates.pencil = {
-      stepId: "pencil",
-      status: "running",
-      content: "",
-      timestamp: now,
-    };
-    updateSteps(stepUpdates);
-    usePipelineStore.setState({
-      isRunning: true,
-      currentStep: "pencil",
-      activeTab: "pencil" as PipelineStepId,
-    });
-
-    const logs: string[] = [];
-    try {
-      const resp = await fetch("/api/agents/debug-pencil", { method: "POST" });
-      if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        usePipelineStore.setState({
-          isRunning: false,
-          error: (errData as { error?: string }).error || "Pencil debug failed",
-        });
-        return;
-      }
-      const reader = resp.body?.getReader();
-      if (!reader) {
-        usePipelineStore.setState({
-          isRunning: false,
-          error: "No response body",
-        });
-        return;
-      }
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6)) as {
-              type: string;
-              message?: string;
-              result?: StepResult;
-            };
-            if (event.type === "step_log" && event.message) {
-              logs.push(event.message);
-              updateSteps({
-                pencil: {
-                  stepId: "pencil",
-                  status: "running",
-                  content: logs.join("\n"),
-                  timestamp: new Date().toISOString(),
-                },
-              });
-            }
-            if (event.type === "step_complete" && event.result)
-              updateSteps({ pencil: event.result });
-          } catch {
-            /* skip */
-          }
-        }
-      }
-      if (buffer.startsWith("data: ")) {
-        try {
-          const event = JSON.parse(buffer.slice(6)) as {
-            type: string;
-            result?: StepResult;
-          };
-          if (event.type === "step_complete" && event.result)
-            updateSteps({ pencil: event.result });
-        } catch {
-          /* skip */
-        }
-      }
-    } catch (err) {
-      console.error("Debug pencil failed:", err);
-      updateSteps({
-        pencil: {
-          stepId: "pencil",
-          status: "failed",
-          error: err instanceof Error ? err.message : "Unknown error",
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } finally {
-      usePipelineStore.setState({ isRunning: false });
-    }
-  }, [isRunning, updateSteps]);
-
   const handleDebugCodingAgents = useCallback(() => {
     if (isRunning || codingStatus === "running") return;
     const runId = `debug-coding-${Date.now()}`;
@@ -1000,9 +897,7 @@ export default function PipelinePage() {
                           stiffness: 420,
                           damping: 28,
                         }}
-                        disabled={
-                          isRunning || prdRefining || parallelGenBusy
-                        }
+                        disabled={isRunning || prdRefining || parallelGenBusy}
                         onClick={() => void processCommandBarInput("continue")}
                         className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -1044,28 +939,25 @@ export default function PipelinePage() {
                       Generate documents
                     </motion.button>
                   )}
-                  {showGenerationPlan &&
-                    genPhase === "awaiting_kickoff" && (
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 420,
-                          damping: 28,
-                        }}
-                        disabled={
-                          !parallelGenResults ||
-                          parallelGenBusy ||
-                          prdRefining
-                        }
-                        onClick={() => void processCommandBarInput("continue")}
-                        className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Run kick-off
-                      </motion.button>
-                    )}
+                  {showGenerationPlan && genPhase === "awaiting_kickoff" && (
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 28,
+                      }}
+                      disabled={
+                        !parallelGenResults || parallelGenBusy || prdRefining
+                      }
+                      onClick={() => void processCommandBarInput("continue")}
+                      className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Run kick-off
+                    </motion.button>
+                  )}
                   {kickoffAwaitingCodingContinue && (
                     <motion.button
                       type="button"
@@ -1321,26 +1213,6 @@ export default function PipelinePage() {
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
               Skip to Kick-off
-            </button>
-            <span className="text-zinc-200">&middot;</span>
-            <button
-              type="button"
-              onClick={handleDebugPencil}
-              disabled={isRunning}
-              className="flex items-center gap-1 transition-colors hover:text-zinc-600 disabled:opacity-40"
-            >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M12 19l7-7 3 3-7 7-3-3z" />
-                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-              </svg>
-              Pencil Design
             </button>
             <span className="text-zinc-200">&middot;</span>
             <button
