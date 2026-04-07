@@ -1,0 +1,32 @@
+# dependencies
+/node_modules
+generated-code/node_modules/
+generated-code/dist/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# next.js
+/.next/
+/out/
+
+# electron
+/dist/
+
+# env files
+.env
+.env.local
+.env*.local
+
+# testing
+/coverage
+
+# misc
+*.pem
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts

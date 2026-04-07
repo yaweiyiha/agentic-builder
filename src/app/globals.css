@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Theme: LAB(55.0481 -49.9246 15.93) — sRGB fallback first for older engines */
+  --background: #f4f4f5;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-hover: #fafafa;
+  --border: #e5e5e5;
+  --border-muted: #d4d4d4;
+
+  --accent: #009867;
+  --accent: lab(55.0481% -49.9246 15.93);
+
+  --accent-hover: #007a52;
+  --accent-hover: lab(46% -49.9246 15.93);
+
+  --accent-on-muted: #006b52;
+  --accent-on-muted: lab(40% -49.9246 15.93);
+
+  --accent-muted: #ecf5f2;
+  --accent-muted: color-mix(in lab, lab(55.0481% -49.9246 15.93) 12%, white);
+  --muted: #5c5c5c;
+  --muted-secondary: #6b6b6b;
+  --muted-tertiary: #737373;
+  --muted-footer: #a3a3a3;
+  --icon-muted: #404040;
+  --destructive: #dc2626;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #d4d4d8;
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #a1a1aa;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}

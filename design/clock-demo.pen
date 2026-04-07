@@ -1,0 +1,1963 @@
+{
+  "version": "2.10",
+  "children": [
+    {
+      "type": "frame",
+      "id": "6Qs17",
+      "x": 0,
+      "y": 0,
+      "name": "Pomodoro Timer Screens",
+      "gap": 48,
+      "padding": 48,
+      "children": [
+        {
+          "type": "frame",
+          "id": "V1RO8",
+          "name": "PAGE-001 Main Timer View — Idle",
+          "width": 1440,
+          "height": 900,
+          "fill": "#0F172A",
+          "cornerRadius": 16,
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "#334155"
+          },
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "0cJDN",
+              "name": "Header",
+              "width": "fill_container",
+              "height": 72,
+              "fill": "#1E293B",
+              "stroke": {
+                "align": "inside",
+                "thickness": {
+                  "bottom": 1
+                },
+                "fill": "#334155"
+              },
+              "padding": [
+                16,
+                24
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ZNYsO",
+                  "name": "Header Left",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "ebnVM",
+                      "name": "tomatoIconIdle",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "timer",
+                      "iconFontFamily": "lucide",
+                      "fill": "#A5B4FC"
+                    },
+                    {
+                      "type": "text",
+                      "id": "XKACl",
+                      "name": "titleIdle",
+                      "fill": "#F1F5F9",
+                      "content": "Pomodoro Timer",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "hhb4d",
+                  "name": "Header Right",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "RRH8v",
+                      "name": "Audio Alert Status",
+                      "fill": "#0F172A",
+                      "cornerRadius": 999,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1,
+                        "fill": "#334155"
+                      },
+                      "gap": 8,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "MRmiH",
+                          "name": "soundIconIdle",
+                          "width": 16,
+                          "height": 16,
+                          "iconFontName": "volume-2",
+                          "iconFontFamily": "lucide",
+                          "fill": "#94A3B8"
+                        },
+                        {
+                          "type": "text",
+                          "id": "jKoBO",
+                          "name": "soundTextIdle",
+                          "fill": "#94A3B8",
+                          "content": "Audio: On",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "viWnF",
+              "name": "Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "padding": 24,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "nVzaD",
+                  "name": "Timer Card",
+                  "width": 720,
+                  "fill": "#1E293B",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "#334155"
+                  },
+                  "layout": "vertical",
+                  "gap": 24,
+                  "padding": 32,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "DDgl3",
+                      "name": "Status Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "IfT3V",
+                          "name": "Session Chip",
+                          "fill": "#0F172A",
+                          "cornerRadius": 999,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 8,
+                          "padding": [
+                            8,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "vIanl",
+                              "name": "Dot",
+                              "width": 8,
+                              "height": 8,
+                              "fill": "#64748B",
+                              "cornerRadius": 99,
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "V5qlP",
+                              "name": "chipTextIdle",
+                              "fill": "#94A3B8",
+                              "content": "Work session • Idle",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "YTMko",
+                          "name": "kbdHintIdle",
+                          "fill": "#64748B",
+                          "content": "Space: Start/Pause • R: Reset",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "xxsfh",
+                      "name": "Timer Display",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "IZwiu",
+                          "name": "timerTextIdle",
+                          "fill": "#F1F5F9",
+                          "content": "25:00",
+                          "fontFamily": "Inter",
+                          "fontSize": 64,
+                          "fontWeight": "800"
+                        },
+                        {
+                          "type": "text",
+                          "id": "xq3xU",
+                          "name": "timerSubIdle",
+                          "fill": "#94A3B8",
+                          "content": "Ready to focus. Press Start to begin.",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "hqMiI",
+                      "name": "Progress",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "6gt6P",
+                          "name": "Progress Label Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "rYzCL",
+                              "name": "progressLabelIdle",
+                              "fill": "#94A3B8",
+                              "content": "Time remaining",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "WaQjI",
+                              "name": "progressPctIdle",
+                              "fill": "#94A3B8",
+                              "content": "100%",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ih2pS",
+                          "name": "Progress Bar",
+                          "width": "fill_container",
+                          "height": 12,
+                          "fill": "#0F172A",
+                          "cornerRadius": 999,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "GKlYF",
+                              "name": "Progress Fill",
+                              "width": 656,
+                              "height": "fill_container",
+                              "fill": "#6366F1",
+                              "cornerRadius": 999,
+                              "layout": "none"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "ZW4KJ",
+                              "name": "Remainder",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "0pPVP",
+                      "name": "Session Controls",
+                      "width": "fill_container",
+                      "gap": 16,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "noi0i",
+                          "name": "CMP-001 Start/Pause Button",
+                          "width": 220,
+                          "height": 48,
+                          "fill": "#6366F1",
+                          "cornerRadius": 12,
+                          "gap": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "AlkQc",
+                              "name": "startIconIdle",
+                              "width": 18,
+                              "height": 18,
+                              "iconFontName": "play",
+                              "iconFontFamily": "lucide",
+                              "fill": "#F1F5F9"
+                            },
+                            {
+                              "type": "text",
+                              "id": "FMwZb",
+                              "name": "startTextIdle",
+                              "fill": "#F1F5F9",
+                              "content": "Start",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "nLdHF",
+                          "name": "CMP-002 Reset Button",
+                          "width": 220,
+                          "height": 48,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "uUdCa",
+                              "name": "resetIconIdle",
+                              "width": 18,
+                              "height": 18,
+                              "iconFontName": "rotate-ccw",
+                              "iconFontFamily": "lucide",
+                              "fill": "#94A3B8"
+                            },
+                            {
+                              "type": "text",
+                              "id": "UToow",
+                              "name": "resetTextIdle",
+                              "fill": "#94A3B8",
+                              "content": "Reset",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "aBfBS",
+              "name": "Footer",
+              "width": "fill_container",
+              "height": 192,
+              "fill": "#0B1220",
+              "stroke": {
+                "align": "inside",
+                "thickness": {
+                  "top": 1
+                },
+                "fill": "#334155"
+              },
+              "layout": "vertical",
+              "gap": 16,
+              "padding": [
+                20,
+                24
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "uOZUi",
+                  "name": "Footer Top",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "BbLfq",
+                      "name": "Session Count Display",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "KWA3d",
+                          "name": "trophyIdle",
+                          "width": 18,
+                          "height": 18,
+                          "iconFontName": "trophy",
+                          "iconFontFamily": "lucide",
+                          "fill": "#F59E0B"
+                        },
+                        {
+                          "type": "text",
+                          "id": "q9BU7",
+                          "name": "sessionCountTextIdle",
+                          "fill": "#F1F5F9",
+                          "content": "Pomodoros completed: 3",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "d1Q69",
+                      "name": "helperIdle",
+                      "fill": "#94A3B8",
+                      "content": "Customize durations (minutes).",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ys4u6",
+                  "name": "Customization Inputs",
+                  "width": "fill_container",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "W6c2C",
+                      "name": "CMP-003 Work Duration Input",
+                      "width": 320,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "EE8Oa",
+                          "name": "workLabelIdle",
+                          "fill": "#94A3B8",
+                          "content": "Work duration",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "6k7Tv",
+                          "name": "Work Input Field",
+                          "width": "fill_container",
+                          "height": 44,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "b20g3",
+                              "name": "workClockIdle",
+                              "width": 16,
+                              "height": 16,
+                              "iconFontName": "briefcase",
+                              "iconFontFamily": "lucide",
+                              "fill": "#64748B"
+                            },
+                            {
+                              "type": "text",
+                              "id": "16sjC",
+                              "name": "workValueIdle",
+                              "fill": "#F1F5F9",
+                              "content": "25",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "bHUWB",
+                              "name": "Spacer",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "7BL4z",
+                              "name": "workUnitIdle",
+                              "fill": "#64748B",
+                              "content": "min",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "XbSnf",
+                      "name": "CMP-004 Break Duration Input",
+                      "width": 320,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "BCWCl",
+                          "name": "breakLabelIdle",
+                          "fill": "#94A3B8",
+                          "content": "Break duration",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "MIf7P",
+                          "name": "Break Input Field",
+                          "width": "fill_container",
+                          "height": 44,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "2j99N",
+                              "name": "breakCoffeeIdle",
+                              "width": 16,
+                              "height": 16,
+                              "iconFontName": "coffee",
+                              "iconFontFamily": "lucide",
+                              "fill": "#64748B"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Nhs00",
+                              "name": "breakValueIdle",
+                              "fill": "#F1F5F9",
+                              "content": "5",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "UpGLt",
+                              "name": "Spacer",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "BvGbQ",
+                              "name": "breakUnitIdle",
+                              "fill": "#64748B",
+                              "content": "min",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "zJbJl",
+                  "name": "noteIdle",
+                  "fill": "#64748B",
+                  "content": "Inputs validate as positive integers. Changes apply to the next reset.",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "9Zf8R",
+          "name": "PAGE-001 Main Timer View — Running",
+          "width": 1440,
+          "height": 900,
+          "fill": "#0F172A",
+          "cornerRadius": 16,
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "#334155"
+          },
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "4tqnu",
+              "name": "Header",
+              "width": "fill_container",
+              "height": 72,
+              "fill": "#1E293B",
+              "stroke": {
+                "align": "inside",
+                "thickness": {
+                  "bottom": 1
+                },
+                "fill": "#334155"
+              },
+              "padding": [
+                16,
+                24
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ey7KJ",
+                  "name": "Header Left",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "dnYO5",
+                      "name": "timerIconRunning",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "timer",
+                      "iconFontFamily": "lucide",
+                      "fill": "#A5B4FC"
+                    },
+                    {
+                      "type": "text",
+                      "id": "8aIYS",
+                      "name": "titleRunning",
+                      "fill": "#F1F5F9",
+                      "content": "Pomodoro Timer",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "AzO95",
+                  "name": "Header Right",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "dqW3D",
+                      "name": "Audio Alert Status",
+                      "fill": "#0F172A",
+                      "cornerRadius": 999,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1,
+                        "fill": "#334155"
+                      },
+                      "gap": 8,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "SnWUw",
+                          "name": "soundIconRunning",
+                          "width": 16,
+                          "height": 16,
+                          "iconFontName": "volume-2",
+                          "iconFontFamily": "lucide",
+                          "fill": "#94A3B8"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Y53kd",
+                          "name": "soundTextRunning",
+                          "fill": "#94A3B8",
+                          "content": "Audio: On",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "zrT5k",
+              "name": "Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "padding": 24,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "vcEaX",
+                  "name": "Timer Card",
+                  "width": 720,
+                  "fill": "#1E293B",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "#334155"
+                  },
+                  "layout": "vertical",
+                  "gap": 24,
+                  "padding": 32,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "EcqU9",
+                      "name": "Status Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "e3Esq",
+                          "name": "Session Chip",
+                          "fill": "#0F172A",
+                          "cornerRadius": 999,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 8,
+                          "padding": [
+                            8,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "rjz4r",
+                              "name": "Dot",
+                              "width": 8,
+                              "height": 8,
+                              "fill": "#10B981",
+                              "cornerRadius": 99,
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "CUlFa",
+                              "name": "chipTextRunning",
+                              "fill": "#D1FAE5",
+                              "content": "Work session • Running",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "WypRo",
+                          "name": "endAtRunning",
+                          "fill": "#94A3B8",
+                          "content": "Ends in 12:34",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "4SB4t",
+                      "name": "Timer Display",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "aBe5I",
+                          "name": "timerTextRunning",
+                          "fill": "#F1F5F9",
+                          "content": "12:34",
+                          "fontFamily": "Inter",
+                          "fontSize": 64,
+                          "fontWeight": "800"
+                        },
+                        {
+                          "type": "text",
+                          "id": "y8LE4",
+                          "name": "timerSubRunning",
+                          "fill": "#94A3B8",
+                          "content": "Stay focused. You'll get a sound at the end.",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ttpYh",
+                      "name": "Progress",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "AwSqz",
+                          "name": "Progress Label Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "t7wta",
+                              "name": "progressLabelRunning",
+                              "fill": "#94A3B8",
+                              "content": "Time remaining",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "vCaJm",
+                              "name": "progressPctRunning",
+                              "fill": "#94A3B8",
+                              "content": "50%",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "R2AxI",
+                          "name": "Progress Bar",
+                          "width": "fill_container",
+                          "height": 12,
+                          "fill": "#0F172A",
+                          "cornerRadius": 999,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "kKFUf",
+                              "name": "Progress Fill",
+                              "width": 328,
+                              "height": "fill_container",
+                              "fill": "#6366F1",
+                              "cornerRadius": 999,
+                              "layout": "none"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "dL9xQ",
+                              "name": "Remainder",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ruGFw",
+                      "name": "Session Controls",
+                      "width": "fill_container",
+                      "gap": 16,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "QPs72",
+                          "name": "CMP-001 Start/Pause Button",
+                          "width": 220,
+                          "height": 48,
+                          "fill": "#6366F1",
+                          "cornerRadius": 12,
+                          "gap": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "ZWxMe",
+                              "name": "pauseIconRunning",
+                              "width": 18,
+                              "height": 18,
+                              "iconFontName": "pause",
+                              "iconFontFamily": "lucide",
+                              "fill": "#F1F5F9"
+                            },
+                            {
+                              "type": "text",
+                              "id": "oIOZ8",
+                              "name": "pauseTextRunning",
+                              "fill": "#F1F5F9",
+                              "content": "Pause",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "qOnDx",
+                          "name": "CMP-002 Reset Button",
+                          "width": 220,
+                          "height": 48,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "G4UyS",
+                              "name": "resetIconRunning",
+                              "width": 18,
+                              "height": 18,
+                              "iconFontName": "rotate-ccw",
+                              "iconFontFamily": "lucide",
+                              "fill": "#94A3B8"
+                            },
+                            {
+                              "type": "text",
+                              "id": "RZrnZ",
+                              "name": "resetTextRunning",
+                              "fill": "#94A3B8",
+                              "content": "Reset",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FTRml",
+              "name": "Footer",
+              "width": "fill_container",
+              "height": 192,
+              "fill": "#0B1220",
+              "stroke": {
+                "align": "inside",
+                "thickness": {
+                  "top": 1
+                },
+                "fill": "#334155"
+              },
+              "layout": "vertical",
+              "gap": 16,
+              "padding": [
+                20,
+                24
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "pmOuf",
+                  "name": "Footer Top",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "gX3PH",
+                      "name": "Session Count Display",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "0r0NQ",
+                          "name": "trophyRunning",
+                          "width": 18,
+                          "height": 18,
+                          "iconFontName": "trophy",
+                          "iconFontFamily": "lucide",
+                          "fill": "#F59E0B"
+                        },
+                        {
+                          "type": "text",
+                          "id": "YuR59",
+                          "name": "sessionCountTextRunning",
+                          "fill": "#F1F5F9",
+                          "content": "Pomodoros completed: 3",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "fdJve",
+                      "name": "helperRunning",
+                      "fill": "#94A3B8",
+                      "content": "Durations locked while running (apply after reset).",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "zWeES",
+                  "name": "Customization Inputs",
+                  "width": "fill_container",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "ezE1d",
+                      "name": "CMP-003 Work Duration Input",
+                      "width": 320,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "LnB8j",
+                          "name": "workLabelRunning",
+                          "fill": "#94A3B8",
+                          "content": "Work duration",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "6s8H0",
+                          "name": "Work Input Field (disabled state)",
+                          "width": "fill_container",
+                          "height": 44,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#1F2A44"
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "3xSKi",
+                              "name": "workClockRunning",
+                              "width": 16,
+                              "height": 16,
+                              "iconFontName": "briefcase",
+                              "iconFontFamily": "lucide",
+                              "fill": "#475569"
+                            },
+                            {
+                              "type": "text",
+                              "id": "4hbkl",
+                              "name": "workValueRunning",
+                              "fill": "#64748B",
+                              "content": "25",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "opogn",
+                              "name": "Spacer",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "BD7iY",
+                              "name": "workUnitRunning",
+                              "fill": "#475569",
+                              "content": "min",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "3kZrv",
+                      "name": "CMP-004 Break Duration Input",
+                      "width": 320,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jcRhi",
+                          "name": "breakLabelRunning",
+                          "fill": "#94A3B8",
+                          "content": "Break duration",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "3Ib69",
+                          "name": "Break Input Field (disabled state)",
+                          "width": "fill_container",
+                          "height": 44,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#1F2A44"
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "xRDYV",
+                              "name": "breakCoffeeRunning",
+                              "width": 16,
+                              "height": 16,
+                              "iconFontName": "coffee",
+                              "iconFontFamily": "lucide",
+                              "fill": "#475569"
+                            },
+                            {
+                              "type": "text",
+                              "id": "LnT7T",
+                              "name": "breakValueRunning",
+                              "fill": "#64748B",
+                              "content": "5",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "0Erwq",
+                              "name": "Spacer",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "a9Uk6",
+                              "name": "breakUnitRunning",
+                              "fill": "#475569",
+                              "content": "min",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "gcvZ1",
+                  "name": "noteRunning",
+                  "fill": "#64748B",
+                  "content": "A sound plays when the session ends (audio alerts).",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "xDTUL",
+          "name": "PAGE-001 Main Timer View — Paused",
+          "width": 1440,
+          "height": 900,
+          "fill": "#0F172A",
+          "cornerRadius": 16,
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "#334155"
+          },
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "6e3bn",
+              "name": "Header",
+              "width": "fill_container",
+              "height": 72,
+              "fill": "#1E293B",
+              "stroke": {
+                "align": "inside",
+                "thickness": {
+                  "bottom": 1
+                },
+                "fill": "#334155"
+              },
+              "padding": [
+                16,
+                24
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "wzCy0",
+                  "name": "Header Left",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "He0wO",
+                      "name": "timerIconPaused",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "timer",
+                      "iconFontFamily": "lucide",
+                      "fill": "#A5B4FC"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kDOWl",
+                      "name": "titlePaused",
+                      "fill": "#F1F5F9",
+                      "content": "Pomodoro Timer",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "NdlaE",
+                  "name": "Header Right",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "RqVpQ",
+                      "name": "Audio Alert Status",
+                      "fill": "#0F172A",
+                      "cornerRadius": 999,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1,
+                        "fill": "#334155"
+                      },
+                      "gap": 8,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "NPUdm",
+                          "name": "soundIconPaused",
+                          "width": 16,
+                          "height": 16,
+                          "iconFontName": "volume-2",
+                          "iconFontFamily": "lucide",
+                          "fill": "#94A3B8"
+                        },
+                        {
+                          "type": "text",
+                          "id": "TKNiw",
+                          "name": "soundTextPaused",
+                          "fill": "#94A3B8",
+                          "content": "Audio: On",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "rNuxX",
+              "name": "Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "padding": 24,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "N49Ai",
+                  "name": "Timer Card",
+                  "width": 720,
+                  "fill": "#1E293B",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "#334155"
+                  },
+                  "layout": "vertical",
+                  "gap": 24,
+                  "padding": 32,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Br1FK",
+                      "name": "Status Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "A1W1o",
+                          "name": "Session Chip",
+                          "fill": "#0F172A",
+                          "cornerRadius": 999,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 8,
+                          "padding": [
+                            8,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "TPmDW",
+                              "name": "Dot",
+                              "width": 8,
+                              "height": 8,
+                              "fill": "#F59E0B",
+                              "cornerRadius": 99,
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "APFhg",
+                              "name": "chipTextPaused",
+                              "fill": "#FEF3C7",
+                              "content": "Work session • Paused",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "1erot",
+                          "name": "pausedHint",
+                          "fill": "#94A3B8",
+                          "content": "Paused — press Resume to continue",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "N4glf",
+                      "name": "Timer Display",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "OKCZb",
+                          "name": "timerTextPaused",
+                          "fill": "#F1F5F9",
+                          "content": "18:10",
+                          "fontFamily": "Inter",
+                          "fontSize": 64,
+                          "fontWeight": "800"
+                        },
+                        {
+                          "type": "text",
+                          "id": "djJOn",
+                          "name": "timerSubPaused",
+                          "fill": "#94A3B8",
+                          "content": "Take a breath. Resume when you're ready.",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "BvhkT",
+                      "name": "Progress",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "CbnXu",
+                          "name": "Progress Label Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "wfCgm",
+                              "name": "progressLabelPaused",
+                              "fill": "#94A3B8",
+                              "content": "Time remaining",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Hb983",
+                              "name": "progressPctPaused",
+                              "fill": "#94A3B8",
+                              "content": "70%",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "PoJTa",
+                          "name": "Progress Bar",
+                          "width": "fill_container",
+                          "height": 12,
+                          "fill": "#0F172A",
+                          "cornerRadius": 999,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "IVnms",
+                              "name": "Progress Fill",
+                              "width": 459,
+                              "height": "fill_container",
+                              "fill": "#6366F1",
+                              "cornerRadius": 999,
+                              "layout": "none"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "SoAF1",
+                              "name": "Remainder",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "9dzdU",
+                      "name": "Session Controls",
+                      "width": "fill_container",
+                      "gap": 16,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "2uvwN",
+                          "name": "CMP-001 Start/Pause Button",
+                          "width": 220,
+                          "height": 48,
+                          "fill": "#6366F1",
+                          "cornerRadius": 12,
+                          "gap": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "E8ay3",
+                              "name": "resumeIconPaused",
+                              "width": 18,
+                              "height": 18,
+                              "iconFontName": "play",
+                              "iconFontFamily": "lucide",
+                              "fill": "#F1F5F9"
+                            },
+                            {
+                              "type": "text",
+                              "id": "TUwe9",
+                              "name": "resumeTextPaused",
+                              "fill": "#F1F5F9",
+                              "content": "Resume",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "4XmGz",
+                          "name": "CMP-002 Reset Button",
+                          "width": 220,
+                          "height": 48,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "l7x9S",
+                              "name": "resetIconPaused",
+                              "width": 18,
+                              "height": 18,
+                              "iconFontName": "rotate-ccw",
+                              "iconFontFamily": "lucide",
+                              "fill": "#94A3B8"
+                            },
+                            {
+                              "type": "text",
+                              "id": "yivzL",
+                              "name": "resetTextPaused",
+                              "fill": "#94A3B8",
+                              "content": "Reset",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "YUs65",
+              "name": "Footer",
+              "width": "fill_container",
+              "height": 192,
+              "fill": "#0B1220",
+              "stroke": {
+                "align": "inside",
+                "thickness": {
+                  "top": 1
+                },
+                "fill": "#334155"
+              },
+              "layout": "vertical",
+              "gap": 16,
+              "padding": [
+                20,
+                24
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Sossb",
+                  "name": "Footer Top",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "6JVw0",
+                      "name": "Session Count Display",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "mmZ5i",
+                          "name": "trophyPaused",
+                          "width": 18,
+                          "height": 18,
+                          "iconFontName": "trophy",
+                          "iconFontFamily": "lucide",
+                          "fill": "#F59E0B"
+                        },
+                        {
+                          "type": "text",
+                          "id": "RyoNS",
+                          "name": "sessionCountTextPaused",
+                          "fill": "#F1F5F9",
+                          "content": "Pomodoros completed: 3",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "CcXmL",
+                      "name": "helperPaused",
+                      "fill": "#94A3B8",
+                      "content": "Adjust durations now (applies after reset).",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "28AVo",
+                  "name": "Customization Inputs",
+                  "width": "fill_container",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "AOPz8",
+                      "name": "CMP-003 Work Duration Input",
+                      "width": 320,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jgdVb",
+                          "name": "workLabelPaused",
+                          "fill": "#94A3B8",
+                          "content": "Work duration",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "pJssl",
+                          "name": "Work Input Field",
+                          "width": "fill_container",
+                          "height": 44,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "vCaqf",
+                              "name": "workClockPaused",
+                              "width": 16,
+                              "height": 16,
+                              "iconFontName": "briefcase",
+                              "iconFontFamily": "lucide",
+                              "fill": "#64748B"
+                            },
+                            {
+                              "type": "text",
+                              "id": "NW37S",
+                              "name": "workValuePaused",
+                              "fill": "#F1F5F9",
+                              "content": "25",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "TYm81",
+                              "name": "Spacer",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "bGnwZ",
+                              "name": "workUnitPaused",
+                              "fill": "#64748B",
+                              "content": "min",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Dzxvg",
+                      "name": "CMP-004 Break Duration Input",
+                      "width": 320,
+                      "layout": "vertical",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Tsm2r",
+                          "name": "breakLabelPaused",
+                          "fill": "#94A3B8",
+                          "content": "Break duration",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "rhhF4",
+                          "name": "Break Input Field",
+                          "width": "fill_container",
+                          "height": 44,
+                          "fill": "#0F172A",
+                          "cornerRadius": 12,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#334155"
+                          },
+                          "gap": 10,
+                          "padding": [
+                            10,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "86Pjo",
+                              "name": "breakCoffeePaused",
+                              "width": 16,
+                              "height": 16,
+                              "iconFontName": "coffee",
+                              "iconFontFamily": "lucide",
+                              "fill": "#64748B"
+                            },
+                            {
+                              "type": "text",
+                              "id": "e0EXA",
+                              "name": "breakValuePaused",
+                              "fill": "#F1F5F9",
+                              "content": "5",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "LMI30",
+                              "name": "Spacer",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "layout": "none"
+                            },
+                            {
+                              "type": "text",
+                              "id": "6dKl8",
+                              "name": "breakUnitPaused",
+                              "fill": "#64748B",
+                              "content": "min",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "7MZBP",
+                  "name": "notePaused",
+                  "fill": "#64748B",
+                  "content": "Reset sets the timer back to the work duration and clears progress.",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
