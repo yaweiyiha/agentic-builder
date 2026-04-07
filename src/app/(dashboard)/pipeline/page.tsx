@@ -1326,14 +1326,17 @@ function PrepSubTabIndicator({ kind }: { kind: PrepTabDotKind }) {
     );
   }
   if (kind === "failed") {
-    return <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-red-500" />;
+    return (
+      <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-red-500" />
+    );
   }
   return <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-zinc-300" />;
 }
 
 function ParallelGenSummaryStrip({ live }: { live: ParallelGenLiveSnapshot }) {
-  const done = Object.values(live.docStatuses).filter((s) => s === "completed")
-    .length;
+  const done = Object.values(live.docStatuses).filter(
+    (s) => s === "completed",
+  ).length;
   const total = Object.keys(live.docStatuses).length;
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200/90 bg-white px-4 py-3 text-[12px] text-zinc-600 shadow-sm">
@@ -1394,9 +1397,7 @@ function ParallelGenerationTabBody({
   if (stepId === "intent") {
     const r = steps.intent;
     if (!r) {
-      return (
-        <p className="text-[13px] text-zinc-500">No intent result yet.</p>
-      );
+      return <p className="text-[13px] text-zinc-500">No intent result yet.</p>;
     }
     if (r.status === "completed") {
       return <CompletedStepContent result={r} />;
@@ -1487,7 +1488,9 @@ function ParallelGenerationTabBody({
         <div className="rounded-2xl border border-zinc-200/90 bg-white p-7 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.08)]">
           <div className="flex flex-wrap gap-4 text-[11px] text-zinc-500">
             {res.tokens > 0 && (
-              <span className="tabular-nums">{res.tokens.toLocaleString()} tok</span>
+              <span className="tabular-nums">
+                {res.tokens.toLocaleString()} tok
+              </span>
             )}
             {res.costUsd !== undefined && res.costUsd > 0 && (
               <span className="tabular-nums text-emerald-700">
@@ -1527,11 +1530,7 @@ function ParallelGenerationTabBody({
     );
   }
 
-  if (
-    st === "completed" &&
-    !res?.content &&
-    res?.progressLog?.length
-  ) {
+  if (st === "completed" && !res?.content && res?.progressLog?.length) {
     return (
       <div className="rounded-2xl border border-zinc-200/90 bg-white p-7">
         <MarkdownRenderer

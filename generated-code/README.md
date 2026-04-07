@@ -1,4 +1,6 @@
-# Scaffold
+# Pomodoro Timer Monorepo
 
-Generated via Agentic Builder quick path (PRD → kick-off only).
-Implement the product from PRD.md.
+This repository uses **npm workspaces** and is organized into `apps/` and `packages/`.
+
+## Structure
+

@@ -1,12 +1,8 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "target": "esnext",
-    "module": "commonjs",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["vitest/globals", "@types/node-fetch"]
+    "jsx": "react-jsx",
+    "noEmit": true
   },
   "include": ["src"]
 }
