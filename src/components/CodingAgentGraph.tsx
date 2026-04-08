@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useCodingStore } from "@/store/coding-store";
+import { useCodingStore, type IntegrationVerifyState } from "@/store/coding-store";
 import Loading from "@/components/Loading";
 import type {
   AgentLogEntry,
@@ -194,7 +194,7 @@ function SubStepList({ subSteps, taskStatus }: { subSteps: TaskSubStep[]; taskSt
 }
 
 export default function CodingAgentGraph() {
-  const { status, agents, tasks, selectedAgentId, totalCostUsd, error, selectAgent, reset } =
+  const { status, agents, tasks, selectedAgentId, totalCostUsd, error, selectAgent, reset, integrationVerify } =
     useCodingStore();
 
   const [selectedRole, setSelectedRole] = useState<CodingAgentRole | null>(null);
@@ -663,6 +663,11 @@ export default function CodingAgentGraph() {
           )}
         </div>
 
+        {/* Final Verification */}
+        {integrationVerify && (
+          <IntegrationVerifyCard verify={integrationVerify} />
+        )}
+
         {/* Log panel */}
         <AnimatePresence mode="wait">
           {logPanelLabel && (
@@ -805,6 +810,116 @@ function taskMetaColorClass(task: CodingTask): string {
   if (task.progressStage === "verifying") return "text-zinc-500";
   if (task.codingStatus === "in_progress") return "text-zinc-500";
   return "text-zinc-400";
+}
+
+function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusConfig: Record<
+    IntegrationVerifyState["status"],
+    { icon: React.ReactNode; label: string; bg: string; text: string }
+  > = {
+    verifying: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin text-indigo-500">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      ),
+      label:
+        verify.fixAttempts > 0
+          ? `Re-verifying after fix (attempt ${verify.fixAttempts}/${verify.maxFixAttempts})...`
+          : "Running full project verification...",
+      bg: "border-indigo-200 bg-indigo-50/60",
+      text: "text-indigo-800",
+    },
+    fixing: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500">
+          <path d="M12 9v4" />
+          <path d="M12 17h.01" />
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        </svg>
+      ),
+      label: `${verify.errorCount ?? 0} error(s) found — fixing (attempt ${verify.fixAttempts + 1}/${verify.maxFixAttempts})...`,
+      bg: "border-amber-200 bg-amber-50/60",
+      text: "text-amber-800",
+    },
+    passed: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      ),
+      label:
+        verify.fixAttempts > 0
+          ? `Passed after ${verify.fixAttempts} fix attempt${verify.fixAttempts === 1 ? "" : "s"}`
+          : "All checks passed",
+      bg: "border-emerald-200 bg-emerald-50/60",
+      text: "text-emerald-800",
+    },
+    failed: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+      ),
+      label: `${verify.errorCount ?? 0} error(s) remaining after ${verify.fixAttempts} fix attempt${verify.fixAttempts === 1 ? "" : "s"}`,
+      bg: "border-red-200 bg-red-50/60",
+      text: "text-red-800",
+    },
+  };
+
+  const cfg = statusConfig[verify.status];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`rounded-xl border ${cfg.bg} px-4 py-3`}
+    >
+      <button
+        type="button"
+        onClick={() => verify.errors && setExpanded((v) => !v)}
+        className="flex w-full items-center gap-3 text-left"
+      >
+        {cfg.icon}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-zinc-900">
+            Final Verification
+          </p>
+          <p className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</p>
+        </div>
+        {verify.errors && (
+          <motion.span
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.12 }}
+            className="shrink-0 text-[10px] text-zinc-400"
+          >
+            ▾
+          </motion.span>
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded && verify.errors && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <pre className="mt-2.5 max-h-[200px] overflow-y-auto rounded-lg bg-zinc-900 p-3 font-mono text-[10px] leading-5 text-zinc-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
+              {verify.errors}
+            </pre>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
 }
 
 function splitLogDetails(details: string): { title: string; body: string } {

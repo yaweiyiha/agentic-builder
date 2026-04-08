@@ -40,6 +40,7 @@ export class EventMapper {
   private nsRoleMap = new Map<string, string>();
   private namespaceAgentMap = new Map<string, string>();
   private agentCurrentTaskId = new Map<string, string>();
+  private integrationFixAttemptCount = 0;
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -85,7 +86,13 @@ export class EventMapper {
         events.push(...this.handleParallelWorkerComplete(u, namespace));
         events.push(...this.emitPhaseWorkingStatus(["test"]));
       } else if (nodeName === "extract_real_contracts") {
-        // silent — no UI event needed
+        // silent
+      } else if (nodeName === "sync_deps") {
+        events.push({
+          type: "integration_verify_start" as CodingSessionEvent["type"],
+          sessionId: this.sessionId,
+          data: {},
+        });
       } else if (nodeName === "fe_dispatch_gate") {
         events.push(...this.emitPhaseWorkingStatus(["frontend"]));
       } else if (nodeName === "generate_code") {
@@ -98,6 +105,8 @@ export class EventMapper {
         events.push(...this.handleTaskDone(u, namespace));
       } else if (nodeName === "integration_verify") {
         events.push(...this.handleIntegrationVerify(u));
+      } else if (nodeName === "integration_fix") {
+        events.push(...this.handleIntegrationFix(u));
       } else if (nodeName === "summary") {
         events.push(this.buildSessionComplete());
       }
@@ -637,19 +646,49 @@ export class EventMapper {
   private handleIntegrationVerify(
     u: Record<string, unknown>,
   ): CodingSessionEvent[] {
-    const errors = u.integrationErrors as string | undefined;
-    if (errors) {
-      return [
-        {
-          type: "agent_task_error" as CodingSessionEvent["type"],
-          sessionId: this.sessionId,
-          data: {
-            error: `Integration verify: ${errors.slice(0, 500)}`,
-            phase: "integration",
-          },
+    const errors =
+      typeof u.integrationErrors === "string"
+        ? u.integrationErrors.trim()
+        : "";
+    const errorCount = errors
+      ? errors.split("\n").filter((l) => l.includes("error TS")).length
+      : 0;
+
+    return [
+      {
+        type: "integration_verify_result" as CodingSessionEvent["type"],
+        sessionId: this.sessionId,
+        data: {
+          passed: !errors,
+          errors: errors ? errors.slice(0, 2000) : undefined,
+          errorCount,
+          fixAttempts: this.integrationFixAttemptCount,
+          maxFixAttempts: 3,
         },
-      ];
-    }
-    return [];
+      },
+    ];
+  }
+
+  private handleIntegrationFix(
+    u: Record<string, unknown>,
+  ): CodingSessionEvent[] {
+    this.integrationFixAttemptCount =
+      typeof u.integrationFixAttempts === "number"
+        ? u.integrationFixAttempts
+        : this.integrationFixAttemptCount + 1;
+    const filesFixed = Array.isArray(u.fileRegistry)
+      ? (u.fileRegistry as unknown[]).length
+      : 0;
+
+    return [
+      {
+        type: "integration_fix_result" as CodingSessionEvent["type"],
+        sessionId: this.sessionId,
+        data: {
+          attempt: this.integrationFixAttemptCount,
+          filesFixed,
+        },
+      },
+    ];
   }
 }

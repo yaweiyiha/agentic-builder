@@ -11,7 +11,6 @@ import { estimateCost, type ChatMessage } from "@/lib/openrouter";
 import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
 import type { CodingAgentRole, CodingTask } from "@/lib/pipeline/types";
 
-const MAX_FIX_ATTEMPTS = 3;
 const MAX_OUTPUT_TOKENS = 16384;
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
@@ -325,8 +324,9 @@ async function generateCode(state: WorkerState) {
 }
 
 // ─── Verify helpers: error classification + auto dep install ───
+// Exported for use by supervisor's integration verify/fix.
 
-interface TscErrorClassification {
+export interface TscErrorClassification {
   missingDeps: string[];
   crossRefErrors: string[];
   realErrors: string[];
@@ -335,7 +335,7 @@ interface TscErrorClassification {
   hasRealErrors: boolean;
 }
 
-function classifyTscErrors(output: string): TscErrorClassification {
+export function classifyTscErrors(output: string): TscErrorClassification {
   const lines = output.split("\n").filter((l) => l.includes("error TS"));
 
   const missingDeps: string[] = [];
@@ -392,7 +392,7 @@ function classifyTscErrors(output: string): TscErrorClassification {
   };
 }
 
-function isPathAlias(specifier: string): boolean {
+export function isPathAlias(specifier: string): boolean {
   return (
     specifier.startsWith("@/") ||
     specifier.startsWith("~/") ||
@@ -400,7 +400,7 @@ function isPathAlias(specifier: string): boolean {
   );
 }
 
-function extractMissingPackages(tscOutput: string): string[] {
+export function extractMissingPackages(tscOutput: string): string[] {
   const pkgs = new Set<string>();
   const moduleRe = /Cannot find module ['"]([^'"]+)['"]/g;
   let m;
@@ -440,7 +440,7 @@ function extractMissingPackages(tscOutput: string): string[] {
   return [...pkgs];
 }
 
-async function installMissingDeps(
+export async function installMissingDeps(
   tscOutput: string,
   outputDir: string,
 ): Promise<void> {
@@ -490,7 +490,7 @@ async function installMissingDeps(
   );
 }
 
-async function findBestTsconfigForFiles(
+export async function findBestTsconfigForFiles(
   taskFiles: string[],
   outputDir: string,
 ): Promise<string | null> {
@@ -531,237 +531,38 @@ async function findBestTsconfigForFiles(
   return null;
 }
 
-// ─── Verify node ───
+// ─── Lightweight verify node (full tsc deferred to integration verify) ───
 
-async function verifyCode(state: WorkerState) {
+async function lightweightVerify(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
-
-  const taskFiles = state.generatedFiles
-    .filter((f) => f.role === state.role)
-    .map((f) => f.path)
-    .filter((p) => /\.(ts|tsx)$/.test(p));
-
-  if (taskFiles.length === 0) {
-    console.log(
-      `[Worker:${state.workerLabel}] Verify: no TS files to check for "${task.title}"`,
-    );
-    return { verifyErrors: "", fixAttempts: state.fixAttempts };
-  }
-
-  console.log(
-    `[Worker:${state.workerLabel}] Verify: running tsc on ${taskFiles.length} file(s) for "${task.title}"...`,
-  );
-
-  const tscProject = await findBestTsconfigForFiles(taskFiles, state.outputDir);
-  const tscCmd = tscProject
-    ? `npx tsc --noEmit --pretty false --skipLibCheck --project ${tscProject} 2>&1`
-    : `npx tsc --noEmit --pretty false --skipLibCheck 2>&1`;
-
-  if (tscProject) {
-    console.log(
-      `[Worker:${state.workerLabel}] Verify: using --project ${tscProject}`,
-    );
-  }
-
-  const runTsc = async (): Promise<{ output: string; exitCode: number }> => {
-    const result = await shellExec(tscCmd, state.outputDir, {
-      timeout: 30_000,
-    });
-    return {
-      output: (result.stderr || result.stdout || "").trim(),
-      exitCode: result.exitCode,
-    };
-  };
-
-  const filterForTask = (raw: string): string =>
-    raw
-      .split("\n")
-      .filter(
-        (line) =>
-          line.includes("error TS") &&
-          taskFiles.some((f) => line.includes(f)),
-      )
-      .slice(0, 50)
-      .join("\n");
-
-  let { output, exitCode } = await runTsc();
-
-  if (exitCode === 0 || !output.includes("error TS")) {
-    console.log(
-      `[Worker:${state.workerLabel}] Verify PASSED for "${task.title}"`,
-    );
-    return { verifyErrors: "", fixAttempts: state.fixAttempts };
-  }
-
-  const relevantOutput = filterForTask(output);
-  if (!relevantOutput) {
-    console.log(
-      `[Worker:${state.workerLabel}] Verify: errors exist but none in task files, PASSED for "${task.title}"`,
-    );
-    return { verifyErrors: "", fixAttempts: state.fixAttempts };
-  }
-
-  const classification = classifyTscErrors(relevantOutput);
-
-  // Type A: missing deps → install first, re-run tsc, no fixAttempts consumed
-  if (classification.hasMissingDeps) {
-    console.log(
-      `[Worker:${state.workerLabel}] Verify: missing deps detected, installing before fix cycle...`,
-    );
-    await installMissingDeps(relevantOutput, state.outputDir);
-    const retry = await runTsc();
-
-    if (retry.exitCode === 0 || !retry.output.includes("error TS")) {
-      console.log(
-        `[Worker:${state.workerLabel}] Verify PASSED after dep install for "${task.title}"`,
-      );
-      return { verifyErrors: "", fixAttempts: state.fixAttempts };
-    }
-
-    const retryRelevant = filterForTask(retry.output);
-    if (!retryRelevant) {
-      console.log(
-        `[Worker:${state.workerLabel}] Verify PASSED after dep install for "${task.title}"`,
-      );
-      return { verifyErrors: "", fixAttempts: state.fixAttempts };
-    }
-
-    const afterInstall = classifyTscErrors(retryRelevant);
-    if (!afterInstall.hasRealErrors) {
-      console.log(
-        `[Worker:${state.workerLabel}] Verify: only cross-ref errors remain after dep install, skipping for "${task.title}"`,
-      );
-      return { verifyErrors: "", fixAttempts: state.fixAttempts };
-    }
-    output = afterInstall.realErrors.join("\n").slice(0, 2000);
-  }
-  // Type B: cross-ref only → skip, other files not generated yet
-  else if (classification.hasCrossRefOnly) {
-    console.log(
-      `[Worker:${state.workerLabel}] Verify: cross-ref errors only (other files not generated yet), skipping for "${task.title}"`,
-    );
-    return { verifyErrors: "", fixAttempts: state.fixAttempts };
-  }
-  // Type C: real code errors → enter fix loop
-  else {
-    output = classification.realErrors.join("\n").slice(0, 2000);
-  }
-
-  const errorPreview = output.slice(0, 200).replace(/\n/g, " | ");
-  console.log(
-    `[Worker:${state.workerLabel}] Verify FAILED (attempt ${state.fixAttempts + 1}/${MAX_FIX_ATTEMPTS}): ${errorPreview}`,
-  );
-  return {
-    verifyErrors: output,
-    fixAttempts: state.fixAttempts,
-  };
-}
-
-function shouldFixOrProceed(state: WorkerState): string {
-  if (!state.verifyErrors) return "task_done";
-  if (state.fixAttempts >= MAX_FIX_ATTEMPTS) return "task_done";
-  return "fix_errors";
-}
-
-async function fixErrors(state: WorkerState) {
-  const task = state.tasks[state.currentTaskIndex];
-
-  const errFiles = extractErrorFiles(state.verifyErrors);
-  const taskFiles = state.generatedFiles
-    .filter((f) => f.role === state.role)
+  const currentFiles = state.generatedFiles
+    .filter((f) => f.summary.includes(task.title))
     .map((f) => f.path);
 
-  const fileContents: string[] = [];
-  const addedPaths = new Set<string>();
-
-  for (const ef of errFiles.slice(0, 5)) {
-    const content = await fsRead(ef, state.outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND")) {
-      fileContents.push(`### ${ef}\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``);
-      addedPaths.add(ef);
+  if (currentFiles.length === 0) {
+    console.log(
+      `[Worker:${state.workerLabel}] Verify: no files generated for "${task.title}" — deferred to final verification`,
+    );
+  } else {
+    let missing = 0;
+    for (const fp of currentFiles) {
+      const content = await fsRead(fp, state.outputDir);
+      if (content.startsWith("FILE_NOT_FOUND") || content.trim().length === 0) {
+        missing++;
+      }
     }
-  }
-
-  const configFiles = await inferRelatedConfigFiles(
-    state.verifyErrors,
-    state.outputDir,
-    taskFiles,
-  );
-  for (const cf of configFiles) {
-    if (addedPaths.has(cf)) continue;
-    const content = await fsRead(cf, state.outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND")) {
-      fileContents.push(
-        `### ${cf} (config)\n\`\`\`json\n${content.slice(0, 2000)}\n\`\`\``,
+    if (missing > 0) {
+      console.log(
+        `[Worker:${state.workerLabel}] Verify: ${currentFiles.length} files generated, ${missing} missing/empty for "${task.title}"`,
       );
-      addedPaths.add(cf);
+    } else {
+      console.log(
+        `[Worker:${state.workerLabel}] Verify: ${currentFiles.length} files OK for "${task.title}" — full tsc deferred to final verification`,
+      );
     }
   }
 
-  const isConfigError = hasConfigErrors(state.verifyErrors);
-  const configHint = isConfigError
-    ? "**IMPORTANT**: These errors are likely caused by tsconfig.json misconfiguration " +
-      '(e.g. missing `"jsx": "react-jsx"` or wrong `compilerOptions`). ' +
-      "If the fix requires changing tsconfig.json or other config files, " +
-      "output the corrected config file(s) as well.\n"
-    : "";
-
-  const versionConstraints = await buildVersionConstraints(state.outputDir);
-
-  const messages: ChatMessage[] = [
-    { role: "system", content: ROLE_PROMPTS[state.role] },
-    {
-      role: "user",
-      content: [
-        `## Fix TypeScript Errors for task: ${task.title}`,
-        "",
-        "### Errors",
-        "```",
-        state.verifyErrors,
-        "```",
-        "",
-        configHint,
-        versionConstraints
-          ? `### Installed package versions (use these APIs, not older ones)\n${versionConstraints}`
-          : "",
-        fileContents.length > 0
-          ? `### Current file contents\n${fileContents.join("\n\n")}`
-          : "",
-        "",
-        "Output ONLY the corrected files using ```file:<path> format.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    },
-  ];
-
-  const startMs = Date.now();
-  const response = await invokeCodegenOrOpenRouter(messages, {
-    temperature: 0.2,
-    max_tokens: MAX_OUTPUT_TOKENS,
-    openRouterVariant: "codeFix",
-  });
-
-  const content = response.choices[0]?.message?.content ?? "";
-  const costUsd = estimateCost(response.model, response.usage);
-  const fixes = parseFileOutput(content);
-
-  const updatedFiles: GeneratedFile[] = [];
-  for (const [fp, fc] of Object.entries(fixes)) {
-    await fsWrite(fp, fc, state.outputDir);
-    updatedFiles.push({
-      path: fp,
-      role: state.role,
-      summary: `Fix attempt ${state.fixAttempts} for: ${task.title}`,
-    });
-  }
-
-  return {
-    generatedFiles: updatedFiles,
-    workerCostUsd: costUsd,
-    verifyErrors: "",
-    fixAttempts: state.fixAttempts + 1,
-  };
+  return { verifyErrors: "", fixAttempts: 0 };
 }
 
 function taskDone(state: WorkerState) {
@@ -794,7 +595,7 @@ function taskDone(state: WorkerState) {
   };
 }
 
-function extractErrorFiles(stderr: string): string[] {
+export function extractErrorFiles(stderr: string): string[] {
   const fileSet = new Set<string>();
   const regex = /([^\s(]+\.tsx?)\(\d+,\d+\):/g;
   let match;
@@ -822,7 +623,7 @@ const CONFIG_ERROR_PATTERNS: {
   },
 ];
 
-async function inferRelatedConfigFiles(
+export async function inferRelatedConfigFiles(
   errors: string,
   outputDir: string,
   taskFiles: string[],
@@ -864,7 +665,7 @@ async function inferRelatedConfigFiles(
   return found;
 }
 
-function hasConfigErrors(errors: string): boolean {
+export function hasConfigErrors(errors: string): boolean {
   return /TS17004|TS1484|TS5023|TS5024|TS6046|--jsx/.test(errors);
 }
 
@@ -874,8 +675,7 @@ export function createWorkerSubGraph() {
   const graph = new StateGraph(WorkerStateAnnotation)
     .addNode("pick_next_task", pickNextTask)
     .addNode("generate_code", generateCode)
-    .addNode("verify", verifyCode)
-    .addNode("fix_errors", fixErrors)
+    .addNode("verify", lightweightVerify)
     .addNode("task_done", taskDone)
 
     .addEdge(START, "pick_next_task")
@@ -884,11 +684,7 @@ export function createWorkerSubGraph() {
       __end__: END,
     })
     .addEdge("generate_code", "verify")
-    .addConditionalEdges("verify", shouldFixOrProceed, {
-      task_done: "task_done",
-      fix_errors: "fix_errors",
-    })
-    .addEdge("fix_errors", "verify")
+    .addEdge("verify", "task_done")
     .addEdge("task_done", "pick_next_task");
 
   return graph.compile();

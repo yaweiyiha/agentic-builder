@@ -81,7 +81,7 @@ export const MODEL_CONFIG = {
   // ── Coding phase ───────────────────────────────────────────────────────────
 
   /** Code generation per task (all coding sub-agents). */
-  codeGen: "gpt-5.3-codex",
+  codeGen: "qwen/qwen3-coder",
 
   /** Error-fix pass after code verification fails. */
   codeFix: "gpt-4o",

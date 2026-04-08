@@ -192,6 +192,9 @@ export interface CodingSessionEvent {
     | "agent_idle"
     | "agent_completed"
     | "agent_log"
+    | "integration_verify_start"
+    | "integration_verify_result"
+    | "integration_fix_result"
     | "session_complete"
     | "session_error";
   sessionId: string;

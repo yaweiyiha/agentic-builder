@@ -8,6 +8,15 @@ import type {
   KickoffWorkItem,
 } from "@/lib/pipeline/types";
 
+export interface IntegrationVerifyState {
+  status: "verifying" | "fixing" | "passed" | "failed";
+  errors?: string;
+  errorCount?: number;
+  fixAttempts: number;
+  maxFixAttempts: number;
+  filesFixed?: number;
+}
+
 interface CodingState {
   sessionId: string | null;
   status: "idle" | "running" | "completed" | "failed";
@@ -16,6 +25,7 @@ interface CodingState {
   selectedAgentId: string | null;
   totalCostUsd: number;
   error: string | null;
+  integrationVerify: IntegrationVerifyState | null;
 
   startCoding: (
     runId: string,
@@ -34,6 +44,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
   selectedAgentId: null,
   totalCostUsd: 0,
   error: null,
+  integrationVerify: null,
 
   selectAgent: (agentId) => set({ selectedAgentId: agentId }),
 
@@ -46,6 +57,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       selectedAgentId: null,
       totalCostUsd: 0,
       sessionId: null,
+      integrationVerify: null,
     });
 
     fetch("/api/agents/coding", {
@@ -120,6 +132,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       selectedAgentId: null,
       totalCostUsd: 0,
       error: null,
+      integrationVerify: null,
     });
   },
 }));
@@ -443,5 +456,64 @@ function handleCodingEvent(
       status: "failed",
       error: (payload.data?.error as string) ?? "Session failed",
     });
+    return;
+  }
+
+  if (type === "integration_verify_start") {
+    set({
+      integrationVerify: {
+        status: "verifying",
+        fixAttempts: 0,
+        maxFixAttempts: 3,
+      },
+    });
+    return;
+  }
+
+  if (type === "integration_verify_result") {
+    const passed = payload.data?.passed as boolean;
+    const errors = payload.data?.errors as string | undefined;
+    const errorCount = payload.data?.errorCount as number | undefined;
+    const fixAttempts = (payload.data?.fixAttempts as number) ?? 0;
+    const maxFixAttempts = (payload.data?.maxFixAttempts as number) ?? 3;
+
+    if (passed) {
+      set({
+        integrationVerify: {
+          status: "passed",
+          fixAttempts,
+          maxFixAttempts,
+        },
+      });
+    } else {
+      const atMax = fixAttempts >= maxFixAttempts;
+      set({
+        integrationVerify: {
+          status: atMax ? "failed" : "fixing",
+          errors,
+          errorCount,
+          fixAttempts,
+          maxFixAttempts,
+        },
+      });
+    }
+    return;
+  }
+
+  if (type === "integration_fix_result") {
+    const attempt = (payload.data?.attempt as number) ?? 0;
+    const filesFixed = payload.data?.filesFixed as number | undefined;
+    const prev = get().integrationVerify;
+    set({
+      integrationVerify: {
+        status: "verifying",
+        fixAttempts: attempt,
+        maxFixAttempts: prev?.maxFixAttempts ?? 3,
+        filesFixed,
+        errors: undefined,
+        errorCount: undefined,
+      },
+    });
+    return;
   }
 }

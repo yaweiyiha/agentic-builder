@@ -7,7 +7,15 @@ import {
   type GeneratedFile,
   type ApiContract,
 } from "./state";
-import { createWorkerSubGraph } from "./agent-subgraph";
+import {
+  createWorkerSubGraph,
+  classifyTscErrors,
+  installMissingDeps,
+  extractErrorFiles,
+  inferRelatedConfigFiles,
+  hasConfigErrors,
+  findBestTsconfigForFiles,
+} from "./agent-subgraph";
 import { shellExec, fsWrite, fsRead, listFiles } from "./tools";
 import {
   chatCompletion,
@@ -914,28 +922,186 @@ async function syncDeps(state: SupervisorState) {
   return {};
 }
 
-async function integrationVerify(state: SupervisorState) {
-  const { stderr, exitCode } = await shellExec(
-    "npx tsc --noEmit 2>&1 | tail -40",
-    state.outputDir,
-  );
+const MAX_INTEGRATION_FIX_ATTEMPTS = 3;
 
-  const hasErrors = exitCode !== 0 && stderr && /error TS/.test(stderr);
+async function integrationVerify(state: SupervisorState) {
+  console.log("[Supervisor] Integration verify: running full project tsc check...");
+
+  const allPaths = state.fileRegistry.map((f) => f.path);
+  const tscProject = await findBestTsconfigForFiles(allPaths, state.outputDir);
+  const tscCmd = tscProject
+    ? `npx tsc --noEmit --pretty false --skipLibCheck --project ${tscProject} 2>&1`
+    : `npx tsc --noEmit --pretty false --skipLibCheck 2>&1`;
+
+  if (tscProject) {
+    console.log(
+      `[Supervisor] Integration verify: using --project ${tscProject}`,
+    );
+  }
+
+  const runTsc = async (): Promise<{ output: string; exitCode: number }> => {
+    const result = await shellExec(tscCmd, state.outputDir, {
+      timeout: 60_000,
+    });
+    return {
+      output: (result.stderr || result.stdout || "").trim(),
+      exitCode: result.exitCode,
+    };
+  };
+
+  let { output, exitCode } = await runTsc();
+
+  if (exitCode === 0 || !output.includes("error TS")) {
+    console.log("[Supervisor] Integration verify: PASSED (no errors)");
+    return { integrationErrors: "" };
+  }
+
+  const classification = classifyTscErrors(output);
+
+  if (classification.hasMissingDeps) {
+    console.log(
+      "[Supervisor] Integration verify: missing deps detected, installing...",
+    );
+    await installMissingDeps(output, state.outputDir);
+    const retry = await runTsc();
+    if (retry.exitCode === 0 || !retry.output.includes("error TS")) {
+      console.log("[Supervisor] Integration verify: PASSED after dep install");
+      return { integrationErrors: "" };
+    }
+    output = retry.output;
+  }
+
+  const errorLines = output
+    .split("\n")
+    .filter((l) => l.includes("error TS"));
+  const errorCount = errorLines.length;
+  const truncated = errorLines.slice(0, 80).join("\n");
+
+  console.log(
+    `[Supervisor] Integration verify: FAILED with ${errorCount} error(s) (fixAttempts=${state.integrationFixAttempts})`,
+  );
   return {
-    integrationErrors: hasErrors ? stderr.slice(-2000) : "",
+    integrationErrors: truncated.slice(0, 4000),
   };
 }
 
 function shouldFixIntegrationOrSummarize(state: SupervisorState): string {
   if (!state.integrationErrors) return "summary";
-  if (state.integrationFixAttempts >= 2) return "summary";
+  if (state.integrationFixAttempts >= MAX_INTEGRATION_FIX_ATTEMPTS) {
+    console.log(
+      `[Supervisor] Integration fix: max attempts (${MAX_INTEGRATION_FIX_ATTEMPTS}) reached, proceeding to summary.`,
+    );
+    return "summary";
+  }
   return "integration_fix";
 }
 
 async function integrationFix(state: SupervisorState) {
+  const attempt = state.integrationFixAttempts + 1;
+  console.log(
+    `[Supervisor] Integration fix: attempt ${attempt}/${MAX_INTEGRATION_FIX_ATTEMPTS}...`,
+  );
+
+  const errFiles = extractErrorFiles(state.integrationErrors);
+  const fileContents: string[] = [];
+  const addedPaths = new Set<string>();
+
+  for (const ef of errFiles.slice(0, 8)) {
+    const content = await fsRead(ef, state.outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND")) {
+      fileContents.push(
+        `### ${ef}\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``,
+      );
+      addedPaths.add(ef);
+    }
+  }
+
+  const allGeneratedPaths = state.fileRegistry.map((f) => f.path);
+  const configFiles = await inferRelatedConfigFiles(
+    state.integrationErrors,
+    state.outputDir,
+    allGeneratedPaths,
+  );
+  for (const cf of configFiles) {
+    if (addedPaths.has(cf)) continue;
+    const content = await fsRead(cf, state.outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND")) {
+      fileContents.push(
+        `### ${cf} (config)\n\`\`\`json\n${content.slice(0, 2000)}\n\`\`\``,
+      );
+      addedPaths.add(cf);
+    }
+  }
+
+  const isConfigError = hasConfigErrors(state.integrationErrors);
+  const configHint = isConfigError
+    ? "**IMPORTANT**: Some errors are likely caused by tsconfig.json misconfiguration " +
+      "(e.g. missing `\"jsx\": \"react-jsx\"` or wrong `compilerOptions`). " +
+      "If the fix requires changing tsconfig.json or other config files, " +
+      "output the corrected config file(s) as well.\n"
+    : "";
+
+  const model = resolveModel(MODEL_CONFIG.codeFix);
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: `You are a Senior Full-Stack Developer fixing TypeScript compilation errors across an entire project.
+Fix all errors so that "npx tsc --noEmit" passes cleanly.
+Rules:
+- Fix type errors, missing imports, incorrect interfaces, wrong JSX config, etc.
+- If a config file (tsconfig.json, package.json) needs changes, output the corrected version.
+- Prefer minimal changes that fix the errors without breaking other functionality.
+- Output ONLY corrected files using \`\`\`file:<relative-path>\\n<contents>\\n\`\`\` format.`,
+    },
+    {
+      role: "user",
+      content: [
+        `## TypeScript Errors (attempt ${attempt}/${MAX_INTEGRATION_FIX_ATTEMPTS})`,
+        "```",
+        state.integrationErrors,
+        "```",
+        "",
+        configHint,
+        fileContents.length > 0
+          ? `## Current file contents\n${fileContents.join("\n\n")}`
+          : "",
+        "",
+        "Fix all errors. Output ONLY the corrected files.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  ];
+
+  const response = await chatCompletion(messages, {
+    model,
+    temperature: 0.2,
+    max_tokens: 16384,
+  });
+
+  const content = response.choices[0]?.message?.content ?? "";
+  const costUsd = estimateCost(response.model, response.usage);
+  const fixes = parseFileOutput(content);
+
+  const fixedFiles: GeneratedFile[] = [];
+  for (const [fp, fc] of Object.entries(fixes)) {
+    await fsWrite(fp, fc, state.outputDir);
+    fixedFiles.push({
+      path: fp,
+      role: "architect",
+      summary: `Integration fix attempt ${attempt}`,
+    });
+  }
+
+  console.log(
+    `[Supervisor] Integration fix: wrote ${fixedFiles.length} files (cost: $${costUsd.toFixed(4)})`,
+  );
+
   return {
-    integrationFixAttempts: state.integrationFixAttempts + 1,
+    integrationFixAttempts: attempt,
     integrationErrors: "",
+    fileRegistry: fixedFiles,
+    totalCostUsd: costUsd,
   };
 }
 

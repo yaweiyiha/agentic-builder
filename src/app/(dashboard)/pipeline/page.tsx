@@ -22,6 +22,7 @@ import Loading from "@/components/Loading";
 import type { PipelineStepId, StepResult } from "@/lib/pipeline/types";
 import type { ProjectTier } from "@/lib/agents/project-classifier";
 import { DEBUG_SAMPLE_KICKOFF_TASKS } from "@/lib/pipeline/debug-sample-tasks";
+import { DEBUG_CRITICAL_ILLNESS_KICKOFF_TASKS } from "@/lib/pipeline/debug-critical-illness-tasks";
 import { parseKickoffTaskBreakdownFromMetadata } from "@/lib/pipeline/kickoff-task-breakdown";
 import {
   isContinueCommand,
@@ -378,6 +379,13 @@ export default function PipelinePage() {
     const runId = `debug-coding-${Date.now()}`;
     setActiveOverridePhase("coding");
     startCoding(runId, DEBUG_SAMPLE_KICKOFF_TASKS, codeOutputDir);
+  }, [isRunning, codingStatus, codeOutputDir, startCoding]);
+
+  const handleDebugCodingCriticalIllness = useCallback(() => {
+    if (isRunning || codingStatus === "running") return;
+    const runId = `debug-coding-ci-${Date.now()}`;
+    setActiveOverridePhase("coding");
+    startCoding(runId, DEBUG_CRITICAL_ILLNESS_KICKOFF_TASKS, codeOutputDir);
   }, [isRunning, codingStatus, codeOutputDir, startCoding]);
 
   const displayedStepId: PipelineStepId =
@@ -1257,6 +1265,26 @@ export default function PipelinePage() {
                 <path d="M21 12V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14" />
               </svg>
               Debug Coding
+            </button>
+            <span className="text-zinc-200">&middot;</span>
+            <button
+              type="button"
+              onClick={handleDebugCodingCriticalIllness}
+              disabled={isRunning || codingStatus === "running"}
+              className="flex items-center gap-1 transition-colors hover:text-zinc-600 disabled:opacity-40"
+              title="23 tasks: critical illness portal (separate from minimal debug sample)"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              Debug Coding · Critical Illness
             </button>
           </div>
 

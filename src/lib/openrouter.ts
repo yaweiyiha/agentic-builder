@@ -3,6 +3,11 @@ import {
   gpt5ChatCompletion,
   gpt5StreamChatCompletion,
 } from "./gpt5";
+import {
+  isGeminiProvider,
+  geminiChatCompletion,
+  geminiStreamChatCompletion,
+} from "./gemini";
 import type {
   ChatMessage,
   OpenRouterOptions,
@@ -85,6 +90,9 @@ export async function chatCompletion(
   messages: ChatMessage[],
   options: OpenRouterOptions = {},
 ): Promise<OpenRouterResponse> {
+  if (isGeminiProvider()) {
+    return geminiChatCompletion(messages, options);
+  }
   if (options.model === GPT5_MODEL_ID) {
     return gpt5ChatCompletion(messages, {
       temperature: options.temperature,
@@ -99,6 +107,9 @@ export async function streamChatCompletion(
   messages: ChatMessage[],
   options: Omit<OpenRouterOptions, "stream"> = {},
 ) {
+  if (isGeminiProvider()) {
+    return geminiStreamChatCompletion(messages, options);
+  }
   if (options.model === GPT5_MODEL_ID) {
     return gpt5StreamChatCompletion(messages, {
       temperature: options.temperature,
