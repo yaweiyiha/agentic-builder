@@ -12,6 +12,7 @@ import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
 import type { CodingAgentRole, CodingTask } from "@/lib/pipeline/types";
 
 const MAX_OUTPUT_TOKENS = 16384;
+const MAX_FIX_ATTEMPTS = 1;
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
   architect: `You are a Senior Software Architect Agent.
@@ -164,7 +165,7 @@ const KNOWN_BREAKING_CHANGES: Record<
   },
 };
 
-async function buildVersionConstraints(outputDir: string): Promise<string> {
+export async function buildVersionConstraints(outputDir: string): Promise<string> {
   const content = await fsRead("package.json", outputDir);
   if (content.startsWith("FILE_NOT_FOUND")) return "";
 
@@ -254,10 +255,41 @@ async function generateCode(state: WorkerState) {
   if (state.fileRegistrySnapshot.length > 0) {
     const listing = state.fileRegistrySnapshot
       .slice(0, 30)
-      .map((f) => `- ${f.path} (${f.role}): ${f.summary}`)
+      .map((f) => {
+        const exportsNote =
+          f.exports && f.exports.length > 0
+            ? ` | exports: ${f.exports.slice(0, 8).join(", ")}`
+            : "";
+        return `- ${f.path} (${f.role}): ${f.summary}${exportsNote}`;
+      })
       .join("\n");
     contextParts.push(`## Already generated files\n${listing}`);
   }
+
+  const skeletonFiles = state.fileRegistrySnapshot.filter(
+    (f) =>
+      f.role === "architect" &&
+      f.summary.startsWith("Interface skeleton") &&
+      /\.(ts|tsx)$/.test(f.path),
+  );
+
+  if (skeletonFiles.length > 0) {
+    const skeletonContents: string[] = [];
+    for (const sf of skeletonFiles.slice(0, 8)) {
+      const content = await fsRead(sf.path, state.outputDir);
+      if (!content.startsWith("FILE_NOT_FOUND")) {
+        skeletonContents.push(
+          `### ${sf.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``,
+        );
+      }
+    }
+    if (skeletonContents.length > 0) {
+      contextParts.push(
+        `## Interface contracts (implement these exactly — do not rename exports)\n${skeletonContents.join("\n\n")}`,
+      );
+    }
+  }
+
   if (state.apiContractsSnapshot.length > 0) {
     const apis = state.apiContractsSnapshot
       .map((a) => `- ${a.method} ${a.endpoint} (${a.service})`)
@@ -301,10 +333,19 @@ async function generateCode(state: WorkerState) {
   const costUsd = estimateCost(response.model, response.usage);
   const parsedFiles = parseFileOutput(content);
 
+  const fsOpts =
+    state.scaffoldProtectedPaths.length > 0
+      ? { scaffoldProtectedPaths: state.scaffoldProtectedPaths }
+      : undefined;
+
   const writtenFiles: string[] = [];
   const newFileEntries: GeneratedFile[] = [];
   for (const [fp, fc] of Object.entries(parsedFiles)) {
-    await fsWrite(fp, fc, state.outputDir);
+    const msg = await fsWrite(fp, fc, state.outputDir, fsOpts);
+    if (msg.startsWith("SKIPPED_PROTECTED")) {
+      console.log(`[Worker:${state.workerLabel}] ${msg}`);
+      continue;
+    }
     writtenFiles.push(fp);
     newFileEntries.push({
       path: fp,
@@ -313,7 +354,9 @@ async function generateCode(state: WorkerState) {
     });
   }
 
-  console.log(`[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (cost: $${costUsd.toFixed(4)})`);
+  console.log(
+    `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+  );
 
   return {
     generatedFiles: newFileEntries,
@@ -443,8 +486,16 @@ export function extractMissingPackages(tscOutput: string): string[] {
 export async function installMissingDeps(
   tscOutput: string,
   outputDir: string,
+  options?: { scaffoldProtectedPaths?: string[] },
 ): Promise<void> {
   const pkgs = extractMissingPackages(tscOutput);
+  const toolOpts =
+    options?.scaffoldProtectedPaths && options.scaffoldProtectedPaths.length > 0
+      ? {
+          scaffoldProtectedPaths: options.scaffoldProtectedPaths,
+          forceProtectedOverwrite: true,
+        }
+      : undefined;
 
   const needsJestDom =
     /toBeInTheDocument|toHaveTextContent|toBeVisible/.test(tscOutput);
@@ -458,6 +509,7 @@ export async function installMissingDeps(
         setupPath,
         `import '@testing-library/jest-dom';\n`,
         outputDir,
+        toolOpts,
       );
       console.log(`[Verify] Created test setup file: ${setupPath}`);
 
@@ -471,7 +523,7 @@ export async function installMissingDeps(
           `test: {\n    setupFiles: ['./src/test/setup.ts'],`,
         );
         if (updated !== vitestConfig) {
-          await fsWrite("vitest.config.ts", updated, outputDir);
+          await fsWrite("vitest.config.ts", updated, outputDir, toolOpts);
           console.log(`[Verify] Updated vitest.config.ts with setupFiles`);
         }
       }
@@ -531,38 +583,71 @@ export async function findBestTsconfigForFiles(
   return null;
 }
 
-// ─── Lightweight verify node (full tsc deferred to integration verify) ───
+// ─── Lightweight verify node (full tsc deferred to phase verify) ───
 
-async function lightweightVerify(state: WorkerState) {
+async function verifyCode(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
-  const currentFiles = state.generatedFiles
-    .filter((f) => f.summary.includes(task.title))
+
+  const taskFiles = state.generatedFiles
+    .filter((f) => f.role === state.role)
     .map((f) => f.path);
 
-  if (currentFiles.length === 0) {
+  if (taskFiles.length === 0) {
     console.log(
-      `[Worker:${state.workerLabel}] Verify: no files generated for "${task.title}" — deferred to final verification`,
+      `[Worker:${state.workerLabel}] LightCheck: no files generated for "${task.title}" — marking as warning`,
     );
-  } else {
-    let missing = 0;
-    for (const fp of currentFiles) {
-      const content = await fsRead(fp, state.outputDir);
-      if (content.startsWith("FILE_NOT_FOUND") || content.trim().length === 0) {
-        missing++;
-      }
+    return {
+      verifyErrors: `No files generated for task: ${task.title}`,
+      fixAttempts: state.fixAttempts,
+    };
+  }
+
+  const issues: string[] = [];
+
+  for (const filePath of taskFiles) {
+    const normalizedPath = path.normalize(filePath);
+    if (path.isAbsolute(normalizedPath) || normalizedPath.includes("..")) {
+      issues.push(`Unsafe path rejected: ${filePath}`);
+      continue;
     }
-    if (missing > 0) {
-      console.log(
-        `[Worker:${state.workerLabel}] Verify: ${currentFiles.length} files generated, ${missing} missing/empty for "${task.title}"`,
-      );
-    } else {
-      console.log(
-        `[Worker:${state.workerLabel}] Verify: ${currentFiles.length} files OK for "${task.title}" — full tsc deferred to final verification`,
+
+    const content = await fsRead(filePath, state.outputDir);
+    if (content.startsWith("FILE_NOT_FOUND")) {
+      issues.push(`File not found after write: ${filePath}`);
+      continue;
+    }
+    if (content.trim().length < 10) {
+      issues.push(`File appears empty: ${filePath} (${content.length} chars)`);
+      continue;
+    }
+
+    const trimmed = content.trimEnd();
+    if (
+      trimmed.endsWith(",") ||
+      trimmed.endsWith("(") ||
+      trimmed.endsWith("{")
+    ) {
+      issues.push(
+        `File may be truncated: ${filePath} (ends with '${trimmed.slice(-1)}')`,
       );
     }
   }
 
-  return { verifyErrors: "", fixAttempts: 0 };
+  if (issues.length > 0) {
+    const errorMsg = issues.join("\n");
+    console.log(
+      `[Worker:${state.workerLabel}] LightCheck FAILED for "${task.title}":\n${errorMsg}`,
+    );
+    return {
+      verifyErrors: errorMsg,
+      fixAttempts: state.fixAttempts,
+    };
+  }
+
+  console.log(
+    `[Worker:${state.workerLabel}] LightCheck PASSED for "${task.title}" (${taskFiles.length} file(s))`,
+  );
+  return { verifyErrors: "", fixAttempts: state.fixAttempts };
 }
 
 function taskDone(state: WorkerState) {
@@ -675,7 +760,7 @@ export function createWorkerSubGraph() {
   const graph = new StateGraph(WorkerStateAnnotation)
     .addNode("pick_next_task", pickNextTask)
     .addNode("generate_code", generateCode)
-    .addNode("verify", lightweightVerify)
+    .addNode("verify", verifyCode)
     .addNode("task_done", taskDone)
 
     .addEdge(START, "pick_next_task")

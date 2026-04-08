@@ -90,17 +90,72 @@ export async function chatCompletion(
   messages: ChatMessage[],
   options: OpenRouterOptions = {},
 ): Promise<OpenRouterResponse> {
+  const requestedModel = options.model ?? OPENROUTER_DEFAULT_MODEL;
+
   if (isGeminiProvider()) {
+    const geminiModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+    console.log(
+      `[LLM] provider=gemini  model=${geminiModel}  (requested=${requestedModel})`,
+    );
     return geminiChatCompletion(messages, options);
   }
   if (options.model === GPT5_MODEL_ID) {
+    console.log(`[LLM] provider=gpt5-gateway  model=${GPT5_MODEL_ID}`);
     return gpt5ChatCompletion(messages, {
       temperature: options.temperature,
       max_tokens: options.max_tokens,
       response_format: options.response_format,
     });
   }
+  console.log(`[LLM] provider=openrouter  model=${requestedModel}`);
   return openRouterChatCompletion(messages, options);
+}
+
+const FALLBACK_RETRY_DELAY_MS = 2_000;
+
+/**
+ * Try an ordered list of models; on LLM-level failure (API error, timeout, empty response)
+ * fall through to the next model. Non-LLM errors (e.g. AbortError) are re-thrown immediately.
+ */
+export async function chatCompletionWithFallback(
+  messages: ChatMessage[],
+  modelChain: string[],
+  options: Omit<OpenRouterOptions, "model"> = {},
+): Promise<OpenRouterResponse> {
+  let lastErr: Error | null = null;
+
+  for (let i = 0; i < modelChain.length; i++) {
+    const model = modelChain[i];
+    try {
+      const resp = await chatCompletion(messages, { ...options, model });
+
+      const content = resp.choices?.[0]?.message?.content ?? "";
+      if (!content.trim() && resp.choices?.[0]?.finish_reason !== "tool_calls") {
+        throw new Error(`Model ${model} returned empty content`);
+      }
+
+      return resp;
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+
+      if (lastErr.name === "AbortError") throw lastErr;
+
+      const isLast = i === modelChain.length - 1;
+      if (isLast) {
+        console.error(
+          `[LLM Fallback] All ${modelChain.length} model(s) failed. Last: ${model} — ${lastErr.message.slice(0, 200)}`,
+        );
+        throw lastErr;
+      }
+
+      console.warn(
+        `[LLM Fallback] model=${model} failed (${lastErr.message.slice(0, 150)}), trying next: ${modelChain[i + 1]}`,
+      );
+      await new Promise((r) => setTimeout(r, FALLBACK_RETRY_DELAY_MS));
+    }
+  }
+
+  throw lastErr ?? new Error("No models in fallback chain");
 }
 
 export async function streamChatCompletion(

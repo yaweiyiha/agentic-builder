@@ -1,6 +1,6 @@
 import { BaseAgent } from "../shared/base-agent";
 import type { CodingAgentRole } from "@/lib/pipeline/types";
-import { MODEL_CONFIG } from "@/lib/model-config";
+import { MODEL_CONFIG, primaryModel } from "@/lib/model-config";
 import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
@@ -141,7 +141,7 @@ export class CodeGenAgent extends BaseAgent {
       name: instanceLabel,
       role: role,
       systemPrompt: ROLE_PROMPTS[role],
-      defaultModel: MODEL_CONFIG.codeGen,
+      defaultModel: primaryModel(MODEL_CONFIG.codeGen),
       temperature: 0.3,
       maxTokens: 16384,
       customChatCompletion: (messages, opts) =>

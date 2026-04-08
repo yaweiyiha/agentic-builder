@@ -1,0 +1,10 @@
+{
+  "name": "project-root",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --parallel run dev",
+    "build": "pnpm --recursive run build",
+    "test": "pnpm --recursive run test"
+  }
+}

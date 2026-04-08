@@ -31,6 +31,7 @@ interface CodingState {
     runId: string,
     tasks: KickoffWorkItem[],
     codeOutputDir: string,
+    projectTier?: string,
   ) => void;
   selectAgent: (agentId: string | null) => void;
   reset: () => void;
@@ -48,7 +49,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
 
   selectAgent: (agentId) => set({ selectedAgentId: agentId }),
 
-  startCoding: (runId, taskItems, codeOutputDir) => {
+  startCoding: (runId, taskItems, codeOutputDir, projectTier) => {
     set({
       status: "running",
       error: null,
@@ -63,7 +64,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
     fetch("/api/agents/coding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ runId, tasks: taskItems, codeOutputDir }),
+      body: JSON.stringify({ runId, tasks: taskItems, codeOutputDir, projectTier }),
     })
       .then(async (resp) => {
         if (!resp.ok) {
@@ -452,10 +453,34 @@ function handleCodingEvent(
   }
 
   if (type === "session_error") {
+    const errorCategory = (payload.data?.errorCategory as string) ?? "unknown";
+    const currentTasks = get().tasks;
+    const currentAgents = get().agents;
+
+    const cleanedTasks = currentTasks.map((t) =>
+      t.codingStatus === "in_progress"
+        ? { ...t, codingStatus: "failed" as const }
+        : t,
+    );
+
+    const cleanedAgents = currentAgents.map((a) =>
+      a.status === "working"
+        ? { ...a, status: "idle" as const, currentTaskId: null }
+        : a,
+    );
+
     set({
       status: "failed",
       error: (payload.data?.error as string) ?? "Session failed",
+      tasks: cleanedTasks,
+      agents: cleanedAgents,
     });
+
+    console.warn(
+      `[CodingStore] session_error (${errorCategory}): ` +
+      `marked ${cleanedTasks.filter((_, i) => currentTasks[i].codingStatus === "in_progress").length} task(s) failed, ` +
+      `reset ${cleanedAgents.filter((_, i) => currentAgents[i].status === "working").length} agent(s) to idle`,
+    );
     return;
   }
 

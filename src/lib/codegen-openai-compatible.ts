@@ -1,6 +1,6 @@
-import { chatCompletion, resolveModel } from "@/lib/openrouter";
+import { chatCompletionWithFallback, resolveModel } from "@/lib/openrouter";
 import type { ChatMessage, OpenRouterResponse } from "@/lib/llm-types";
-import { MODEL_CONFIG } from "@/lib/model-config";
+import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 
 const DEFAULT_CODEGEN_BASE = "https://api.gptsapi.net/v1";
 const DEFAULT_CODEGEN_MODEL = "claude-opus-4-6";
@@ -157,12 +157,22 @@ export async function invokeCodegenOrOpenRouter(
   },
 ): Promise<OpenRouterResponse> {
   if (isCodegenCustomProvider()) {
+    const customModel =
+      process.env.CODEGEN_MODEL?.trim() || DEFAULT_CODEGEN_MODEL;
+    const customBase =
+      process.env.CODEGEN_OPENAI_BASE_URL?.trim() || DEFAULT_CODEGEN_BASE;
+    console.log(
+      `[LLM] provider=codegen-custom  model=${customModel}  base=${customBase}`,
+    );
     return chatCompletionsOpenAICompatible(messages, options);
   }
   const key = options.openRouterVariant ?? "codeGen";
-  const model = resolveModel(MODEL_CONFIG[key]);
-  return chatCompletion(messages, {
-    model,
+  const configValue = MODEL_CONFIG[key] ?? "gpt-4o";
+  const chain = resolveModelChain(configValue, resolveModel);
+  console.log(
+    `[LLM] invokeCodegenOrOpenRouter  variant=${key}  chain=[${chain.join(" → ")}]`,
+  );
+  return chatCompletionWithFallback(messages, chain, {
     temperature: options.temperature,
     max_tokens: options.max_tokens,
   });

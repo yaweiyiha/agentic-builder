@@ -2,6 +2,10 @@ import path from "path";
 import fs from "fs/promises";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import {
+  mergeScaffoldContent,
+  normalizeScaffoldRelPath,
+} from "@/lib/pipeline/scaffold-file-merge";
 
 const execFileAsync = promisify(execFile);
 
@@ -33,10 +37,18 @@ function isSafeCommand(cmd: string): boolean {
   );
 }
 
+export type FsWriteOptions = {
+  /** Relative paths from tier scaffold; existing files merge or skip instead of overwrite. */
+  scaffoldProtectedPaths?: Iterable<string>;
+  /** Fix passes (supervisor) may replace protected files when errors require it. */
+  forceProtectedOverwrite?: boolean;
+};
+
 export async function fsWrite(
   filePath: string,
   content: string,
   outputDir: string,
+  options?: FsWriteOptions,
 ): Promise<string> {
   const normalized = path.normalize(filePath).replace(/^(\.\.(\/|\\|$))+/, "");
   const abs = path.resolve(path.join(outputDir, normalized));
@@ -44,9 +56,47 @@ export async function fsWrite(
   if (!abs.startsWith(resolvedRoot + path.sep) && abs !== resolvedRoot) {
     return `REJECTED: path traversal detected for "${filePath}"`;
   }
+
+  const key = normalizeScaffoldRelPath(normalized);
+  const protectedSet =
+    options?.scaffoldProtectedPaths != null
+      ? new Set(
+          [...options.scaffoldProtectedPaths].map((p) =>
+            normalizeScaffoldRelPath(p),
+          ),
+        )
+      : null;
+
+  let toWrite = content;
+  let mergeKind: "none" | "merged" | "incoming" = "none";
+
+  if (protectedSet?.has(key)) {
+    try {
+      const existing = await fs.readFile(abs, "utf-8");
+      const merged = mergeScaffoldContent(key, existing, content, {
+        forceOverwrite: options?.forceProtectedOverwrite ?? false,
+      });
+      if (merged.kind === "skip") {
+        return `SKIPPED_PROTECTED: ${key} (${merged.reason})`;
+      }
+      if (merged.kind === "merged") {
+        toWrite = merged.content;
+        mergeKind = "merged";
+      } else if (merged.kind === "use_incoming") {
+        toWrite = merged.content;
+        mergeKind = "incoming";
+      }
+    } catch {
+      /* missing file under a protected path — write full incoming */
+    }
+  }
+
   await fs.mkdir(path.dirname(abs), { recursive: true });
-  await fs.writeFile(abs, content, "utf-8");
-  return `Written: ${normalized} (${content.length} chars)`;
+  await fs.writeFile(abs, toWrite, "utf-8");
+  if (mergeKind === "merged") {
+    return `Merged (scaffold): ${normalized} (${toWrite.length} chars)`;
+  }
+  return `Written: ${normalized} (${toWrite.length} chars)`;
 }
 
 export async function fsRead(

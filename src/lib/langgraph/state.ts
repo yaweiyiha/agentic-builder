@@ -66,6 +66,18 @@ export const SupervisorStateAnnotation = Annotation.Root({
     default: () => "",
   }),
 
+  /** When true, tier scaffold was copied in Coding API — architect phase skips LLM. */
+  prebuiltScaffold: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
+
+  /** Relative paths from scaffolds/<tier>/; fsWrite merges or skips instead of overwriting. */
+  scaffoldProtectedPaths: Annotation<string[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+
   architectTasks: Annotation<CodingTask[]>({
     reducer: (_prev, next) => next,
     default: () => [],
@@ -156,6 +168,11 @@ export const WorkerStateAnnotation = Annotation.Root({
     default: () => [],
   }),
   apiContractsSnapshot: Annotation<ApiContract[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+
+  scaffoldProtectedPaths: Annotation<string[]>({
     reducer: (_prev, next) => next,
     default: () => [],
   }),

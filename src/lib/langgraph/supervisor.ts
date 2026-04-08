@@ -7,6 +7,7 @@ import {
   type PhaseResult,
   type GeneratedFile,
   type ApiContract,
+  type TaskResult,
 } from "./state";
 import {
   createWorkerSubGraph,
@@ -16,15 +17,22 @@ import {
   inferRelatedConfigFiles,
   hasConfigErrors,
   findBestTsconfigForFiles,
+  buildVersionConstraints,
 } from "./agent-subgraph";
-import { shellExec, fsWrite, fsRead, listFiles } from "./tools";
 import {
-  chatCompletion,
+  shellExec,
+  fsWrite,
+  fsRead,
+  listFiles,
+  type FsWriteOptions,
+} from "./tools";
+import {
+  chatCompletionWithFallback,
   resolveModel,
   estimateCost,
   type ChatMessage,
 } from "@/lib/openrouter";
-import { MODEL_CONFIG } from "@/lib/model-config";
+import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
   CodingAgentRole,
   CodingTask,
@@ -119,10 +127,139 @@ function classifyTasks(state: SupervisorState) {
 
 const workerGraph = createWorkerSubGraph();
 
+function scaffoldWriteOpts(
+  state: SupervisorState,
+  forceOverwrite: boolean,
+): FsWriteOptions | undefined {
+  const paths = state.scaffoldProtectedPaths;
+  if (!paths || paths.length === 0) return undefined;
+  return {
+    scaffoldProtectedPaths: paths,
+    forceProtectedOverwrite: forceOverwrite,
+  };
+}
+
+const PREBUILT_REGISTRY_MAX_FILES = 500;
+
+const PREBUILT_SKIP_PATH_SEGMENTS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  ".next",
+]);
+
+function shouldIncludeInPrebuiltRegistry(rel: string): boolean {
+  const norm = rel.replace(/\\/g, "/");
+  const parts = norm.split("/");
+  for (const p of parts) {
+    if (PREBUILT_SKIP_PATH_SEGMENTS.has(p)) return false;
+  }
+  if (norm.endsWith(".DS_Store") || norm.endsWith(".swp")) return false;
+  if (/(^|\/)\.env($|\..+)/.test(norm)) return false;
+  return true;
+}
+
+/**
+ * Register scaffold files + write ARCHITECTURE_SCAFFOLD.md (no LLM).
+ */
+async function buildPrebuiltScaffoldRegistryAndDoc(
+  outputDir: string,
+): Promise<GeneratedFile[]> {
+  const all = await listFiles(".", outputDir);
+  const filtered = all.filter(shouldIncludeInPrebuiltRegistry).sort();
+  const capped = filtered.slice(0, PREBUILT_REGISTRY_MAX_FILES);
+  const registry: GeneratedFile[] = capped.map((p) => ({
+    path: p,
+    role: "architect",
+    summary: "Prebuilt tier scaffold",
+  }));
+
+  let scriptsSection = "(no root package.json or scripts)";
+  const pkgRaw = await fsRead("package.json", outputDir);
+  if (!pkgRaw.startsWith("FILE_NOT_FOUND") && !pkgRaw.startsWith("REJECTED")) {
+    try {
+      const j = JSON.parse(pkgRaw) as { scripts?: Record<string, string> };
+      if (j.scripts && Object.keys(j.scripts).length > 0) {
+        scriptsSection = Object.entries(j.scripts)
+          .map(([k, v]) => `- \`${k}\`: \`${String(v)}\``)
+          .join("\n");
+      }
+    } catch {
+      scriptsSection = "(could not parse package.json)";
+    }
+  }
+
+  const listCap = 400;
+  const listLines = filtered.slice(0, listCap);
+  const moreLine =
+    filtered.length > listCap
+      ? `... and ${filtered.length - listCap} more path(s)`
+      : null;
+
+  const doc = [
+    "# Architecture (prebuilt scaffold)",
+    "",
+    "This directory was bootstrapped from the **tier scaffold** at coding session start.",
+    "Architect kickoff tasks were **not** run with an LLM; implement features in backend, frontend, and test phases.",
+    "",
+    "## Root `package.json` scripts",
+    "",
+    scriptsSection,
+    "",
+    "## Source paths (excludes node_modules, dist, .next, .git)",
+    "",
+    "```text",
+    ...listLines,
+    ...(moreLine ? [moreLine] : []),
+    "```",
+    "",
+  ].join("\n");
+
+  await fsWrite("ARCHITECTURE_SCAFFOLD.md", doc, outputDir);
+
+  const docEntry: GeneratedFile = {
+    path: "ARCHITECTURE_SCAFFOLD.md",
+    role: "architect",
+    summary: "Prebuilt scaffold index (auto-generated)",
+  };
+
+  return [...registry, docEntry];
+}
+
 async function runArchitectPhase(state: SupervisorState) {
   if (state.architectTasks.length === 0) {
     console.log("[Supervisor] Architect phase: no tasks, skipping.");
     return {};
+  }
+
+  if (state.prebuiltScaffold) {
+    console.log(
+      `[Supervisor] Architect phase: prebuiltScaffold=true — skipping LLM for ${state.architectTasks.length} task(s); registering template files.`,
+    );
+    const registry = await buildPrebuiltScaffoldRegistryAndDoc(state.outputDir);
+    const taskResults: TaskResult[] = state.architectTasks.map((task) => ({
+      taskId: task.id,
+      status: "completed",
+      generatedFiles: [],
+      costUsd: 0,
+      durationMs: 0,
+      verifyPassed: true,
+      fixCycles: 0,
+      warnings: [
+        "Completed via prebuilt tier scaffold (no LLM). See ARCHITECTURE_SCAFFOLD.md.",
+      ],
+    }));
+    const phaseResult: PhaseResult = {
+      role: "architect",
+      workerLabel: "Architect",
+      taskResults,
+      totalCostUsd: 0,
+    };
+    return {
+      phaseResults: [phaseResult],
+      fileRegistry: registry,
+      totalCostUsd: 0,
+    };
   }
 
   console.log(
@@ -137,6 +274,7 @@ async function runArchitectPhase(state: SupervisorState) {
       projectContext: state.projectContext,
       fileRegistrySnapshot: state.fileRegistry,
       apiContractsSnapshot: state.apiContracts,
+      scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
       currentTaskIndex: 0,
     },
     { recursionLimit: 150 },
@@ -166,11 +304,51 @@ async function runArchitectPhase(state: SupervisorState) {
 const MAX_SCAFFOLD_FIX_ATTEMPTS = 2;
 const VERIFY_NPM_INSTALL_TIMEOUT_MS = 180_000;
 
-async function scaffoldVerify(_state: SupervisorState) {
+async function scaffoldVerify(state: SupervisorState) {
+  if (state.prebuiltScaffold) {
+    console.log(
+      "[Supervisor] Scaffold verify: prebuilt scaffold — skipping tsc (template already validated).",
+    );
+    return { scaffoldErrors: "" };
+  }
+
+  if (state.fileRegistry.length === 0) {
+    console.log("[Supervisor] Scaffold verify: no architect files to check.");
+    return { scaffoldErrors: "" };
+  }
+
+  const archFiles = state.fileRegistry
+    .filter((f) => f.role === "architect" && /\.(ts|tsx)$/.test(f.path))
+    .map((f) => f.path)
+    .slice(0, 10);
+
+  if (archFiles.length === 0) {
+    console.log("[Supervisor] Scaffold verify: no TS files from architect.");
+    return { scaffoldErrors: "" };
+  }
+
   console.log(
-    "[Supervisor] Scaffold verify: skipping npm install and build — they run once at final integration verify (all package roots).",
+    `[Supervisor] Scaffold verify: tsc check on ${archFiles.length} architect file(s)...`,
   );
-  return { scaffoldErrors: "" };
+
+  const { stdout, stderr, exitCode } = await shellExec(
+    `npx tsc --noEmit --pretty false --skipLibCheck 2>&1 | head -40`,
+    state.outputDir,
+    { timeout: 30_000 },
+  );
+
+  const output = (stderr || stdout || "").trim();
+  const hasErrors = exitCode !== 0 && output.includes("error TS");
+
+  if (!hasErrors) {
+    console.log("[Supervisor] Scaffold verify: tsc PASSED.");
+    return { scaffoldErrors: "" };
+  }
+
+  console.log(
+    `[Supervisor] Scaffold verify: tsc errors found.\n${output.slice(0, 300)}`,
+  );
+  return { scaffoldErrors: output.slice(0, 2000) };
 }
 
 function hasNpmWorkspaces(pkg: { workspaces?: unknown }): boolean {
@@ -304,7 +482,7 @@ async function scaffoldFix(state: SupervisorState) {
     }
   }
 
-  const model = resolveModel(MODEL_CONFIG.codeFix);
+  const codeFixChain = resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -332,8 +510,7 @@ Rules:
     },
   ];
 
-  const response = await chatCompletion(messages, {
-    model,
+  const response = await chatCompletionWithFallback(messages, codeFixChain, {
     temperature: 0.2,
     max_tokens: 16384,
   });
@@ -343,8 +520,9 @@ Rules:
   const fixes = parseFileOutput(content);
 
   const fixedFiles: GeneratedFile[] = [];
+  const fixOpts = scaffoldWriteOpts(state, true);
   for (const [fp, fc] of Object.entries(fixes)) {
-    await fsWrite(fp, fc, state.outputDir);
+    await fsWrite(fp, fc, state.outputDir, fixOpts);
     fixedFiles.push({
       path: fp,
       role: "architect",
@@ -353,7 +531,7 @@ Rules:
   }
 
   console.log(
-    `[Supervisor] Scaffold fix: wrote ${fixedFiles.length} files (cost: $${costUsd.toFixed(4)})`,
+    `[Supervisor] Scaffold fix: wrote ${fixedFiles.length} file(s) (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
   );
 
   return {
@@ -445,7 +623,7 @@ async function generateApiContracts(state: SupervisorState) {
     .join("\n");
   contextParts.push(`## Backend tasks to implement\n${taskList}`);
 
-  const model = resolveModel(MODEL_CONFIG.codeFix);
+  const contractModelChain = resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
   const messages: ChatMessage[] = [
     { role: "system", content: API_CONTRACT_SYSTEM_PROMPT },
     {
@@ -460,8 +638,7 @@ async function generateApiContracts(state: SupervisorState) {
   ];
 
   try {
-    const response = await chatCompletion(messages, {
-      model,
+    const response = await chatCompletionWithFallback(messages, contractModelChain, {
       temperature: 0.1,
       max_tokens: 4096,
     });
@@ -518,7 +695,7 @@ async function generateApiContracts(state: SupervisorState) {
     await fsWrite("API_CONTRACTS.json", contractJson, state.outputDir);
 
     console.log(
-      `[Supervisor] generateApiContracts: generated ${contracts.length} contracts, written to API_CONTRACTS.json (cost: $${costUsd.toFixed(4)})`,
+      `[Supervisor] generateApiContracts: generated ${contracts.length} contracts, written to API_CONTRACTS.json (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
     );
 
     return {
@@ -532,6 +709,173 @@ async function generateApiContracts(state: SupervisorState) {
     );
     return {};
   }
+}
+
+/**
+ * Architect Phase 完成后，在 BE/FE 任务开始前，
+ * 生成所有服务文件的接口骨架（类型定义 + 函数签名，无实现）。
+ * 骨架文件让所有后续任务对接口有一致的预期，避免各自猜导出内容。
+ */
+async function generateServiceSkeletons(
+  state: SupervisorState,
+): Promise<Partial<SupervisorState>> {
+  if (
+    state.backendTasks.length === 0 &&
+    state.frontendTasks.length === 0
+  ) {
+    return {};
+  }
+
+  console.log(
+    "[Supervisor] generateServiceSkeletons: generating interface contracts...",
+  );
+
+  const allTasks = [
+    ...state.backendTasks,
+    ...state.frontendTasks,
+  ]
+    .map(
+      (t) =>
+        `- [${inferRole(t)}] ${t.title}: ${t.description.slice(0, 150)}`,
+    )
+    .join("\n");
+
+  const existingTypeFiles = state.fileRegistry
+    .filter(
+      (f) =>
+        f.role === "architect" &&
+        (f.path.includes("type") ||
+          f.path.includes("model") ||
+          f.path.includes("schema") ||
+          f.path.includes("interface")) &&
+        /\.(ts|tsx)$/.test(f.path),
+    )
+    .slice(0, 5);
+
+  const typeFileContents: string[] = [];
+  for (const tf of existingTypeFiles) {
+    const content = await fsRead(tf.path, state.outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND")) {
+      typeFileContents.push(
+        `### ${tf.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``,
+      );
+    }
+  }
+
+  const skeletonModelChain = resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: `You are a Senior TypeScript Architect.
+Generate skeleton files — type definitions and function signatures ONLY, no implementations.
+Each function body should be: throw new Error("Not implemented");
+
+Rules:
+- Export every type, interface, enum, and function that other modules will import
+- Use consistent naming across all files
+- If a service function is used in a route, it MUST be exported from the service file
+- If a type is used in multiple files, define it ONCE in a shared types file and import it everywhere
+- Output files using \`\`\`file:<path> format
+- Output ONLY skeleton files, no explanatory text`,
+    },
+    {
+      role: "user",
+      content: [
+        "## All tasks that will be implemented",
+        allTasks,
+        "",
+        typeFileContents.length > 0
+          ? `## Existing type files from Architect\n${typeFileContents.join("\n\n")}`
+          : "",
+        "",
+        state.apiContracts.length > 0
+          ? `## API Contracts\n${state.apiContracts
+              .map((c) => `- ${c.method} ${c.endpoint} (${c.service})`)
+              .join("\n")}`
+          : "",
+        "",
+        "Generate skeleton files for:",
+        "1. All shared type definitions (types/, interfaces/)",
+        "2. All service files (lib/server/*/*.service.ts)",
+        "3. All API client files (lib/api/*.ts) for frontend consumption",
+        "4. Validation schemas if needed",
+        "",
+        "Each skeleton must export every identifier that will be imported by other files.",
+        "Output ONLY skeleton files using ```file:<path> format.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  ];
+
+  try {
+    const response = await chatCompletionWithFallback(messages, skeletonModelChain, {
+      temperature: 0.1,
+      max_tokens: 16384,
+    });
+
+    const content = response.choices[0]?.message?.content ?? "";
+    const costUsd = estimateCost(response.model, response.usage);
+    const skeletonFiles = parseFileOutput(content);
+
+    const skOpts = scaffoldWriteOpts(state, false);
+    const newEntries: GeneratedFile[] = [];
+    for (const [fp, fc] of Object.entries(skeletonFiles)) {
+      await fsWrite(fp, fc, state.outputDir, skOpts);
+
+      const exports = extractExports(fc);
+      newEntries.push({
+        path: fp,
+        role: "architect",
+        summary: `Interface skeleton for: ${fp}`,
+        exports,
+      });
+    }
+
+    console.log(
+      `[Supervisor] generateServiceSkeletons: generated ${newEntries.length} skeleton file(s) (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+    );
+
+    return {
+      fileRegistry: newEntries,
+      totalCostUsd: costUsd,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      `[Supervisor] generateServiceSkeletons: error — ${msg}. Continuing without skeletons.`,
+    );
+    return {};
+  }
+}
+
+function extractExports(source: string): string[] {
+  const exports = new Set<string>();
+
+  const namedPattern =
+    /^export\s+(?:const|function|class|type|interface|enum|async\s+function)\s+(\w+)/gm;
+  const bracePattern = /export\s*\{([^}]+)\}/g;
+  const defaultPattern =
+    /^export\s+default\s+(?:function|class)\s+(\w+)/gm;
+
+  let m: RegExpExecArray | null;
+
+  while ((m = namedPattern.exec(source)) !== null) {
+    if (m[1]) exports.add(m[1]);
+  }
+
+  while ((m = bracePattern.exec(source)) !== null) {
+    m[1].split(",").forEach((name) => {
+      const trimmed = name.trim().split(" as ")[0].trim();
+      if (trimmed) exports.add(trimmed);
+    });
+  }
+
+  while ((m = defaultPattern.exec(source)) !== null) {
+    if (m[1]) exports.add(m[1]);
+  }
+
+  return [...exports];
 }
 
 // ─── Phased dispatch (BE first, then FE) ───
@@ -555,6 +899,7 @@ function dispatchBackendAndTestWorkers(state: SupervisorState): Send[] {
         projectContext: state.projectContext,
         fileRegistrySnapshot: state.fileRegistry,
         apiContractsSnapshot: state.apiContracts,
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     );
@@ -570,6 +915,7 @@ function dispatchBackendAndTestWorkers(state: SupervisorState): Send[] {
         projectContext: state.projectContext,
         fileRegistrySnapshot: state.fileRegistry,
         apiContractsSnapshot: state.apiContracts,
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     );
@@ -585,6 +931,7 @@ function dispatchBackendAndTestWorkers(state: SupervisorState): Send[] {
         projectContext: "",
         fileRegistrySnapshot: [],
         apiContractsSnapshot: [],
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     );
@@ -608,6 +955,7 @@ function dispatchFrontendWorkers(state: SupervisorState): Send[] {
         projectContext: "",
         fileRegistrySnapshot: [],
         apiContractsSnapshot: [],
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     ];
@@ -630,6 +978,7 @@ function dispatchFrontendWorkers(state: SupervisorState): Send[] {
         projectContext: feContext,
         fileRegistrySnapshot: state.fileRegistry,
         apiContractsSnapshot: state.apiContracts,
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
   );
@@ -696,6 +1045,198 @@ async function extractRealContracts(state: SupervisorState) {
   return { apiContracts: newContracts };
 }
 
+// ─── Phase-level verification ───
+
+const MAX_PHASE_FIX_ATTEMPTS = 2;
+
+async function phaseVerify(
+  state: SupervisorState,
+): Promise<Partial<SupervisorState>> {
+  console.log("[Supervisor] Phase verify: installing dependencies...");
+
+  const installResult = await shellExec(
+    "npm install --prefer-offline 2>&1 | tail -10",
+    state.outputDir,
+    { timeout: 60_000 },
+  );
+
+  if (installResult.exitCode !== 0) {
+    console.warn(
+      `[Supervisor] Phase verify: npm install failed, continuing anyway.`,
+    );
+  } else {
+    console.log("[Supervisor] Phase verify: npm install OK.");
+  }
+
+  console.log("[Supervisor] Phase verify: running tsc...");
+  const tscResult = await shellExec(
+    "npx tsc --noEmit --pretty false --skipLibCheck 2>&1 | head -60",
+    state.outputDir,
+    { timeout: 60_000 },
+  );
+
+  const output = (tscResult.stderr || tscResult.stdout || "").trim();
+  const hasErrors = tscResult.exitCode !== 0 && output.includes("error TS");
+
+  if (!hasErrors) {
+    console.log("[Supervisor] Phase verify: tsc PASSED.");
+    return { scaffoldErrors: "" };
+  }
+
+  const realErrors = output
+    .split("\n")
+    .filter((line) => {
+      if (!line.includes("error TS")) return false;
+      if (
+        line.includes("Cannot find module") &&
+        (line.includes("'./") || line.includes("'../"))
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .join("\n");
+
+  if (!realErrors) {
+    console.log(
+      "[Supervisor] Phase verify: only cross-ref errors (expected at this stage), PASSED.",
+    );
+    return { scaffoldErrors: "" };
+  }
+
+  console.log(
+    `[Supervisor] Phase verify: tsc FAILED.\n${realErrors.slice(0, 300)}`,
+  );
+
+  return { scaffoldErrors: realErrors.slice(0, 3000) };
+}
+
+function shouldFixPhaseOrContinue(state: SupervisorState): string {
+  if (!state.scaffoldErrors) return "continue";
+  if (state.scaffoldFixAttempts >= MAX_PHASE_FIX_ATTEMPTS) {
+    console.log(
+      `[Supervisor] Phase fix: max attempts reached, proceeding with warnings.`,
+    );
+    return "continue";
+  }
+  return "phase_fix";
+}
+
+async function phaseFix(
+  state: SupervisorState,
+): Promise<Partial<SupervisorState>> {
+  const attempt = state.scaffoldFixAttempts + 1;
+  console.log(
+    `[Supervisor] Phase fix attempt ${attempt}/${MAX_PHASE_FIX_ATTEMPTS}...`,
+  );
+
+  const errorFiles = extractBuildErrorFiles(state.scaffoldErrors);
+  const fileContents: string[] = [];
+  const alreadyRead = new Set<string>();
+
+  for (const ef of errorFiles.slice(0, 6)) {
+    if (alreadyRead.has(ef)) continue;
+    alreadyRead.add(ef);
+    const content = await fsRead(ef, state.outputDir);
+    if (!content.startsWith("FILE_NOT_FOUND")) {
+      fileContents.push(
+        `### ${ef} (has errors)\n\`\`\`typescript\n${content.slice(0, 2000)}\n\`\`\``,
+      );
+    }
+  }
+
+  const importedModulePattern =
+    /Module '"([^"]+)"' has no exported member/g;
+  let im: RegExpExecArray | null;
+  while ((im = importedModulePattern.exec(state.scaffoldErrors)) !== null) {
+    const modulePath = im[1];
+    const resolvedPath = modulePath
+      .replace(/^@\//, "src/")
+      .replace(/^~\//, "src/");
+    const candidates = [
+      resolvedPath + ".ts",
+      resolvedPath + ".tsx",
+      resolvedPath + "/index.ts",
+    ];
+    for (const candidate of candidates) {
+      if (alreadyRead.has(candidate)) continue;
+      const content = await fsRead(candidate, state.outputDir);
+      if (!content.startsWith("FILE_NOT_FOUND")) {
+        alreadyRead.add(candidate);
+        fileContents.push(
+          `### ${candidate} (imported module — check its actual exports)\n\`\`\`typescript\n${content.slice(0, 2000)}\n\`\`\``,
+        );
+        break;
+      }
+    }
+  }
+
+  const versionConstraints = await buildVersionConstraints(state.outputDir);
+
+  const phaseFixChain = resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content:
+        "You are a Senior Engineer. Fix the TypeScript errors below. " +
+        "Output ONLY corrected files using ```file:<path> format. " +
+        "Do not rewrite files that have no errors.",
+    },
+    {
+      role: "user",
+      content: [
+        "## TypeScript Errors",
+        "```",
+        state.scaffoldErrors,
+        "```",
+        "",
+        versionConstraints
+          ? `## Installed package versions (use these APIs)\n${versionConstraints}`
+          : "",
+        "",
+        fileContents.length > 0
+          ? `## Current file contents\n${fileContents.join("\n\n")}`
+          : "",
+        "",
+        "Fix all errors. Output corrected files only.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  ];
+
+  const response = await chatCompletionWithFallback(messages, phaseFixChain, {
+    temperature: 0.2,
+    max_tokens: 16384,
+  });
+
+  const content = response.choices[0]?.message?.content ?? "";
+  const costUsd = estimateCost(response.model, response.usage);
+  const fixes = parseFileOutput(content);
+
+  const phaseFixOpts = scaffoldWriteOpts(state, true);
+  const fixedFiles: GeneratedFile[] = [];
+  for (const [fp, fc] of Object.entries(fixes)) {
+    await fsWrite(fp, fc, state.outputDir, phaseFixOpts);
+    fixedFiles.push({
+      path: fp,
+      role: "architect",
+      summary: `Phase fix attempt ${attempt}`,
+    });
+  }
+
+  console.log(
+    `[Supervisor] Phase fix: wrote ${fixedFiles.length} file(s) (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+  );
+
+  return {
+    scaffoldFixAttempts: attempt,
+    scaffoldErrors: "",
+    fileRegistry: fixedFiles,
+    totalCostUsd: costUsd,
+  };
+}
+
 // ─── (legacy) Parallel dispatch — kept for reference, replaced by phased dispatch ───
 
 function dispatchParallelWorkers(state: SupervisorState): Send[] {
@@ -713,6 +1254,7 @@ function dispatchParallelWorkers(state: SupervisorState): Send[] {
         projectContext: state.projectContext,
         fileRegistrySnapshot: state.fileRegistry,
         apiContractsSnapshot: state.apiContracts,
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     );
@@ -733,6 +1275,7 @@ function dispatchParallelWorkers(state: SupervisorState): Send[] {
         projectContext: feContext,
         fileRegistrySnapshot: state.fileRegistry,
         apiContractsSnapshot: state.apiContracts,
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     );
@@ -748,6 +1291,7 @@ function dispatchParallelWorkers(state: SupervisorState): Send[] {
         projectContext: state.projectContext,
         fileRegistrySnapshot: state.fileRegistry,
         apiContractsSnapshot: state.apiContracts,
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     );
@@ -763,6 +1307,7 @@ function dispatchParallelWorkers(state: SupervisorState): Send[] {
         projectContext: "",
         fileRegistrySnapshot: [],
         apiContractsSnapshot: [],
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
       }),
     );
@@ -1084,7 +1629,9 @@ async function integrationVerify(state: SupervisorState) {
     console.log(
       "[Supervisor] Integration verify: missing deps detected, installing...",
     );
-    await installMissingDeps(output, state.outputDir);
+    await installMissingDeps(output, state.outputDir, {
+      scaffoldProtectedPaths: state.scaffoldProtectedPaths,
+    });
     const retry = await runTsc();
     if (retry.exitCode === 0 || !retry.output.includes("error TS")) {
       console.log("[Supervisor] Integration verify: PASSED after dep install");
@@ -1163,7 +1710,7 @@ async function integrationFix(state: SupervisorState) {
       "output the corrected config file(s) as well.\n"
     : "";
 
-  const model = resolveModel(MODEL_CONFIG.codeFix);
+  const integFixChain = resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -1195,8 +1742,7 @@ Rules:
     },
   ];
 
-  const response = await chatCompletion(messages, {
-    model,
+  const response = await chatCompletionWithFallback(messages, integFixChain, {
     temperature: 0.2,
     max_tokens: 16384,
   });
@@ -1205,9 +1751,10 @@ Rules:
   const costUsd = estimateCost(response.model, response.usage);
   const fixes = parseFileOutput(content);
 
+  const integOpts = scaffoldWriteOpts(state, true);
   const fixedFiles: GeneratedFile[] = [];
   for (const [fp, fc] of Object.entries(fixes)) {
-    await fsWrite(fp, fc, state.outputDir);
+    await fsWrite(fp, fc, state.outputDir, integOpts);
     fixedFiles.push({
       path: fp,
       role: "architect",
@@ -1216,7 +1763,7 @@ Rules:
   }
 
   console.log(
-    `[Supervisor] Integration fix: wrote ${fixedFiles.length} files (cost: $${costUsd.toFixed(4)})`,
+    `[Supervisor] Integration fix: wrote ${fixedFiles.length} file(s) (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
   );
 
   return {
@@ -1263,10 +1810,15 @@ export function createSupervisorGraph() {
     .addNode("scaffold_fix", scaffoldFix)
     .addNode("dispatch_gate", dispatchGate)
     .addNode("generate_api_contracts", generateApiContracts)
+    .addNode("generate_service_skeletons", generateServiceSkeletons)
     .addNode("be_worker", parallelWorkerNode)
+    .addNode("be_phase_verify", phaseVerify)
+    .addNode("be_phase_fix", phaseFix)
     .addNode("extract_real_contracts", extractRealContracts)
     .addNode("fe_dispatch_gate", feDispatchGate)
     .addNode("fe_worker", parallelWorkerNode)
+    .addNode("fe_phase_verify", phaseVerify)
+    .addNode("fe_phase_fix", phaseFix)
     .addNode("sync_deps", syncDeps)
     .addNode("integration_verify", integrationVerify)
     .addNode("integration_fix", integrationFix)
@@ -1281,14 +1833,25 @@ export function createSupervisorGraph() {
     })
     .addEdge("scaffold_fix", "scaffold_verify")
     .addEdge("dispatch_gate", "generate_api_contracts")
+    .addEdge("generate_api_contracts", "generate_service_skeletons")
     .addConditionalEdges(
-      "generate_api_contracts",
+      "generate_service_skeletons",
       dispatchBackendAndTestWorkers,
     )
-    .addEdge("be_worker", "extract_real_contracts")
+    .addEdge("be_worker", "be_phase_verify")
+    .addConditionalEdges("be_phase_verify", shouldFixPhaseOrContinue, {
+      continue: "extract_real_contracts",
+      phase_fix: "be_phase_fix",
+    })
+    .addEdge("be_phase_fix", "be_phase_verify")
     .addEdge("extract_real_contracts", "fe_dispatch_gate")
     .addConditionalEdges("fe_dispatch_gate", dispatchFrontendWorkers)
-    .addEdge("fe_worker", "sync_deps")
+    .addEdge("fe_worker", "fe_phase_verify")
+    .addConditionalEdges("fe_phase_verify", shouldFixPhaseOrContinue, {
+      continue: "sync_deps",
+      phase_fix: "fe_phase_fix",
+    })
+    .addEdge("fe_phase_fix", "fe_phase_verify")
     .addEdge("sync_deps", "integration_verify")
     .addConditionalEdges(
       "integration_verify",

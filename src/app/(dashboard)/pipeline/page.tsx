@@ -32,7 +32,7 @@ import {
   defaultSelectedParallelDocIds,
   parallelDocBlueprintsForTier,
 } from "@/lib/pipeline/parallel-doc-plan";
-import { MODEL_CONFIG } from "@/lib/model-config";
+import { MODEL_CONFIG, primaryModel } from "@/lib/model-config";
 import { resolveModel } from "@/lib/openrouter";
 
 const PREP_STEPS: { id: PipelineStepId; label: string }[] = [
@@ -615,7 +615,7 @@ export default function PipelinePage() {
       if (codingStatus === "idle") return null;
       return {
         label: "Coding",
-        model: resolveModel(MODEL_CONFIG.codeGen),
+        model: resolveModel(primaryModel(MODEL_CONFIG.codeGen)),
         status:
           codingStatus === "running"
             ? "running"

@@ -1,6 +1,13 @@
 import type { CodingSessionEvent } from "@/lib/pipeline/types";
 import type { PhaseResult, TaskResult, GeneratedFile } from "./state";
 
+export type ErrorCategory =
+  | "client_disconnect"
+  | "timeout"
+  | "llm_error"
+  | "graph_error"
+  | "unknown";
+
 // Mirror supervisor's worker allocation logic so we can pre-create agents
 // with the exact same labels the supervisor will use.
 function computeWorkerCount(role: string, taskCount: number): number {
@@ -133,11 +140,14 @@ export class EventMapper {
     };
   }
 
-  buildSessionError(error: string): CodingSessionEvent {
+  buildSessionError(
+    error: string,
+    errorCategory: ErrorCategory = "unknown",
+  ): CodingSessionEvent {
     return {
       type: "session_error",
       sessionId: this.sessionId,
-      data: { error },
+      data: { error, errorCategory },
     };
   }
 
