@@ -625,7 +625,9 @@ export class EventMapper {
       type: "agent_log" as CodingSessionEvent["type"],
       sessionId: this.sessionId,
       agentId,
-      data: { message: `Scaffold verified: npm install && npm run build passed.` },
+      data: {
+        message: `Scaffold phase complete. Dependency install runs at final integration verify.`,
+      },
     }];
   }
 

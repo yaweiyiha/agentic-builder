@@ -1,22 +1,32 @@
 import type { Metadata } from 'next';
-import './globals.css'; // Assuming this contains Tailwind directives
+import { Inter } from 'next/font/google';
+import './globals.css'; // Ensure Tailwind CSS is imported here
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import Providers from './providers'; // Import the client-side Providers component
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Pomodoro Productivity Tracker',
-  description: 'Enhance your focus and track productivity with the Pomodoro Technique.',
+  title: 'Policy & Claims Portal',
+  description: 'Manage your policies and claims efficiently.',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      {/* Applying font-base from design tokens. Tailwind's default sans-serif is often similar to Arial. */}
-      {/* Using a slightly off-white for the body background to provide subtle contrast with pure white elements. */}
-      <body className="font-['Arial',sans-serif] bg-[#f8fafc] text-[#18181b]">
-        {children}
+      <body className={`${inter.className} flex flex-col min-h-screen`}>
+        <Providers>
+          <Header />
+          <main className="flex-grow p-[24px] bg-[#F1F5F9]">
+            {children}
+          </main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );

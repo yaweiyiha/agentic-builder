@@ -1,3 +1,4 @@
+import path from "path";
 import { StateGraph, START, END, Send } from "@langchain/langgraph";
 import {
   SupervisorStateAnnotation,
@@ -160,56 +161,93 @@ async function runArchitectPhase(state: SupervisorState) {
   };
 }
 
-// ─── Scaffold verification (Strategy C) ───
+// ─── Scaffold handoff (install/build deferred to integration verify) ───
 
 const MAX_SCAFFOLD_FIX_ATTEMPTS = 2;
-const SCAFFOLD_INSTALL_TIMEOUT_MS = 60_000;
-const SCAFFOLD_BUILD_TIMEOUT_MS = 60_000;
+const VERIFY_NPM_INSTALL_TIMEOUT_MS = 180_000;
 
-async function scaffoldVerify(state: SupervisorState) {
-  console.log("[Supervisor] Scaffold verify: running npm install...");
-
-  const installResult = await shellExec(
-    "npm install --prefer-offline 2>&1 | tail -20",
-    state.outputDir,
-    { timeout: SCAFFOLD_INSTALL_TIMEOUT_MS },
-  );
-
-  if (installResult.exitCode !== 0) {
-    const errorMsg =
-      `npm install failed (exit ${installResult.exitCode}):\n${installResult.stderr || installResult.stdout}`.slice(
-        0,
-        2000,
-      );
-    console.log(
-      `[Supervisor] Scaffold verify: npm install FAILED.\n${errorMsg.slice(0, 300)}`,
-    );
-    return { scaffoldErrors: errorMsg };
-  }
-
+async function scaffoldVerify(_state: SupervisorState) {
   console.log(
-    "[Supervisor] Scaffold verify: npm install OK. Running npm run build...",
+    "[Supervisor] Scaffold verify: skipping npm install and build — they run once at final integration verify (all package roots).",
   );
-  const buildResult = await shellExec(
-    "npm run build 2>&1 | tail -40",
-    state.outputDir,
-    { timeout: SCAFFOLD_BUILD_TIMEOUT_MS },
-  );
+  return { scaffoldErrors: "" };
+}
 
-  if (buildResult.exitCode !== 0) {
-    const errorMsg =
-      `npm run build failed (exit ${buildResult.exitCode}):\n${buildResult.stderr || buildResult.stdout}`.slice(
-        0,
-        2000,
-      );
-    console.log(
-      `[Supervisor] Scaffold verify: build FAILED.\n${errorMsg.slice(0, 300)}`,
-    );
-    return { scaffoldErrors: errorMsg };
+function hasNpmWorkspaces(pkg: { workspaces?: unknown }): boolean {
+  const w = pkg.workspaces;
+  if (w == null) return false;
+  if (Array.isArray(w)) return w.length > 0;
+  if (typeof w === "object" && w !== null) {
+    const packages = (w as { packages?: unknown }).packages;
+    return Array.isArray(packages) && packages.length > 0;
+  }
+  return false;
+}
+
+async function findPackageJsonRelativeDirs(outputDir: string): Promise<string[]> {
+  const files = await listFiles(".", outputDir);
+  const dirs = new Set<string>();
+  for (const f of files) {
+    const norm = f.replace(/\\/g, "/");
+    if (norm.split("/").includes("node_modules")) continue;
+    if (!norm.endsWith("/package.json") && norm !== "package.json") continue;
+    const dir =
+      norm === "package.json" ? "." : norm.slice(0, -"/package.json".length);
+    dirs.add(dir);
+  }
+  return [...dirs].sort(
+    (a, b) => a.split("/").length - b.split("/").length,
+  );
+}
+
+/** Run npm install at repo root (workspaces) or at each package root (no workspaces). */
+async function runNpmInstallAllRoots(outputDir: string): Promise<void> {
+  const rootPkgRaw = await fsRead("package.json", outputDir);
+  if (!rootPkgRaw.startsWith("FILE_NOT_FOUND")) {
+    try {
+      const pkg = JSON.parse(rootPkgRaw) as { workspaces?: unknown };
+      if (hasNpmWorkspaces(pkg)) {
+        console.log(
+          "[Supervisor] Integration verify: npm workspaces — npm install at repo root only.",
+        );
+        const r = await shellExec(
+          "npm install --prefer-offline 2>&1 | tail -30",
+          outputDir,
+          { timeout: VERIFY_NPM_INSTALL_TIMEOUT_MS },
+        );
+        if (r.exitCode !== 0) {
+          console.warn(
+            `[Supervisor] Integration verify: root npm install exit ${r.exitCode}: ${(r.stderr || r.stdout).slice(0, 400)}`,
+          );
+        }
+        return;
+      }
+    } catch {
+      // fall through to per-package installs
+    }
   }
 
-  console.log("[Supervisor] Scaffold verify: build OK. Scaffold is runnable.");
-  return { scaffoldErrors: "" };
+  const dirs = await findPackageJsonRelativeDirs(outputDir);
+  if (dirs.length === 0) {
+    console.log("[Supervisor] Integration verify: no package.json found.");
+    return;
+  }
+  for (const rel of dirs) {
+    const cwd = rel === "." ? outputDir : path.join(outputDir, rel);
+    console.log(
+      `[Supervisor] Integration verify: npm install in "${rel === "." ? "." : rel}"`,
+    );
+    const r = await shellExec(
+      "npm install --prefer-offline 2>&1 | tail -30",
+      cwd,
+      { timeout: VERIFY_NPM_INSTALL_TIMEOUT_MS },
+    );
+    if (r.exitCode !== 0) {
+      console.warn(
+        `[Supervisor] Integration verify: npm install in "${rel}" exit ${r.exitCode}: ${(r.stderr || r.stdout).slice(0, 400)}`,
+      );
+    }
+  }
 }
 
 function shouldFixScaffoldOrContinue(state: SupervisorState): string {
@@ -828,17 +866,20 @@ function extractPackageName(specifier: string): string | null {
   return specifier.split("/")[0];
 }
 
-async function syncDeps(state: SupervisorState) {
-  console.log("[Supervisor] syncDeps: scanning imports...");
-
-  const files = await listFiles(".", state.outputDir);
-  const sourceFiles = files.filter(
-    (f) => /\.(tsx?|jsx?|mjs|cjs)$/.test(f) && !f.includes("node_modules"),
+function isUnderAnyPrefix(file: string, prefixes: string[]): boolean {
+  const norm = file.replace(/\\/g, "/");
+  return prefixes.some(
+    (root) => norm === root || norm.startsWith(`${root}/`),
   );
+}
 
+async function scanImportsFromFiles(
+  outputDir: string,
+  sourceFiles: string[],
+): Promise<Set<string>> {
   const importedPkgs = new Set<string>();
   for (const file of sourceFiles) {
-    const content = await fsRead(file, state.outputDir);
+    const content = await fsRead(file, outputDir);
     if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED"))
       continue;
 
@@ -859,17 +900,28 @@ async function syncDeps(state: SupervisorState) {
       }
     }
   }
+  return importedPkgs;
+}
 
-  if (importedPkgs.size === 0) {
-    console.log("[Supervisor] syncDeps: no external imports found.");
-    return {};
-  }
+/** Root package.json vs imports; excludes sources that live under nested package roots (e.g. frontend/). */
+async function collectMissingImportPackages(
+  outputDir: string,
+  nestedPackageRoots: string[] = [],
+): Promise<string[]> {
+  const nestedNorm = nestedPackageRoots.map((r) => r.replace(/\\/g, "/"));
+  const files = await listFiles(".", outputDir);
+  const sourceFiles = files.filter(
+    (f) =>
+      /\.(tsx?|jsx?|mjs|cjs)$/.test(f) &&
+      !f.includes("node_modules") &&
+      !isUnderAnyPrefix(f, nestedNorm),
+  );
 
-  const pkgJsonContent = await fsRead("package.json", state.outputDir);
-  if (pkgJsonContent.startsWith("FILE_NOT_FOUND")) {
-    console.log("[Supervisor] syncDeps: no package.json found, skipping.");
-    return {};
-  }
+  const importedPkgs = await scanImportsFromFiles(outputDir, sourceFiles);
+  if (importedPkgs.size === 0) return [];
+
+  const pkgJsonContent = await fsRead("package.json", outputDir);
+  if (pkgJsonContent.startsWith("FILE_NOT_FOUND")) return [];
 
   let pkgJson: {
     dependencies?: Record<string, string>;
@@ -878,8 +930,7 @@ async function syncDeps(state: SupervisorState) {
   try {
     pkgJson = JSON.parse(pkgJsonContent);
   } catch {
-    console.warn("[Supervisor] syncDeps: invalid package.json, skipping.");
-    return {};
+    return [];
   }
 
   const declared = new Set([
@@ -889,42 +940,113 @@ async function syncDeps(state: SupervisorState) {
     "react/jsx-dev-runtime",
   ]);
 
-  const missing = [...importedPkgs].filter((pkg) => !declared.has(pkg));
+  return [...importedPkgs].filter((pkg) => !declared.has(pkg));
+}
 
-  if (missing.length === 0) {
-    console.log("[Supervisor] syncDeps: all imports satisfied.");
-    return {};
+/** Missing deps for a nested package (e.g. apps/api) vs its own package.json. */
+async function collectMissingImportPackagesForPrefix(
+  outputDir: string,
+  prefix: string,
+): Promise<string[]> {
+  const prefixNorm = prefix.replace(/\\/g, "/");
+  const files = await listFiles(".", outputDir);
+  const sourceFiles = files.filter((f) => {
+    const norm = f.replace(/\\/g, "/");
+    return (
+      /\.(tsx?|jsx?|mjs|cjs)$/.test(f) &&
+      !f.includes("node_modules") &&
+      (norm === prefixNorm || norm.startsWith(`${prefixNorm}/`))
+    );
+  });
+
+  const importedPkgs = await scanImportsFromFiles(outputDir, sourceFiles);
+  if (importedPkgs.size === 0) return [];
+
+  const pkgJsonContent = await fsRead(`${prefixNorm}/package.json`, outputDir);
+  if (pkgJsonContent.startsWith("FILE_NOT_FOUND")) return [];
+
+  let pkgJson: {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  try {
+    pkgJson = JSON.parse(pkgJsonContent);
+  } catch {
+    return [];
   }
 
-  console.log(
-    `[Supervisor] syncDeps: ${missing.length} missing → ${missing.join(", ")}`,
-  );
+  const declared = new Set([
+    ...Object.keys(pkgJson.dependencies ?? {}),
+    ...Object.keys(pkgJson.devDependencies ?? {}),
+    "react/jsx-runtime",
+    "react/jsx-dev-runtime",
+  ]);
 
-  const installCmd = `npm install --save ${missing.join(" ")} 2>&1 | tail -10`;
-  const { stdout, stderr, exitCode } = await shellExec(
-    installCmd,
-    state.outputDir,
-    {
-      timeout: 120_000,
-    },
-  );
+  return [...importedPkgs].filter((pkg) => !declared.has(pkg));
+}
 
-  if (exitCode === 0) {
+const VERIFY_IMPORT_INSTALL_TIMEOUT_MS = 120_000;
+
+async function installImportGapsAllProjects(outputDir: string): Promise<void> {
+  await runNpmInstallAllRoots(outputDir);
+
+  const dirs = await findPackageJsonRelativeDirs(outputDir);
+  const nested = dirs.filter((d) => d !== ".");
+
+  const rootMissing = await collectMissingImportPackages(outputDir, nested);
+  if (rootMissing.length > 0) {
     console.log(
-      `[Supervisor] syncDeps: installed ${missing.length} packages OK.`,
+      `[Supervisor] Integration verify: root npm install --save (${rootMissing.length}): ${rootMissing.join(", ")}`,
     );
-  } else {
-    console.warn(
-      `[Supervisor] syncDeps: npm install exited ${exitCode}. stderr: ${(stderr || stdout).slice(0, 300)}`,
+    const r = await shellExec(
+      `npm install --save ${rootMissing.join(" ")} 2>&1 | tail -15`,
+      outputDir,
+      { timeout: VERIFY_IMPORT_INSTALL_TIMEOUT_MS },
     );
+    if (r.exitCode !== 0) {
+      console.warn(
+        `[Supervisor] Integration verify: root import-based install exit ${r.exitCode}: ${(r.stderr || r.stdout).slice(0, 300)}`,
+      );
+    }
   }
 
+  for (const rel of nested) {
+    const missing = await collectMissingImportPackagesForPrefix(outputDir, rel);
+    if (missing.length === 0) continue;
+    const cwd = path.join(outputDir, rel);
+    console.log(
+      `[Supervisor] Integration verify: "${rel}" npm install --save (${missing.length}): ${missing.join(", ")}`,
+    );
+    const r = await shellExec(
+      `npm install --save ${missing.join(" ")} 2>&1 | tail -15`,
+      cwd,
+      { timeout: VERIFY_IMPORT_INSTALL_TIMEOUT_MS },
+    );
+    if (r.exitCode !== 0) {
+      console.warn(
+        `[Supervisor] Integration verify: "${rel}" import-based install exit ${r.exitCode}: ${(r.stderr || r.stdout).slice(0, 300)}`,
+      );
+    }
+  }
+}
+
+async function syncDeps(_state: SupervisorState) {
+  console.log(
+    "[Supervisor] sync_deps: skipping installs (npm install runs in integration verify).",
+  );
   return {};
 }
 
 const MAX_INTEGRATION_FIX_ATTEMPTS = 3;
 
 async function integrationVerify(state: SupervisorState) {
+  if (state.integrationFixAttempts === 0) {
+    console.log(
+      "[Supervisor] Integration verify: first pass — npm install for all package roots, then import-gap installs (root + nested apps).",
+    );
+    await installImportGapsAllProjects(state.outputDir);
+  }
+
   console.log("[Supervisor] Integration verify: running full project tsc check...");
 
   const allPaths = state.fileRegistry.map((f) => f.path);

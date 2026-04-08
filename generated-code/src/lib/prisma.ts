@@ -1,13 +1,17 @@
+// This is the actual prisma client setup.
+// It will be mocked in tests, but the types are derived from this.
 import { PrismaClient } from '@prisma/client';
 
-// Add prisma to the NodeJS global type
+const prismaClientSingleton = () => {
+  return new PrismaClient();
+};
+
 declare global {
-  var prisma: PrismaClient | undefined;
+  var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
 }
 
-// Prevent multiple instances of Prisma Client in development
-const prisma = global.prisma || new PrismaClient();
-
-if (process.env.NODE_ENV === 'development') global.prisma = prisma;
+const prisma = globalThis.prisma ?? prismaClientSingleton();
 
 export default prisma;
+
+if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;

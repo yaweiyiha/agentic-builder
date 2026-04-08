@@ -1,5 +1,6 @@
 # dependencies
 /node_modules
+generated-code
 generated-code/node_modules/
 generated-code/dist/
 generated-code/public/design/*.png

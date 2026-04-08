@@ -1,37 +1,80 @@
-import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from './lib/jwt';
+import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-/**
- * Middleware to authenticate requests using JWT tokens.
- * It expects a 'Bearer <token>' in the Authorization header.
- * If authentication is successful, it attaches the userId to the request object.
- * If authentication fails, it sends a 401 Unauthorized response.
- */
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Extract token from "Bearer <token>"
+export default withAuth(
+  // This `middleware` function is executed only if the `authorized` callback returns `true`.
+  // At this point, the user is already considered authorized for the given path.
+  function middleware(req: NextRequest & { nextauth: { token: any } }) {
+    // You can access the authenticated user's token here if needed for further logic,
+    // such as logging, adding custom headers, or performing additional checks.
+    // console.log("Middleware function executed for:", req.nextUrl.pathname);
+    // console.log("Authenticated token:", req.nextauth.token);
 
-  if (!token) {
-    return res.status(401).json({ message: 'Authentication token required' });
+    // For API routes, you might want to add specific headers or logging.
+    // For example:
+    // if (req.nextUrl.pathname.startsWith("/api/")) {
+    //   const response = NextResponse.next();
+    //   response.headers.set("X-Authenticated-User-ID", req.nextauth.token?.sub || "unknown");
+    //   return response;
+    // }
+
+    return NextResponse.next();
+  },
+  {
+    callbacks: {
+      // The `authorized` callback determines if a user is allowed to access a path.
+      // If it returns `false`:
+      // - For a *page* request, NextAuth.js will redirect to the `pages.signIn` URL.
+      // - For an *API* request, NextAuth.js will return a `401 Unauthorized` response.
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl;
+
+        // 1. Allow all NextAuth.js API routes (e.g., /api/auth/signin, /api/auth/callback)
+        // These routes are essential for the authentication flow itself and should not require a token.
+        if (pathname.startsWith("/api/auth")) {
+          return true;
+        }
+
+        // 2. Allow public health check API route without authentication.
+        if (pathname === "/api/health") {
+          return true;
+        }
+
+        // 3. Require authentication for specific protected API routes.
+        // These are the core API endpoints that manage user-specific data.
+        if (pathname.startsWith("/api/member") || pathname.startsWith("/api/claims")) {
+          return !!token; // User must have a valid token to access these.
+        }
+
+        // 4. For all other routes included in the `matcher` (e.g., frontend pages like /timer, /settings, /statistics),
+        // require a token. If no token, NextAuth.js will handle the redirect/401.
+        // If you only want to protect API routes, you might adjust the matcher and this logic.
+        // Based on the PRD, frontend pages like /timer, /settings, /statistics also require authentication.
+        return !!token;
+      },
+    },
+    // Specify the URL for the login page.
+    // NextAuth.js will redirect unauthenticated users to this page if they try to access a protected *page* route.
+    pages: {
+      signIn: "/login",
+    },
   }
+);
 
-  try {
-    const decoded = verifyToken(token);
-    // Assuming the JWT payload contains a 'userId' field
-    if (decoded && decoded.userId) {
-      req.userId = decoded.userId;
-      next(); // Proceed to the next middleware/route handler
-    } else {
-      return res.status(401).json({ message: 'Invalid token payload' });
-    }
-  } catch (error: any) {
-    if (error.message === 'Token expired') {
-      return res.status(401).json({ message: 'Authentication token expired' });
-    }
-    if (error.message === 'Invalid token') {
-      return res.status(401).json({ message: 'Invalid authentication token' });
-    }
-    console.error('Error verifying token:', error);
-    return res.status(500).json({ message: 'Failed to authenticate token' });
-  }
+// Configure the `matcher` to specify which paths the middleware should run on.
+// It's crucial to include all paths that need to be protected or explicitly allowed
+// (like /api/health and /api/auth) in this array.
+export const config = {
+  matcher: [
+    "/api/member/:path*", // Protect all routes under /api/member
+    "/api/claims/:path*", // Protect all routes under /api/claims
+    "/api/health",        // Include health check to allow it through the middleware
+    "/api/auth/:path*",   // Essential for NextAuth.js authentication flow
+    // Add any frontend pages that require authentication here.
+    // Example:
+    "/timer",
+    "/settings",
+    "/statistics",
+  ],
 };

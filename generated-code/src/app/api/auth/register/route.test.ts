@@ -1,177 +1,149 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { POST } from './route';
-import { NextRequest, NextResponse } from 'next/server';
+import { mockRequest, getJsonResponse } from '@/lib/test-utils';
 import prisma from '@/lib/prisma';
-import { hashPassword, generateSessionToken, setSessionCookie } from '@/lib/auth';
+import { hash } from 'bcryptjs';
 
-// Mock prisma client
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    user: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-    },
-  },
-}));
+// Mock the prisma client and bcryptjs for this test file
+vi.mock('@/lib/prisma');
+vi.mock('bcryptjs');
 
-// Mock auth utilities
-vi.mock('@/lib/auth', () => ({
-  hashPassword: vi.fn(),
-  generateSessionToken: vi.fn(),
-  setSessionCookie: vi.fn(),
-}));
-
-// Mock NextResponse to capture status and JSON body
-vi.mock('next/server', () => {
-  return {
-    NextResponse: {
-      json: vi.fn((data, init) => {
-        const response = {
-          status: init?.status || 200,
-          _json: data, // Store the JSON data for inspection
-          cookies: {
-            set: vi.fn(), // Mock cookies.set method
-          },
-        };
-        // Mock the setSessionCookie behavior
-        if (init?.status === 201) {
-          (response.cookies.set as vi.Mock).mockImplementation((name, value, options) => {
-            (response as any)._cookie = { name, value, options }; // Capture cookie details
-          });
-        }
-        return response;
-      }),
-    },
-    NextRequest: vi.fn(), // Will be mocked per test
+const mockPrisma = prisma as unknown as {
+  user: {
+    findUnique: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
   };
-});
+  userSettings: {
+    create: ReturnType<typeof vi.fn>;
+  };
+};
+
+const mockHash = hash as ReturnType<typeof vi.fn>;
 
 describe('POST /api/auth/register', () => {
-  const mockEmail = 'test@example.com';
-  const mockPassword = 'password123';
-  const mockHashedPassword = 'hashed_password_123';
-  const mockUserId = 'user-id-123';
-  const mockSessionToken = 'mock_session_token';
-
   beforeEach(() => {
-    // Reset all mocks before each test
     vi.clearAllMocks();
-    (hashPassword as vi.Mock).mockResolvedValue(mockHashedPassword);
-    (generateSessionToken as vi.Mock).mockReturnValue(mockSessionToken);
-    (setSessionCookie as vi.Mock).mockImplementation((res, token) => {
-      // Simulate setting cookie on the mocked NextResponse
-      res.cookies.set('sessionToken', token, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 604800 });
+    mockPrisma.user.findUnique.mockResolvedValue(null); // Assume user does not exist by default
+    mockPrisma.user.create.mockImplementation((data) =>
+      Promise.resolve({
+        id: 'new-user-id',
+        email: data.data.email,
+        password: data.data.password,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        settings: {
+          id: 'settings-id',
+          userId: 'new-user-id',
+          workDurationMinutes: 25,
+          shortBreakDurationMinutes: 5,
+          longBreakDurationMinutes: 15,
+          longBreakInterval: 4,
+          notificationSoundEnabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+    );
+    mockPrisma.userSettings.create.mockResolvedValue({
+      id: 'settings-id',
+      userId: 'new-user-id',
+      workDurationMinutes: 25,
+      shortBreakDurationMinutes: 5,
+      longBreakDurationMinutes: 15,
+      longBreakInterval: 4,
+      notificationSoundEnabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    mockHash.mockResolvedValue('hashed_password_123'); // Mock hashed password
+  });
+
+  it('should register a new user successfully with default settings', async () => {
+    const req = mockRequest('POST', 'http://localhost/api/auth/register', {
+      email: 'test@example.com',
+      password: 'password123',
+    });
+
+    const res = await POST(req);
+    const json = await getJsonResponse(res);
+
+    expect(res.status).toBe(201);
+    expect(json).toEqual({
+      message: 'User registered successfully',
+      user: expect.objectContaining({
+        id: 'new-user-id',
+        email: 'test@example.com',
+        settings: expect.objectContaining({
+          userId: 'new-user-id',
+          workDurationMinutes: 25,
+        }),
+      }),
+    });
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+    expect(mockHash).toHaveBeenCalledWith('password123', 10);
+    expect(mockPrisma.user.create).toHaveBeenCalledWith({
+      data: {
+        email: 'test@example.com',
+        password: 'hashed_password_123',
+        settings: {
+          create: {},
+        },
+      },
+      include: {
+        settings: true,
+      },
     });
   });
 
-  it('should register a new user and return 201 with session cookie', async () => {
-    (prisma.user.findUnique as vi.Mock).mockResolvedValue(null); // User does not exist
-    (prisma.user.create as vi.Mock).mockResolvedValue({ id: mockUserId, email: mockEmail, password_hash: mockHashedPassword });
+  it('should return 400 if email or password is missing', async () => {
+    const req1 = mockRequest('POST', 'http://localhost/api/auth/register', { email: 'test@example.com' });
+    const res1 = await POST(req1);
+    const json1 = await getJsonResponse(res1);
+    expect(res1.status).toBe(400);
+    expect(json1).toEqual({ message: 'Email and password are required' });
 
-    const mockRequest = {
-      json: () => Promise.resolve({ email: mockEmail, password: mockPassword }),
-    } as NextRequest;
-
-    const response = await POST(mockRequest);
-
-    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: mockEmail } });
-    expect(hashPassword).toHaveBeenCalledWith(mockPassword);
-    expect(prisma.user.create).toHaveBeenCalledWith({
-      data: {
-        email: mockEmail,
-        password_hash: mockHashedPassword,
-      },
-    });
-    expect(generateSessionToken).toHaveBeenCalledWith(mockUserId);
-    expect(setSessionCookie).toHaveBeenCalledWith(expect.any(Object), mockSessionToken);
-
-    expect(response.status).toBe(201);
-    expect(response._json).toEqual({ message: 'Registration successful', userId: mockUserId });
-    expect(response.cookies.set).toHaveBeenCalledWith(
-      'sessionToken',
-      mockSessionToken,
-      expect.objectContaining({ httpOnly: true, secure: expect.any(Boolean), sameSite: 'lax', path: '/', maxAge: 604800 })
-    );
+    const req2 = mockRequest('POST', 'http://localhost/api/auth/register', { password: 'password123' });
+    const res2 = await POST(req2);
+    const json2 = await getJsonResponse(res2);
+    expect(res2.status).toBe(400);
+    expect(json2).toEqual({ message: 'Email and password are required' });
   });
 
   it('should return 409 if user with email already exists', async () => {
-    (prisma.user.findUnique as vi.Mock).mockResolvedValue({ id: mockUserId, email: mockEmail }); // User already exists
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'existing-user-id',
+      email: 'existing@example.com',
+      password: 'hashed_password',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-    const mockRequest = {
-      json: () => Promise.resolve({ email: mockEmail, password: mockPassword }),
-    } as NextRequest;
+    const req = mockRequest('POST', 'http://localhost/api/auth/register', {
+      email: 'existing@example.com',
+      password: 'password123',
+    });
 
-    const response = await POST(mockRequest);
+    const res = await POST(req);
+    const json = await getJsonResponse(res);
 
-    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: mockEmail } });
-    expect(prisma.user.create).not.toHaveBeenCalled(); // Should not create a new user
-    expect(hashPassword).not.toHaveBeenCalled();
-    expect(generateSessionToken).not.toHaveBeenCalled();
-    expect(setSessionCookie).not.toHaveBeenCalled();
-
-    expect(response.status).toBe(409);
-    expect(response._json).toEqual({ message: 'User with this email already exists' });
-  });
-
-  it('should return 400 if email is missing', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({ password: mockPassword }),
-    } as NextRequest;
-
-    const response = await POST(mockRequest);
-
-    expect(response.status).toBe(400);
-    expect(response._json).toEqual({ message: 'Email and password are required' });
-    expect(prisma.user.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('should return 400 if password is missing', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({ email: mockEmail }),
-    } as NextRequest;
-
-    const response = await POST(mockRequest);
-
-    expect(response.status).toBe(400);
-    expect(response._json).toEqual({ message: 'Email and password are required' });
-    expect(prisma.user.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('should return 400 for invalid email format', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({ email: 'invalid-email', password: mockPassword }),
-    } as NextRequest;
-
-    const response = await POST(mockRequest);
-
-    expect(response.status).toBe(400);
-    expect(response._json).toEqual({ message: 'Invalid email format' });
-    expect(prisma.user.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('should return 400 if password is too short', async () => {
-    const mockRequest = {
-      json: () => Promise.resolve({ email: mockEmail, password: 'short' }),
-    } as NextRequest;
-
-    const response = await POST(mockRequest);
-
-    expect(response.status).toBe(400);
-    expect(response._json).toEqual({ message: 'Password must be at least 8 characters long' });
-    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(res.status).toBe(409);
+    expect(json).toEqual({ message: 'User with this email already exists' });
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'existing@example.com' } });
+    expect(mockPrisma.user.create).not.toHaveBeenCalled(); // Ensure create is not called
   });
 
   it('should return 500 for internal server errors', async () => {
-    (prisma.user.findUnique as vi.Mock).mockRejectedValue(new Error('Database error'));
+    mockPrisma.user.create.mockRejectedValue(new Error('Database error'));
 
-    const mockRequest = {
-      json: () => Promise.resolve({ email: mockEmail, password: mockPassword }),
-    } as NextRequest;
+    const req = mockRequest('POST', 'http://localhost/api/auth/register', {
+      email: 'error@example.com',
+      password: 'password123',
+    });
 
-    const response = await POST(mockRequest);
+    const res = await POST(req);
+    const json = await getJsonResponse(res);
 
-    expect(response.status).toBe(500);
-    expect(response._json).toEqual({ message: 'Internal server error' });
-    expect(prisma.user.findUnique).toHaveBeenCalled(); // Error occurred during DB operation
+    expect(res.status).toBe(500);
+    expect(json).toEqual({ message: 'Something went wrong during registration' });
   });
 });

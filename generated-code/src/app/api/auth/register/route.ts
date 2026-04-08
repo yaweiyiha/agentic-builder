@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { hashPassword, generateSessionToken, setSessionCookie } from '@/lib/auth';
+import { hash } from 'bcryptjs';
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
-    }
-
-    // Basic email format validation
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      return NextResponse.json({ message: 'Invalid email format' }, { status: 400 });
-    }
-
-    // Password strength validation (example: min 8 chars)
-    if (password.length < 8) {
-      return NextResponse.json({ message: 'Password must be at least 8 characters long' }, { status: 400 });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -28,26 +18,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'User with this email already exists' }, { status: 409 });
     }
 
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await hash(password, 10);
 
     const newUser = await prisma.user.create({
       data: {
         email,
-        password_hash: hashedPassword,
+        password: hashedPassword,
+        settings: {
+          create: {}, // Create default settings for the new user
+        },
+      },
+      include: {
+        settings: true,
       },
     });
 
-    // Generate session token and set cookie
-    const sessionToken = generateSessionToken(newUser.id);
-    const response = NextResponse.json(
-      { message: 'Registration successful', userId: newUser.id },
-      { status: 201 }
-    );
-    setSessionCookie(response, sessionToken);
+    // For security, do not return the password hash
+    const { password: _, ...userWithoutPassword } = newUser;
 
-    return response;
+    return NextResponse.json({ message: 'User registered successfully', user: userWithoutPassword }, { status: 201 });
   } catch (error) {
     console.error('Registration error:', error);
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ message: 'Something went wrong during registration' }, { status: 500 });
   }
 }

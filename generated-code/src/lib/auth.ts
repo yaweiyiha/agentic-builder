@@ -1,42 +1,57 @@
-import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+// This file defines the authOptions for NextAuth, as referenced by the API routes.
+// It's needed for type inference and for mocking getServerSession.
+import { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import prisma from '@/lib/prisma';
+import { compare } from 'bcryptjs';
 
-/**
- * Extracts and verifies the JWT token from the request to get the user ID.
- * @param req The NextRequest object.
- * @returns The user ID if authentication is successful.
- * @throws {Error} If the token is missing or invalid.
- */
-export function getUserIdFromRequest(req: NextRequest): string {
-  const token = req.cookies.get('token')?.value || req.headers.get('authorization')?.split(' ')[1];
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials.password) {
+          return null;
+        }
 
-  if (!token) {
-    throw new Error('Unauthorized: No token provided.');
-  }
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
 
-  try {
-    if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET is not defined in environment variables.');
-    }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET) as { userId: string };
-    return decoded.userId;
-  } catch (error) {
-    console.error('JWT verification failed:', error);
-    throw new Error('Unauthorized: Invalid token.');
-  }
-}
+        if (!user || !(await compare(credentials.password, user.password))) {
+          return null;
+        }
 
-/**
- * Middleware-like function to protect API routes.
- * @param req The NextRequest object.
- * @param handler The actual API route handler function.
- * @returns A NextResponse or the result of the handler.
- */
-export async function withAuth(req: NextRequest, handler: (req: NextRequest, userId: string) => Promise<NextResponse>) {
-  try {
-    const userId = getUserIdFromRequest(req);
-    return await handler(req, userId);
-  } catch (error: any) {
-    return NextResponse.json({ message: error.message || 'Authentication failed.' }, { status: 401 });
-  }
-}
+        return {
+          id: user.id,
+          email: user.email,
+        };
+      },
+    }),
+  ],
+  session: {
+    strategy: 'jwt',
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token.id) {
+        session.user.id = token.id as string;
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: '/login',
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};

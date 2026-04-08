@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
-/**
- * Handles POST requests to log out a user by clearing the authentication cookie.
- * @returns {NextResponse} A response indicating successful logout.
- */
 export async function POST() {
-  try {
-    // Clear the authentication cookie
-    cookies().delete('token'); // Assuming 'token' is the name of your auth cookie
+  const session = await getServerSession(authOptions);
 
-    return NextResponse.json({ message: 'Logged out successfully' }, { status: 200 });
-  } catch (error) {
-    console.error('Logout error:', error);
-    return NextResponse.json({ message: 'An unexpected error occurred during logout.' }, { status: 500 });
+  if (!session) {
+    return NextResponse.json({ message: 'No active session to log out from' }, { status: 400 });
   }
+
+  // NextAuth handles the actual session invalidation via its signout function.
+  // This API route would typically trigger a client-side signout.
+  // For a server-side logout, NextAuth's /api/auth/signout endpoint is used.
+  // This route can simply confirm that a session existed.
+  return NextResponse.json({ message: 'Logout initiated (session existed)' }, { status: 200 });
 }

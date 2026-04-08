@@ -1,133 +1,112 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useMutation, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Input from '../../components/ui/Input';
-import Button from '../../components/ui/Button';
+import { signIn, useSession } from 'next-auth/react';
+import AuthFormContainer from '../components/AuthFormContainer';
+import Input from '../components/Input';
+import Button from '../components/Button';
 
-// This is a minimal QueryClientProvider for demonstration.
-// In a real Next.js app, this would typically wrap your entire app in layout.tsx
-const queryClient = new QueryClient();
-
-interface LoginResponse {
-  token: string; // Assuming the API returns a token on successful login
-  // Add other user data if needed
-}
-
-const LoginPageContent: React.FC = () => {
+const LoginPage: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  const [formError, setFormError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+
   const router = useRouter();
+  const { data: session, status } = useSession();
 
-  const loginMutation = useMutation<LoginResponse, Error, { email: string; password: string }>(
-    async (credentials) => {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Invalid credentials');
-      }
-
-      return response.json();
-    },
-    {
-      onSuccess: (data) => {
-        // Store the token (e.g., in localStorage or a secure cookie)
-        localStorage.setItem('authToken', data.token);
-        router.push('/timer'); // Redirect to the timer page on success
-      },
-      onError: (error: Error) => {
-        setFormError(error.message || 'An unexpected error occurred.');
-      },
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push('/timer'); // Redirect to timer page if already logged in
     }
-  );
+  }, [status, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = () => {
+    const newErrors: { email?: string; password?: string; general?: string } = {};
+    if (!email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Email address is invalid';
+    }
+    if (!password) {
+      newErrors.password = 'Password is required';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(''); // Clear previous errors
+    setErrors({});
 
-    if (!email || !password) {
-      setFormError('Please enter both email and password.');
+    if (!validateForm()) {
       return;
     }
 
-    loginMutation.mutate({ email, password });
+    setLoading(true);
+    try {
+      const result = await signIn('credentials', {
+        redirect: false, // Do not redirect, handle it manually
+        email,
+        password,
+      });
+
+      if (result?.error) {
+        setErrors({ general: 'Invalid credentials. Please check your email and password.' });
+      } else {
+        router.push('/timer'); // Redirect to timer page on successful login
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrors({ general: 'An unexpected error occurred. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#ffffff] p-[1rem]">
-      <div className="w-full max-w-[400px] bg-[#ffffff] p-[2rem] rounded-[0.375rem] shadow-md border border-gray-200">
-        <h1 className="text-[24px] font-bold text-center text-[#18181b] mb-[2rem]">
-          Pomodoro Productivity Tracker
-        </h1>
-
-        <form onSubmit={handleSubmit}>
-          <Input
-            id="email"
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@example.com"
-            required
-            autoComplete="email"
-          />
-          <Input
-            id="password"
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            autoComplete="current-password"
-          />
-
-          {formError && (
-            <p className="text-[14px] text-red-500 text-center mb-[1rem]">{formError}</p>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full mb-[1rem]"
-            isLoading={loginMutation.isLoading}
-            disabled={loginMutation.isLoading}
-          >
-            Login
-          </Button>
-        </form>
-
-        <div className="text-center text-[14px] text-[#18181b]">
-          <Link href="/forgot-password" className="text-[#2563eb] hover:underline">
-            Forgot Password?
-          </Link>
-        </div>
-
-        <div className="text-center text-[14px] text-[#18181b] mt-[1rem]">
-          Don't have an account?{' '}
-          <Link href="/register" className="text-[#2563eb] hover:underline">
-            Register
-          </Link>
-        </div>
+  if (status === 'loading' || status === 'authenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] font-sans text-[#18181b]">
+        Loading...
       </div>
-    </div>
-  );
-};
+    );
+  }
 
-const LoginPage: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <LoginPageContent />
-    </QueryClientProvider>
+    <AuthFormContainer
+      title="Login to Pomodoro"
+      footerText="Don't have an account?"
+      footerLinkHref="/register"
+      footerLinkText="Register"
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[1rem]">
+        <Input
+          id="email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errors.email}
+          disabled={loading}
+        />
+        <Input
+          id="password"
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errors.password}
+          disabled={loading}
+        />
+        {errors.general && (
+          <p className="text-[14px] text-red-500 text-center">{errors.general}</p>
+        )}
+        <Button type="submit" loading={loading} disabled={loading}>
+          Login
+        </Button>
+      </form>
+    </AuthFormContainer>
   );
 };
 
