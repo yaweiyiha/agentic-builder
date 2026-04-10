@@ -71,8 +71,19 @@ function isFrontendOnly(state: SupervisorState): boolean {
   return state.backendTasks.length === 0;
 }
 
+const ENABLE_PHASE_INCREMENTAL_CONTEXT_SYNC =
+  process.env.BLUEPRINT_INCREMENTAL_CONTEXT_SYNC !== "0";
+
 function workersForRole(role: CodingAgentRole, count: number): number {
   if (role === "architect" || role === "test") return 1;
+  // Strict context mode: keep one worker per coding role so each task sees
+  // the latest outputs from previous tasks within the same role.
+  if (
+    ENABLE_PHASE_INCREMENTAL_CONTEXT_SYNC &&
+    (role === "backend" || role === "frontend")
+  ) {
+    return 1;
+  }
   if (count <= 3) return 1;
   if (count <= 8) return 2;
   return 3;
@@ -200,6 +211,7 @@ async function buildPrebuiltScaffoldRegistryAndDoc(
     "# Architecture (prebuilt scaffold)",
     "",
     "This directory was bootstrapped from the **tier scaffold** at coding session start.",
+    "See **SCAFFOLD_SPEC.md** for layout conventions, commands, and where to add code.",
     "Architect kickoff tasks were **not** run with an LLM; implement features in backend, frontend, and test phases.",
     "",
     "## Root `package.json` scripts",
@@ -451,6 +463,248 @@ function parseFileOutput(raw: string): Record<string, string> {
   return files;
 }
 
+type PackageRootKey = "root" | "web" | "api" | "shared";
+
+interface DependencyPlanItem {
+  pkg: string;
+  reason: string;
+}
+
+interface DependencyWorkspacePlan {
+  relPath: string;
+  suggested: DependencyPlanItem[];
+  alreadyDeclared: string[];
+  missing: DependencyPlanItem[];
+}
+
+async function readPackageDeps(
+  relPath: string,
+  outputDir: string,
+): Promise<Set<string>> {
+  const raw = await fsRead(relPath, outputDir);
+  if (raw.startsWith("FILE_NOT_FOUND") || raw.startsWith("REJECTED")) {
+    return new Set();
+  }
+  try {
+    const j = JSON.parse(raw) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    return new Set([
+      ...Object.keys(j.dependencies ?? {}),
+      ...Object.keys(j.devDependencies ?? {}),
+    ]);
+  } catch {
+    return new Set();
+  }
+}
+
+function collectDependencySuggestions(state: SupervisorState): Record<PackageRootKey, DependencyPlanItem[]> {
+  const text = [
+    state.projectContext,
+    ...state.tasks.map((t) => `${t.phase} ${t.title} ${t.description}`),
+  ]
+    .join("\n")
+    .toLowerCase();
+
+  const root: DependencyPlanItem[] = [];
+  const web: DependencyPlanItem[] = [];
+  const api: DependencyPlanItem[] = [];
+  const shared: DependencyPlanItem[] = [];
+
+  // Baseline monorepo internal linkage.
+  web.push({
+    pkg: "@project/shared",
+    reason: "Frontend imports shared contracts/types/schemas.",
+  });
+  api.push({
+    pkg: "@project/shared",
+    reason: "Backend imports shared contracts/types/schemas.",
+  });
+  shared.push({
+    pkg: "zod",
+    reason: "Shared runtime validation schemas.",
+  });
+
+  if (/query|server state|cache|invalidate/.test(text)) {
+    web.push({
+      pkg: "@tanstack/react-query",
+      reason: "Server-state caching and request lifecycle.",
+    });
+  }
+  if (/axios|http client|api client/.test(text)) {
+    web.push({ pkg: "axios", reason: "HTTP client for API calls." });
+  }
+  if (/store|zustand|global state/.test(text)) {
+    web.push({ pkg: "zustand", reason: "Client-side state management." });
+  }
+  if (/form|validation|register|login/.test(text)) {
+    web.push({ pkg: "zod", reason: "Form and API payload validation." });
+  }
+  if (
+    /chart|charts|graph|statistics|analytics|trend|recharts|line\s*chart|bar\s*chart|pie\s*chart/.test(
+      text,
+    )
+  ) {
+    web.push({
+      pkg: "recharts",
+      reason: "Data visualization components for statistics/analytics UI.",
+    });
+  }
+
+  if (/express/.test(text)) {
+    api.push({ pkg: "express", reason: "HTTP server runtime." });
+  }
+  if (/fastify/.test(text)) {
+    api.push({ pkg: "fastify", reason: "HTTP server runtime." });
+  }
+  if (/auth|jwt|token|session/.test(text)) {
+    api.push({ pkg: "jose", reason: "JWT/session token primitives." });
+  }
+  if (/security|helmet/.test(text)) {
+    api.push({ pkg: "helmet", reason: "Secure HTTP headers defaults." });
+  }
+  if (/cors/.test(text)) {
+    api.push({ pkg: "cors", reason: "Cross-origin API access control." });
+  }
+  if (/database|schema|prisma|model/.test(text)) {
+    api.push({
+      pkg: "zod",
+      reason: "Runtime input validation near handlers/services.",
+    });
+  }
+
+  if (/test|vitest|integration/.test(text)) {
+    root.push({
+      pkg: "vitest",
+      reason: "Unit/integration test runner across workspaces.",
+    });
+  }
+  if (/e2e|playwright/.test(text)) {
+    root.push({ pkg: "playwright", reason: "End-to-end browser tests." });
+  }
+
+  const dedupe = (items: DependencyPlanItem[]): DependencyPlanItem[] => {
+    const map = new Map<string, DependencyPlanItem>();
+    for (const item of items) {
+      if (!map.has(item.pkg)) {
+        map.set(item.pkg, item);
+      }
+    }
+    return [...map.values()];
+  };
+
+  return {
+    root: dedupe(root),
+    web: dedupe(web),
+    api: dedupe(api),
+    shared: dedupe(shared),
+  };
+}
+
+async function buildDependencyBaselinePlans(
+  state: SupervisorState,
+): Promise<DependencyWorkspacePlan[]> {
+  const suggestions = collectDependencySuggestions(state);
+  const workspaceMap: Array<{ key: PackageRootKey; relPath: string }> = [
+    { key: "root", relPath: "package.json" },
+    { key: "web", relPath: "apps/web/package.json" },
+    { key: "api", relPath: "apps/api/package.json" },
+    { key: "shared", relPath: "packages/shared/package.json" },
+  ];
+
+  const plans: DependencyWorkspacePlan[] = [];
+  for (const ws of workspaceMap) {
+    const declared = await readPackageDeps(ws.relPath, state.outputDir);
+    if (declared.size === 0) continue;
+    const suggested = suggestions[ws.key];
+    const missing = suggested.filter((s) => !declared.has(s.pkg));
+    plans.push({
+      relPath: ws.relPath,
+      suggested,
+      alreadyDeclared: suggested
+        .map((s) => s.pkg)
+        .filter((pkg) => declared.has(pkg))
+        .sort(),
+      missing,
+    });
+  }
+  return plans;
+}
+
+function renderDependencyPlanMarkdown(plans: DependencyWorkspacePlan[]): string {
+  const body = plans
+    .map((p) => {
+      const suggested = p.suggested.length
+        ? p.suggested
+            .map((s) => `- \`${s.pkg}\` — ${s.reason}`)
+            .join("\n")
+        : "- (none)";
+      const declared = p.alreadyDeclared.length
+        ? p.alreadyDeclared.map((d) => `- \`${d}\``).join("\n")
+        : "- (none matched yet)";
+      const missing = p.missing.length
+        ? p.missing.map((m) => `- \`${m.pkg}\` — ${m.reason}`).join("\n")
+        : "- (none)";
+      return [
+        `### ${p.relPath}`,
+        "",
+        "**Suggested for this project**",
+        suggested,
+        "",
+        "**Already declared (matched)**",
+        declared,
+        "",
+        "**Missing (to be added by coding/integration if used)**",
+        missing,
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  return [
+    "# Dependency baseline",
+    "",
+    "This plan is generated **before feature coding** to align package usage with PRD + task breakdown.",
+    "Coding agents should prefer these packages and avoid introducing parallel alternatives.",
+    "",
+    body || "(no workspace package.json found)",
+    "",
+  ].join("\n");
+}
+
+async function dependencyBaseline(state: SupervisorState): Promise<Partial<SupervisorState>> {
+  console.log("[Supervisor] dependency_baseline: planning dependencies before coding...");
+  const plans = await buildDependencyBaselinePlans(state);
+  const md = renderDependencyPlanMarkdown(plans);
+  await fsWrite("DEPENDENCY_PLAN.md", md, state.outputDir);
+
+  const summaryLines = plans
+    .map((p) => {
+      const missing = p.missing.map((m) => m.pkg).join(", ") || "(none)";
+      return `- ${p.relPath}: missing ${missing}`;
+    })
+    .join("\n");
+  const contextPatch = [
+    "## Dependency baseline (pre-coding)",
+    "Use these package decisions as the source of truth unless a task explicitly requires otherwise.",
+    summaryLines || "- (no package roots found)",
+    "Full details: DEPENDENCY_PLAN.md",
+  ].join("\n");
+
+  return {
+    projectContext: state.projectContext
+      ? `${state.projectContext}\n\n---\n\n${contextPatch}`
+      : contextPatch,
+    fileRegistry: [
+      {
+        path: "DEPENDENCY_PLAN.md",
+        role: "architect",
+        summary: "Pre-coding dependency baseline (workspace-aware)",
+      },
+    ],
+  };
+}
+
 async function scaffoldFix(state: SupervisorState) {
   const attempt = state.scaffoldFixAttempts + 1;
   console.log(
@@ -556,7 +810,189 @@ function extractBuildErrorFiles(errors: string): string[] {
       if (!f.includes("node_modules")) fileSet.add(f);
     }
   }
+  const conventionPattern = /\[CONVENTION\]\s+([^\s:]+):/g;
+  let cm: RegExpExecArray | null;
+  while ((cm = conventionPattern.exec(errors)) !== null) {
+    const f = cm[1].replace(/^\.\//, "");
+    if (f && !f.includes("node_modules")) fileSet.add(f);
+  }
   return [...fileSet];
+}
+
+function appendConventionFileHints(errors: string, files: string[]): string {
+  if (files.length === 0) return errors;
+  const hintLines = files.map((f) => `- ${f}`).join("\n");
+  return [errors, "", "CONVENTION_TARGET_FILES:", hintLines].join("\n");
+}
+
+async function collectConventionViolations(
+  outputDir: string,
+): Promise<{ errorsText: string; files: string[] }> {
+  const files = await listFiles(".", outputDir);
+  const sourceFiles = files.filter(
+    (f) =>
+      /\.(ts|tsx|js|jsx)$/.test(f) &&
+      !f.includes("node_modules") &&
+      !f.startsWith("dist/") &&
+      !f.startsWith(".next/"),
+  );
+
+  const violations: string[] = [];
+  const touchedFiles = new Set<string>();
+  const scaffoldSpec = await fsRead("SCAFFOLD_SPEC.md", outputDir);
+  const isMTier = /scaffold specification \(tier m\)/i.test(scaffoldSpec);
+
+  for (const rel of sourceFiles) {
+    const content = await fsRead(rel, outputDir);
+    if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED")) {
+      continue;
+    }
+
+    if (/(?:from\s+["']@shared\/|import\s+["']@shared\/)/.test(content)) {
+      violations.push(
+        `[CONVENTION] ${rel}: Use "@project/shared/..." imports; "@shared/..." is forbidden unless explicitly configured.`,
+      );
+      touchedFiles.add(rel);
+    }
+
+    if (rel.startsWith("packages/shared/schemas/")) {
+      const schemaTypePattern = /export\s+type\s+([A-Z]\w*Schema)\b/g;
+      let tm: RegExpExecArray | null;
+      while ((tm = schemaTypePattern.exec(content)) !== null) {
+        violations.push(
+          `[CONVENTION] ${rel}: Replace type "${tm[1]}" with "*Input" (or "*Dto") to avoid schema/type naming collisions.`,
+        );
+        touchedFiles.add(rel);
+      }
+    }
+
+    const importSchemaValuePattern =
+      /import\s+\{[^}]*\b([A-Z]\w*Schema)\b[^}]*\}\s+from\s+["']@project\/shared\/schemas\//g;
+    let im: RegExpExecArray | null;
+    while ((im = importSchemaValuePattern.exec(content)) !== null) {
+      const importBlockStart = Math.max(0, im.index - 40);
+      const importSnippet = content.slice(importBlockStart, im.index + 140);
+      if (!/import\s+type\s+\{/.test(importSnippet)) {
+        violations.push(
+          `[CONVENTION] ${rel}: "${im[1]}" looks like a type. Import runtime schema values as camelCase (e.g. registerSchema) and use "import type" for types.`,
+        );
+        touchedFiles.add(rel);
+      }
+    }
+
+    // M-tier strict routing root: ONLY apps/web/src/pages
+    if (isMTier) {
+      const isWebAppDirFile = rel.startsWith("apps/web/app/");
+      const isWebSrcAppDirFile = rel.startsWith("apps/web/src/app/");
+      if (isWebAppDirFile || isWebSrcAppDirFile) {
+        violations.push(
+          `[CONVENTION] ${rel}: M-tier allows a single page root only: "apps/web/src/pages". Do not place pages/layout/routes under "apps/web/app" or "apps/web/src/app".`,
+        );
+        touchedFiles.add(rel);
+      }
+
+      if (
+        /(?:from\s+["']@\/app\/|from\s+["']\.{1,2}\/app\/|import\s+["']@\/app\/)/.test(
+          content,
+        )
+      ) {
+        violations.push(
+          `[CONVENTION] ${rel}: M-tier imports must target "src/pages" routes/components; "@\/app/*" and "./app/*" imports are forbidden.`,
+        );
+        touchedFiles.add(rel);
+      }
+    }
+  }
+
+  if (isMTier) {
+    const appEntryPath = "apps/web/src/App.tsx";
+    const routesFilePath = "apps/web/src/routes.tsx";
+    const appEntryContent = await fsRead(appEntryPath, outputDir);
+    const routesFileContent = await fsRead(routesFilePath, outputDir);
+    const appExists =
+      !appEntryContent.startsWith("FILE_NOT_FOUND") &&
+      !appEntryContent.startsWith("REJECTED");
+    const routesFileExists =
+      !routesFileContent.startsWith("FILE_NOT_FOUND") &&
+      !routesFileContent.startsWith("REJECTED");
+
+    if (!appExists) {
+      violations.push(
+        `[CONVENTION] ${appEntryPath}: M-tier frontend must keep App.tsx as the web entry and route registry owner (directly or by importing src/routes.tsx).`,
+      );
+      touchedFiles.add(appEntryPath);
+    } else {
+      const hasRouterRegistry =
+        /\bRoutes\b/.test(appEntryContent) ||
+        /\bRouterProvider\b/.test(appEntryContent) ||
+        /from\s+["']\.\/routes["']/.test(appEntryContent) ||
+        /from\s+["']@\/routes["']/.test(appEntryContent);
+      if (!hasRouterRegistry) {
+        violations.push(
+          `[CONVENTION] ${appEntryPath}: App entry must register React Router routes (Routes/Route) or import a dedicated src/routes.tsx registry.`,
+        );
+        touchedFiles.add(appEntryPath);
+      }
+    }
+
+    const pageFiles = sourceFiles.filter(
+      (f) => f.startsWith("apps/web/src/pages/") && /\.tsx?$/.test(f),
+    );
+    if (pageFiles.length > 0) {
+      const registrySource = [
+        appExists ? appEntryContent : "",
+        routesFileExists ? routesFileContent : "",
+      ].join("\n");
+
+      const hasPagesImport =
+        /from\s+["'](?:@\/pages\/|\.\/pages\/|\.\.\/pages\/)/.test(registrySource);
+      if (!hasPagesImport) {
+        violations.push(
+          `[CONVENTION] ${appEntryPath}: Pages exist under apps/web/src/pages but route registry does not import page modules. Register page routes explicitly.`,
+        );
+        touchedFiles.add(appEntryPath);
+        if (routesFileExists) touchedFiles.add(routesFilePath);
+      }
+
+      const hasNonRootRoute = /path\s*=\s*["']\/[^"']+["']/.test(registrySource);
+      if (pageFiles.length > 1 && !hasNonRootRoute) {
+        violations.push(
+          `[CONVENTION] ${appEntryPath}: Multiple pages detected, but no non-root route is registered. Add at least one route entry beyond "/".`,
+        );
+        touchedFiles.add(appEntryPath);
+        if (routesFileExists) touchedFiles.add(routesFilePath);
+      }
+    }
+
+    const homeEntryCandidates = [
+      "apps/web/src/pages/Home.tsx",
+      "apps/web/src/pages/Index.tsx",
+      "apps/web/src/pages/index.tsx",
+      appEntryPath,
+    ];
+    let hasHomeNavigationEntry = false;
+    for (const candidate of homeEntryCandidates) {
+      const content = await fsRead(candidate, outputDir);
+      if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED")) {
+        continue;
+      }
+      if (/\b(Link|NavLink|useNavigate)\b/.test(content)) {
+        hasHomeNavigationEntry = true;
+        break;
+      }
+    }
+    if (!hasHomeNavigationEntry) {
+      violations.push(
+        `[CONVENTION] ${appEntryPath}: Home entry must provide visible route entry points (Link/NavLink or button using useNavigate) so users can navigate to primary pages.`,
+      );
+      touchedFiles.add(appEntryPath);
+    }
+  }
+
+  return {
+    errorsText: violations.join("\n"),
+    files: [...touchedFiles],
+  };
 }
 
 // ─── API Contract generation ───
@@ -706,6 +1142,126 @@ async function generateApiContracts(state: SupervisorState) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(
       `[Supervisor] generateApiContracts: error — ${msg}. Continuing without contracts.`,
+    );
+    return {};
+  }
+}
+
+/**
+ * Bootstrap shared schemas/types/contracts BEFORE backend/frontend workers.
+ * This makes downstream imports stable and reduces naming drift.
+ */
+async function bootstrapSharedContracts(
+  state: SupervisorState,
+): Promise<Partial<SupervisorState>> {
+  const sharedPkg = await fsRead("packages/shared/package.json", state.outputDir);
+  if (sharedPkg.startsWith("FILE_NOT_FOUND") || sharedPkg.startsWith("REJECTED")) {
+    console.log(
+      "[Supervisor] bootstrapSharedContracts: packages/shared not found, skipping.",
+    );
+    return {};
+  }
+
+  console.log(
+    "[Supervisor] bootstrapSharedContracts: generating shared schemas/types/contracts...",
+  );
+
+  const taskText = state.tasks
+    .map((t) => `- [${t.phase}] ${t.title}: ${t.description}`)
+    .join("\n");
+  const apiText =
+    state.apiContracts.length > 0
+      ? state.apiContracts
+          .map((c) => `- ${c.method} ${c.endpoint} (${c.service}) ${c.schema}`)
+          .join("\n")
+      : "- (none)";
+
+  const existingShared = state.fileRegistry
+    .filter((f) => f.path.startsWith("packages/shared/"))
+    .slice(0, 20)
+    .map((f) => `- ${f.path} (${f.summary})`)
+    .join("\n");
+
+  const chain = resolveModelChain(
+    MODEL_CONFIG.codeFix ?? "gpt-4o",
+    resolveModel,
+  );
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: `You are a Senior TypeScript API Contract Architect.
+Generate/repair ONLY shared package files for a monorepo:
+- packages/shared/schemas/*.ts
+- packages/shared/types/*.ts
+- packages/shared/src/contracts/*.ts
+- packages/shared/src/index.ts (optional update if needed)
+
+Critical rules:
+- Import path convention in consumers: @project/shared/types/... and @project/shared/schemas/...
+- Zod naming: runtime values are camelCase schema objects (e.g. loginSchema, registerSchema).
+- Inferred types MUST use *Input / *Dto names (e.g. LoginInput, RegisterInput). Do NOT export type names like LoginSchema/RegisterSchema.
+- Keep exports consistent and explicit.
+- Output ONLY file blocks: \`\`\`file:<relative-path>\n<contents>\n\`\`\``,
+    },
+    {
+      role: "user",
+      content: [
+        "## Tasks",
+        taskText || "- (none)",
+        "",
+        "## API contracts",
+        apiText,
+        "",
+        "## Existing shared files (registry)",
+        existingShared || "- (none)",
+        "",
+        "Generate a coherent shared contract baseline now.",
+      ].join("\n"),
+    },
+  ];
+
+  try {
+    const response = await chatCompletionWithFallback(messages, chain, {
+      temperature: 0.1,
+      max_tokens: 16384,
+    });
+    const content = response.choices[0]?.message?.content ?? "";
+    const costUsd = estimateCost(response.model, response.usage);
+    const files = parseFileOutput(content);
+
+    const skOpts = scaffoldWriteOpts(state, true);
+    const newEntries: GeneratedFile[] = [];
+    for (const [fp, fc] of Object.entries(files)) {
+      const norm = fp.replace(/\\/g, "/");
+      if (
+        !norm.startsWith("packages/shared/schemas/") &&
+        !norm.startsWith("packages/shared/types/") &&
+        !norm.startsWith("packages/shared/src/contracts/") &&
+        norm !== "packages/shared/src/index.ts"
+      ) {
+        continue;
+      }
+      await fsWrite(norm, fc, state.outputDir, skOpts);
+      newEntries.push({
+        path: norm,
+        role: "architect",
+        summary: "Shared contracts baseline (schemas/types/contracts)",
+        exports: extractExports(fc),
+      });
+    }
+
+    console.log(
+      `[Supervisor] bootstrapSharedContracts: wrote ${newEntries.length} file(s) (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+    );
+
+    return {
+      fileRegistry: newEntries,
+      totalCostUsd: costUsd,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      `[Supervisor] bootstrapSharedContracts: error — ${msg}. Continuing without bootstrap.`,
     );
     return {};
   }
@@ -1079,8 +1635,20 @@ async function phaseVerify(
   const hasErrors = tscResult.exitCode !== 0 && output.includes("error TS");
 
   if (!hasErrors) {
-    console.log("[Supervisor] Phase verify: tsc PASSED.");
-    return { scaffoldErrors: "" };
+    const convention = await collectConventionViolations(state.outputDir);
+    if (!convention.errorsText) {
+      console.log("[Supervisor] Phase verify: tsc PASSED.");
+      return { scaffoldErrors: "" };
+    }
+    console.log(
+      `[Supervisor] Phase verify: convention violations found (${convention.files.length} file(s)).`,
+    );
+    return {
+      scaffoldErrors: appendConventionFileHints(
+        convention.errorsText,
+        convention.files,
+      ).slice(0, 3000),
+    };
   }
 
   const realErrors = output
@@ -1098,17 +1666,33 @@ async function phaseVerify(
     .join("\n");
 
   if (!realErrors) {
+    const convention = await collectConventionViolations(state.outputDir);
+    if (!convention.errorsText) {
+      console.log(
+        "[Supervisor] Phase verify: only cross-ref errors (expected at this stage), PASSED.",
+      );
+      return { scaffoldErrors: "" };
+    }
     console.log(
-      "[Supervisor] Phase verify: only cross-ref errors (expected at this stage), PASSED.",
+      `[Supervisor] Phase verify: cross-ref-only TS errors, but convention violations found (${convention.files.length}).`,
     );
-    return { scaffoldErrors: "" };
+    return {
+      scaffoldErrors: appendConventionFileHints(
+        convention.errorsText,
+        convention.files,
+      ).slice(0, 3000),
+    };
   }
 
   console.log(
     `[Supervisor] Phase verify: tsc FAILED.\n${realErrors.slice(0, 300)}`,
   );
 
-  return { scaffoldErrors: realErrors.slice(0, 3000) };
+  const convention = await collectConventionViolations(state.outputDir);
+  const mergedErrors = convention.errorsText
+    ? `${realErrors}\n\n${appendConventionFileHints(convention.errorsText, convention.files)}`
+    : realErrors;
+  return { scaffoldErrors: mergedErrors.slice(0, 3000) };
 }
 
 function shouldFixPhaseOrContinue(state: SupervisorState): string {
@@ -1179,6 +1763,8 @@ async function phaseFix(
       role: "system",
       content:
         "You are a Senior Engineer. Fix the TypeScript errors below. " +
+        "If errors include [CONVENTION], treat them as MUST-FIX policy violations. " +
+        "For M-tier web projects, use only apps/web/src/pages as page root (no apps/web/app or apps/web/src/app). " +
         "Output ONLY corrected files using ```file:<path> format. " +
         "Do not rewrite files that have no errors.",
     },
@@ -1619,8 +2205,20 @@ async function integrationVerify(state: SupervisorState) {
   let { output, exitCode } = await runTsc();
 
   if (exitCode === 0 || !output.includes("error TS")) {
-    console.log("[Supervisor] Integration verify: PASSED (no errors)");
-    return { integrationErrors: "" };
+    const convention = await collectConventionViolations(state.outputDir);
+    if (!convention.errorsText) {
+      console.log("[Supervisor] Integration verify: PASSED (no errors)");
+      return { integrationErrors: "" };
+    }
+    console.log(
+      `[Supervisor] Integration verify: convention violations found (${convention.files.length} file(s)).`,
+    );
+    return {
+      integrationErrors: appendConventionFileHints(
+        convention.errorsText,
+        convention.files,
+      ).slice(0, 4000),
+    };
   }
 
   const classification = classifyTscErrors(output);
@@ -1634,8 +2232,20 @@ async function integrationVerify(state: SupervisorState) {
     });
     const retry = await runTsc();
     if (retry.exitCode === 0 || !retry.output.includes("error TS")) {
-      console.log("[Supervisor] Integration verify: PASSED after dep install");
-      return { integrationErrors: "" };
+      const convention = await collectConventionViolations(state.outputDir);
+      if (!convention.errorsText) {
+        console.log("[Supervisor] Integration verify: PASSED after dep install");
+        return { integrationErrors: "" };
+      }
+      console.log(
+        `[Supervisor] Integration verify: dep install fixed TS, but convention violations found (${convention.files.length} file(s)).`,
+      );
+      return {
+        integrationErrors: appendConventionFileHints(
+          convention.errorsText,
+          convention.files,
+        ).slice(0, 4000),
+      };
     }
     output = retry.output;
   }
@@ -1645,12 +2255,16 @@ async function integrationVerify(state: SupervisorState) {
     .filter((l) => l.includes("error TS"));
   const errorCount = errorLines.length;
   const truncated = errorLines.slice(0, 80).join("\n");
+  const convention = await collectConventionViolations(state.outputDir);
+  const mergedErrors = convention.errorsText
+    ? `${truncated}\n\n${appendConventionFileHints(convention.errorsText, convention.files)}`
+    : truncated;
 
   console.log(
     `[Supervisor] Integration verify: FAILED with ${errorCount} error(s) (fixAttempts=${state.integrationFixAttempts})`,
   );
   return {
-    integrationErrors: truncated.slice(0, 4000),
+    integrationErrors: mergedErrors.slice(0, 4000),
   };
 }
 
@@ -1672,10 +2286,12 @@ async function integrationFix(state: SupervisorState) {
   );
 
   const errFiles = extractErrorFiles(state.integrationErrors);
+  const conventionFiles = extractBuildErrorFiles(state.integrationErrors);
+  const allErrFiles = [...new Set([...errFiles, ...conventionFiles])];
   const fileContents: string[] = [];
   const addedPaths = new Set<string>();
 
-  for (const ef of errFiles.slice(0, 8)) {
+  for (const ef of allErrFiles.slice(0, 12)) {
     const content = await fsRead(ef, state.outputDir);
     if (!content.startsWith("FILE_NOT_FOUND")) {
       fileContents.push(
@@ -1718,6 +2334,8 @@ async function integrationFix(state: SupervisorState) {
 Fix all errors so that "npx tsc --noEmit" passes cleanly.
 Rules:
 - Fix type errors, missing imports, incorrect interfaces, wrong JSX config, etc.
+- If errors include [CONVENTION], they are policy violations and MUST be fixed.
+- For M-tier web projects, page root must be only apps/web/src/pages. Remove/replace apps/web/app and apps/web/src/app usage.
 - If a config file (tsconfig.json, package.json) needs changes, output the corrected version.
 - Prefer minimal changes that fix the errors without breaking other functionality.
 - Output ONLY corrected files using \`\`\`file:<relative-path>\\n<contents>\\n\`\`\` format.`,
@@ -1809,7 +2427,9 @@ export function createSupervisorGraph() {
     .addNode("scaffold_verify", scaffoldVerify)
     .addNode("scaffold_fix", scaffoldFix)
     .addNode("dispatch_gate", dispatchGate)
+    .addNode("dependency_baseline", dependencyBaseline)
     .addNode("generate_api_contracts", generateApiContracts)
+    .addNode("bootstrap_shared_contracts", bootstrapSharedContracts)
     .addNode("generate_service_skeletons", generateServiceSkeletons)
     .addNode("be_worker", parallelWorkerNode)
     .addNode("be_phase_verify", phaseVerify)
@@ -1832,8 +2452,10 @@ export function createSupervisorGraph() {
       scaffold_fix: "scaffold_fix",
     })
     .addEdge("scaffold_fix", "scaffold_verify")
-    .addEdge("dispatch_gate", "generate_api_contracts")
-    .addEdge("generate_api_contracts", "generate_service_skeletons")
+    .addEdge("dispatch_gate", "dependency_baseline")
+    .addEdge("dependency_baseline", "generate_api_contracts")
+    .addEdge("generate_api_contracts", "bootstrap_shared_contracts")
+    .addEdge("bootstrap_shared_contracts", "generate_service_skeletons")
     .addConditionalEdges(
       "generate_service_skeletons",
       dispatchBackendAndTestWorkers,

@@ -114,6 +114,16 @@ export interface CodingTask extends KickoffWorkItem {
   progressStage?: "generating" | "verifying" | "fixing";
   /** Short preview of the latest verification error. */
   errorPreview?: string;
+  /** Actual per-task generation token usage from coding stage. */
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  /** Actual per-task generation cost from coding stage. */
+  taskCostUsd?: number;
+  /** Explicit list of modified files for this task (same as generatedFiles). */
+  modifiedFiles?: string[];
 }
 
 export interface CodingAgentInstance {

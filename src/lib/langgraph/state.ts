@@ -28,6 +28,11 @@ export interface TaskResult {
   generatedFiles: string[];
   costUsd: number;
   durationMs: number;
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
   verifyPassed: boolean;
   fixCycles: number;
   warnings?: string[];
@@ -164,7 +169,11 @@ export const WorkerStateAnnotation = Annotation.Root({
     default: () => "",
   }),
   fileRegistrySnapshot: Annotation<GeneratedFile[]>({
-    reducer: (_prev, next) => next,
+    reducer: (prev, next) => {
+      const map = new Map(prev.map((f) => [f.path, f]));
+      for (const f of next) map.set(f.path, f);
+      return [...map.values()];
+    },
     default: () => [],
   }),
   apiContractsSnapshot: Annotation<ApiContract[]>({
@@ -202,9 +211,37 @@ export const WorkerStateAnnotation = Annotation.Root({
     },
     default: () => [],
   }),
+  currentTaskGeneratedFiles: Annotation<string[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+  currentTaskCostUsd: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+  currentTaskDurationMs: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+  currentTaskTokenUsage: Annotation<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }>({
+    reducer: (_prev, next) => next,
+    default: () => ({ promptTokens: 0, completionTokens: 0, totalTokens: 0 }),
+  }),
   workerCostUsd: Annotation<number>({
     reducer: (prev, next) => prev + next,
     default: () => 0,
+  }),
+  currentTaskRetryCount: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+  currentTaskLastError: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
   }),
 });
 

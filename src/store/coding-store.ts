@@ -289,6 +289,10 @@ function handleCodingEvent(
       const completedStatus =
         (payload.data?.status as CodingTask["codingStatus"] | undefined) ??
         "completed";
+      const tokenUsage = payload.data?.tokenUsage as
+        | { totalTokens?: number }
+        | undefined;
+      const totalTokens = tokenUsage?.totalTokens ?? 0;
       return {
         ...a,
         currentTaskId: null,
@@ -300,14 +304,22 @@ function handleCodingEvent(
             timestamp: new Date().toISOString(),
             type: "task_complete" as const,
             taskId: payload.taskId,
-            details:
+            details: [
               typeof payload.data?.verifyErrors === "string"
                 ? (payload.data.verifyErrors as string)
-                : undefined,
+                : "",
+              ((payload.data?.modifiedFiles as string[]) ??
+                (payload.data?.filesGenerated as string[]) ??
+                [])
+                .map((f) => `- ${f}`)
+                .join("\n"),
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
             message:
               completedStatus === "completed_with_warnings"
-                ? `Completed with warnings (${((payload.data?.filesGenerated as string[]) ?? []).length} files, $${costUsd.toFixed(4)})`
-                : `Completed (${((payload.data?.filesGenerated as string[]) ?? []).length} files, $${costUsd.toFixed(4)})`,
+                ? `Completed with warnings (${((payload.data?.filesGenerated as string[]) ?? []).length} files, ${totalTokens.toLocaleString()} tokens, $${costUsd.toFixed(4)})`
+                : `Completed (${((payload.data?.filesGenerated as string[]) ?? []).length} files, ${totalTokens.toLocaleString()} tokens, $${costUsd.toFixed(4)})`,
           },
         ],
       };
@@ -315,6 +327,14 @@ function handleCodingEvent(
     const existingTasks = get().tasks;
     const taskExists = existingTasks.some((t) => t.id === payload.taskId);
     const filesGenerated = (payload.data?.filesGenerated as string[]) ?? [];
+    const modifiedFiles = (payload.data?.modifiedFiles as string[]) ?? filesGenerated;
+    const tokenUsage = payload.data?.tokenUsage as
+      | {
+          promptTokens: number;
+          completionTokens: number;
+          totalTokens: number;
+        }
+      | undefined;
     let tasks: CodingTask[];
     if (taskExists) {
       tasks = existingTasks.map((t) => {
@@ -326,6 +346,9 @@ function handleCodingEvent(
             (payload.data?.status as CodingTask["codingStatus"] | undefined) ??
             ("completed" as const),
           generatedFiles: filesGenerated,
+          modifiedFiles,
+          tokenUsage: tokenUsage ?? t.tokenUsage,
+          taskCostUsd: (payload.data?.costUsd as number | undefined) ?? t.taskCostUsd,
           progressStage: undefined,
           fixAttempts:
             (payload.data?.fixCycles as number | undefined) ?? t.fixAttempts,
@@ -355,6 +378,9 @@ function handleCodingEvent(
             (payload.data?.status as CodingTask["codingStatus"] | undefined) ??
             ("completed" as const),
           generatedFiles: filesGenerated,
+          modifiedFiles,
+          tokenUsage,
+          taskCostUsd: payload.data?.costUsd as number | undefined,
           fixAttempts: payload.data?.fixCycles as number | undefined,
           verifyErrors: payload.data?.verifyErrors as string | undefined,
           errorPreview: (payload.data?.verifyErrors as string | undefined)?.slice(

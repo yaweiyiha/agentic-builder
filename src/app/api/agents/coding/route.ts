@@ -12,6 +12,10 @@ import {
   listScaffoldTemplateRelativePaths,
   type ScaffoldTier,
 } from "@/lib/pipeline/scaffold-copy";
+import {
+  getTierScaffoldSpecForCodingContext,
+  writeScaffoldSpecFile,
+} from "@/lib/pipeline/scaffold-spec";
 import type { KickoffWorkItem, CodingTask } from "@/lib/pipeline/types";
 
 const execFileAsync = promisify(execFile);
@@ -106,6 +110,7 @@ export async function POST(request: NextRequest) {
 
   const tier = ((projectTier ?? "M").toUpperCase()) as ScaffoldTier;
   const { copied: scaffoldCopied } = await copyScaffold(tier, outputRoot);
+  await writeScaffoldSpecFile(outputRoot, tier);
   const scaffoldProtectedPaths =
     await listScaffoldTemplateRelativePaths(tier);
   if (scaffoldCopied.length > 0) {
@@ -153,10 +158,19 @@ export async function POST(request: NextRequest) {
   if (implGuideDoc)
     baseContextParts.push(`## Implementation Guide\n\n${implGuideDoc}`);
 
+  const scaffoldContextBlock = [
+    "## Scaffold specification",
+    "",
+    "The repository includes **SCAFFOLD_SPEC.md** (tier layout, commands, where to implement).",
+    "Follow that layout; extend prebuilt apps and `packages/shared` instead of replacing the whole scaffold.",
+    "",
+    getTierScaffoldSpecForCodingContext(tier),
+  ].join("\n");
+
   const projectContext =
     baseContextParts.length > 0
-      ? baseContextParts.join("\n\n---\n\n")
-      : "No project documents found. Generate code based on task description only.";
+      ? `${baseContextParts.join("\n\n---\n\n")}\n\n---\n\n${scaffoldContextBlock}`
+      : `No project documents found. Generate code based on task description only.\n\n---\n\n${scaffoldContextBlock}`;
 
   const frontendDesignContext = [
     designSpecDoc ? `## Design Specification\n\n${designSpecDoc}` : "",

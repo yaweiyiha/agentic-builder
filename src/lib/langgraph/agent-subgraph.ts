@@ -12,6 +12,7 @@ import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
 import type { CodingAgentRole, CodingTask } from "@/lib/pipeline/types";
 
 const MAX_OUTPUT_TOKENS = 16384;
+const MAX_TASK_GENERATION_RETRIES = 2;
 const MAX_FIX_ATTEMPTS = 1;
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
@@ -57,6 +58,10 @@ The project MUST pass "npm install && npm run build && npm run dev" without erro
 - Always include Tailwind CSS setup: tailwindcss, postcss, autoprefixer, tailwind.config.ts, postcss.config.js, and the @tailwind directives in a CSS file.
 - All file paths must be relative (no leading slash).
 
+### Monorepo shared package (when \`packages/shared\` exists)
+- Use the workspace package name from \`packages/shared/package.json\` (default \`@project/shared\`). Consumers import \`@project/shared/types/...\` and \`@project/shared/schemas/...\`. **Never** \`@shared/\` unless the repo already defines that alias.
+- Zod modules: \`export const registerSchema = z.object({...})\` and \`export type RegisterInput = z.infer<typeof registerSchema>\`. Do **not** export a type \`RegisterSchema\` (same stem as the schema with different capitalization).
+
 ### Interactive shell (frontend / Vite apps)
 - App.tsx, routes, and layout must not ship dead controls: primary navigation and actions use React Router (Link, useNavigate) or real onClick with state updates — no empty handlers.
 
@@ -96,6 +101,11 @@ If token data is missing for a specific value, use the closest design-standard v
 - All components must be TypeScript (.tsx). All utilities must be TypeScript (.ts).
 - Use functional components with hooks exclusively. No class components.
 - All file paths must be relative (no leading slash).
+- Monorepo: import shared types/schemas only as \`@project/shared/types/...\` and \`@project/shared/schemas/...\` (never \`@shared/\`). For Zod, import the schema object (\`registerSchema\`) for \`.parse\`; import **types** with \`import type { RegisterInput }\` from the same module — do not use a type named \`RegisterSchema\`.
+- For M-tier Vite web apps, use a single page root: \`apps/web/src/pages\` (or \`src/pages\` inside that package). Never generate pages under \`app/\` or \`src/app/\`.
+- Route registry is required: \`src/App.tsx\` (or a dedicated \`src/routes.tsx\` imported by App) MUST register React Router routes for generated pages.
+- Home route requirement: \`/\` must provide visible navigation entry points (Link/NavLink/button+useNavigate) to primary pages (at least one non-root route).
+- If \`src/pages/*\` exists, ensure those pages are actually reachable from the route registry.
 
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.`,
@@ -103,6 +113,8 @@ Output ONLY code blocks with the file: prefix. No explanatory text outside code 
   backend: `You are a Senior Backend Engineer Agent.
 Generate production-quality backend code: API endpoints, services, DB queries, business logic.
 Responsibilities: route handlers, service layer, ORM models, auth middleware, validation, event handlers.
+### Monorepo imports
+- When a shared package exists, import DTOs and zod schemas as \`@project/shared/types/...\` and \`@project/shared/schemas/...\` only (never \`@shared/\`). Define inferred types as \`*Input\` / \`*Dto\`, not \`*Schema\` types alongside \`*Schema\` zod exports.
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.`,
 
@@ -222,6 +234,85 @@ function parseFileOutput(raw: string): Record<string, string> {
   return files;
 }
 
+function escapeRegex(raw: string): string {
+  return raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function taskPatternToRegex(pattern: string): RegExp {
+  const normalized = pattern.replace(/\\/g, "/").trim();
+  const regex = "^" + escapeRegex(normalized).replace(/\\\*/g, ".*") + "$";
+  return new RegExp(regex);
+}
+
+function matchesTaskPathHint(filePath: string, hint: string): boolean {
+  const p = filePath.replace(/\\/g, "/");
+  const h = hint.replace(/\\/g, "/").trim();
+  if (!h) return false;
+  if (h.includes("*")) return taskPatternToRegex(h).test(p);
+  if (p === h) return true;
+  if (p.endsWith(`/${h}`)) return true;
+  return p.startsWith(`${h}/`);
+}
+
+async function buildRelevantFileContext(
+  state: WorkerState,
+  task: CodingTask,
+): Promise<string> {
+  const hints = (task.files ?? []).map((f) => f.replace(/\\/g, "/"));
+  const candidates = new Set<string>();
+
+  // 1) Direct hint matches from current registry.
+  if (hints.length > 0) {
+    for (const f of state.fileRegistrySnapshot) {
+      const p = f.path.replace(/\\/g, "/");
+      if (hints.some((h) => matchesTaskPathHint(p, h))) {
+        candidates.add(p);
+      }
+    }
+  }
+
+  // 2) Prefer files created by same role in previous tasks (consistency).
+  for (const f of state.fileRegistrySnapshot) {
+    if (f.role === state.role) candidates.add(f.path.replace(/\\/g, "/"));
+  }
+
+  // 3) Always include key shared contract roots if present.
+  [
+    "packages/shared/schemas/auth.ts",
+    "packages/shared/schemas/tasks.ts",
+    "packages/shared/schemas/users.ts",
+    "packages/shared/types/auth.ts",
+    "packages/shared/types/tasks.ts",
+    "packages/shared/types/users.ts",
+    "packages/shared/src/contracts/auth.ts",
+    "packages/shared/src/contracts/tasks.ts",
+    "apps/web/src/lib/apiClient.ts",
+    "apps/web/lib/api/auth.client.ts",
+    "apps/api/src/routes/auth.ts",
+    "API_CONTRACTS.json",
+    "SCAFFOLD_SPEC.md",
+    "DEPENDENCY_PLAN.md",
+  ].forEach((p) => candidates.add(p));
+
+  // Read up to a bounded set to control context size.
+  const selected = [...candidates].slice(0, 18);
+  const chunks: string[] = [];
+  for (const rel of selected) {
+    const content = await fsRead(rel, state.outputDir);
+    if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED")) {
+      continue;
+    }
+    const block =
+      rel.endsWith(".md") || rel.endsWith(".json")
+        ? content.slice(0, 1800)
+        : content.slice(0, 2200);
+    chunks.push(`### ${rel}\n\`\`\`\n${block}\n\`\`\``);
+  }
+
+  if (chunks.length === 0) return "";
+  return `## Relevant existing files (read before coding)\n${chunks.join("\n\n")}`;
+}
+
 // ─── Node functions ───
 
 function pickNextTask(state: WorkerState) {
@@ -235,6 +326,16 @@ function pickNextTask(state: WorkerState) {
   return {
     verifyErrors: "",
     fixAttempts: 0,
+    currentTaskRetryCount: 0,
+    currentTaskLastError: "",
+    currentTaskGeneratedFiles: [],
+    currentTaskCostUsd: 0,
+    currentTaskDurationMs: 0,
+    currentTaskTokenUsage: {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    },
   };
 }
 
@@ -243,127 +344,179 @@ function shouldContinueOrEnd(state: WorkerState): string {
   return "generate_code";
 }
 
+function routeAfterGenerate(state: WorkerState): string {
+  if (!state.currentTaskLastError) return "verify";
+  if (state.currentTaskRetryCount <= MAX_TASK_GENERATION_RETRIES) {
+    return "generate_code";
+  }
+  return "task_failed";
+}
+
 async function generateCode(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
+  const attempt = state.currentTaskRetryCount + 1;
 
-  console.log(`[Worker:${state.workerLabel}] Generating code for: "${task.title}" ...`);
+  try {
+    console.log(
+      `[Worker:${state.workerLabel}] Generating code for: "${task.title}" (attempt ${attempt}/${MAX_TASK_GENERATION_RETRIES + 1}) ...`,
+    );
 
-  const contextParts: string[] = [];
-  if (state.projectContext) {
-    contextParts.push(state.projectContext);
-  }
-  if (state.fileRegistrySnapshot.length > 0) {
-    const listing = state.fileRegistrySnapshot
-      .slice(0, 30)
-      .map((f) => {
-        const exportsNote =
-          f.exports && f.exports.length > 0
-            ? ` | exports: ${f.exports.slice(0, 8).join(", ")}`
-            : "";
-        return `- ${f.path} (${f.role}): ${f.summary}${exportsNote}`;
-      })
-      .join("\n");
-    contextParts.push(`## Already generated files\n${listing}`);
-  }
+    const contextParts: string[] = [];
+    if (state.projectContext) {
+      contextParts.push(state.projectContext);
+    }
+    if (state.fileRegistrySnapshot.length > 0) {
+      const listing = state.fileRegistrySnapshot
+        .slice(0, 30)
+        .map((f) => {
+          const exportsNote =
+            f.exports && f.exports.length > 0
+              ? ` | exports: ${f.exports.slice(0, 8).join(", ")}`
+              : "";
+          return `- ${f.path} (${f.role}): ${f.summary}${exportsNote}`;
+        })
+        .join("\n");
+      contextParts.push(`## Already generated files\n${listing}`);
+    }
 
-  const skeletonFiles = state.fileRegistrySnapshot.filter(
-    (f) =>
-      f.role === "architect" &&
-      f.summary.startsWith("Interface skeleton") &&
-      /\.(ts|tsx)$/.test(f.path),
-  );
+    const skeletonFiles = state.fileRegistrySnapshot.filter(
+      (f) =>
+        f.role === "architect" &&
+        f.summary.startsWith("Interface skeleton") &&
+        /\.(ts|tsx)$/.test(f.path),
+    );
 
-  if (skeletonFiles.length > 0) {
-    const skeletonContents: string[] = [];
-    for (const sf of skeletonFiles.slice(0, 8)) {
-      const content = await fsRead(sf.path, state.outputDir);
-      if (!content.startsWith("FILE_NOT_FOUND")) {
-        skeletonContents.push(
-          `### ${sf.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``,
+    if (skeletonFiles.length > 0) {
+      const skeletonContents: string[] = [];
+      for (const sf of skeletonFiles.slice(0, 8)) {
+        const content = await fsRead(sf.path, state.outputDir);
+        if (!content.startsWith("FILE_NOT_FOUND")) {
+          skeletonContents.push(
+            `### ${sf.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``,
+          );
+        }
+      }
+      if (skeletonContents.length > 0) {
+        contextParts.push(
+          `## Interface contracts (implement these exactly — do not rename exports)\n${skeletonContents.join("\n\n")}`,
         );
       }
     }
-    if (skeletonContents.length > 0) {
-      contextParts.push(
-        `## Interface contracts (implement these exactly — do not rename exports)\n${skeletonContents.join("\n\n")}`,
-      );
+
+    if (state.apiContractsSnapshot.length > 0) {
+      const apis = state.apiContractsSnapshot
+        .map((a) => `- ${a.method} ${a.endpoint} (${a.service})`)
+        .join("\n");
+      contextParts.push(`## Available API endpoints\n${apis}`);
     }
-  }
 
-  if (state.apiContractsSnapshot.length > 0) {
-    const apis = state.apiContractsSnapshot
-      .map((a) => `- ${a.method} ${a.endpoint} (${a.service})`)
-      .join("\n");
-    contextParts.push(`## Available API endpoints\n${apis}`);
-  }
+    const relevantFilesContext = await buildRelevantFileContext(state, task);
+    if (relevantFilesContext) {
+      contextParts.push(relevantFilesContext);
+    }
 
-  const versionConstraints = await buildVersionConstraints(state.outputDir);
-  if (versionConstraints) {
-    contextParts.push(versionConstraints);
-  }
+    const versionConstraints = await buildVersionConstraints(state.outputDir);
+    if (versionConstraints) {
+      contextParts.push(versionConstraints);
+    }
 
-  const fileHint =
-    task.files && task.files.length > 0
-      ? `\nKey files to create/modify:\n${task.files.map((f) => `- ${f}`).join("\n")}`
-      : "";
+    const fileHint =
+      task.files && task.files.length > 0
+        ? `\nKey files to create/modify:\n${task.files.map((f) => `- ${f}`).join("\n")}`
+        : "";
 
-  const messages: ChatMessage[] = [
-    { role: "system", content: ROLE_PROMPTS[state.role] },
-  ];
-  if (contextParts.length > 0) {
+    const messages: ChatMessage[] = [
+      { role: "system", content: ROLE_PROMPTS[state.role] },
+    ];
+    if (contextParts.length > 0) {
+      messages.push({
+        role: "system",
+        content: `## Project Context\n${contextParts.join("\n\n")}`,
+      });
+    }
     messages.push({
-      role: "system",
-      content: `## Project Context\n${contextParts.join("\n\n")}`,
+      role: "user",
+      content: `## Task: ${task.title}\n\n${task.description}${fileHint}\n\nGenerate the complete code for this task.\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
     });
-  }
-  messages.push({
-    role: "user",
-    content: `## Task: ${task.title}\n\n${task.description}${fileHint}\n\nGenerate the complete code for this task.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
-  });
 
-  const startMs = Date.now();
-  const response = await invokeCodegenOrOpenRouter(messages, {
-    temperature: 0.3,
-    max_tokens: MAX_OUTPUT_TOKENS,
-    openRouterVariant: "codeGen",
-  });
-  const durationMs = Date.now() - startMs;
+    const startMs = Date.now();
+    const response = await invokeCodegenOrOpenRouter(messages, {
+      temperature: 0.3,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      openRouterVariant: "codeGen",
+    });
+    const durationMs = Date.now() - startMs;
 
-  const content = response.choices[0]?.message?.content ?? "";
-  const costUsd = estimateCost(response.model, response.usage);
-  const parsedFiles = parseFileOutput(content);
+    const content = response.choices[0]?.message?.content ?? "";
+    const costUsd = estimateCost(response.model, response.usage);
+    const usage = response.usage as
+      | {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+          promptTokens?: number;
+          completionTokens?: number;
+          totalTokens?: number;
+        }
+      | undefined;
+    const promptTokens = usage?.prompt_tokens ?? usage?.promptTokens ?? 0;
+    const completionTokens =
+      usage?.completion_tokens ?? usage?.completionTokens ?? 0;
+    const totalTokens =
+      usage?.total_tokens ?? usage?.totalTokens ?? promptTokens + completionTokens;
+    const parsedFiles = parseFileOutput(content);
 
-  const fsOpts =
-    state.scaffoldProtectedPaths.length > 0
-      ? { scaffoldProtectedPaths: state.scaffoldProtectedPaths }
-      : undefined;
+    const fsOpts =
+      state.scaffoldProtectedPaths.length > 0
+        ? { scaffoldProtectedPaths: state.scaffoldProtectedPaths }
+        : undefined;
 
-  const writtenFiles: string[] = [];
-  const newFileEntries: GeneratedFile[] = [];
-  for (const [fp, fc] of Object.entries(parsedFiles)) {
-    const msg = await fsWrite(fp, fc, state.outputDir, fsOpts);
-    if (msg.startsWith("SKIPPED_PROTECTED")) {
-      console.log(`[Worker:${state.workerLabel}] ${msg}`);
-      continue;
+    const writtenFiles: string[] = [];
+    const newFileEntries: GeneratedFile[] = [];
+    for (const [fp, fc] of Object.entries(parsedFiles)) {
+      const msg = await fsWrite(fp, fc, state.outputDir, fsOpts);
+      if (msg.startsWith("SKIPPED_PROTECTED")) {
+        console.log(`[Worker:${state.workerLabel}] ${msg}`);
+        continue;
+      }
+      writtenFiles.push(fp);
+      newFileEntries.push({
+        path: fp,
+        role: state.role,
+        summary: `Generated for task: ${task.title}`,
+      });
     }
-    writtenFiles.push(fp);
-    newFileEntries.push({
-      path: fp,
-      role: state.role,
-      summary: `Generated for task: ${task.title}`,
-    });
+
+    console.log(
+      `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+    );
+
+    return {
+      generatedFiles: newFileEntries,
+      currentTaskGeneratedFiles: writtenFiles,
+      currentTaskCostUsd: costUsd,
+      currentTaskDurationMs: durationMs,
+      currentTaskTokenUsage: {
+        promptTokens,
+        completionTokens,
+        totalTokens,
+      },
+      workerCostUsd: costUsd,
+      verifyErrors: "",
+      fixAttempts: 0,
+      currentTaskLastError: "",
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const retryCount = state.currentTaskRetryCount + 1;
+    console.warn(
+      `[Worker:${state.workerLabel}] Task "${task.title}" generation failed (attempt ${retryCount}/${MAX_TASK_GENERATION_RETRIES + 1}): ${message}`,
+    );
+    return {
+      currentTaskRetryCount: retryCount,
+      currentTaskLastError: message.slice(0, 2000),
+    };
   }
-
-  console.log(
-    `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
-  );
-
-  return {
-    generatedFiles: newFileEntries,
-    workerCostUsd: costUsd,
-    verifyErrors: "",
-    fixAttempts: 0,
-  };
 }
 
 // ─── Verify helpers: error classification + auto dep install ───
@@ -653,9 +806,7 @@ async function verifyCode(state: WorkerState) {
 function taskDone(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
   console.log(`[Worker:${state.workerLabel}] Task done: "${task.title}" (${state.currentTaskIndex + 1}/${state.tasks.length})`);
-  const filesForTask = state.generatedFiles
-    .filter((f) => f.summary.includes(task.title) || f.summary.includes(task.id))
-    .map((f) => f.path);
+  const filesForTask = state.currentTaskGeneratedFiles;
 
   const result: TaskResult = {
     taskId: task.id,
@@ -663,8 +814,9 @@ function taskDone(state: WorkerState) {
       ? "completed_with_warnings"
       : "completed",
     generatedFiles: filesForTask,
-    costUsd: state.workerCostUsd,
-    durationMs: 0,
+    costUsd: state.currentTaskCostUsd,
+    durationMs: state.currentTaskDurationMs,
+    tokenUsage: state.currentTaskTokenUsage,
     verifyPassed: !state.verifyErrors,
     fixCycles: state.fixAttempts,
     warnings: state.verifyErrors
@@ -674,9 +826,60 @@ function taskDone(state: WorkerState) {
 
   return {
     taskResults: [result],
+    fileRegistrySnapshot: state.generatedFiles,
     currentTaskIndex: state.currentTaskIndex + 1,
     verifyErrors: "",
     fixAttempts: 0,
+    currentTaskGeneratedFiles: [],
+    currentTaskCostUsd: 0,
+    currentTaskDurationMs: 0,
+    currentTaskTokenUsage: {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    },
+    currentTaskRetryCount: 0,
+    currentTaskLastError: "",
+  };
+}
+
+function taskFailed(state: WorkerState) {
+  const task = state.tasks[state.currentTaskIndex];
+  const failureMsg =
+    state.currentTaskLastError ||
+    "Task generation failed after retries. No additional error details.";
+  console.warn(
+    `[Worker:${state.workerLabel}] Task failed after retries: "${task.title}" (${state.currentTaskRetryCount}/${MAX_TASK_GENERATION_RETRIES + 1})`,
+  );
+
+  const result: TaskResult = {
+    taskId: task.id,
+    status: "failed",
+    generatedFiles: state.currentTaskGeneratedFiles,
+    costUsd: state.currentTaskCostUsd,
+    durationMs: state.currentTaskDurationMs,
+    tokenUsage: state.currentTaskTokenUsage,
+    verifyPassed: false,
+    fixCycles: state.currentTaskRetryCount,
+    warnings: [failureMsg.slice(0, 500)],
+  };
+
+  return {
+    taskResults: [result],
+    fileRegistrySnapshot: state.generatedFiles,
+    currentTaskIndex: state.currentTaskIndex + 1,
+    verifyErrors: "",
+    fixAttempts: 0,
+    currentTaskGeneratedFiles: [],
+    currentTaskCostUsd: 0,
+    currentTaskDurationMs: 0,
+    currentTaskTokenUsage: {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    },
+    currentTaskRetryCount: 0,
+    currentTaskLastError: "",
   };
 }
 
@@ -762,15 +965,21 @@ export function createWorkerSubGraph() {
     .addNode("generate_code", generateCode)
     .addNode("verify", verifyCode)
     .addNode("task_done", taskDone)
+    .addNode("task_failed", taskFailed)
 
     .addEdge(START, "pick_next_task")
     .addConditionalEdges("pick_next_task", shouldContinueOrEnd, {
       generate_code: "generate_code",
       __end__: END,
     })
-    .addEdge("generate_code", "verify")
+    .addConditionalEdges("generate_code", routeAfterGenerate, {
+      generate_code: "generate_code",
+      verify: "verify",
+      task_failed: "task_failed",
+    })
     .addEdge("verify", "task_done")
-    .addEdge("task_done", "pick_next_task");
+    .addEdge("task_done", "pick_next_task")
+    .addEdge("task_failed", "pick_next_task");
 
   return graph.compile();
 }

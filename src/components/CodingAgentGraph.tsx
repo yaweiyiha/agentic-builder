@@ -290,12 +290,6 @@ export default function CodingAgentGraph() {
       task.codingStatus === "in_progress" && task.progressStage === "fixing",
   ).length;
   const totalTasks = tasks.length;
-  const latestDetailedLog = [...visibleLogs]
-    .reverse()
-    .find((entry) => !!entry.details);
-  const latestDetailedLogContent = latestDetailedLog?.details
-    ? splitLogDetails(latestDetailedLog.details)
-    : null;
 
   if (status === "idle") {
     return (
@@ -611,6 +605,11 @@ export default function CodingAgentGraph() {
                       >
                         {formatTaskMeta(task, agent?.label ?? meta.label, hasSubSteps ? `${taskSubStepDone}/${taskSubStepTotal} steps` : undefined)}
                       </p>
+                      {isCompletedTask(task) && (
+                        <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
+                          {formatTaskArtifacts(task)}
+                        </p>
+                      )}
 
                       {/* Per-task progress bar */}
                       {(isRunning || isDone) && taskSubStepTotal > 0 && (
@@ -684,18 +683,6 @@ export default function CodingAgentGraph() {
                 <p className="font-mono text-[11px] text-zinc-900">{logPanelLabel}</p>
               </div>
               <div className="h-px bg-zinc-200" />
-              {latestDetailedLogContent && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-                  <p className="text-[11px] font-semibold text-red-800">
-                    {latestDetailedLogContent.title}
-                  </p>
-                  {latestDetailedLogContent.body && (
-                    <p className="mt-1 font-mono text-[10px] leading-5 text-red-900">
-                      {latestDetailedLogContent.body}
-                    </p>
-                  )}
-                </div>
-              )}
               {visibleLogs.length === 0 ? (
                 <p className="font-mono text-[11px] text-zinc-400">No activity yet.</p>
               ) : (
@@ -787,10 +774,25 @@ function formatTaskMeta(
   }
 
   if (task.codingStatus === "completed") {
-    return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""}${task.generatedFiles ? ` · ${task.generatedFiles.length} files` : ""}`;
+    const tokenText = task.tokenUsage?.totalTokens
+      ? ` · ${task.tokenUsage.totalTokens.toLocaleString()} tokens`
+      : "";
+    const costText =
+      task.taskCostUsd !== undefined ? ` · $${task.taskCostUsd.toFixed(4)}` : "";
+    return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""}${task.generatedFiles ? ` · ${task.generatedFiles.length} files` : ""}${tokenText}${costText}`;
   }
 
   return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""} · Queued`;
+}
+
+function formatTaskArtifacts(task: CodingTask): string {
+  const files = task.modifiedFiles ?? task.generatedFiles ?? [];
+  const tokens = task.tokenUsage?.totalTokens ?? 0;
+  const cost = task.taskCostUsd;
+  const filesText = files.length > 0 ? `${files.length} files` : "0 files";
+  const tokenText = tokens > 0 ? `${tokens.toLocaleString()} tokens` : "0 tokens";
+  const costText = cost !== undefined ? `$${cost.toFixed(4)}` : "$0.0000";
+  return `${filesText} · ${tokenText} · ${costText}`;
 }
 
 function formatTaskStatus(task: CodingTask): string {
@@ -922,17 +924,6 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
   );
 }
 
-function splitLogDetails(details: string): { title: string; body: string } {
-  const lines = details
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  return {
-    title: lines[0] ?? details,
-    body: lines.slice(1).join("\n"),
-  };
-}
-
 function LogLine({ entry }: { entry: DisplayLogEntry }) {
   const time = new Date(entry.timestamp).toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -957,10 +948,17 @@ function LogLine({ entry }: { entry: DisplayLogEntry }) {
               : "text-zinc-400";
 
   return (
-    <p className="font-mono text-[11px]">
-      <span className="text-zinc-400">[{time}]</span>{" "}
-      {entry.agentLabel && <span className="text-zinc-500">[{entry.agentLabel}] </span>}
-      <span className={color}>{entry.message}</span>
-    </p>
+    <div className="space-y-1 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
+      <p className="font-mono text-[11px]">
+        <span className="text-zinc-400">[{time}]</span>{" "}
+        {entry.agentLabel && <span className="text-zinc-500">[{entry.agentLabel}] </span>}
+        <span className={color}>{entry.message}</span>
+      </p>
+      {entry.details && (
+        <pre className="whitespace-pre-wrap break-words rounded bg-zinc-900 px-2 py-1.5 font-mono text-[10px] leading-5 text-zinc-200">
+          {entry.details}
+        </pre>
+      )}
+    </div>
   );
 }

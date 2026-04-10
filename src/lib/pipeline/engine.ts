@@ -38,7 +38,7 @@ import {
   buildGitInitInstructions,
 } from "./code-output";
 import { runKickoffIntegrations } from "./kickoff-integrations";
-import { buildTaskBreakdownFromDocuments } from "./kickoff-task-breakdown";
+import { buildTaskBreakdownFromDocuments } from "./kickoff-task-breakdown.server";
 
 type EventHandler = (event: PipelineEvent) => void;
 
@@ -887,6 +887,7 @@ export class PipelineEngine {
 
     try {
       const result = await executor();
+      const processTrace = this.buildStepProcessTrace(result.content, result);
 
       const stepResult = this.buildStepResult(stepId, "completed", {
         content: result.content,
@@ -895,6 +896,9 @@ export class PipelineEngine {
         durationMs: result.durationMs,
         tokenUsage: result.usage,
         traceId: result.traceId,
+        metadata: {
+          processTrace,
+        },
       });
 
       run.steps[stepId] = stepResult;
@@ -939,6 +943,41 @@ export class PipelineEngine {
       status,
       timestamp: new Date().toISOString(),
       ...partial,
+    };
+  }
+
+  /**
+   * Safe process summary for users.
+   * Does not expose hidden chain-of-thought; only observable generation facts.
+   */
+  private buildStepProcessTrace(
+    content: string,
+    result: AgentResult,
+  ): {
+    outline: string[];
+    model: string;
+    durationMs: number;
+    costUsd: number;
+    tokenUsage?: AgentResult["usage"];
+  } {
+    const headingMatches = [...content.matchAll(/^#{1,4}\s+(.+)$/gm)]
+      .map((m) => (m[1] ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    const outline =
+      headingMatches.length > 0
+        ? headingMatches
+        : content
+            .split("\n")
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0)
+            .slice(0, 5);
+    return {
+      outline,
+      model: result.model,
+      durationMs: result.durationMs,
+      costUsd: result.costUsd,
+      tokenUsage: result.usage,
     };
   }
 

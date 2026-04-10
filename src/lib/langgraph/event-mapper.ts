@@ -10,8 +10,17 @@ export type ErrorCategory =
 
 // Mirror supervisor's worker allocation logic so we can pre-create agents
 // with the exact same labels the supervisor will use.
+const ENABLE_PHASE_INCREMENTAL_CONTEXT_SYNC =
+  process.env.BLUEPRINT_INCREMENTAL_CONTEXT_SYNC !== "0";
+
 function computeWorkerCount(role: string, taskCount: number): number {
   if (role === "architect" || role === "test") return 1;
+  if (
+    ENABLE_PHASE_INCREMENTAL_CONTEXT_SYNC &&
+    (role === "backend" || role === "frontend")
+  ) {
+    return 1;
+  }
   if (taskCount <= 3) return 1;
   if (taskCount <= 8) return 2;
   return 3;
@@ -324,8 +333,10 @@ export class EventMapper {
             taskId: tr.taskId,
             data: {
               filesGenerated: tr.generatedFiles,
+              modifiedFiles: tr.generatedFiles,
               costUsd: tr.costUsd,
               durationMs: tr.durationMs,
+              tokenUsage: tr.tokenUsage,
               verifyPassed: tr.verifyPassed,
               fixCycles: tr.fixCycles,
               status: tr.status,
@@ -365,6 +376,10 @@ export class EventMapper {
     const events: CodingSessionEvent[] = [];
     const nsKey = namespace.join(",");
     const files = u.generatedFiles as GeneratedFile[] | undefined;
+    const generationError =
+      typeof u.currentTaskLastError === "string" ? u.currentTaskLastError.trim() : "";
+    const retryCount =
+      typeof u.currentTaskRetryCount === "number" ? u.currentTaskRetryCount : 0;
     if (files?.[0]?.role && !this.nsRoleMap.has(nsKey)) {
       this.nsRoleMap.set(nsKey, files[0].role);
     }
@@ -373,7 +388,40 @@ export class EventMapper {
     const tsFileCount =
       files?.filter((file) => /\.(ts|tsx)$/.test(file.path)).length ?? 0;
 
-    if (!agentId || !taskId || tsFileCount === 0) return events;
+    if (!agentId || !taskId) return events;
+
+    if (generationError) {
+      const maxAttempts = 3;
+      const retryMessage =
+        retryCount >= maxAttempts
+          ? `Task generation failed · reached max retries (${retryCount}/${maxAttempts})`
+          : `Task generation failed · retry ${retryCount}/${maxAttempts}`;
+      events.push({
+        type: "agent_task_progress",
+        sessionId: this.sessionId,
+        agentId,
+        taskId,
+        data: {
+          stage: "fixing",
+          fixAttempt: retryCount,
+          errorPreview: generationError.slice(0, 200),
+        },
+      });
+      events.push({
+        type: "agent_log",
+        sessionId: this.sessionId,
+        agentId,
+        taskId,
+        data: {
+          logType: "task_fix",
+          message: retryMessage,
+          details: generationError.slice(0, 2000),
+        },
+      });
+      return events;
+    }
+
+    if (tsFileCount === 0) return events;
 
     events.push({
       type: "agent_task_progress",
@@ -552,21 +600,36 @@ export class EventMapper {
     if (!this.emittedTaskCompletes.has(taskId)) {
       this.emittedTaskCompletes.add(taskId);
       this.agentCurrentTaskId.delete(agentId);
-      events.push({
-        type: "agent_task_complete",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          filesGenerated: completedResult.generatedFiles,
-          costUsd: completedResult.costUsd,
-          durationMs: completedResult.durationMs,
-          verifyPassed: completedResult.verifyPassed,
-          fixCycles: completedResult.fixCycles,
-          status: completedResult.status,
-          verifyErrors: completedResult.warnings?.[0],
-        },
-      });
+      if (completedResult.status === "failed") {
+        events.push({
+          type: "agent_task_error",
+          sessionId: this.sessionId,
+          agentId,
+          taskId,
+          data: {
+            error: completedResult.warnings?.[0] ?? "Task failed after retries",
+            retryCount: completedResult.fixCycles,
+          },
+        });
+      } else {
+        events.push({
+          type: "agent_task_complete",
+          sessionId: this.sessionId,
+          agentId,
+          taskId,
+          data: {
+            filesGenerated: completedResult.generatedFiles,
+            modifiedFiles: completedResult.generatedFiles,
+            costUsd: completedResult.costUsd,
+            durationMs: completedResult.durationMs,
+            tokenUsage: completedResult.tokenUsage,
+            verifyPassed: completedResult.verifyPassed,
+            fixCycles: completedResult.fixCycles,
+            status: completedResult.status,
+            verifyErrors: completedResult.warnings?.[0],
+          },
+        });
+      }
     }
 
     if (nextIndex !== undefined) {

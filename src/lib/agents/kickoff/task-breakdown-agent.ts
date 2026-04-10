@@ -2,7 +2,10 @@ import { BaseAgent } from "../shared/base-agent";
 import type { ProjectTier } from "../shared/project-classifier";
 import { MODEL_CONFIG } from "@/lib/model-config";
 
-const TIER_TASK_LIMITS: Record<ProjectTier, { min: number; max: number; guidance: string }> = {
+const TIER_TASK_LIMITS: Record<
+  ProjectTier,
+  { min: number; max: number; guidance: string }
+> = {
   S: {
     min: 3,
     max: 6,
@@ -13,7 +16,7 @@ const TIER_TASK_LIMITS: Record<ProjectTier, { min: number; max: number; guidance
     min: 5,
     max: 10,
     guidance:
-      "This is a MEDIUM project. STRICTLY limit to 5-10 tasks. Aggressively merge related work — e.g. combine all backend CRUD endpoints into ONE task, all frontend pages into ONE task, all config/setup into ONE task. Do NOT create separate tasks for individual API endpoints, individual pages, or individual models. Think in broad strokes: scaffolding, data layer, backend API, frontend app, testing.",
+      "This is a MEDIUM (**M**) project on a **pnpm monorepo** scaffold (`apps/web` Vite, `apps/api` Express, `packages/shared`). STRICTLY **5–10** tasks. Keep backend/data broad, but split frontend by page when there are multiple pages: first one route-shell/layout task, then page-level frontend tasks. Create an early contracts/client task so API contracts and frontend client stay aligned with PRD requirement IDs. **Scaffolding** must not redo the whole monorepo — only small alignment (env, scripts) if the PRD demands it.",
   },
   L: {
     min: 15,
@@ -23,8 +26,33 @@ const TIER_TASK_LIMITS: Record<ProjectTier, { min: number; max: number; guidance
   },
 };
 
-function buildSystemPrompt(tier: ProjectTier): string {
+function mTierPhaseGuide(): string {
+  return `
+
+## Tier M — phases and task shape (STRICT)
+Use **few, wide** tasks (5–10). Typical **phase** labels (merge if empty):
+- **Scaffolding** — Only if the PRD needs **extra** tooling not already in the template; otherwise **omit** or fold into **Integration**. Never plan \"greenfield\" recreation of \`pnpm-workspace.yaml\`, \`apps/web\`, or \`apps/api\`.
+- **Data Layer** — Prefer **one** broad task: shared DTOs, validation, DB schema/client in \`packages/shared\` and related persistence.
+- **Backend Services** — Prefer **one** broad task for \`apps/api\` (all routes, middleware, domain logic), unless API is unusually large.
+- **Integration (contracts/client)** — Add an **early** task that defines/aligns API contracts + frontend API client with PRD IDs before page implementation.
+- **Frontend** — First create **one** route shell/layout task, then split into **page-level** tasks (one task per page/flow, not per tiny component).
+  - Route shell/layout task must explicitly include apps/web/src/App.tsx (or src/routes.tsx) route registration and "/" homepage navigation entry links.
+- **Integration** — **Optional** single task: base URL, CORS, auth headers, error handling between web and api.
+- **Testing** — **One** task: Vitest (and e2e only if PRD requires) across the workspaces you touched.
+
+**Bad for M:** separate tasks per endpoint or per tiny UI component, or \"create package.json for web\".
+**Good for M:** one contracts/client task, one route-shell/layout task, then page-level tasks like \"Implement Timer page\" and \"Implement History page\".
+`;
+}
+
+function buildSystemPrompt(tier: ProjectTier, scaffoldBlock?: string): string {
   const limits = TIER_TASK_LIMITS[tier];
+  const mGuide = tier === "M" ? mTierPhaseGuide() : "";
+  const scaffoldSection =
+    scaffoldBlock && scaffoldBlock.trim().length > 0
+      ? `\n${scaffoldBlock.trim()}\n`
+      : "";
+
   return `You are a senior Engineering Lead that produces detailed coding task breakdowns.
 
 ## Your Role
@@ -53,7 +81,7 @@ Before generating tasks, analyze the PRD to determine the project type:
 
 ## Project Scale
 ${limits.guidance}
-
+${mGuide}${scaffoldSection}
 ## Output Format — strict JSON array
 
 You MUST output ONLY a JSON array (no markdown fences, no explanation, no preamble).
@@ -139,8 +167,16 @@ This means it MUST explicitly include:
 The scaffolding task's acceptanceCriteria MUST include: "npm install && npm run build succeeds without errors" and "npm run dev starts the dev server".
 
 ## Rules
+- If the prompt includes **Pipeline coding tier** and template paths, the **scaffold is already copied before coding** — do not plan tasks that duplicate that layout; implement features on top of it.
 - Generate EXACTLY **${limits.min}–${limits.max} tasks**. NEVER exceed ${limits.max}. If you generate more than ${limits.max} tasks, your output will be REJECTED.
-- Merge related work aggressively: combine multiple API endpoints, multiple pages, or multiple models into broader tasks.
+- Sequence tasks so cross-task context is stable:
+  - Add an early **contracts/client** task (phase can be "Data Layer" or "Integration") that aligns request/response schemas, shared types, and frontend API client with PRD IDs.
+  - Ensure this contracts/client task appears before backend endpoint implementation and before page-level frontend tasks.
+- Frontend task granularity:
+  - Create one **route shell/layout** frontend task first (routing table, app shell, navigation/layout wiring).
+  - Route shell/layout task must include explicit edits to apps/web/src/App.tsx (or src/routes.tsx imported by App) and ensure "/" has real navigation entries.
+  - Then split frontend implementation by **page/flow** (one task per page), not by tiny component.
+- Merge related work aggressively for backend/data: combine multiple API endpoints and models into broader tasks unless scale clearly requires more split.
 - Order tasks by execution sequence (respecting dependencies).
 - Focus on CODING tasks — skip pure planning, meeting, or documentation-only items.
 - Reference PRD feature IDs (FR-xxx) and user stories (US-xx) where applicable.
@@ -152,11 +188,11 @@ The scaffolding task's acceptanceCriteria MUST include: "npm install && npm run 
 export class TaskBreakdownAgent extends BaseAgent {
   private tier: ProjectTier;
 
-  constructor(tier: ProjectTier = "L") {
+  constructor(tier: ProjectTier = "L", scaffoldBlock?: string) {
     super({
       name: "Task Breakdown Agent",
       role: "Engineering Lead",
-      systemPrompt: buildSystemPrompt(tier),
+      systemPrompt: buildSystemPrompt(tier, scaffoldBlock),
       defaultModel: MODEL_CONFIG.taskBreakdown,
       temperature: 0.3,
       maxTokens: 16384,
@@ -206,7 +242,9 @@ export class TaskBreakdownAgent extends BaseAgent {
         : "Focus on the PRD requirements and Design Spec components.";
 
     const userMessage =
-      `Analyze all provided documents and generate a coding task breakdown as a JSON array. ${focusHint}\n\n` +
+      `Analyze all provided documents and generate a coding task breakdown as a JSON array. ` +
+      `Respect the **ProjectTier** and any **Pipeline coding tier** / scaffold section in the system prompt. ` +
+      `${focusHint}\n\n` +
       sections[0];
 
     return this.run(

@@ -1471,7 +1471,7 @@
                               "id": "tdUjk",
                               "name": "tk1m",
                               "fill": "$--text-muted",
-                              "content": "Architect · 3 files · $0.008",
+                              "content": "Architect · 3 files · 2,140 tokens · $0.008",
                               "fontFamily": "Geist Mono",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -1537,7 +1537,7 @@
                               "id": "3N7eX",
                               "name": "tk2m",
                               "fill": "$--text-muted",
-                              "content": "Architect · 5 files · $0.012",
+                              "content": "Architect · 5 files · 3,920 tokens · $0.012",
                               "fontFamily": "Geist Mono",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -1607,7 +1607,7 @@
                               "id": "2FHu3",
                               "name": "tk3m",
                               "fill": "$--text-secondary",
-                              "content": "Backend Dev · Generating...",
+                              "content": "Backend Dev · Generating... · 1,420 tokens",
                               "fontFamily": "Geist Mono",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -1722,7 +1722,7 @@
                           "id": "8sWfp",
                           "name": "logT",
                           "fill": "$--text-secondary",
-                          "content": "Agent Output",
+                          "content": "Agent Output (full stream)",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "600"
@@ -1793,6 +1793,86 @@
                       "content": "[12:34:10] Verify skipped (deferred to integration)",
                       "fontFamily": "Geist Mono",
                       "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "jpZvF",
+                      "name": "log5",
+                      "fill": "#6B7280FF",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "[12:34:11] Task completed · 1,420 tokens · $0.0043",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JhM8O",
+                      "name": "log6",
+                      "fill": "#111827FF",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "[12:34:11] Modified files: apps/api/src/routes/health.ts, apps/api/src/__tests__/health.test.ts",
+                      "lineHeight": 1.35,
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "u2dOE",
+                  "name": "Selected Task Detail",
+                  "width": "fill_container",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E5E7EBFF"
+                  },
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "4Dqlh",
+                      "name": "dTitle",
+                      "fill": "#111827FF",
+                      "content": "Task Detail — Health API route handler",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "3mPq0",
+                      "name": "dMeta",
+                      "fill": "#6B7280FF",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Prompt 1,120 · Completion 300 · Total 1,420 tokens · Cost $0.0043",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JFhW3",
+                      "name": "dFiles",
+                      "fill": "#111827FF",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Modified files: apps/api/src/routes/health.ts, apps/api/src/__tests__/health.test.ts, apps/web/src/lib/apiClient.ts",
+                      "lineHeight": 1.4,
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 10,
                       "fontWeight": "normal"
                     }
                   ]
