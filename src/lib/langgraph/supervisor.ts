@@ -2328,7 +2328,7 @@ async function runBuildGate(outputDir: string): Promise<string> {
 
 // ─── Phase-level verify + fix (agentic loop) ───
 
-const MAX_VERIFY_FIX_ITERATIONS = 20;
+const MAX_VERIFY_FIX_ITERATIONS = 50;
 
 /**
  * RALPH Phase 2 — External Judge.
@@ -2484,6 +2484,18 @@ const SUPERVISOR_VERIFY_TOOLS: OpenRouterToolDefinition[] = [
 ];
 
 /** Execute a single tool call from the verify+fix agent loop. */
+function buildSupervisorSearchMatcher(
+  pattern: string,
+): (line: string) => boolean {
+  try {
+    const regex = new RegExp(pattern, "i");
+    return (line: string) => regex.test(line);
+  } catch {
+    const lowered = pattern.toLowerCase();
+    return (line: string) => line.toLowerCase().includes(lowered);
+  }
+}
+
 async function executeSupervisorTool(
   name: string,
   args: Record<string, unknown>,
@@ -2548,21 +2560,41 @@ async function executeSupervisorTool(
       const pattern = String(args.pattern ?? "");
       const searchPath = String(args.path ?? ".");
       if (!pattern) return "Error: pattern required";
-      const escaped = pattern.replace(/'/g, "'\\''");
-      const cmd = `grep -r --include="*.ts" --include="*.tsx" --include="*.json" -n '${escaped}' ${searchPath} 2>&1 | head -60`;
-      try {
-        const { stdout, stderr } = await execFileAsync("bash", ["-c", cmd], {
-          cwd: outputDir,
-          maxBuffer: 10 * 1024 * 1024,
-          timeout: 30_000,
-        });
-        return ((stdout ?? "") + (stderr ?? "")).trim().slice(0, MAX_OUT);
-      } catch (err: unknown) {
-        const e = err as { stdout?: string; stderr?: string; message?: string };
-        return ((e.stdout ?? "") + (e.stderr ?? "") || e.message || "")
-          .trim()
-          .slice(0, MAX_OUT);
+
+      const matcher = buildSupervisorSearchMatcher(pattern);
+      const filePaths: string[] = [];
+      const directFileContent = await fsRead(searchPath, outputDir);
+      if (
+        !directFileContent.startsWith("FILE_NOT_FOUND") &&
+        !directFileContent.startsWith("REJECTED")
+      ) {
+        filePaths.push(searchPath);
+      } else {
+        filePaths.push(...(await listFiles(searchPath, outputDir)));
       }
+
+      const matches: string[] = [];
+      for (const relPath of filePaths) {
+        if (!/\.(ts|tsx|js|jsx|json|md)$/.test(relPath)) continue;
+        const content = await fsRead(relPath, outputDir);
+        if (
+          content.startsWith("FILE_NOT_FOUND") ||
+          content.startsWith("REJECTED")
+        ) {
+          continue;
+        }
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          if (!matcher(lines[i])) continue;
+          matches.push(`${relPath}:${i + 1}:${lines[i]}`);
+          if (matches.length >= 60) break;
+        }
+        if (matches.length >= 60) break;
+      }
+
+      return (matches.join("\n") || "No matches found.")
+        .trim()
+        .slice(0, MAX_OUT);
     }
     default:
       return `Error: unknown tool '${name}'`;
@@ -3334,7 +3366,7 @@ async function syncDeps(_state: SupervisorState) {
   return {};
 }
 
-const MAX_INTEGRATION_VERIFY_FIX_ITERATIONS = 80;
+const MAX_INTEGRATION_VERIFY_FIX_ITERATIONS = 150;
 
 // ─── DB dependency detection (Fix 3) ─────────────────────────────────────────
 
@@ -3762,12 +3794,23 @@ async function integrationVerifyAndFix(
 
   const systemPrompt = [
     "You are a Senior Full-Stack Engineer performing the **Final Verification** of a fully generated codebase.",
-    "Your two objectives, in order:",
-    "  1. Fix ALL compile/type/build errors so the project builds cleanly.",
-    "  2. Review the PRD requirements and ensure every feature is correctly implemented and user-usable.",
+    "Your three objectives, in order:",
+    "  1. FIRST ensure route registration is complete:",
+    "     - Register frontend pages from `frontend/src/views` in `frontend/src/router.tsx`.",
+    "     - Register backend API module routes from `backend/src/api/modules` in `backend/src/api/modules/index.ts`.",
+    "  2. Fix ALL compile/type/build errors so the project builds cleanly.",
+    "  3. Review the PRD requirements and ensure every feature is correctly implemented and user-usable.",
+    "",
+    "## Phase 0 — Routing & Module Registration",
+    "Before running compile/build checks, inspect these two integration points first:",
+    "1. Read `frontend/src/router.tsx` and list files in `frontend/src/views`.",
+    "   - Every actual page in `frontend/src/views` must be reachable via a registered route unless it is clearly dead code.",
+    "2. Read `backend/src/api/modules/index.ts` and list module route files under `backend/src/api/modules`.",
+    "   - Every implemented API module route must be registered from the API module index unless it is clearly unused/dead code.",
+    "3. Fix these registration gaps first, then continue with compile/build verification.",
     "",
     "## Phase 1 — Compile & Build",
-    `1. Run: \`${tscCmd}\`  — check TypeScript errors across the whole project`,
+    `1. Run: \`${tscCmd}\`  — check TypeScript errors across the whole project after route/module registration is fixed`,
     "2. For each TypeScript error:",
     "   a. Read the file with the error",
     "   b. Read any imported modules that are missing exports",
@@ -3797,6 +3840,8 @@ async function integrationVerifyAndFix(
     "## Hard rules",
     "- Do NOT switch HTTP frameworks (Express ↔ Fastify ↔ Koa) or frontend frameworks.",
     "- For split M-tier projects, keep routing in frontend/src/router.tsx and backend API modules under backend/src/api/modules.",
+    "- Route/module registration is mandatory: treat missing registrations in `frontend/src/router.tsx` and `backend/src/api/modules/index.ts` as top-priority integration defects.",
+    "- Do not stop after making pages/controllers exist on disk; they must be wired into the actual router/module entrypoints.",
     "- Minimal targeted changes — do not rewrite working code.",
     "- Install missing npm packages: `pnpm add <pkg> --filter <workspace-name>`",
     "- If errors include [CONVENTION], they are policy violations and MUST be fixed.",
@@ -3830,11 +3875,11 @@ async function integrationVerifyAndFix(
   let totalCostUsd = 0;
 
   /**
-   * Context compression: when messages exceed ~30k tokens, compact the middle
+   * Context compression: when messages exceed ~10k tokens, compact the middle
    * portion into a summary, keeping system prompt + last 6 messages.
    */
   function compactMessagesIfNeeded(): void {
-    const COMPACT_THRESHOLD = 30_000 * 4;
+    const COMPACT_THRESHOLD = 10_000 * 4;
     const KEEP_TAIL = 6;
     const totalChars = messages.reduce(
       (sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0),
