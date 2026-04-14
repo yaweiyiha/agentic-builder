@@ -24,6 +24,13 @@ export interface AgentConfig {
     messages: ChatMessage[],
     opts: OpenRouterOptions,
   ) => Promise<OpenRouterResponse>;
+  /** When set, streamRun bypasses OpenRouter SSE and uses this implementation (e.g. Anthropic Messages API). */
+  customStreamRun?: (
+    messages: ChatMessage[],
+    opts: Omit<OpenRouterOptions, "stream">,
+    onChunk: (chunk: string, type: "thinking" | "content") => void,
+    ctx: { traceId: string },
+  ) => Promise<AgentResult>;
 }
 
 export interface AgentResult {
@@ -83,10 +90,9 @@ export class BaseAgent {
       const modelChain = Array.isArray(this.config.defaultModel)
         ? (this.config.defaultModel as string[])
         : [this.config.defaultModel as string];
-      const resolvedModel = resolveModel(modelChain[0]);
       response = await this.config.customChatCompletion(messages, {
         ...opts,
-        model: resolvedModel,
+        model: modelChain[0],
       });
     } else if (Array.isArray(this.config.defaultModel)) {
       const modelChain = (this.config.defaultModel as string[]).map(
@@ -122,17 +128,28 @@ export class BaseAgent {
     const traceId = `${stepId ?? "agent"}-${sessionId ?? uuidv4()}`;
 
     const messages = this.buildMessages(userMessage, additionalContext);
-    const model = Array.isArray(this.config.defaultModel)
-      ? resolveModel((this.config.defaultModel as string[])[0])
-      : resolveModel(this.config.defaultModel as string);
+    const rawModel = Array.isArray(this.config.defaultModel)
+      ? (this.config.defaultModel as string[])[0]
+      : (this.config.defaultModel as string);
 
     const streamOpts: Omit<OpenRouterOptions, "stream"> = {
-      model,
+      model: rawModel,
       temperature: this.config.temperature ?? 0.7,
       max_tokens: this.config.maxTokens ?? 4096,
     };
 
-    const stream = await streamChatCompletion(messages, streamOpts);
+    if (this.config.customStreamRun) {
+      return this.config.customStreamRun(messages, streamOpts, onChunk, {
+        traceId,
+      });
+    }
+
+    const model = resolveModel(rawModel);
+
+    const stream = await streamChatCompletion(messages, {
+      ...streamOpts,
+      model,
+    });
 
     let fullContent = "";
     let responseModel = model;

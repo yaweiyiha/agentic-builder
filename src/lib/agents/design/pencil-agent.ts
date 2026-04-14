@@ -532,13 +532,6 @@ Do NOT use image generation operations.
 - thickness can be { "top": n, "right": n, "bottom": n, "left": n } or any subset.
 - NEVER use "stroke": "#color" or "strokeWidth" — these are INVALID and will cause errors.
 
-## Design Standards
-- Dark theme: backgrounds #0F172A / #1E293B / #334155, text #F1F5F9 / #94A3B8 / #64748B
-- 8px grid: 4, 8, 12, 16, 24, 32, 48
-- Font sizes: 12, 14, 16, 20, 24, 32
-- Accent: #6366F1 (indigo), #3B82F6 (blue), #10B981 (emerald), #F59E0B (amber)
-- Corner radius: 4, 8, 12, 16
-- Professional SaaS dashboard aesthetic
 `;
 
 const MAX_PRD_CHARS = 28_000;
@@ -629,13 +622,19 @@ export class PencilDesignAgent {
       "userMessage:",
       userPrompt.length,
     );
-    const maxTokens = 50000;
+    const maxTokens = (() => {
+      const raw = process.env.PENCIL_BATCH_JSON_MAX_TOKENS;
+      const parsed =
+        raw !== undefined && raw !== "" ? Number.parseInt(raw, 10) : Number.NaN;
+      const n = Number.isNaN(parsed) ? 50000 : parsed;
+      return Math.min(128_000, Math.max(8_000, n));
+    })();
     console.log(
       "[PencilAgent] Calling LLM (json_object mode, model:",
       model,
       ", max_tokens:",
       maxTokens,
-      ")...",
+      "env PENCIL_BATCH_JSON_MAX_TOKENS optional)...",
     );
 
     const messages: ChatMessage[] = [

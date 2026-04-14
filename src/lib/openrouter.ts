@@ -226,7 +226,13 @@ export async function openRouterChatCompletion(
     } catch {
       /* keep raw */
     }
-    throw new Error(`OpenRouter API error: ${response.status} - ${detail}`);
+    const creditHint =
+      response.status === 402
+        ? " If this mentions max_tokens vs credits: lower max_tokens in the caller (e.g. PENCIL_LIVE_COMPLETION_MAX_TOKENS for Pencil Live) or add credits at https://openrouter.ai/settings/credits"
+        : "";
+    throw new Error(
+      `OpenRouter API error: ${response.status} - ${detail}${creditHint}`,
+    );
   }
 
   const raw = await response.text();

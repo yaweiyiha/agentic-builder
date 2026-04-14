@@ -20,8 +20,41 @@ import {
 import type { AgentResult } from "@/lib/agents/shared/base-agent";
 
 const MODEL = MODEL_CONFIG.pencilToolUse;
-const MAX_TURNS = 24;
-const MAX_BATCH_OP_LINES = 8;
+
+/** Tunable via env — defaults chosen to finish multi-screen PRDs without stopping too early. */
+function envInt(
+  name: string,
+  defaultValue: number,
+  min: number,
+  max?: number,
+): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return defaultValue;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n)) return defaultValue;
+  let v = Math.max(min, n);
+  if (max !== undefined) v = Math.min(max, v);
+  return v;
+}
+
+/** Max LLM turns (each may issue one or more tool calls). */
+const MAX_TURNS = envInt("PENCIL_LIVE_MAX_TURNS", 56, 8, 200);
+/** Per MCP guidance, keep batches ≤ ~25 ops; we default a bit below that. */
+const MAX_BATCH_OP_LINES = envInt("PENCIL_LIVE_MAX_BATCH_LINES", 22, 4, 28);
+/** End only after this many consecutive assistant replies with zero tool calls (recovers “forgot to call tool”). */
+const MAX_CONSECUTIVE_NO_TOOL_ROUNDS = envInt(
+  "PENCIL_LIVE_MAX_IDLE_ROUNDS",
+  2,
+  1,
+  8,
+);
+/** Default kept moderate: OpenRouter reserves budget from max_tokens — high values fail on low credit. */
+const LIVE_COMPLETION_MAX_TOKENS = envInt(
+  "PENCIL_LIVE_COMPLETION_MAX_TOKENS",
+  2048,
+  256,
+  32000,
+);
 
 export type PencilLiveEvent =
   | { type: "session_start"; message: string }
@@ -61,6 +94,17 @@ function truncate(text: string, limit = 4000): string {
   return text.length > limit ? `${text.slice(0, limit)}\n\n[truncated]` : text;
 }
 
+function buildContinueNudge(): string {
+  return [
+    "上一轮回复没有调用任何工具。",
+    "若 PRD / Design Specification 里还有未画的主屏或未完成区域，请继续调用 batch_design（单次不超过 " +
+      String(MAX_BATCH_OP_LINES) +
+      " 行 DSL）、batch_get 或 get_editor_state。",
+    "引用上一批之外的父节点时务必使用带引号的真实 node id。",
+    "若确实已全部画完，请先 get_editor_state 或 batch_get 确认画布，再给出一句中文总结；否则请勿只输出文字而不调用工具。",
+  ].join("\n");
+}
+
 function buildUserPrompt(
   prd: string,
   designSpec: string,
@@ -70,7 +114,7 @@ function buildUserPrompt(
     "使用可用的 Pencil 工具逐步完成设计稿绘制。",
     "",
     "要求：",
-    "- 不要一次性生成整页超长操作，单次 batch_design 最多 8 行左右。",
+    `- 控制每批复杂度：单次 batch_design 不超过 ${String(MAX_BATCH_OP_LINES)} 行操作；多屏分多批完成。`,
     "- 每完成一个小步骤后，观察工具返回结果再继续。",
     "- 遇到语法或属性错误时，先修正再继续。",
     "- 优先完成主屏，再扩展次要屏。",
@@ -98,8 +142,9 @@ function buildSystemPrompt() {
   return [
     "你是一个直接操作 Pencil MCP 的资深 UI 设计代理。",
     "你必须通过工具完成绘制，而不是输出最终 batch script 文本。",
-    "如果需要批量插入节点，请调用 batch_design，但每次只提交一个小而正确的增量。",
-    `单次 batch_design 最多 ${MAX_BATCH_OP_LINES} 行操作。`,
+    "如果需要批量插入节点，请调用 batch_design，但每次只提交一个正确可执行的增量。",
+    `单次 batch_design 最多 ${MAX_BATCH_OP_LINES} 行操作（多屏必须分多次调用）。`,
+    "在 PRD/Design Spec 中的主屏尚未全部落地前，不要提前结束；不要仅用文字描述“已完成”。",
     "每次失败后，基于返回错误即时修正。",
     "绝对不要把自然语言句子传给 batch_design。",
     'batch_design 的 operations 必须是 Pencil DSL，每行一条操作，例如：screen=I(document,{type:"frame",layout:"vertical",width:1440,height:900,fill:"#0F172A",name:"Dashboard"})',
@@ -311,6 +356,9 @@ function ensureSmallBatch(args: Record<string, unknown>) {
     .map((line) => line.trim())
     .filter(Boolean);
   if (lines.length > MAX_BATCH_OP_LINES) {
+    console.warn(
+      `[PencilLive] batch_design truncated: ${lines.length} → ${MAX_BATCH_OP_LINES} lines (cap PENCIL_LIVE_MAX_BATCH_LINES)`,
+    );
     args.operations = lines.slice(0, MAX_BATCH_OP_LINES).join("\n");
   }
 }
@@ -323,7 +371,7 @@ async function getTopLevelNodeIds(mcp: PencilMcpClient): Promise<string[]> {
   while ((match = idPattern.exec(raw)) !== null) {
     ids.push(match[1]);
   }
-  return [...new Set(ids)].slice(0, 12);
+  return [...new Set(ids)].slice(0, 32);
 }
 
 function transcriptMarkdown(
@@ -488,16 +536,23 @@ export async function runPencilLiveSession(
     type: "session_start",
     message: "Pencil live session started",
   });
+  console.log("[PencilLive] config", {
+    MAX_TURNS,
+    MAX_BATCH_OP_LINES,
+    MAX_CONSECUTIVE_NO_TOOL_ROUNDS,
+    LIVE_COMPLETION_MAX_TOKENS,
+  });
 
   await runWithPencilMcpExclusive(async () => {
     await mcp.connect();
     try {
       await mcp.openDocument("new");
+      let consecutiveNoToolRounds = 0;
       for (let turn = 0; turn < MAX_TURNS; turn++) {
         const response = await chatCompletion(messages, {
           model,
           temperature: 0.3,
-          max_tokens: 4096,
+          max_tokens: LIVE_COMPLETION_MAX_TOKENS,
           tools,
           tool_choice: "auto",
         });
@@ -546,8 +601,22 @@ export async function runPencilLiveSession(
         }
 
         if (toolCalls.length === 0) {
-          break;
+          consecutiveNoToolRounds += 1;
+          if (consecutiveNoToolRounds >= MAX_CONSECUTIVE_NO_TOOL_ROUNDS) {
+            console.warn(
+              `[PencilLive] Stopping after ${String(consecutiveNoToolRounds)} consecutive assistant turn(s) with no tool calls (max idle rounds=${String(MAX_CONSECUTIVE_NO_TOOL_ROUNDS)}).`,
+            );
+            break;
+          }
+          const nudge = buildContinueNudge();
+          messages.push({ role: "user", content: nudge });
+          console.warn(
+            `[PencilLive] Idle round ${String(consecutiveNoToolRounds)}/${String(MAX_CONSECUTIVE_NO_TOOL_ROUNDS)} — injecting continue nudge`,
+          );
+          continue;
         }
+
+        consecutiveNoToolRounds = 0;
 
         for (const toolCall of toolCalls) {
           const entry = await executeTool(
