@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     sysdesign,
     implguide,
     design,
+    pencil,
   } = body as {
     featureBrief: string;
     codeOutputDir?: string;
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     sysdesign?: string;
     implguide?: string;
     design?: string;
+    pencil?: string;
   };
 
   if (!prd) {
@@ -68,7 +70,17 @@ export async function POST(request: NextRequest) {
       run.steps.sysdesign = buildStep("sysdesign", sysdesign);
       run.steps.implguide = buildStep("implguide", implguide);
       run.steps.design = buildStep("design", design);
-      run.steps.pencil = buildStep("pencil", "Pencil step disabled.");
+
+      const pencilTrimmed = pencil?.trim() ?? "";
+      const isPencilReal =
+        pencilTrimmed.length > 0 &&
+        !pencilTrimmed.includes("step disabled") &&
+        !pencilTrimmed.includes("was not selected");
+      run.steps.pencil = {
+        ...buildStep("pencil", isPencilReal ? pencilTrimmed : ""),
+        metadata: { skipped: !isPencilReal },
+      };
+
       run.steps.mockup = buildStep("mockup", "Mockup step disabled.");
       run.steps.qa = buildStep("qa", "");
       run.steps.verify = buildStep("verify", "");

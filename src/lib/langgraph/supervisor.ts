@@ -2619,6 +2619,17 @@ async function phaseVerifyAndFix(
   options?: PhaseVerifyAndFixOptions,
 ): Promise<Partial<SupervisorState>> {
   const label = "[Supervisor] VerifyFix";
+
+  // Skip backend verify+fix when the project has no backend tasks (frontend-only project).
+  // Frontend TypeScript errors will be caught by fe_phase_verify that runs afterwards.
+  const isBackendPhase = options?.workerHintRoles?.includes("backend");
+  if (isBackendPhase && state.backendTasks.length === 0) {
+    console.log(
+      `${label}: skipping backend verify (frontend-only project, no backend tasks).`,
+    );
+    return { scaffoldErrors: undefined, scaffoldFixAttempts: 0 };
+  }
+
   const MAX_ITER = state.ralphConfig.enabled
     ? Math.min(
         state.ralphConfig.maxIterationsPerPhase * 3,

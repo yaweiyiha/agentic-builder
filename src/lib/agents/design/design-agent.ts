@@ -1,5 +1,7 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import { openRouterVisionChatCompletion, estimateCost, resolveModel } from "@/lib/openrouter";
+import type { VisionContentPart } from "@/lib/llm-types";
 
 const SYSTEM_PROMPT = `You are a senior UI/UX Design Agent for 57Blocks Agentic Builder Pod.
 
@@ -76,5 +78,54 @@ export class DesignAgent extends BaseAgent {
       "step-2-design",
       sessionId,
     );
+  }
+
+  async generateDesignWithReferenceImage(
+    prdContent: string,
+    referenceImageBase64: string,
+    additionalContext?: string,
+    sessionId?: string,
+  ) {
+    const startTime = Date.now();
+    const model = resolveModel(this.config.defaultModel as string);
+
+    const userTextParts: VisionContentPart[] = [
+      {
+        type: "text",
+        text: [
+          additionalContext?.trim() ? additionalContext.trim() : "",
+          "The user has uploaded a reference image to guide the visual style. Analyze the image and incorporate its color palette, typography style, spacing, component shapes, and overall aesthetic into the design specification.",
+          "",
+          `Based on the following PRD, generate a detailed design specification:\n\n${prdContent}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+      },
+      {
+        type: "image_url",
+        image_url: { url: referenceImageBase64, detail: "auto" },
+      },
+    ];
+
+    const messages = [
+      { role: "system" as const, content: this.config.systemPrompt },
+      { role: "user" as const, content: userTextParts },
+    ];
+
+    const resp = await openRouterVisionChatCompletion(messages, {
+      model,
+      temperature: this.config.temperature ?? 0.7,
+      max_tokens: this.config.maxTokens ?? 8192,
+    });
+
+    const content = resp.choices[0]?.message?.content ?? "";
+    const costUsd = estimateCost(resp.model, resp.usage);
+    return {
+      content: typeof content === "string" ? content : JSON.stringify(content),
+      model: resp.model,
+      costUsd,
+      durationMs: Date.now() - startTime,
+      usage: resp.usage,
+    };
   }
 }

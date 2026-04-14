@@ -456,7 +456,7 @@ export function toDesignTokensMarkdown(parsed: ParsedDesign): string {
 // ── Prompt ──
 
 const SYSTEM_PROMPT = `You are an expert UI designer working with Pencil (.pen design tool).
-Your task: create high-quality dark-theme design screens.
+Your task: create high-quality  design screens.
 
 You MUST respond with **valid JSON only** — no markdown, no prose, no fences.
 

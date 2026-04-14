@@ -58,7 +58,7 @@ function tierScaffoldBrief(tier: ScaffoldTier): string {
     case "M":
       return [
         "- Root layout: `frontend/`, `backend/`, `PRD.md`, `README.md`.",
-        "- **`frontend/`**: Vite + React + TypeScript + React Router + Ant Design.",
+        "- **`frontend/`**: Vite + React + TypeScript + React Router + Tailwind CSS + Ant Design.",
         "- **`backend/`**: Koa + TypeScript + Sequelize + PostgreSQL.",
         "- Frontend API requests use `/api`; Vite dev server proxies `/api` to `http://localhost:4000`.",
         "- Backend entrypoints: `src/app.ts` assembles Koa middleware/routes, `src/server.ts` starts the service, `src/api/modules/*` contains business modules.",

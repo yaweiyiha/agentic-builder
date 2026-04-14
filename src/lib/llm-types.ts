@@ -1,9 +1,19 @@
+export type VisionContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "auto" | "low" | "high" } };
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
   name?: string;
   tool_call_id?: string;
   tool_calls?: OpenRouterToolCall[];
+}
+
+/** A message whose content may be a mix of text and image parts (for vision models). */
+export interface VisionChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string | VisionContentPart[];
 }
 
 export interface OpenRouterToolFunction {

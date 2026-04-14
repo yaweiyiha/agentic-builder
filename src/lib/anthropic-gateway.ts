@@ -15,7 +15,20 @@ import type { AgentResult } from "@/lib/agents/shared/base-agent";
 
 const ANTHROPIC_VERSION = "2023-06-01";
 
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  if (!value?.trim()) return false;
+  const v = value.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+/**
+ * When `ANTHROPIC_GATEWAY_DISABLED` is set to 1/true/yes, PRD never uses the Anthropic HTTP gateway,
+ * even if `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` are still present (e.g. from the shell or another env file).
+ */
 export function isAnthropicGatewayForPrdEnabled(): boolean {
+  if (isTruthyEnvFlag(process.env.ANTHROPIC_GATEWAY_DISABLED)) {
+    return false;
+  }
   const base = process.env.ANTHROPIC_BASE_URL?.trim();
   const token = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
   return Boolean(base && token);

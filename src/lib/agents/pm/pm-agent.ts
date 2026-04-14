@@ -1,13 +1,7 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
-import {
-  anthropicGatewayChatCompletion,
-  anthropicGatewayStreamRun,
-  isAnthropicGatewayForPrdEnabled,
-} from "@/lib/anthropic-gateway";
-import type { ProjectTier } from "../shared/project-classifier";
 
-const DEFAULT_ANTHROPIC_GATEWAY_MODEL = "claude-sonnet-4-20250514";
+import type { ProjectTier } from "../shared/project-classifier";
 
 // ─── Tier S: Simple tool / single-page app ───
 
@@ -399,23 +393,15 @@ export class PMAgent extends BaseAgent {
   private tier: ProjectTier;
 
   constructor(tier: ProjectTier = "L") {
-    const gateway = isAnthropicGatewayForPrdEnabled();
-    const gatewayModel =
-      process.env.ANTHROPIC_PRD_MODEL?.trim() || DEFAULT_ANTHROPIC_GATEWAY_MODEL;
     super({
       name: "PM Agent",
       role: "Product Manager",
       systemPrompt: TIER_PROMPTS[tier],
-      defaultModel: gateway ? gatewayModel : MODEL_CONFIG.prd,
+      defaultModel: MODEL_CONFIG.prd,
       temperature: 0.6,
       maxTokens: TIER_MAX_TOKENS[tier],
-      customChatCompletion: gateway
-        ? (messages, opts) => anthropicGatewayChatCompletion(messages, opts)
-        : undefined,
-      customStreamRun: gateway
-        ? (messages, opts, onChunk, ctx) =>
-            anthropicGatewayStreamRun(messages, opts, onChunk, ctx)
-        : undefined,
+      customChatCompletion: undefined,
+      customStreamRun: undefined,
     });
     this.tier = tier;
   }

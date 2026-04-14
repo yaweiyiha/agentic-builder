@@ -36,6 +36,7 @@ import type {
 import { DEFAULT_RALPH_CONFIG } from "./types";
 import {
   resolveCodeOutputRoot,
+  removePreviousDesignDocs,
   writeCodegenFileMap,
   buildGitInitInstructions,
 } from "./code-output";
@@ -601,6 +602,7 @@ export class PipelineEngine {
     }
 
     try {
+      await removePreviousDesignDocs(outputRoot);
       const { written, errors } = await writeCodegenFileMap(
         outputRoot,
         fileMap,

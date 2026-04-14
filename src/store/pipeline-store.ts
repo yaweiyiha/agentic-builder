@@ -100,6 +100,7 @@ export const usePipelineStore = create<PipelineState>()(
             sysdesign: steps.sysdesign?.content ?? "",
             implguide: steps.implguide?.content ?? "",
             design: steps.design?.content ?? "",
+            pencil: steps.pencil?.content ?? "",
           }),
         })
           .then(async (resp) => {

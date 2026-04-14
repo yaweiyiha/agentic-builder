@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
+import { getDesignStylePreset } from "@/lib/pipeline/design-style-presets";
 import { runPencilLiveSession } from "@/lib/pencil-host/live-runner";
 import path from "path";
 import fs from "fs/promises";
@@ -8,12 +9,14 @@ export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { userMessage, prdContent, sessionId, codeOutputDir } = body as {
-    userMessage: string;
-    prdContent?: string;
-    sessionId?: string;
-    codeOutputDir?: string;
-  };
+  const { userMessage, prdContent, sessionId, codeOutputDir, designStyleId } =
+    body as {
+      userMessage: string;
+      prdContent?: string;
+      sessionId?: string;
+      codeOutputDir?: string;
+      designStyleId?: string;
+    };
 
   if (!userMessage) {
     return Response.json({ error: "userMessage is required" }, { status: 400 });
@@ -40,12 +43,14 @@ export async function POST(request: NextRequest) {
       };
 
       try {
+        const style = getDesignStylePreset(designStyleId);
         const result = await runPencilLiveSession({
           prdContent: prdContent ?? "",
           designSpec,
           projectRoot: outputRoot,
           sessionId,
           augmentMarkdown: `## User Change Request\n\n${userMessage}\n\nApply the requested changes to the Pencil design file.`,
+          styleAugment: style.pencilPrompt,
           onEvent: (event) => send(event),
         });
         send({

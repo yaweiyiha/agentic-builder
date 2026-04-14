@@ -59,6 +59,11 @@ export function defaultSelectedParallelDocIds(tier: ProjectTier): PipelineStepId
   return parallelDocBlueprintsForTier(tier).map((d) => d.id);
 }
 
+/** Default selection for the first preparation batch: all docs except Pencil (run Pencil after Design Spec is confirmed). */
+export function defaultParallelDocIdsWithoutPencil(tier: ProjectTier): PipelineStepId[] {
+  return defaultSelectedParallelDocIds(tier).filter((id) => id !== "pencil");
+}
+
 export const SKIPPED_LABELS_BY_TIER: Record<ProjectTier, string[]> = {
   S: ["TRD", "System Design", "Implementation Guide", "QA", "Verification"],
   M: ["TRD", "System Design", "Implementation Guide"],

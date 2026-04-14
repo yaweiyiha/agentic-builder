@@ -13,6 +13,8 @@ interface PencilEditPanelProps {
   content: string;
   codeOutputDir?: string;
   prdContent?: string;
+  /** Matches Design style from preparation — keeps Pencil chat aligned with the same tokens. */
+  designStyleId?: string;
   /** Called after AI finishes modifying the Pencil file */
   onPencilUpdated?: () => void;
 }
@@ -31,6 +33,7 @@ export default function PencilEditPanel({
   content,
   codeOutputDir,
   prdContent,
+  designStyleId,
   onPencilUpdated,
 }: PencilEditPanelProps) {
   const [chatInput, setChatInput] = useState("");
@@ -91,6 +94,7 @@ export default function PencilEditPanel({
           userMessage: msg,
           prdContent: prdContent ?? "",
           codeOutputDir,
+          designStyleId,
           sessionId: `pencil-chat-${Date.now()}`,
         }),
       });

@@ -10,6 +10,7 @@ import {
 } from "./gemini";
 import type {
   ChatMessage,
+  VisionChatMessage,
   OpenRouterOptions,
   OpenRouterResponse,
   OpenRouterToolDefinition,
@@ -19,6 +20,8 @@ import type {
 
 export type {
   ChatMessage,
+  VisionContentPart,
+  VisionChatMessage,
   OpenRouterOptions,
   OpenRouterUsage,
   OpenRouterResponse,
@@ -243,6 +246,29 @@ export async function openRouterChatCompletion(
       `OpenRouter returned non-JSON response (${raw.length} chars): ${raw.slice(0, 300)}`,
     );
   }
+}
+
+/**
+ * Vision-aware completion — accepts messages with array content (text + image parts).
+ * Routes directly to OpenRouter; bypasses Gemini and GPT-5 gateways.
+ */
+export async function openRouterVisionChatCompletion(
+  messages: VisionChatMessage[],
+  options: OpenRouterOptions = {},
+): Promise<OpenRouterResponse> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
+  const { model = OPENROUTER_DEFAULT_MODEL, temperature = 0.7, max_tokens = 4096 } = options;
+  const response = await fetch(OPENROUTER_API_URL, {
+    method: "POST",
+    headers: openRouterHeaders(apiKey),
+    body: JSON.stringify({ model, messages, temperature, max_tokens }),
+  });
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(`OpenRouter vision API error: ${response.status} - ${raw.slice(0, 300)}`);
+  }
+  return JSON.parse(await response.text()) as OpenRouterResponse;
 }
 
 export async function openRouterStreamChatCompletion(

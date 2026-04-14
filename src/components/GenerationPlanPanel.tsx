@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, Fragment } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import Loading from "./Loading";
@@ -14,6 +14,8 @@ import PrdSpecWireframesSection, {
   parsePrdStepMetadata,
 } from "@/components/PrdSpecWireframesSection";
 import { formatPrdSpecForContext } from "@/lib/requirements/prd-spec-extractor";
+import type { DesignStyleId } from "@/lib/pipeline/design-style-presets";
+import { InlineStylePicker } from "@/components/PrepStyleChatPanel";
 
 interface DocPlan {
   id: string;
@@ -68,6 +70,15 @@ interface GenerationPlanPanelProps {
   showPrdSpecSection?: boolean;
   /** Fired whenever parallel doc statuses or results change (for tab indicators + tab panels). */
   onParallelStateChange?: (snapshot: ParallelGenLiveSnapshot) => void;
+  designStyleId: DesignStyleId;
+  onDesignStyleChange?: (id: DesignStyleId) => void;
+  /** When false, Pencil cannot be toggled on until Design Spec is confirmed in the workflow. */
+  allowPencilSelection?: boolean;
+  /** Confirmed Design Spec text — required by the API for a Pencil-only batch. */
+  mergedDesignSpecForPencil?: string | null;
+  /** Base64 data URL of a reference image uploaded by the user for style matching. */
+  styleReferenceImage?: string | null;
+  onStyleReferenceImageChange?: (v: string | null) => void;
 }
 
 export default function GenerationPlanPanel({
@@ -85,6 +96,12 @@ export default function GenerationPlanPanel({
   showProgressList = true,
   showPrdSpecSection = true,
   onParallelStateChange,
+  designStyleId,
+  onDesignStyleChange,
+  allowPencilSelection = true,
+  mergedDesignSpecForPencil = null,
+  styleReferenceImage = null,
+  onStyleReferenceImageChange,
 }: GenerationPlanPanelProps) {
   const docs: DocPlan[] = parallelDocBlueprintsForTier(tier).map((b) => ({
     ...b,
@@ -246,6 +263,9 @@ export default function GenerationPlanPanel({
         }
       }
 
+      const pencilOnlyBatch =
+        selected.length === 1 && selected[0] === "pencil";
+
       const resp = await fetch("/api/agents/parallel-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -256,6 +276,12 @@ export default function GenerationPlanPanel({
           codeOutputDir,
           pencilAugmentMarkdown,
           tier,
+          designStyleId,
+          designSpecContent:
+            pencilOnlyBatch && mergedDesignSpecForPencil?.trim()
+              ? mergedDesignSpecForPencil.trim()
+              : undefined,
+          styleReferenceImageBase64: styleReferenceImage ?? undefined,
         }),
       });
 
@@ -315,6 +341,9 @@ export default function GenerationPlanPanel({
     handleStreamEvent,
     onBusyChange,
     onGenerationStreamFinished,
+    designStyleId,
+    mergedDesignSpecForPencil,
+    styleReferenceImage,
   ]);
 
   useEffect(() => {
@@ -359,6 +388,11 @@ export default function GenerationPlanPanel({
           estTotalTokens={estTotalTokens}
           estTotalCost={estTotalCost}
           onToggle={toggleDoc}
+          allowPencilSelection={allowPencilSelection}
+          designStyleId={designStyleId}
+          onDesignStyleChange={onDesignStyleChange}
+          styleReferenceImage={styleReferenceImage}
+          onStyleReferenceImageChange={onStyleReferenceImageChange}
         />
       )}
 
@@ -388,6 +422,11 @@ export function PlanView({
   estTotalTokens,
   estTotalCost,
   onToggle,
+  allowPencilSelection = true,
+  designStyleId,
+  onDesignStyleChange,
+  styleReferenceImage,
+  onStyleReferenceImageChange,
 }: {
   docs: DocPlan[];
   tier: ProjectTier;
@@ -395,7 +434,21 @@ export function PlanView({
   estTotalTokens: number;
   estTotalCost: number;
   onToggle: (id: string) => void;
+  allowPencilSelection?: boolean;
+  designStyleId?: DesignStyleId;
+  onDesignStyleChange?: (id: DesignStyleId) => void;
+  styleReferenceImage?: string | null;
+  onStyleReferenceImageChange?: (v: string | null) => void;
 }) {
+  const designDoc = docs.find((d) => d.id === "design");
+  const [designExpanded, setDesignExpanded] = useState(
+    designDoc?.selected ?? false,
+  );
+
+  useEffect(() => {
+    if (designDoc?.selected) setDesignExpanded(true);
+  }, [designDoc?.selected]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -433,47 +486,109 @@ export function PlanView({
             </thead>
             <tbody>
               {docs.map((doc) => (
-                <tr
-                  key={doc.id}
-                  className={`border-b border-zinc-100 transition-colors last:border-b-0 ${doc.selected ? "bg-white" : "bg-zinc-50/40"}`}
-                >
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`inline-flex min-w-[52px] justify-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                          doc.selected
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-zinc-200 text-zinc-600"
-                        }`}
-                        aria-hidden
-                      >
-                        {doc.selected ? "On" : "Off"}
-                      </span>
-                      <label
-                        htmlFor={`plan-include-${doc.id}`}
-                        className={`cursor-pointer font-medium ${doc.selected ? "text-zinc-900" : "text-zinc-400"}`}
-                      >
-                        {doc.label}
-                      </label>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-zinc-600">
-                    ~{doc.estimatedTokens.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-zinc-600">
-                    ~${doc.estimatedCost.toFixed(4)}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    <input
-                      id={`plan-include-${doc.id}`}
-                      type="checkbox"
-                      checked={doc.selected}
-                      onChange={() => onToggle(doc.id)}
-                      className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                      aria-label={`Include ${doc.label}`}
-                    />
-                  </td>
-                </tr>
+                <Fragment key={doc.id}>
+                  <tr
+                    className={`border-b border-zinc-100 transition-colors ${doc.selected ? "bg-white" : "bg-zinc-50/40"}`}
+                  >
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`inline-flex min-w-[52px] justify-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                            doc.selected
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-zinc-200 text-zinc-600"
+                          }`}
+                          aria-hidden
+                        >
+                          {doc.selected ? "On" : "Off"}
+                        </span>
+                        <label
+                          htmlFor={`plan-include-${doc.id}`}
+                          className={`cursor-pointer font-medium ${doc.selected ? "text-zinc-900" : "text-zinc-400"}`}
+                        >
+                          {doc.label}
+                        </label>
+                        {doc.id === "design" && doc.selected && (
+                          <button
+                            type="button"
+                            onClick={() => setDesignExpanded((v) => !v)}
+                            className="ml-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                          >
+                            <motion.svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              animate={{ rotate: designExpanded ? 180 : 0 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <path d="M6 9l6 6 6-6" />
+                            </motion.svg>
+                            Style
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-zinc-600">
+                      ~{doc.estimatedTokens.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-zinc-600">
+                      ~${doc.estimatedCost.toFixed(4)}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <input
+                        id={`plan-include-${doc.id}`}
+                        type="checkbox"
+                        checked={doc.selected}
+                        disabled={doc.id === "pencil" && !allowPencilSelection}
+                        onChange={() => {
+                          if (doc.id === "pencil" && !allowPencilSelection)
+                            return;
+                          onToggle(doc.id);
+                        }}
+                        className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Include ${doc.label}`}
+                      />
+                    </td>
+                  </tr>
+
+                  {doc.id === "design" && designStyleId && onDesignStyleChange && (
+                    <AnimatePresence>
+                      {designExpanded && (
+                        <motion.tr
+                          key="design-style-picker"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.18 }}
+                        >
+                          <td
+                            colSpan={4}
+                            className="border-b border-zinc-100 bg-zinc-50/60 p-0"
+                          >
+                            <motion.div
+                              initial={{ height: 0, overflow: "hidden" }}
+                              animate={{ height: "auto", overflow: "visible" }}
+                              exit={{ height: 0, overflow: "hidden" }}
+                              transition={{ duration: 0.22, ease: "easeInOut" }}
+                            >
+                              <InlineStylePicker
+                                selectedStyleId={designStyleId}
+                                onSelectStyle={onDesignStyleChange}
+                                styleReferenceImage={styleReferenceImage}
+                                onStyleReferenceImageChange={
+                                  onStyleReferenceImageChange
+                                }
+                              />
+                            </motion.div>
+                          </td>
+                        </motion.tr>
+                      )}
+                    </AnimatePresence>
+                  )}
+                </Fragment>
               ))}
             </tbody>
             <tfoot>

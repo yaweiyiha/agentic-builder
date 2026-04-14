@@ -83,6 +83,8 @@ interface RunPencilLiveInput {
   projectRoot: string;
   sessionId?: string;
   augmentMarkdown?: string;
+  /** Pencil-friendly tokens from the selected design style (English). Merged into the system prompt. */
+  styleAugment?: string;
   onEvent?: (event: PencilLiveEvent) => void;
 }
 
@@ -138,8 +140,8 @@ function buildUserPrompt(
   return parts.join("\n");
 }
 
-function buildSystemPrompt() {
-  return [
+function buildSystemPrompt(styleAugment?: string) {
+  const base = [
     "你是一个直接操作 Pencil MCP 的资深 UI 设计代理。",
     "你必须通过工具完成绘制，而不是输出最终 batch script 文本。",
     "如果需要批量插入节点，请调用 batch_design，但每次只提交一个正确可执行的增量。",
@@ -151,12 +153,16 @@ function buildSystemPrompt() {
     "如果不确定 DSL 语法，先调用 get_guidelines，再生成下一批操作。",
     '跨多个 batch_design 调用时，之前 block 里的变量绑定会失效；复用父节点时请使用带引号的 node id，例如 I("9z9wK", {...})。',
     "不要使用 button 或 align 这类未经验证的属性/节点类型；按钮请用 rectangle + text 组合。",
-    "优先使用深色 SaaS 风格，1440x900 画板。",
+    "优先遵循下方「风格指令」中的颜色与布局；若与示例 DSL 颜色冲突，以风格指令为准。",
     "文本节点使用 content 字段，禁止 text 字段。",
     "不要更新 document，不要输出透明 fill 字符串。",
     "当所有主屏完成后，可以调用 get_screenshot 或 batch_get 检查结果。",
     "你可以在结束前调用 export_nodes，但即使不调用，宿主也会自动导出。",
-  ].join("\n");
+  ];
+  if (styleAugment?.trim()) {
+    base.push("", "## 风格指令（必须遵守）", styleAugment.trim());
+  }
+  return base.join("\n");
 }
 
 function buildTools(outputDir: string): OpenRouterToolDefinition[] {
@@ -502,7 +508,7 @@ export async function runPencilLiveSession(
   const transcript: PencilTranscriptEntry[] = [];
   const artifactUrls: string[] = [];
   const messages: ChatMessage[] = [
-    { role: "system", content: buildSystemPrompt() },
+    { role: "system", content: buildSystemPrompt(input.styleAugment) },
     {
       role: "user",
       content: buildUserPrompt(

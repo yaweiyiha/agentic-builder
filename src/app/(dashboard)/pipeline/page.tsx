@@ -19,6 +19,8 @@ import PrdSpecWireframesSection, {
   parsePrdStepMetadata,
 } from "@/components/PrdSpecWireframesSection";
 import DocReviewPanel from "@/components/DocReviewPanel";
+import PencilEditPanel from "@/components/PencilEditPanel";
+import { PrepStyleChatTranscript, type PrepDocChatMsg } from "@/components/PrepStyleChatPanel";
 import Loading from "@/components/Loading";
 import type { PipelineStepId, StepResult } from "@/lib/pipeline/types";
 import type { ProjectTier } from "@/lib/agents/project-classifier";
@@ -33,6 +35,10 @@ import {
   defaultSelectedParallelDocIds,
   parallelDocBlueprintsForTier,
 } from "@/lib/pipeline/parallel-doc-plan";
+import {
+  defaultDesignStyleId,
+  type DesignStyleId,
+} from "@/lib/pipeline/design-style-presets";
 import { MODEL_CONFIG, primaryModel } from "@/lib/model-config";
 import { resolveModel } from "@/lib/openrouter";
 
@@ -118,6 +124,17 @@ export default function PipelinePage() {
   const [selectedParallelDocIds, setSelectedParallelDocIds] = useState<
     PipelineStepId[]
   >([]);
+  const [designStyleId, setDesignStyleId] = useState<DesignStyleId>(
+    defaultDesignStyleId,
+  );
+  const [styleReferenceImage, setStyleReferenceImage] = useState<string | null>(null);
+  const [prepDocChatHistory, setPrepDocChatHistory] = useState<PrepDocChatMsg[]>(
+    [],
+  );
+  /** False after a Design Spec is generated until the user explicitly confirms it (unlocks Pencil). */
+  const [designSpecConfirmed, setDesignSpecConfirmed] = useState(true);
+  /** False after Pencil output exists until the user confirms before kick-off. */
+  const [pencilOutputConfirmed, setPencilOutputConfirmed] = useState(true);
   const lastRunBriefRef = useRef("");
 
   const activePhase: TopPhase = activeOverridePhase ?? phaseForStep(activeTab);
@@ -220,25 +237,35 @@ export default function PipelinePage() {
 
   const { updateSteps, runKickoff } = usePipelineStore();
 
-  const handleToggleParallelDoc = useCallback((id: PipelineStepId) => {
-    setSelectedParallelDocIds((prev) => {
-      const cls = usePipelineStore.getState().steps.intent?.metadata
-        ?.classification as { tier?: ProjectTier } | undefined;
-      const tier = (cls?.tier ?? "M") as ProjectTier;
-      const order = parallelDocBlueprintsForTier(tier).map((b) => b.id);
-      const sel = new Set(prev);
-      if (sel.has(id)) sel.delete(id);
-      else sel.add(id);
-      return order.filter((x) => sel.has(x));
-    });
-  }, []);
+  const handleToggleParallelDoc = useCallback(
+    (id: PipelineStepId) => {
+      if (id === "pencil" && !designSpecConfirmed) return;
+      setSelectedParallelDocIds((prev) => {
+        const cls = usePipelineStore.getState().steps.intent?.metadata
+          ?.classification as { tier?: ProjectTier } | undefined;
+        const tier = (cls?.tier ?? "M") as ProjectTier;
+        const order = parallelDocBlueprintsForTier(tier).map((b) => b.id);
+        const sel = new Set(prev);
+        if (sel.has(id)) sel.delete(id);
+        else sel.add(id);
+        return order.filter((x) => sel.has(x));
+      });
+    },
+    [designSpecConfirmed],
+  );
 
   const handlePrdConfirm = useCallback(
     (finalPrd: string) => {
       const cls = usePipelineStore.getState().steps.intent?.metadata
         ?.classification as { tier?: ProjectTier } | undefined;
       const t = (cls?.tier ?? "M") as ProjectTier;
+      const quick = usePipelineStore.getState().fastFromPrd;
       setSelectedParallelDocIds(defaultSelectedParallelDocIds(t));
+      setDesignStyleId(defaultDesignStyleId());
+      setStyleReferenceImage(null);
+      setPrepDocChatHistory([]);
+      setDesignSpecConfirmed(true);
+      setPencilOutputConfirmed(true);
       setPrdConfirmed(true);
       setConfirmedPrd(finalPrd);
       setGenPhase("planning");
@@ -260,6 +287,7 @@ export default function PipelinePage() {
     setGenPhase("idle");
     setSelectedParallelDocIds([]);
     setPrdChatHistory([]);
+    setPrepDocChatHistory([]);
     setStartGenNonce(0);
     setParallelGenResults(null);
     setParallelGenLive(null);
@@ -270,8 +298,14 @@ export default function PipelinePage() {
 
   const handleParallelStreamFinished = useCallback(
     (results: Record<string, ParallelDocResult>) => {
-      setParallelGenResults(results);
+      setParallelGenResults((prev) => ({ ...prev, ...results }));
       setGenPhase("awaiting_kickoff");
+      if (results.design?.content?.trim()) {
+        setDesignSpecConfirmed(false);
+      }
+      if (results.pencil?.content?.trim()) {
+        setPencilOutputConfirmed(false);
+      }
     },
     [],
   );
@@ -290,6 +324,9 @@ export default function PipelinePage() {
 
   const handleGenerationComplete = useCallback(
     (results: Record<string, ParallelDocResult>) => {
+      if (!designSpecConfirmed || !pencilOutputConfirmed) {
+        return;
+      }
       setGenPhase("done");
       const stepUpdates: Partial<Record<PipelineStepId, StepResult>> = {};
       for (const [docId, result] of Object.entries(results)) {
@@ -336,7 +373,7 @@ export default function PipelinePage() {
         runKickoff();
       }, 300);
     },
-    [updateSteps, runKickoff],
+    [updateSteps, runKickoff, designSpecConfirmed, pencilOutputConfirmed],
   );
 
   const handleSkipToKickoff = useCallback(async () => {
@@ -449,6 +486,8 @@ export default function PipelinePage() {
       genPhase === "generating" ||
       genPhase === "awaiting_kickoff") &&
     !isRunning;
+
+  const showDocPlanWorkspace = showGenerationPlan;
 
   useEffect(() => {
     if (showPrdReview && prdResult?.content) {
@@ -654,6 +693,9 @@ export default function PipelinePage() {
     (sum, s) => sum + (s?.tokenUsage?.totalTokens ?? 0),
     0,
   );
+
+  const kickoffBlockedByConfirmations =
+    !designSpecConfirmed || !pencilOutputConfirmed;
 
   const currentStageModel = useMemo(() => {
     if (activePhase === "coding") {
@@ -888,25 +930,39 @@ export default function PipelinePage() {
           />
         ) : showGenerationPlan ? (
           <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-6">
-            {/* Always mounted to drive SSE + state syncing */}
-            <GenerationPlanPanel
-              tier={projectTier}
-              prdContent={confirmedPrd || prdResult?.content || ""}
-              sessionId={steps.intent?.timestamp ?? "session"}
-              selectedParallelDocIds={selectedParallelDocIds}
-              onToggleParallelDoc={handleToggleParallelDoc}
-              startGenerationNonce={startGenNonce}
-              onBusyChange={setParallelGenBusy}
-              onGenerationStreamFinished={handleParallelStreamFinished}
-              prdMetadata={
-                prdResult?.metadata as Record<string, unknown> | undefined
-              }
-              codeOutputDir={codeOutputDir}
-              showPlanTable={genPhase === "planning"}
-              showProgressList={false}
-              showPrdSpecSection={false}
-              onParallelStateChange={setParallelGenLive}
-            />
+            {showDocPlanWorkspace && (
+              <>
+                {prepDocChatHistory.length > 0 && genPhase === "planning" && (
+                  <PrepStyleChatTranscript messages={prepDocChatHistory} />
+                )}
+                <GenerationPlanPanel
+                  tier={projectTier}
+                  prdContent={confirmedPrd || prdResult?.content || ""}
+                  sessionId={steps.intent?.timestamp ?? "session"}
+                  selectedParallelDocIds={selectedParallelDocIds}
+                  onToggleParallelDoc={handleToggleParallelDoc}
+                  startGenerationNonce={startGenNonce}
+                  onBusyChange={setParallelGenBusy}
+                  onGenerationStreamFinished={handleParallelStreamFinished}
+                  prdMetadata={
+                    prdResult?.metadata as Record<string, unknown> | undefined
+                  }
+                  codeOutputDir={codeOutputDir}
+                  showPlanTable={genPhase === "planning"}
+                  showProgressList={false}
+                  showPrdSpecSection={false}
+                  onParallelStateChange={setParallelGenLive}
+                  designStyleId={designStyleId}
+                  onDesignStyleChange={setDesignStyleId}
+                  allowPencilSelection={designSpecConfirmed}
+                  mergedDesignSpecForPencil={
+                    parallelGenResults?.design?.content ?? null
+                  }
+                  styleReferenceImage={styleReferenceImage}
+                  onStyleReferenceImageChange={setStyleReferenceImage}
+                />
+              </>
+            )}
             {/* After generation starts: show per-tab content, no plan table */}
             {(genPhase === "generating" || genPhase === "awaiting_kickoff") && (
               <>
@@ -925,6 +981,7 @@ export default function PipelinePage() {
                   selectedParallelDocIds={selectedParallelDocIds}
                   codeOutputDir={codeOutputDir}
                   onDocContentSaved={handleDocContentSaved}
+                  designStyleId={designStyleId}
                 />
               </>
             )}
@@ -1025,40 +1082,81 @@ export default function PipelinePage() {
                     </>
                   )}
                   {showGenerationPlan && genPhase === "planning" && (
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 28,
-                      }}
-                      disabled={parallelGenBusy || prdRefining}
-                      onClick={() => void processCommandBarInput("continue")}
-                      className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Generate documents
-                    </motion.button>
-                  )}
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 420,
+                          damping: 28,
+                        }}
+                        disabled={parallelGenBusy || prdRefining}
+                        onClick={() => void processCommandBarInput("continue")}
+                        className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Generate documents
+                      </motion.button>
+                    )}
                   {showGenerationPlan && genPhase === "awaiting_kickoff" && (
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 28,
-                      }}
-                      disabled={
-                        !parallelGenResults || parallelGenBusy || prdRefining
-                      }
-                      onClick={() => void processCommandBarInput("continue")}
-                      className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Run kick-off
-                    </motion.button>
+                    <>
+                      {parallelGenResults?.design?.content &&
+                        !designSpecConfirmed && (
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 28,
+                            }}
+                            disabled={parallelGenBusy || prdRefining}
+                            onClick={() => setDesignSpecConfirmed(true)}
+                            className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-950 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Confirm Design Spec
+                          </motion.button>
+                        )}
+                      {parallelGenResults?.pencil?.content &&
+                        !pencilOutputConfirmed && (
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 28,
+                            }}
+                            disabled={parallelGenBusy || prdRefining}
+                            onClick={() => setPencilOutputConfirmed(true)}
+                            className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2.5 text-xs font-semibold text-indigo-950 shadow-sm transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Confirm Pencil output
+                          </motion.button>
+                        )}
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 420,
+                          damping: 28,
+                        }}
+                        disabled={
+                          !parallelGenResults ||
+                          parallelGenBusy ||
+                          prdRefining ||
+                          kickoffBlockedByConfirmations
+                        }
+                        onClick={() => void processCommandBarInput("continue")}
+                        className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Run kick-off
+                      </motion.button>
+                    </>
                   )}
                   {kickoffAwaitingCodingContinue && (
                     <motion.button
@@ -1487,6 +1585,7 @@ function ParallelGenerationTabBody({
   selectedParallelDocIds,
   codeOutputDir,
   onDocContentSaved,
+  designStyleId,
 }: {
   stepId: PipelineStepId;
   live: ParallelGenLiveSnapshot | null;
@@ -1497,6 +1596,7 @@ function ParallelGenerationTabBody({
   selectedParallelDocIds: PipelineStepId[];
   codeOutputDir?: string;
   onDocContentSaved?: (docId: string, newContent: string) => void;
+  designStyleId: DesignStyleId;
 }) {
   const resultFor = (id: PipelineStepId): ParallelDocResult | undefined =>
     live?.docResults[id] ?? fallbackResults?.[id];
@@ -1616,6 +1716,14 @@ function ParallelGenerationTabBody({
           codeOutputDir={codeOutputDir}
           onContentSaved={onDocContentSaved}
         />
+        {stepId === "pencil" && (
+          <PencilEditPanel
+            content={res.content}
+            codeOutputDir={codeOutputDir}
+            prdContent={confirmedPrd}
+            designStyleId={designStyleId}
+          />
+        )}
         {res.artifactUrls && res.artifactUrls.length > 0 && (
           <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-[12px] text-zinc-700">
             <p className="font-semibold text-zinc-900">Artifacts</p>

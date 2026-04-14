@@ -9,6 +9,7 @@ import {
 } from "@/lib/agents";
 import type { AgentResult } from "@/lib/agents";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
+import { getDesignStylePreset } from "@/lib/pipeline/design-style-presets";
 import {
   runPencilLiveSession,
   type PencilLiveEvent,
@@ -33,11 +34,11 @@ The build tool is Vite with @vitejs/plugin-react. Routing uses react-router-dom.
 
   M: `## IMPORTANT: Tech Stack Constraint (Tier M — monorepo)
 This is a **Tier-M split frontend/backend** project with the following stack:
-- **Frontend** (\`frontend/\`): **Vite + React + TypeScript + React Router + Ant Design**. **NEVER use Next.js.**
+- **Frontend** (\`frontend/\`): **Vite + React + TypeScript + React Router + Tailwind CSS + Ant Design**. **NEVER use Next.js.**
 - **Backend** (\`backend/\`): **Koa + TypeScript + Sequelize + PostgreSQL**.
 - There is no pnpm workspace shared package by default in this tier.
 **NEVER recommend or reference Next.js** — no App Router, no next/router, no next/link, no next/image, no Next.js API routes, no server components.
-The frontend uses Vite with @vitejs/plugin-react and react-router-dom for routing.`,
+The frontend uses Vite with @vitejs/plugin-react and react-router-dom for routing. Styles use Tailwind CSS utility classes.`,
 
   L: `## Tech Stack (Tier L — monorepo)
 This is a **Tier-L monorepo** project:
@@ -46,7 +47,14 @@ This is a **Tier-L monorepo** project:
 - **Shared** (\`packages/shared\`): shared types and utilities.`,
 };
 
-function buildAgentMap(tierConstraint: string): Record<string, DocAgentFn> {
+function buildAgentMap(
+  tierConstraint: string,
+  designStyleMarkdown: string,
+  referenceImageBase64?: string,
+): Record<string, DocAgentFn> {
+  const designAdditional = [tierConstraint, designStyleMarkdown]
+    .filter((s) => s.trim().length > 0)
+    .join("\n\n");
   return {
     trd: (prd, _trd, _sys, _ds, sid) =>
       new TRDAgent().generateTRD(`${tierConstraint}\n\n${prd}`, undefined, sid),
@@ -63,8 +71,14 @@ function buildAgentMap(tierConstraint: string): Record<string, DocAgentFn> {
         sys,
         sid,
       ),
-    design: (prd, _trd, _sys, _ds, sid) =>
-      new DesignAgent().generateDesign(prd, undefined, sid),
+    design: (prd, _trd, _sys, _ds, sid) => {
+      const agent = new DesignAgent();
+      const ctx = designAdditional.trim() ? designAdditional : undefined;
+      if (referenceImageBase64?.trim()) {
+        return agent.generateDesignWithReferenceImage(prd, referenceImageBase64, ctx, sid);
+      }
+      return agent.generateDesign(prd, ctx, sid);
+    },
     qa: (prd, _trd, _sys, _ds, sid) =>
       new QAAgent().generateAudit(prd, "", sid),
     verify: (prd, _trd, _sys, _ds, sid) =>
@@ -101,6 +115,9 @@ export async function POST(request: NextRequest) {
     codeOutputDir,
     pencilAugmentMarkdown,
     tier,
+    designStyleId,
+    designSpecContent,
+    styleReferenceImageBase64,
   } = body as {
     prdContent: string;
     selectedDocs: string[];
@@ -109,6 +126,12 @@ export async function POST(request: NextRequest) {
     /** Structured PRD excerpt from client (steps.prd.metadata). */
     pencilAugmentMarkdown?: string;
     tier?: string;
+    /** Visual style preset id — drives Design Spec + Pencil prompts. */
+    designStyleId?: string;
+    /** Required when `selectedDocs` is Pencil-only: confirmed Design Spec markdown. */
+    designSpecContent?: string;
+    /** Base64 data URL of a reference image for style matching. */
+    styleReferenceImageBase64?: string;
   };
 
   const effectiveTier = (tier ?? "M").toUpperCase() as "S" | "M" | "L";
@@ -120,10 +143,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const hasPencilOnlyBatch =
+    selectedDocs.includes("pencil") && !selectedDocs.includes("design");
+  if (hasPencilOnlyBatch && !designSpecContent?.trim()) {
+    return Response.json(
+      {
+        error:
+          "designSpecContent is required when running Pencil without Design Spec in the same request (use the confirmed Design Spec from the previous step).",
+      },
+      { status: 400 },
+    );
+  }
+
   const outputRoot = resolveCodeOutputRoot(process.cwd(), codeOutputDir);
   const tierConstraint =
     TIER_STACK_CONSTRAINT[effectiveTier] ?? TIER_STACK_CONSTRAINT.M;
-  const agentMap = buildAgentMap(tierConstraint);
+  const stylePreset = getDesignStylePreset(designStyleId);
+  const agentMap = buildAgentMap(
+    tierConstraint,
+    stylePreset.designSpecPrompt,
+    styleReferenceImageBase64,
+  );
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -150,6 +190,7 @@ export async function POST(request: NextRequest) {
       const hasSysDesign = selectedDocs.includes("sysdesign");
       const hasImplGuide = selectedDocs.includes("implguide");
       const hasPencil = selectedDocs.includes("pencil");
+      const pencilStyleAugment = stylePreset.pencilPrompt;
 
       // Phase A: independent docs (trd, design, qa, verify can all run in parallel)
       const phaseA = selectedDocs.filter(
@@ -166,12 +207,16 @@ export async function POST(request: NextRequest) {
         try {
           let result: AgentResult;
           if (docId === "pencil") {
+            const specForPencil =
+              ds.trim() ||
+              (typeof designSpecContent === "string" ? designSpecContent : "");
             result = await runPencilLiveSession({
               prdContent,
-              designSpec: ds,
+              designSpec: specForPencil,
               projectRoot: outputRoot,
               sessionId,
               augmentMarkdown: pencilAugmentMarkdown,
+              styleAugment: pencilStyleAugment,
               onEvent: (event: PencilLiveEvent) => {
                 send({
                   type: "doc_progress",
