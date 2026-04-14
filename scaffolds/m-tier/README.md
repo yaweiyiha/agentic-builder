@@ -211,6 +211,7 @@ backend/
 ## 6. 编码规范
 
 - !!非常重要!!： 导入类型定义时，必须使用 import type 关键字，不能仅使用 import。
+- 优先使用 Tailwind CSS 进行样式开发。
 
 ---
 
