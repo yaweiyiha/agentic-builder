@@ -996,7 +996,7 @@ export async function findBestTsconfigForFiles(
   return null;
 }
 
-// ─── Verify node: per-task `tsc`; Worker `task_fix` closes the loop on tsc errors ───
+// ─── Verify node: file presence/safety only; project `tsc` runs in supervisor phase verify ───
 
 async function verifyCode(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
@@ -1048,49 +1048,13 @@ async function verifyCode(state: WorkerState) {
   const tsFiles = taskFiles.filter((f) => /\.(ts|tsx)$/.test(f));
   if (tsFiles.length === 0) {
     console.log(
-      `[Worker:${state.workerLabel}] No TypeScript files in task — skip tsc for "${task.title}"`,
+      `[Worker:${state.workerLabel}] No TypeScript files in task — skip compile check for "${task.title}"`,
     );
     return { verifyErrors: "", fixAttempts: state.fixAttempts };
   }
 
-  const tsconfig = await findBestTsconfigForFiles(tsFiles, state.outputDir);
-  const tscCmd = tsconfig
-    ? `npx tsc --noEmit --skipLibCheck --pretty false --project ${tsconfig} 2>&1`
-    : `npx tsc --noEmit --skipLibCheck --pretty false 2>&1`;
-
   console.log(
-    `[Worker:${state.workerLabel}] Per-task tsc check for "${task.title}"...`,
-  );
-
-  const tscResult = await shellExec(tscCmd, state.outputDir, {
-    timeout: 60_000,
-  });
-  const tscOutput = (tscResult.stderr || tscResult.stdout || "").trim();
-
-  if (
-    (tscResult.exitCode !== 0 || tscOutput.includes("error TS")) &&
-    tscOutput.includes("error TS")
-  ) {
-    const errorLines = tscOutput.split("\n").filter((l) => l.includes("error TS"));
-    const taskFileSet = new Set(tsFiles.map((f) => f.replace(/\\/g, "/")));
-    const relevantErrors = errorLines.filter((line) =>
-      [...taskFileSet].some((tf) => line.includes(tf)),
-    );
-
-    if (relevantErrors.length > 0) {
-      const tscErrors = relevantErrors.slice(0, 20).join("\n");
-      console.log(
-        `[Worker:${state.workerLabel}] Per-task tsc FAILED for "${task.title}" (${relevantErrors.length} error(s)) — worker task_fix may retry.`,
-      );
-      return {
-        verifyErrors: `${WORKER_TSC_VERIFY_PREFIX}\n${tscErrors}`,
-        fixAttempts: state.fixAttempts,
-      };
-    }
-  }
-
-  console.log(
-    `[Worker:${state.workerLabel}] Per-task tsc PASSED for "${task.title}"`,
+    `[Worker:${state.workerLabel}] Task output OK for "${task.title}" (${tsFiles.length} TS file(s)) — per-task tsc disabled; project-wide tsc runs in supervisor verify.`,
   );
 
   return { verifyErrors: "", fixAttempts: state.fixAttempts };

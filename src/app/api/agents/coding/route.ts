@@ -21,6 +21,7 @@ import {
   resolveBlueprintGeneratedDatabaseUrl,
 } from "@/lib/pipeline/generated-code-env";
 import type { KickoffWorkItem, CodingTask, RalphConfig } from "@/lib/pipeline/types";
+import { stripTestingPhaseTasks } from "@/lib/pipeline/strip-testing-tasks";
 import { DEFAULT_RALPH_CONFIG } from "@/lib/pipeline/types";
 
 const execFileAsync = promisify(execFile);
@@ -95,6 +96,14 @@ export async function POST(request: NextRequest) {
   if (!runId || !Array.isArray(tasks) || tasks.length === 0) {
     return Response.json(
       { error: "runId and non-empty tasks array are required" },
+      { status: 400 },
+    );
+  }
+
+  const tasksAfterStrip = stripTestingPhaseTasks(tasks);
+  if (tasksAfterStrip.length === 0) {
+    return Response.json(
+      { error: "No tasks to run after excluding Testing-phase tasks" },
       { status: 400 },
     );
   }
@@ -225,7 +234,7 @@ export async function POST(request: NextRequest) {
     .filter(Boolean)
     .join("\n\n---\n\n");
 
-  const codingTasks: CodingTask[] = tasks.map((t) => ({
+  const codingTasks: CodingTask[] = tasksAfterStrip.map((t) => ({
     ...t,
     assignedAgentId: null,
     codingStatus: "pending" as const,

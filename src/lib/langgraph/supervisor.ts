@@ -52,6 +52,7 @@ import type {
   CodingTask,
   KickoffWorkItem,
 } from "@/lib/pipeline/types";
+import { stripTestingPhaseTasks } from "@/lib/pipeline/strip-testing-tasks";
 
 const execFileAsync = promisify(execFile);
 
@@ -115,13 +116,14 @@ function chunkTasks<T>(tasks: T[], chunks: number): T[][] {
 // ─── Nodes ───
 
 function classifyTasks(state: SupervisorState) {
+  const tasks = stripTestingPhaseTasks(state.tasks);
   const byRole: Record<CodingAgentRole, CodingTask[]> = {
     architect: [],
     backend: [],
     frontend: [],
     test: [],
   };
-  for (const task of state.tasks) {
+  for (const task of tasks) {
     const role = inferRole(task);
     byRole[role].push(task);
   }
@@ -144,6 +146,7 @@ function classifyTasks(state: SupervisorState) {
   }
 
   return {
+    tasks,
     architectTasks: byRole.architect,
     backendTasks: byRole.backend,
     frontendTasks: byRole.frontend,
@@ -2527,7 +2530,7 @@ function formatWorkerTscWarningsForRoles(
   if (chunks.length === 0) return "";
   return [
     "",
-    "## Worker per-task `tsc` output (reported before this verify — fix all issues)",
+    "## Worker task verify warnings (from per-task checks — fix all issues)",
     "",
     ...chunks,
     "",

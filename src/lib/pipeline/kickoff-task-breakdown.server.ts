@@ -8,6 +8,7 @@ import {
 } from "@/lib/pipeline/scaffold-copy";
 import { buildTaskBreakdownScaffoldBlock } from "@/lib/pipeline/scaffold-spec";
 import type { KickoffWorkItem } from "./types";
+import { stripTestingPhaseTasks } from "./strip-testing-tasks";
 
 function isKickoffWorkItem(x: unknown): x is KickoffWorkItem {
   if (!x || typeof x !== "object") return false;
@@ -181,7 +182,7 @@ export async function buildTaskBreakdownFromDocuments(params: {
   const parsed = parseJsonArrayFromLlmOutput(result.content);
 
   return {
-    tasks: parsed.tasks,
+    tasks: stripTestingPhaseTasks(parsed.tasks),
     costUsd: result.costUsd,
     durationMs: result.durationMs,
     model: result.model,

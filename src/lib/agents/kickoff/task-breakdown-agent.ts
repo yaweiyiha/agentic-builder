@@ -7,11 +7,11 @@ import { MODEL_CONFIG } from "@/lib/model-config";
  * Task count must be derived from PRD/TRD scope — see system prompt "Task count" section.
  */
 const TIER_CODING_STYLE: Record<ProjectTier, string> = {
-  S: `Pipeline tier **S** (small scope): prefer **fewer, broader** tasks when the PRD is thin — scaffolding + core feature + tests as appropriate. Merge related work; do not pad with filler tasks to "look busy".`,
+  S: `Pipeline tier **S** (small scope): prefer **fewer, broader** tasks when the PRD is thin — scaffolding + core feature. Merge related work; do not pad with filler tasks to "look busy".`,
 
   M: `Pipeline tier **M** (monorepo): stack is **pnpm** with \`apps/web\` (**Vite + React**, NOT Next.js), \`apps/api\` (**Express**), \`packages/shared\`. **NEVER use Next.js for M-tier** — the frontend is always Vite + React with React Router. The scaffold is prebuilt and already copied; **do not plan a Scaffolding task that recreates the repo structure**. Keep backend/data tasks reasonably broad; split **frontend by page or major flow** when the PRD lists multiple surfaces — first a **route shell/layout** task, then page-level tasks. Add an **early contracts/client** task so API shapes and the web client stay aligned with PRD requirement IDs. The web app uses \`@\` → \`apps/web/src\`; cross-directory imports MUST use \`@/\`, never \`../\` across packages.`,
 
-  L: `Pipeline tier **L** (broad product): expect **thorough** coverage across phases the PRD actually requires — scaffolding, data, auth, backend services, frontend, integration, testing, infrastructure — but **only** where the documents call for them; still derive *how many* tasks from requirement breadth, not from a quota.`,
+  L: `Pipeline tier **L** (broad product): expect **thorough** coverage across phases the PRD actually requires — scaffolding, data, auth, backend services, frontend, integration, infrastructure — but **only** where the documents call for them; still derive *how many* tasks from requirement breadth, not from a quota.`,
 };
 
 function mTierPhaseGuide(): string {
@@ -26,7 +26,7 @@ Use **coarse-grained** tasks unless the PRD forces more splits. Typical **phase*
 - **Frontend** — First create **one** route shell/layout task, then split into **page-level** tasks (one task per page/flow, not per tiny component).
   - Route shell/layout task must explicitly include apps/web/src/App.tsx (or src/routes.tsx) route registration and "/" homepage navigation entry links.
 - **Integration** — **Optional** single task: base URL, CORS, auth headers, error handling between web and api.
-- **Testing** — **REQUIRED. One** task: Vitest unit + integration tests for backend routes and key frontend logic. Never omit.
+- **Testing** — **Do not** add tasks with phase "Testing" (automated test tasks are disabled in the pipeline).
 
 **Bad for M:** separate tasks per endpoint or per tiny UI component, or \"create package.json for web\".
 **Good for M:** one contracts/client task, one route-shell/layout task, then page-level tasks like \"Implement Timer page\" and \"Implement History page\".
@@ -57,7 +57,7 @@ Before generating tasks, analyze the PRD to determine the project type:
    **Do NOT classify as frontend-only** just because the PRD describes a simple or small product — if there is any
    mention of saving data, user accounts, multi-user access, notifications, or any server-side feature, it is full-stack.
    → Use **React + Vite + TypeScript + Tailwind CSS**. NEVER use Next.js.
-   → Allowed phases: "Scaffolding", "Frontend", "Testing" ONLY.
+   → Allowed phases: "Scaffolding", "Frontend" ONLY (do NOT use phase "Testing").
    → Do NOT generate "Data Layer", "Backend Services", "Auth & Gateway", "Infrastructure", or "Integration" tasks.
    → Do NOT use Prisma, API routes, Docker, Kubernetes, or any server-side technology.
 
@@ -70,14 +70,13 @@ Before generating tasks, analyze the PRD to determine the project type:
    → **S-tier**: Vite + React frontend with Express/Node backend in a single repo.
    → **M-tier**: Express backend in apps/api, **Vite + React** frontend in apps/web. **NEVER use Next.js for M-tier.**
    → **L-tier**: Falls here only if SSR is NOT required; otherwise use type 2.
-   → All phases are allowed. Backend Services and Testing phases are **mandatory** — see rule below.
+   → All phases are allowed except **Testing** (do not emit phase "Testing"). Backend Services phase is **mandatory** — see rule below.
 
 ## CRITICAL: Mandatory phases for full-stack projects
 For any full-stack project (types 2 or 3 above), the output MUST contain:
 - At least **one task with phase "Backend Services"** — implementing the actual API routes, controllers, and domain logic in apps/api/src (or equivalent). The scaffold ships an empty Express app; your task adds the feature code.
-- At least **one task with phase "Testing"** — Vitest unit/integration tests covering the backend routes and key frontend logic.
 
-**The scaffold does NOT implement your features.** The scaffold only provides the project skeleton (package.json, tsconfig, app shell). Every endpoint, every business rule, every page must be coded in a Backend Services, Frontend, or Testing task. Do not omit these phases because the scaffold "already has" apps/api or apps/web — those are empty shells, not implemented features.
+**The scaffold does NOT implement your features.** The scaffold only provides the project skeleton (package.json, tsconfig, app shell). Every endpoint, every business rule, every page must be coded in Backend Services or Frontend tasks. Do not omit Backend Services because the scaffold "already has" apps/api or apps/web — those are empty shells, not implemented features.
 
 ## Task count — derive from PRD (no fixed quota)
 - **Do not** target a predetermined number of tasks. The **only** driver for how many tasks to output is **document scope**: user flows, pages, APIs, data stores, integrations, and **coverage of every AC/FR (and PAGE-*/CMP-* if listed)** via \`coversRequirementIds\`.
@@ -129,8 +128,9 @@ Each element has this shape:
 Field rules:
 - **id**: sequential T-001, T-002, ... (string)
 - **phase**: one of "Scaffolding", "Frontend", "Data Layer", "Auth & Gateway", "Backend Services",
-  "Integration", "Testing", "Infrastructure" (string).
-  For frontend-only projects, use ONLY "Scaffolding", "Frontend", "Testing".
+  "Integration", "Infrastructure" (string).
+  **Never** use phase "Testing" — the pipeline does not run dedicated test tasks yet.
+  For frontend-only projects, use ONLY "Scaffolding", "Frontend".
 - **title**: short imperative sentence (< 80 chars)
 - **description**: 1-3 sentences explaining what to build, which files to touch, and
   any relevant FR-xxx / US-xx references from the PRD.

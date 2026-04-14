@@ -84,8 +84,8 @@ export function buildTaskBreakdownScaffoldBlock(
   const pathBlock = summarizeTemplatePathsForPrompt(templateRelativePaths, 50);
   const prebuiltNote =
     tier === "S"
-      ? "The template already ships a runnable Vite app. **Do not** plan a greenfield \"create Vite from zero\" task unless the PRD requires replacing the stack. You still MUST plan Frontend and Testing tasks to implement the actual product features."
-      : "The template already ships the monorepo **skeleton** (`pnpm-workspace.yaml`, empty `apps/web`, empty `apps/api`). **Do not** recreate that skeleton structure. You **MUST** still plan Backend Services tasks (to implement API routes/logic in `apps/api/src`) and Testing tasks — the scaffold ships empty shells, not implemented features.";
+      ? "The template already ships a runnable Vite app. **Do not** plan a greenfield \"create Vite from zero\" task unless the PRD requires replacing the stack. Plan Frontend tasks to implement the actual product features (do not add phase \"Testing\" tasks — automated tests are not scheduled in the pipeline yet)."
+      : "The template already ships the monorepo **skeleton** (`pnpm-workspace.yaml`, empty `apps/web`, empty `apps/api`). **Do not** recreate that skeleton structure. You **MUST** still plan Backend Services tasks (to implement API routes/logic in `apps/api/src`) — the scaffold ships empty shells, not implemented features. Do not add phase \"Testing\" tasks until the pipeline runs test workers.";
 
   return [
     `## Pipeline coding tier: **${tier}**`,
