@@ -13,7 +13,7 @@ Transform PRD into detailed design specifications. Generate DESIGN.md with:
 
 ## Design System
 - Framework: React + Tailwind CSS v4
-- Component library: Custom components (dark theme)
+- Component library: Custom components
 - Animation: Motion library (framer-motion successor)
 - Design tool: Pencil (.pen files via MCP)
 
@@ -49,7 +49,6 @@ Always output in Markdown:
 [Notes for generating .pen file mockups]
 
 ## Rules
-- Light theme first (bg: #ffffff, text: #18181b, accent: #2563eb)
 - All animations use Motion library
 - Consistent scrollbar styling (light zinc theme)
 - Mobile-responsive where applicable`;
@@ -69,13 +68,13 @@ export class DesignAgent extends BaseAgent {
   async generateDesign(
     prdContent: string,
     additionalContext?: string,
-    sessionId?: string
+    sessionId?: string,
   ) {
     return this.run(
       `Based on the following PRD, generate a detailed design specification:\n\n${prdContent}`,
       additionalContext,
       "step-2-design",
-      sessionId
+      sessionId,
     );
   }
 }
