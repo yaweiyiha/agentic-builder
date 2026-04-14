@@ -20,7 +20,11 @@ import {
   formatGeneratedCodeDotEnv,
   resolveBlueprintGeneratedDatabaseUrl,
 } from "@/lib/pipeline/generated-code-env";
-import type { KickoffWorkItem, CodingTask, RalphConfig } from "@/lib/pipeline/types";
+import type {
+  KickoffWorkItem,
+  CodingTask,
+  RalphConfig,
+} from "@/lib/pipeline/types";
 import { stripTestingPhaseTasks } from "@/lib/pipeline/strip-testing-tasks";
 import { DEFAULT_RALPH_CONFIG } from "@/lib/pipeline/types";
 
@@ -28,12 +32,18 @@ const execFileAsync = promisify(execFile);
 
 export const maxDuration = 600;
 
-function classifyError(error: unknown, clientAborted: boolean): {
+function classifyError(
+  error: unknown,
+  clientAborted: boolean,
+): {
   category: ErrorCategory;
   message: string;
 } {
   if (clientAborted) {
-    return { category: "client_disconnect", message: "Client disconnected (SSE closed)" };
+    return {
+      category: "client_disconnect",
+      message: "Client disconnected (SSE closed)",
+    };
   }
 
   if (!(error instanceof Error)) {
@@ -43,8 +53,15 @@ function classifyError(error: unknown, clientAborted: boolean): {
   const msg = error.message.toLowerCase();
   const name = error.name;
 
-  if (name === "AbortError" || msg.includes("aborted") || msg.includes("cancelled")) {
-    return { category: "client_disconnect", message: `Client aborted: ${error.message}` };
+  if (
+    name === "AbortError" ||
+    msg.includes("aborted") ||
+    msg.includes("cancelled")
+  ) {
+    return {
+      category: "client_disconnect",
+      message: `Client aborted: ${error.message}`,
+    };
   }
 
   if (
@@ -54,7 +71,10 @@ function classifyError(error: unknown, clientAborted: boolean): {
     msg.includes("exceeded") ||
     name === "TimeoutError"
   ) {
-    return { category: "timeout", message: `Timeout/terminated: ${error.message}` };
+    return {
+      category: "timeout",
+      message: `Timeout/terminated: ${error.message}`,
+    };
   }
 
   if (
@@ -91,7 +111,10 @@ export async function POST(request: NextRequest) {
     databaseUrl?: string;
   };
 
-  const ralphConfig: RalphConfig = { ...DEFAULT_RALPH_CONFIG, ...(ralphOverride ?? {}) };
+  const ralphConfig: RalphConfig = {
+    ...DEFAULT_RALPH_CONFIG,
+    ...(ralphOverride ?? {}),
+  };
 
   if (!runId || !Array.isArray(tasks) || tasks.length === 0) {
     return Response.json(
@@ -113,7 +136,14 @@ export async function POST(request: NextRequest) {
   // Robust cleanup: handle each entry individually so one failure doesn't stop the rest.
   // Keep .git (RALPH commits), specific doc .md files, and .ralph tracking dir.
   const KEEP_ENTRIES = new Set([".git", ".ralph"]);
-  const KEEP_MD = new Set(["PRD.md", "TRD.md", "SystemDesign.md", "ImplementationGuide.md", "DesignSpec.md", "PencilDesign.md"]);
+  const KEEP_MD = new Set([
+    "PRD.md",
+    "TRD.md",
+    "SystemDesign.md",
+    "ImplementationGuide.md",
+    "DesignSpec.md",
+    "PencilDesign.md",
+  ]);
   await fs.mkdir(outputRoot, { recursive: true });
   const entries = await fs.readdir(outputRoot).catch(() => [] as string[]);
   let removedCount = 0;
@@ -125,27 +155,39 @@ export async function POST(request: NextRequest) {
       await fs.rm(entryPath, { recursive: true, force: true });
       removedCount++;
     } catch (e) {
-      console.warn(`[CodingAPI] Could not remove ${entry}: ${e instanceof Error ? e.message : String(e)}`);
+      console.warn(
+        `[CodingAPI] Could not remove ${entry}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
-  console.log(`[CodingAPI] Cleaned output directory: ${outputRoot} (removed ${removedCount} entries)`);
+  console.log(
+    `[CodingAPI] Cleaned output directory: ${outputRoot} (removed ${removedCount} entries)`,
+  );
 
-  const tier = ((projectTier ?? "M").toUpperCase()) as ScaffoldTier;
+  const tier = (projectTier ?? "M").toUpperCase() as ScaffoldTier;
 
   // Always overwrite scaffold files so fresh copies are guaranteed even if cleanup was partial.
   let scaffoldCopied: string[] = [];
   try {
-    const result = await copyScaffold(tier, outputRoot, { forceOverwrite: true });
+    const result = await copyScaffold(tier, outputRoot, {
+      forceOverwrite: true,
+    });
     scaffoldCopied = result.copied;
-    console.log(`[CodingAPI] Scaffold (${tier} tier): wrote ${scaffoldCopied.length} file(s) to ${outputRoot}`);
+    console.log(
+      `[CodingAPI] Scaffold (${tier} tier): wrote ${scaffoldCopied.length} file(s) to ${outputRoot}`,
+    );
   } catch (e) {
-    console.warn(`[CodingAPI] Scaffold copy warning: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(
+      `[CodingAPI] Scaffold copy warning: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 
   try {
     await writeScaffoldSpecFile(outputRoot, tier);
   } catch (e) {
-    console.warn(`[CodingAPI] writeScaffoldSpecFile warning: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(
+      `[CodingAPI] writeScaffoldSpecFile warning: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 
   const resolvedDbUrl = resolveBlueprintGeneratedDatabaseUrl(databaseUrlBody);
@@ -166,21 +208,36 @@ export async function POST(request: NextRequest) {
 
   const scaffoldProtectedPaths = await listScaffoldTemplateRelativePaths(tier);
 
-  // Run pnpm install whenever scaffold files exist (not just when newly copied).
-  const hasScaffoldPkg = await fs.access(path.join(outputRoot, "package.json")).then(() => true).catch(() => false);
-  if (hasScaffoldPkg) {
+  // Run installs for every package root present in the scaffold.
+  const installTargets = tier === "M" ? ["frontend", "backend"] : [""];
+  for (const relTarget of installTargets) {
+    const targetDir = relTarget ? path.join(outputRoot, relTarget) : outputRoot;
+    const hasPkg = await fs
+      .access(path.join(targetDir, "package.json"))
+      .then(() => true)
+      .catch(() => false);
+    if (!hasPkg) continue;
     try {
-      console.log("[CodingAPI] Running pnpm install for scaffold...");
+      console.log(
+        `[CodingAPI] Running pnpm install for scaffold at ${relTarget || "."}...`,
+      );
       await execFileAsync("pnpm", ["install", "--no-frozen-lockfile"], {
-        cwd: outputRoot,
+        cwd: targetDir,
         maxBuffer: 10 * 1024 * 1024,
         timeout: 180_000,
       });
-      console.log("[CodingAPI] pnpm install OK.");
+      console.log(`[CodingAPI] pnpm install OK at ${relTarget || "."}.`);
     } catch (e) {
       const err = e as { stdout?: string; stderr?: string; message?: string };
-      const detail = (err.stderr || err.stdout || err.message || String(e)).slice(0, 400);
-      console.warn(`[CodingAPI] pnpm install warning: ${detail}`);
+      const detail = (
+        err.stderr ||
+        err.stdout ||
+        err.message ||
+        String(e)
+      ).slice(0, 400);
+      console.warn(
+        `[CodingAPI] pnpm install warning at ${relTarget || "."}: ${detail}`,
+      );
     }
   }
 
@@ -202,6 +259,23 @@ export async function POST(request: NextRequest) {
   const implGuideDoc = await readDoc("ImplementationGuide.md", 6000);
   const designSpecDoc = await readDoc("DesignSpec.md", 8000);
   const pencilDesignDoc = await readDoc("PencilDesign.md");
+  const scaffoldReadmePath = path.resolve(
+    process.cwd(),
+    "scaffolds",
+    "m-tier",
+    "README.md",
+  );
+  const scaffoldReadmeDoc =
+    tier === "M"
+      ? await fs
+          .readFile(scaffoldReadmePath, "utf-8")
+          .then((raw) =>
+            raw.length > 12000
+              ? `${raw.slice(0, 12000)}\n\n[m-tier README truncated]`
+              : raw,
+          )
+          .catch(() => "")
+      : "";
 
   const baseContextParts: string[] = [];
   if (prdDoc) baseContextParts.push(`## PRD\n\n${prdDoc}`);
@@ -215,8 +289,16 @@ export async function POST(request: NextRequest) {
     "## Scaffold specification",
     "",
     "The repository includes **SCAFFOLD_SPEC.md** (tier layout, commands, where to implement).",
-    "Follow that layout; extend prebuilt apps and `packages/shared` instead of replacing the whole scaffold.",
+    "Follow that layout; extend the prebuilt scaffold structure instead of replacing it wholesale.",
     "",
+    ...(scaffoldReadmeDoc
+      ? [
+          `## Scaffold README Reference (${scaffoldReadmePath})`,
+          "",
+          scaffoldReadmeDoc,
+          "",
+        ]
+      : []),
     getTierScaffoldSpecForCodingContext(tier),
   ].join("\n");
 
@@ -227,9 +309,7 @@ export async function POST(request: NextRequest) {
 
   const frontendDesignContext = [
     designSpecDoc ? `## Design Specification\n\n${designSpecDoc}` : "",
-    pencilDesignDoc
-      ? `## Pencil Design Tokens\n\n${pencilDesignDoc}`
-      : "",
+    pencilDesignDoc ? `## Pencil Design Tokens\n\n${pencilDesignDoc}` : "",
   ]
     .filter(Boolean)
     .join("\n\n---\n\n");
@@ -247,7 +327,9 @@ export async function POST(request: NextRequest) {
   let clientAborted = false;
   request.signal.addEventListener("abort", () => {
     clientAborted = true;
-    console.warn(`[CodingAPI] Session ${sessionId}: client disconnected (signal aborted)`);
+    console.warn(
+      `[CodingAPI] Session ${sessionId}: client disconnected (signal aborted)`,
+    );
   });
 
   const stream = new ReadableStream({
@@ -263,14 +345,18 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log(`[CodingAPI] Session ${sessionId}: starting with ${codingTasks.length} tasks, output: ${outputRoot}`);
+      console.log(
+        `[CodingAPI] Session ${sessionId}: starting with ${codingTasks.length} tasks, output: ${outputRoot}`,
+      );
 
-      send(mapper.buildSessionStart(
-        codingTasks.map((t) => ({
-          ...t,
-          assignedAgentId: null,
-        })),
-      ));
+      send(
+        mapper.buildSessionStart(
+          codingTasks.map((t) => ({
+            ...t,
+            assignedAgentId: null,
+          })),
+        ),
+      );
 
       const graph = createSupervisorGraph();
 
@@ -288,9 +374,13 @@ export async function POST(request: NextRequest) {
             const { ProgressTracker } = await import("@/lib/ralph");
             const tracker = new ProgressTracker(outputRoot);
             await tracker.init(codingTasks, sessionId);
-            console.log(`[CodingAPI] RALPH enabled — progress tracker initialised at ${outputRoot}/.ralph/`);
+            console.log(
+              `[CodingAPI] RALPH enabled — progress tracker initialised at ${outputRoot}/.ralph/`,
+            );
           } catch (e) {
-            console.warn(`[CodingAPI] RALPH progress tracker init failed: ${e}`);
+            console.warn(
+              `[CodingAPI] RALPH progress tracker init failed: ${e}`,
+            );
           }
         }
 
@@ -309,13 +399,17 @@ export async function POST(request: NextRequest) {
 
         for await (const chunk of streamIterator) {
           if (clientAborted) {
-            console.warn(`[CodingAPI] Session ${sessionId}: stopping iteration — client disconnected`);
+            console.warn(
+              `[CodingAPI] Session ${sessionId}: stopping iteration — client disconnected`,
+            );
             break;
           }
 
           const [ns, updates] = chunk as [string[], Record<string, unknown>];
           const nodeNames = Object.keys(updates);
-          console.log(`[CodingAPI] Stream chunk: ns=[${ns.join(",")}] nodes=[${nodeNames.join(",")}]`);
+          console.log(
+            `[CodingAPI] Stream chunk: ns=[${ns.join(",")}] nodes=[${nodeNames.join(",")}]`,
+          );
 
           const events = mapper.mapChunk(
             chunk as [string[], Record<string, unknown>],

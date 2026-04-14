@@ -17,12 +17,6 @@ import {
 /** Pencil step: LLM (up to 16k tokens) + many batch_design chunks can exceed 5 minutes. */
 export const maxDuration = 600;
 
-interface DocSpec {
-  id: string;
-  label: string;
-  estimatedTokens: number;
-}
-
 type DocAgentFn = (
   prd: string,
   trd: string,
@@ -38,12 +32,12 @@ This is a **Tier-S (single app)** project. The frontend uses **Vite + React + Ty
 The build tool is Vite with @vitejs/plugin-react. Routing uses react-router-dom.`,
 
   M: `## IMPORTANT: Tech Stack Constraint (Tier M — monorepo)
-This is a **Tier-M monorepo** project with the following stack:
-- **Frontend** (\`apps/web\`): **Vite + React + TypeScript + Tailwind CSS + React Router**. **NEVER use Next.js.**
-- **Backend** (\`apps/api\`): **Express + TypeScript**.
-- **Shared** (\`packages/shared\`): shared types and utilities.
+This is a **Tier-M split frontend/backend** project with the following stack:
+- **Frontend** (\`frontend/\`): **Vite + React + TypeScript + React Router + Ant Design**. **NEVER use Next.js.**
+- **Backend** (\`backend/\`): **Koa + TypeScript + Sequelize + PostgreSQL**.
+- There is no pnpm workspace shared package by default in this tier.
 **NEVER recommend or reference Next.js** — no App Router, no next/router, no next/link, no next/image, no Next.js API routes, no server components.
-The web app uses Vite with @vitejs/plugin-react and react-router-dom for routing.`,
+The frontend uses Vite with @vitejs/plugin-react and react-router-dom for routing.`,
 
   L: `## Tech Stack (Tier L — monorepo)
 This is a **Tier-L monorepo** project:
@@ -57,9 +51,18 @@ function buildAgentMap(tierConstraint: string): Record<string, DocAgentFn> {
     trd: (prd, _trd, _sys, _ds, sid) =>
       new TRDAgent().generateTRD(`${tierConstraint}\n\n${prd}`, undefined, sid),
     sysdesign: (prd, trd, _sys, _ds, sid) =>
-      new SysDesignAgent().generateSysDesign(`${tierConstraint}\n\n${prd}`, trd, sid),
+      new SysDesignAgent().generateSysDesign(
+        `${tierConstraint}\n\n${prd}`,
+        trd,
+        sid,
+      ),
     implguide: (prd, trd, sys, _ds, sid) =>
-      new ImplGuideAgent().generateImplGuide(`${tierConstraint}\n\n${prd}`, trd, sys, sid),
+      new ImplGuideAgent().generateImplGuide(
+        `${tierConstraint}\n\n${prd}`,
+        trd,
+        sys,
+        sid,
+      ),
     design: (prd, _trd, _sys, _ds, sid) =>
       new DesignAgent().generateDesign(prd, undefined, sid),
     qa: (prd, _trd, _sys, _ds, sid) =>
@@ -108,7 +111,7 @@ export async function POST(request: NextRequest) {
     tier?: string;
   };
 
-  const effectiveTier = ((tier ?? "M").toUpperCase()) as "S" | "M" | "L";
+  const effectiveTier = (tier ?? "M").toUpperCase() as "S" | "M" | "L";
 
   if (!prdContent || !selectedDocs || selectedDocs.length === 0) {
     return Response.json(
@@ -118,7 +121,8 @@ export async function POST(request: NextRequest) {
   }
 
   const outputRoot = resolveCodeOutputRoot(process.cwd(), codeOutputDir);
-  const tierConstraint = TIER_STACK_CONSTRAINT[effectiveTier] ?? TIER_STACK_CONSTRAINT.M;
+  const tierConstraint =
+    TIER_STACK_CONSTRAINT[effectiveTier] ?? TIER_STACK_CONSTRAINT.M;
   const agentMap = buildAgentMap(tierConstraint);
 
   const encoder = new TextEncoder();
@@ -186,7 +190,7 @@ export async function POST(request: NextRequest) {
             content: result.content,
             costUsd: result.costUsd,
             durationMs: result.durationMs,
-            tokens: result.usage.totalTokens,
+            tokens: result.usage.total_tokens,
           };
           send({
             type: "doc_complete",
@@ -195,7 +199,7 @@ export async function POST(request: NextRequest) {
             content: result.content,
             costUsd: result.costUsd,
             durationMs: result.durationMs,
-            tokens: result.usage.totalTokens,
+            tokens: result.usage.total_tokens,
           });
         } catch (error) {
           const msg =

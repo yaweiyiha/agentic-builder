@@ -1,5 +1,11 @@
 import { chatCompletionWithFallback, resolveModel } from "@/lib/openrouter";
-import type { ChatMessage, OpenRouterResponse } from "@/lib/llm-types";
+import type {
+  ChatMessage,
+  OpenRouterResponse,
+  OpenRouterToolDefinition,
+  OpenRouterToolCall,
+  OpenRouterOptions,
+} from "@/lib/llm-types";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 
 const DEFAULT_CODEGEN_BASE = "https://api.gptsapi.net/v1";
@@ -23,7 +29,12 @@ function normalizeBaseUrl(base: string): string {
  */
 async function chatCompletionsOpenAICompatible(
   messages: ChatMessage[],
-  options: { temperature: number; max_tokens: number },
+  options: {
+    temperature: number;
+    max_tokens: number;
+    tools?: OpenRouterToolDefinition[];
+    tool_choice?: OpenRouterOptions["tool_choice"];
+  },
 ): Promise<OpenRouterResponse> {
   const apiKey = process.env.CODEGEN_API_KEY?.trim();
   if (!apiKey) {
@@ -40,6 +51,8 @@ async function chatCompletionsOpenAICompatible(
     messages,
     temperature: options.temperature,
     max_tokens: options.max_tokens,
+    ...(options.tools?.length ? { tools: options.tools } : {}),
+    ...(options.tool_choice ? { tool_choice: options.tool_choice } : {}),
   });
 
   let res: Response | null = null;
@@ -104,7 +117,12 @@ async function chatCompletionsOpenAICompatible(
     id?: string;
     model?: string;
     choices?: Array<{
-      message?: { role?: string; content?: string | null };
+      message?: {
+        role?: string;
+        content?: string | null;
+        tool_calls?: OpenRouterToolCall[];
+      };
+      finish_reason?: string | null;
     }>;
     usage?: {
       prompt_tokens?: number;
@@ -130,8 +148,12 @@ async function chatCompletionsOpenAICompatible(
     model: json.model ?? model,
     choices: [
       {
-        message: { role: "assistant", content },
-        finish_reason: "stop",
+        message: {
+          role: "assistant",
+          content,
+          tool_calls: json.choices?.[0]?.message?.tool_calls,
+        },
+        finish_reason: json.choices?.[0]?.finish_reason ?? "stop",
       },
     ],
     usage: {
@@ -154,6 +176,8 @@ export async function invokeCodegenOrOpenRouter(
     temperature: number;
     max_tokens: number;
     openRouterVariant?: CodegenOpenRouterVariant;
+    tools?: OpenRouterToolDefinition[];
+    tool_choice?: OpenRouterOptions["tool_choice"];
   },
 ): Promise<OpenRouterResponse> {
   if (isCodegenCustomProvider()) {

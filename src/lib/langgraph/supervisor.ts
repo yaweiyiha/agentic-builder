@@ -550,20 +550,24 @@ function collectDependencySuggestions(
   const web: DependencyPlanItem[] = [];
   const api: DependencyPlanItem[] = [];
   const shared: DependencyPlanItem[] = [];
+  const hasSharedPackage =
+    /packages\/shared|@project\/shared|workspace:\*/.test(text);
 
-  // Baseline monorepo internal linkage.
-  web.push({
-    pkg: "@project/shared",
-    reason: "Frontend imports shared contracts/types/schemas.",
-  });
-  api.push({
-    pkg: "@project/shared",
-    reason: "Backend imports shared contracts/types/schemas.",
-  });
-  shared.push({
-    pkg: "zod",
-    reason: "Shared runtime validation schemas.",
-  });
+  // Baseline monorepo internal linkage when a shared package actually exists.
+  if (hasSharedPackage) {
+    web.push({
+      pkg: "@project/shared",
+      reason: "Frontend imports shared contracts/types/schemas.",
+    });
+    api.push({
+      pkg: "@project/shared",
+      reason: "Backend imports shared contracts/types/schemas.",
+    });
+    shared.push({
+      pkg: "zod",
+      reason: "Shared runtime validation schemas.",
+    });
+  }
 
   if (/query|server state|cache|invalidate/.test(text)) {
     web.push({
@@ -679,6 +683,8 @@ async function buildDependencyBaselinePlans(
   const suggestions = collectDependencySuggestions(state);
   const workspaceMap: Array<{ key: PackageRootKey; relPath: string }> = [
     { key: "root", relPath: "package.json" },
+    { key: "web", relPath: "frontend/package.json" },
+    { key: "api", relPath: "backend/package.json" },
     { key: "web", relPath: "apps/web/package.json" },
     { key: "api", relPath: "apps/api/package.json" },
     { key: "shared", relPath: "packages/shared/package.json" },
@@ -821,7 +827,7 @@ async function scaffoldFix(state: SupervisorState) {
       content: `You are a Senior Software Architect. Fix the build errors below so that "npm install && npm run build" succeeds.
 Rules:
 - NEVER use create-react-app or react-scripts.
-- For M-tier monorepo projects: frontend is ALWAYS Vite + React (apps/web), backend is Express (apps/api). NEVER introduce Next.js.
+- For M-tier split projects: frontend is Vite + React in frontend/, backend is Koa + TypeScript in backend/. NEVER introduce Next.js.
 - For L-tier monorepo projects: frontend is Next.js (apps/web), backend is Fastify (apps/api).
 - For Vite projects: index.html must be in the project root, src/main.tsx is the entry point.
 - Output ONLY corrected/new files using \`\`\`file:<relative-path>\n<contents>\n\`\`\` format.
@@ -921,6 +927,9 @@ async function collectConventionViolations(
   const touchedFiles = new Set<string>();
   const scaffoldSpec = await fsRead("SCAFFOLD_SPEC.md", outputDir);
   const isMTier = /scaffold specification \(tier m\)/i.test(scaffoldSpec);
+  const hasSplitMTierFrontend = !(
+    await fsRead("frontend/package.json", outputDir)
+  ).startsWith("FILE_NOT_FOUND");
 
   for (const rel of sourceFiles) {
     const content = await fsRead(rel, outputDir);
@@ -945,6 +954,7 @@ async function collectConventionViolations(
     const isViteFrontendSource =
       /\.(ts|tsx)$/.test(rel) &&
       (rel.startsWith("src/") ||
+        rel.startsWith("frontend/src/") ||
         rel.startsWith("apps/web/src/") ||
         rel.startsWith("web/src/")) &&
       !rel.includes("/test/") &&
@@ -970,7 +980,8 @@ async function collectConventionViolations(
     }
 
     const isWebUiSource =
-      rel.startsWith("apps/web/src/") && /\.(tsx|jsx)$/.test(rel);
+      (rel.startsWith("frontend/src/") || rel.startsWith("apps/web/src/")) &&
+      /\.(tsx|jsx)$/.test(rel);
     if (isWebUiSource) {
       if (/<a\b[^>]*href=["'](?:#|)["'][^>]*>/g.test(content)) {
         violations.push(
@@ -1021,41 +1032,90 @@ async function collectConventionViolations(
       }
     }
 
-    // M-tier strict routing root: ONLY apps/web/src/pages
-    if (isMTier) {
-      const isWebAppDirFile = rel.startsWith("apps/web/app/");
-      const isWebSrcAppDirFile = rel.startsWith("apps/web/src/app/");
-      if (isWebAppDirFile || isWebSrcAppDirFile) {
+    if (isMTier && hasSplitMTierFrontend) {
+      const isForbiddenAppDirFile =
+        rel.startsWith("frontend/app/") || rel.startsWith("frontend/src/app/");
+      if (isForbiddenAppDirFile) {
         violations.push(
-          `[CONVENTION] ${rel}: M-tier allows a single page root only: "apps/web/src/pages". Do not place pages/layout/routes under "apps/web/app" or "apps/web/src/app".`,
-        );
-        touchedFiles.add(rel);
-      }
-
-      if (
-        /(?:from\s+["']@\/app\/|from\s+["']\.{1,2}\/app\/|import\s+["']@\/app\/)/.test(
-          content,
-        )
-      ) {
-        violations.push(
-          `[CONVENTION] ${rel}: M-tier imports must target "src/pages" routes/components; "@\/app/*" and "./app/*" imports are forbidden.`,
+          `[CONVENTION] ${rel}: Split M-tier keeps frontend routes in "frontend/src/router.tsx" and page-level screens under "frontend/src/views" (or nearby React source), not under "frontend/app" or "frontend/src/app".`,
         );
         touchedFiles.add(rel);
       }
     }
   }
 
-  if (isMTier) {
+  if (isMTier && hasSplitMTierFrontend) {
+    const routerPath = "frontend/src/router.tsx";
+    const routerContent = await fsRead(routerPath, outputDir);
+    const routerExists =
+      !routerContent.startsWith("FILE_NOT_FOUND") &&
+      !routerContent.startsWith("REJECTED");
+
+    if (!routerExists) {
+      violations.push(
+        `[CONVENTION] ${routerPath}: Split M-tier frontend must keep a dedicated React Router registry in frontend/src/router.tsx.`,
+      );
+      touchedFiles.add(routerPath);
+    } else {
+      const hasRouterRegistry =
+        /\bBrowserRouter\b/.test(routerContent) ||
+        /\bRoutes\b/.test(routerContent) ||
+        /\bRouterProvider\b/.test(routerContent);
+      if (!hasRouterRegistry) {
+        violations.push(
+          `[CONVENTION] ${routerPath}: Route registry must define React Router wiring (BrowserRouter, Routes/Route, or RouterProvider).`,
+        );
+        touchedFiles.add(routerPath);
+      }
+    }
+
+    const viewFiles = sourceFiles.filter(
+      (f) => f.startsWith("frontend/src/views/") && /\.tsx?$/.test(f),
+    );
+    if (viewFiles.length > 0 && routerExists) {
+      const hasViewImport = /from\s+["'](?:\.\/views\/|\.{2}\/views\/)/.test(
+        routerContent,
+      );
+      if (!hasViewImport) {
+        violations.push(
+          `[CONVENTION] ${routerPath}: Views exist under frontend/src/views but the route registry does not import them. Register those screens explicitly.`,
+        );
+        touchedFiles.add(routerPath);
+      }
+    }
+
+    const homeEntryCandidates = [
+      "frontend/src/router.tsx",
+      "frontend/src/App.tsx",
+      "frontend/src/views/Home.tsx",
+      "frontend/src/views/LandingPage.tsx",
+    ];
+    let hasHomeNavigationEntry = false;
+    for (const candidate of homeEntryCandidates) {
+      const content = await fsRead(candidate, outputDir);
+      if (
+        content.startsWith("FILE_NOT_FOUND") ||
+        content.startsWith("REJECTED")
+      ) {
+        continue;
+      }
+      if (/\b(Link|NavLink|useNavigate)\b/.test(content)) {
+        hasHomeNavigationEntry = true;
+        break;
+      }
+    }
+    if (!hasHomeNavigationEntry) {
+      violations.push(
+        `[CONVENTION] ${routerPath}: Home/landing entry must provide visible route entry points (Link/NavLink or button using useNavigate) so users can navigate to primary pages.`,
+      );
+      touchedFiles.add(routerPath);
+    }
+  } else if (isMTier) {
     const appEntryPath = "apps/web/src/App.tsx";
-    const routesFilePath = "apps/web/src/routes.tsx";
     const appEntryContent = await fsRead(appEntryPath, outputDir);
-    const routesFileContent = await fsRead(routesFilePath, outputDir);
     const appExists =
       !appEntryContent.startsWith("FILE_NOT_FOUND") &&
       !appEntryContent.startsWith("REJECTED");
-    const routesFileExists =
-      !routesFileContent.startsWith("FILE_NOT_FOUND") &&
-      !routesFileContent.startsWith("REJECTED");
 
     if (!appExists) {
       violations.push(
@@ -1074,66 +1134,6 @@ async function collectConventionViolations(
         );
         touchedFiles.add(appEntryPath);
       }
-    }
-
-    const pageFiles = sourceFiles.filter(
-      (f) => f.startsWith("apps/web/src/pages/") && /\.tsx?$/.test(f),
-    );
-    if (pageFiles.length > 0) {
-      const registrySource = [
-        appExists ? appEntryContent : "",
-        routesFileExists ? routesFileContent : "",
-      ].join("\n");
-
-      const hasPagesImport =
-        /from\s+["'](?:@\/pages\/|\.\/pages\/|\.\.\/pages\/)/.test(
-          registrySource,
-        );
-      if (!hasPagesImport) {
-        violations.push(
-          `[CONVENTION] ${appEntryPath}: Pages exist under apps/web/src/pages but route registry does not import page modules. Register page routes explicitly.`,
-        );
-        touchedFiles.add(appEntryPath);
-        if (routesFileExists) touchedFiles.add(routesFilePath);
-      }
-
-      const hasNonRootRoute = /path\s*=\s*["']\/[^"']+["']/.test(
-        registrySource,
-      );
-      if (pageFiles.length > 1 && !hasNonRootRoute) {
-        violations.push(
-          `[CONVENTION] ${appEntryPath}: Multiple pages detected, but no non-root route is registered. Add at least one route entry beyond "/".`,
-        );
-        touchedFiles.add(appEntryPath);
-        if (routesFileExists) touchedFiles.add(routesFilePath);
-      }
-    }
-
-    const homeEntryCandidates = [
-      "apps/web/src/pages/Home.tsx",
-      "apps/web/src/pages/Index.tsx",
-      "apps/web/src/pages/index.tsx",
-      appEntryPath,
-    ];
-    let hasHomeNavigationEntry = false;
-    for (const candidate of homeEntryCandidates) {
-      const content = await fsRead(candidate, outputDir);
-      if (
-        content.startsWith("FILE_NOT_FOUND") ||
-        content.startsWith("REJECTED")
-      ) {
-        continue;
-      }
-      if (/\b(Link|NavLink|useNavigate)\b/.test(content)) {
-        hasHomeNavigationEntry = true;
-        break;
-      }
-    }
-    if (!hasHomeNavigationEntry) {
-      violations.push(
-        `[CONVENTION] ${appEntryPath}: Home entry must provide visible route entry points (Link/NavLink or button using useNavigate) so users can navigate to primary pages.`,
-      );
-      touchedFiles.add(appEntryPath);
     }
   }
 
@@ -1171,15 +1171,22 @@ async function refineTaskBreakdown(
     .slice(0, 50);
 
   const sharedContractsContent: string[] = [];
-  for (const f of state.fileRegistry.filter(
-    (f) =>
-      f.role === "architect" &&
-      (f.path.includes("shared") || f.path.includes("type")) &&
-      /\.(ts|tsx)$/.test(f.path),
-  ).slice(0, 5)) {
+  for (const f of state.fileRegistry
+    .filter(
+      (f) =>
+        f.role === "architect" &&
+        (f.path.includes("shared") || f.path.includes("type")) &&
+        /\.(ts|tsx)$/.test(f.path),
+    )
+    .slice(0, 5)) {
     const content = await fsRead(f.path, state.outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
-      sharedContractsContent.push(`### ${f.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      sharedContractsContent.push(
+        `### ${f.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``,
+      );
     }
   }
 
@@ -1187,9 +1194,7 @@ async function refineTaskBreakdown(
     .map(
       (t) =>
         `- [${t.id}] (${t.phase}) ${t.title}: ${t.description.slice(0, 200)}${
-          t.files
-            ? ` | files: ${JSON.stringify(t.files).slice(0, 150)}`
-            : ""
+          t.files ? ` | files: ${JSON.stringify(t.files).slice(0, 150)}` : ""
         }`,
     )
     .join("\n");
@@ -1424,9 +1429,7 @@ async function gapAnalysis(
         gaps = JSON.parse(jsonMatch[0]) as Array<Record<string, unknown>>;
       }
     } catch {
-      console.warn(
-        "[Supervisor] gapAnalysis: failed to parse LLM output.",
-      );
+      console.warn("[Supervisor] gapAnalysis: failed to parse LLM output.");
       return { supplementaryTasks: [], totalCostUsd: costUsd };
     }
 
@@ -1523,8 +1526,7 @@ function dispatchSupplementaryWorkers(state: SupervisorState): Send[] {
         workerLabel: `Supplementary ${role.charAt(0).toUpperCase() + role.slice(1)}`,
         tasks,
         outputDir: state.outputDir,
-        projectContext:
-          role === "frontend" ? feContext : state.projectContext,
+        projectContext: role === "frontend" ? feContext : state.projectContext,
         fileRegistrySnapshot: state.fileRegistry,
         apiContractsSnapshot: state.apiContracts,
         scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
@@ -2227,7 +2229,66 @@ async function runBuildGate(outputDir: string): Promise<string> {
   console.log("[Supervisor] Build gate: attempting pnpm run build...");
 
   const pkgRaw = await fsRead("package.json", outputDir);
-  if (pkgRaw.startsWith("FILE_NOT_FOUND")) return "";
+  const frontendPkgRaw = await fsRead("frontend/package.json", outputDir);
+  const backendPkgRaw = await fsRead("backend/package.json", outputDir);
+
+  if (
+    pkgRaw.startsWith("FILE_NOT_FOUND") &&
+    frontendPkgRaw.startsWith("FILE_NOT_FOUND") &&
+    backendPkgRaw.startsWith("FILE_NOT_FOUND")
+  ) {
+    return "";
+  }
+
+  if (
+    pkgRaw.startsWith("FILE_NOT_FOUND") &&
+    (!frontendPkgRaw.startsWith("FILE_NOT_FOUND") ||
+      !backendPkgRaw.startsWith("FILE_NOT_FOUND"))
+  ) {
+    const targets = [
+      !frontendPkgRaw.startsWith("FILE_NOT_FOUND")
+        ? { name: "frontend", cwd: "frontend" }
+        : null,
+      !backendPkgRaw.startsWith("FILE_NOT_FOUND")
+        ? { name: "backend", cwd: "backend" }
+        : null,
+    ].filter((v): v is { name: string; cwd: string } => Boolean(v));
+
+    const failures: string[] = [];
+    for (const target of targets) {
+      try {
+        const result = await shellExec(
+          "pnpm run build 2>&1",
+          path.join(outputDir, target.cwd),
+          {
+            timeout: 120_000,
+          },
+        );
+        const out = (result.stderr || result.stdout || "").trim();
+        if (
+          result.exitCode !== 0 &&
+          !/Missing script|ENOENT|not found/.test(out)
+        ) {
+          failures.push(
+            `### ${target.name}\n\`\`\`\n${out.split("\n").slice(-40).join("\n")}\n\`\`\``,
+          );
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/Missing script|ENOENT|not found/.test(msg)) {
+          failures.push(`### ${target.name}\n${msg.slice(0, 500)}`);
+        }
+      }
+    }
+
+    if (failures.length === 0) {
+      console.log("[Supervisor] Build gate: PASSED for split M-tier targets.");
+      return "";
+    }
+
+    console.log("[Supervisor] Build gate: FAILED for split M-tier targets.");
+    return `## Build failed\n${failures.join("\n\n")}`;
+  }
 
   let usesPnpm = false;
   try {
@@ -3305,7 +3366,11 @@ async function detectDbDependencies(
   };
 
   // Check package.json dependencies — root and monorepo api workspace
-  const pkgPaths = ["package.json", "apps/api/package.json"];
+  const pkgPaths = [
+    "package.json",
+    "backend/package.json",
+    "apps/api/package.json",
+  ];
   for (const pkgPath of pkgPaths) {
     const pkgRaw = await fsRead(pkgPath, outputDir);
     if (pkgRaw.startsWith("FILE_NOT_FOUND")) continue;
@@ -3731,7 +3796,7 @@ async function integrationVerifyAndFix(
     "",
     "## Hard rules",
     "- Do NOT switch HTTP frameworks (Express ↔ Fastify ↔ Koa) or frontend frameworks.",
-    "- For M-tier web projects, page root must be only apps/web/src/pages.",
+    "- For split M-tier projects, keep routing in frontend/src/router.tsx and backend API modules under backend/src/api/modules.",
     "- Minimal targeted changes — do not rewrite working code.",
     "- Install missing npm packages: `pnpm add <pkg> --filter <workspace-name>`",
     "- If errors include [CONVENTION], they are policy violations and MUST be fixed.",

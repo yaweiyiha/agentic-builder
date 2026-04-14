@@ -15,15 +15,29 @@ import {
   buildAddCommand,
   isAutoInstallableNpmPackageName,
 } from "./tools";
-import { estimateCost, type ChatMessage, chatCompletionWithFallback } from "@/lib/openrouter";
+import {
+  estimateCost,
+  type ChatMessage,
+  chatCompletionWithFallback,
+} from "@/lib/openrouter";
 import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
-import type { CodingAgentRole, CodingTask, TaskSubStep } from "@/lib/pipeline/types";
+import type {
+  CodingAgentRole,
+  CodingTask,
+  TaskSubStep,
+} from "@/lib/pipeline/types";
+import type {
+  OpenRouterResponse,
+  OpenRouterToolDefinition,
+} from "@/lib/llm-types";
 import { ProgressTracker } from "@/lib/ralph";
 
 const MAX_OUTPUT_TOKENS = 16384;
 const MAX_TASK_GENERATION_RETRIES = 2;
+const MAX_WORKER_TOOL_ITERATIONS = 6;
+const MAX_WORKER_TOOL_OUTPUT_CHARS = 4000;
 /** Per-task tsc fix attempts when RALPH is off (1 = single task_fix then done). */
 const MAX_FIX_ATTEMPTS = 1;
 /** Per-task tsc fix attempts cap when RALPH is on. */
@@ -37,30 +51,87 @@ const RALPH_COMPLETE_TOKEN = "<promise>TASK_COMPLETE</promise>";
 const RALPH_FAILED_RE = /<promise>TASK_FAILED:\s*([\s\S]*?)<\/promise>/;
 
 /**
- * Vite alias rules injected into every frontend (and test) prompt.
- * The scaffolds configure `@` → `./src` in both vite.config.ts and tsconfig paths.
+ * Import path rules injected into frontend/test prompts.
+ * Some scaffolds configure `@` → `./src`, while others intentionally do not.
  */
-const VITE_ALIAS_RULES = `
-## Import path rules (VITE ALIAS — MANDATORY)
-The project uses Vite with \`@\` mapped to \`./src\` (configured in vite.config.ts + tsconfig paths).
-
-ALWAYS use the \`@/\` alias for any import that crosses directory boundaries:
-  ✅  import Button from '@/components/Button'
-  ✅  import { useAuth } from '@/hooks/useAuth'
-  ✅  import { apiClient } from '@/lib/apiClient'
-  ✅  import type { User } from '@/types/user'
-  ✅  import styles from '@/assets/styles.css'
-  ✅  import HomePage from '@/pages/Home'
-
-ONLY use relative imports for files in the SAME directory:
-  ✅  import { helper } from './helper'        (same folder)
-  ❌  import { helper } from '../lib/helper'   (going up — use @/lib/helper instead)
-  ❌  import Button from '../../components/Button'  (going up — use @/components/Button)
-
-For monorepo shared packages use the workspace alias, NOT a relative path:
-  ✅  import type { User } from '@project/shared/types/user'
-  ❌  import type { User } from '../../../packages/shared/src/types/user'
+const FRONTEND_IMPORT_RULES = `
+## Frontend import path rules
+- Read the provided \`vite.config.ts\` / \`tsconfig.json\` context before writing imports.
+- If those files show \`@\` mapped to \`./src\`, use the \`@/\` alias for cross-directory imports.
+- If no alias is configured, use normal relative imports and do NOT invent \`@/\`.
+- If the project includes a shared package, import it using the package name defined in its \`package.json\` (for example \`@project/shared\`), never via deep relative paths into another package.
 `;
+
+const WORKER_READONLY_TOOLS_GUIDE = `
+## Available read-only tools
+- \`read_file(path)\`: read an existing file before editing or importing from it.
+- \`list_files(dir?)\`: inspect the current generated project tree when you need to locate files.
+- \`grep(pattern, path?)\`: search code/content across the generated project before making assumptions.
+- Use these tools whenever the task depends on existing files, exports, routes, or scaffold conventions not fully shown in context.
+`;
+
+const WORKER_READONLY_TOOLS: OpenRouterToolDefinition[] = [
+  {
+    type: "function",
+    function: {
+      name: "read_file",
+      description:
+        "Read a file by relative path from the generated project root.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Relative file path, e.g. frontend/src/router.tsx",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_files",
+      description:
+        "List files recursively under a directory relative to the generated project root.",
+      parameters: {
+        type: "object",
+        properties: {
+          dir: {
+            type: "string",
+            description:
+              "Directory relative to project root. Omit or use '.' for root.",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "grep",
+      description:
+        "Search for a pattern in project files and return matching lines with file paths.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: {
+            type: "string",
+            description: "Regex or literal text to search for.",
+          },
+          path: {
+            type: "string",
+            description:
+              "File or directory relative to project root. Defaults to '.'.",
+          },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+];
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
   architect: `You are a Senior Software Architect Agent.
@@ -69,11 +140,11 @@ Generate scaffolding/config/shared foundations for the assigned task.
 Rules:
 - Follow the scaffold and task scope; prefer extending existing files over creating duplicate structures.
 - Use valid JSON/TS syntax.
-- For shared package imports, use \`@project/shared/types/*\` and \`@project/shared/schemas/*\` (never \`@shared/*\`).
+- If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` aliases).
 - For Zod naming, use \`camelCaseSchema\` for runtime values and \`*Input\` / \`*Dto\` for inferred types.
-- When generating vite.config.ts, ALWAYS include the \`@\` alias: \`resolve: { alias: { '@': path.resolve(__dirname, './src') } }\`.
-- When generating tsconfig.json for a Vite project, ALWAYS include: \`"paths": { "@/*": ["./src/*"] }\` under compilerOptions.
-${VITE_ALIAS_RULES}
+- If you create a brand new Vite project from scratch and choose to use the \`@\` alias, wire it consistently in both \`vite.config.ts\` and \`tsconfig.json\`.
+${FRONTEND_IMPORT_RULES}
+${WORKER_READONLY_TOOLS_GUIDE}
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
 
@@ -86,7 +157,7 @@ Generate React + TypeScript + Tailwind code for the assigned task.
 
 Rules:
 - Keep routing/page structure consistent with existing project layout.
-- For shared package imports, use \`@project/shared/types/*\` and \`@project/shared/schemas/*\` (never \`@shared/*\`, never \`@repo/shared/*\`).
+- If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` or \`@repo/shared/*\`).
 - When Design Tokens are provided in context, implement them accurately in UI code.
 - Keep edits scoped to this task.
 - ALWAYS type every event handler and callback parameter explicitly:
@@ -97,7 +168,8 @@ Rules:
 - ALWAYS type every function parameter and return value; never rely on implicit \`any\`.
 - Only import from files that are listed in "Already generated files" or in this task's file hints.
   If a dependency file does not exist yet, create a minimal stub for it in this same response.
-${VITE_ALIAS_RULES}
+${FRONTEND_IMPORT_RULES}
+${WORKER_READONLY_TOOLS_GUIDE}
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
 
@@ -110,17 +182,17 @@ Generate backend code (routes/services/domain logic) for the assigned task.
 
 Rules:
 - Keep exports/imports consistent with existing modules and contracts.
-- For shared package imports, use \`@project/shared/types/*\` and \`@project/shared/schemas/*\` (never \`@shared/*\`, never \`@repo/shared/*\`).
+- If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` or \`@repo/shared/*\`).
 - Use \`camelCaseSchema\` values and \`*Input\` / \`*Dto\` inferred types.
-- Backend (Node/Express/Fastify) does NOT use Vite aliases. Use relative imports or Node path aliases if configured.
+- Backend code does NOT use Vite aliases. Use relative imports or backend-specific path aliases only if the project config explicitly defines them.
 - Keep edits scoped to this task.
 - **Prisma rule (MANDATORY)**: If the task uses \`@prisma/client\` or creates any \`prisma.*\` helper, you MUST output \`prisma/schema.prisma\` with:
   - A \`generator client\` block (\`provider = "prisma-client-js"\`).
   - A \`datasource db\` block for PostgreSQL: \`provider = "postgresql"\` and \`url = env("DATABASE_URL")\` (standard Prisma 5/6; the repo root \`.env\` is created at scaffold time).
   - All model definitions.
   Do NOT add \`prisma.config.ts\` unless the project already uses Prisma 7 with that layout.
-- Stick to the framework already in the project. If \`apps/api/package.json\` depends on **Express**, use Express. Do not introduce Fastify, Hapi, or any other HTTP framework unless the scaffold explicitly uses it.
-- Express request params/query/headers typing rules (MANDATORY):
+- Stick to the framework already in the project. Read \`package.json\`, \`app.ts\`, and route entry files in context first. If the project uses **Koa**, keep Koa. If it uses **Express**, keep Express. If it uses **Fastify**, keep Fastify. Do not switch frameworks.
+- When the project uses Express, these typing rules are mandatory:
     - \`req.params\` is \`Record<string, string>\` — access as \`req.params.id\` (string, safe).
     - \`req.headers\` values are \`string | string[] | undefined\` — always narrow:
         const auth = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization;
@@ -130,6 +202,7 @@ Rules:
 - ALWAYS type every function parameter explicitly; never use implicit \`any\`.
 - Only import types/interfaces that actually exist in the shared package context provided.
   If a shared type is missing, define a local interface instead of importing a non-existent path.
+${WORKER_READONLY_TOOLS_GUIDE}
 
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
@@ -141,7 +214,8 @@ If you cannot complete the task, end with: <promise>TASK_FAILED: <reason></promi
   test: `You are a Senior QA / Test Engineer Agent.
 Generate comprehensive test suites: unit, integration, e2e.
 Frameworks: Vitest, @testing-library/react, Playwright, k6.
-${VITE_ALIAS_RULES}
+${FRONTEND_IMPORT_RULES}
+${WORKER_READONLY_TOOLS_GUIDE}
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
 
@@ -185,7 +259,7 @@ const KNOWN_BREAKING_CHANGES: Record<
   prisma: {
     sinceVersion: "7.0.0",
     notes:
-      "v5/6 (default for generated apps): `datasource db { provider = \"postgresql\" url = env(\"DATABASE_URL\") }`. " +
+      'v5/6 (default for generated apps): `datasource db { provider = "postgresql" url = env("DATABASE_URL") }`. ' +
       "v7+: `url`/`directUrl` may be omitted from schema; connection via prisma.config.ts — follow the version in package.json. " +
       "v5+: `findUnique` throws if not found when using `findUniqueOrThrow`. `rejectOnNotFound` option removed.",
   },
@@ -203,7 +277,9 @@ const KNOWN_BREAKING_CHANGES: Record<
   },
 };
 
-export async function buildVersionConstraints(outputDir: string): Promise<string> {
+export async function buildVersionConstraints(
+  outputDir: string,
+): Promise<string> {
   const content = await fsRead("package.json", outputDir);
   if (content.startsWith("FILE_NOT_FOUND")) return "";
 
@@ -246,6 +322,188 @@ export async function buildVersionConstraints(outputDir: string): Promise<string
     "",
     ...constraints,
   ].join("\n");
+}
+
+function getResponseUsageCounts(response: OpenRouterResponse): {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+} {
+  const usage = response.usage as
+    | {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+      }
+    | undefined;
+  const promptTokens = usage?.prompt_tokens ?? usage?.promptTokens ?? 0;
+  const completionTokens =
+    usage?.completion_tokens ?? usage?.completionTokens ?? 0;
+  const totalTokens =
+    usage?.total_tokens ??
+    usage?.totalTokens ??
+    promptTokens + completionTokens;
+  return { promptTokens, completionTokens, totalTokens };
+}
+
+function buildSearchMatcher(pattern: string): (line: string) => boolean {
+  try {
+    const regex = new RegExp(pattern, "i");
+    return (line: string) => regex.test(line);
+  } catch {
+    const lowered = pattern.toLowerCase();
+    return (line: string) => line.toLowerCase().includes(lowered);
+  }
+}
+
+async function executeWorkerReadonlyTool(
+  name: string,
+  args: Record<string, unknown>,
+  outputDir: string,
+): Promise<string> {
+  switch (name) {
+    case "read_file": {
+      const filePath = String(args.path ?? "").trim();
+      if (!filePath) return "Error: path is required";
+      const content = await fsRead(filePath, outputDir);
+      return content.slice(0, MAX_WORKER_TOOL_OUTPUT_CHARS);
+    }
+    case "list_files": {
+      const dir = String(args.dir ?? ".").trim() || ".";
+      const files = await listFiles(dir, outputDir);
+      return (files.join("\n") || "(no files found)").slice(
+        0,
+        MAX_WORKER_TOOL_OUTPUT_CHARS,
+      );
+    }
+    case "grep": {
+      const pattern = String(args.pattern ?? "").trim();
+      const searchPath = String(args.path ?? ".").trim() || ".";
+      if (!pattern) return "Error: pattern is required";
+
+      const matcher = buildSearchMatcher(pattern);
+      const filePaths: string[] = [];
+      const directFileContent = await fsRead(searchPath, outputDir);
+      if (
+        !directFileContent.startsWith("FILE_NOT_FOUND") &&
+        !directFileContent.startsWith("REJECTED")
+      ) {
+        filePaths.push(searchPath);
+      } else {
+        filePaths.push(...(await listFiles(searchPath, outputDir)));
+      }
+
+      const matches: string[] = [];
+      for (const relPath of filePaths) {
+        if (!/\.(ts|tsx|js|jsx|json|css|md)$/.test(relPath)) continue;
+        const content = await fsRead(relPath, outputDir);
+        if (
+          content.startsWith("FILE_NOT_FOUND") ||
+          content.startsWith("REJECTED")
+        ) {
+          continue;
+        }
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          if (!matcher(lines[i])) continue;
+          matches.push(`${relPath}:${i + 1}:${lines[i]}`);
+          if (matches.length >= 60) break;
+        }
+        if (matches.length >= 60) break;
+      }
+
+      return (matches.join("\n") || "No matches found.").slice(
+        0,
+        MAX_WORKER_TOOL_OUTPUT_CHARS,
+      );
+    }
+    default:
+      return `Error: unknown tool '${name}'`;
+  }
+}
+
+async function runCodegenWorkerLoop(
+  messages: ChatMessage[],
+  outputDir: string,
+): Promise<{
+  content: string;
+  rawContent: string;
+  model: string;
+  costUsd: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}> {
+  let totalCostUsd = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let totalTokens = 0;
+
+  for (let i = 0; i < MAX_WORKER_TOOL_ITERATIONS; i++) {
+    const response = await invokeCodegenOrOpenRouter(messages, {
+      temperature: 0.3,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      openRouterVariant: "codeGen",
+      tools: WORKER_READONLY_TOOLS,
+      tool_choice: "auto",
+    });
+    const choice = response.choices[0];
+    const content = choice?.message?.content ?? "";
+    const toolCalls = choice?.message?.tool_calls ?? [];
+    const usage = getResponseUsageCounts(response);
+    totalCostUsd += estimateCost(response.model, response.usage);
+    promptTokens += usage.promptTokens;
+    completionTokens += usage.completionTokens;
+    totalTokens += usage.totalTokens;
+
+    messages.push({
+      role: "assistant",
+      content,
+      tool_calls: toolCalls,
+    });
+
+    if (toolCalls.length === 0) {
+      return {
+        content,
+        rawContent: content,
+        model: response.model,
+        costUsd: totalCostUsd,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+      };
+    }
+
+    for (const toolCall of toolCalls) {
+      let args: Record<string, unknown>;
+      try {
+        args = JSON.parse(toolCall.function.arguments || "{}") as Record<
+          string,
+          unknown
+        >;
+      } catch {
+        args = {};
+      }
+      const result = await executeWorkerReadonlyTool(
+        toolCall.function.name,
+        args,
+        outputDir,
+      );
+      messages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        name: toolCall.function.name,
+        content: result,
+      });
+    }
+  }
+
+  throw new Error(
+    `Worker tool loop exceeded ${MAX_WORKER_TOOL_ITERATIONS} iterations without final code output.`,
+  );
 }
 
 function parseFileOutput(raw: string): Record<string, string> {
@@ -347,18 +605,27 @@ function formatTaskFileHints(taskFiles: unknown): string {
   if (typeof taskFiles !== "object") return "";
   const record = taskFiles as Record<string, unknown>;
   const creates = Array.isArray(record.creates)
-    ? (record.creates as unknown[]).filter((f): f is string => typeof f === "string")
+    ? (record.creates as unknown[]).filter(
+        (f): f is string => typeof f === "string",
+      )
     : [];
   const modifies = Array.isArray(record.modifies)
-    ? (record.modifies as unknown[]).filter((f): f is string => typeof f === "string")
+    ? (record.modifies as unknown[]).filter(
+        (f): f is string => typeof f === "string",
+      )
     : [];
   const reads = Array.isArray(record.reads)
-    ? (record.reads as unknown[]).filter((f): f is string => typeof f === "string")
+    ? (record.reads as unknown[]).filter(
+        (f): f is string => typeof f === "string",
+      )
     : [];
   const lines: string[] = [];
-  if (creates.length > 0) lines.push(`Creates:\n${creates.map((f) => `- ${f}`).join("\n")}`);
-  if (modifies.length > 0) lines.push(`Modifies:\n${modifies.map((f) => `- ${f}`).join("\n")}`);
-  if (reads.length > 0) lines.push(`Reads:\n${reads.map((f) => `- ${f}`).join("\n")}`);
+  if (creates.length > 0)
+    lines.push(`Creates:\n${creates.map((f) => `- ${f}`).join("\n")}`);
+  if (modifies.length > 0)
+    lines.push(`Modifies:\n${modifies.map((f) => `- ${f}`).join("\n")}`);
+  if (reads.length > 0)
+    lines.push(`Reads:\n${reads.map((f) => `- ${f}`).join("\n")}`);
   return lines.length > 0 ? `\nTask file plan:\n${lines.join("\n")}` : "";
 }
 
@@ -386,15 +653,31 @@ async function buildRelevantFileContext(
     if (f.role === state.role) candidates.add(f.path.replace(/\\/g, "/"));
   }
 
-  // 3) Dynamically discover all files under packages/shared/src/ so agents
-  //    always see the exact type shapes and don't hallucinate missing exports.
+  // 3) Dynamically discover shared/frontend/backend source files so agents
+  //    see the current scaffold layout and don't hallucinate old paths.
   try {
     const sharedFiles = await listFiles("packages/shared/src", state.outputDir);
     for (const f of sharedFiles) {
       if (/\.(ts|tsx)$/.test(f)) candidates.add(f.replace(/\\/g, "/"));
     }
   } catch {
-    // listFiles may throw if the directory doesn't exist (S-tier / frontend-only)
+    // listFiles may throw if the directory doesn't exist
+  }
+  try {
+    const frontendFiles = await listFiles("frontend/src", state.outputDir);
+    for (const f of frontendFiles) {
+      if (/\.(ts|tsx|css)$/.test(f)) candidates.add(f.replace(/\\/g, "/"));
+    }
+  } catch {
+    // non-M-tier layouts may not have frontend/
+  }
+  try {
+    const backendFiles = await listFiles("backend/src", state.outputDir);
+    for (const f of backendFiles) {
+      if (/\.(ts|tsx)$/.test(f)) candidates.add(f.replace(/\\/g, "/"));
+    }
+  } catch {
+    // non-M-tier layouts may not have backend/
   }
   // Also add flat-layout shared files (non-src/) and key app files.
   [
@@ -405,6 +688,16 @@ async function buildRelevantFileContext(
     "packages/shared/types/tasks.ts",
     "packages/shared/types/users.ts",
     "packages/shared/src/index.ts",
+    "frontend/package.json",
+    "frontend/vite.config.ts",
+    "frontend/tsconfig.json",
+    "frontend/src/main.tsx",
+    "frontend/src/router.tsx",
+    "frontend/src/api/client.ts",
+    "backend/package.json",
+    "backend/src/app.ts",
+    "backend/src/server.ts",
+    "backend/src/api/modules/index.ts",
     "apps/web/src/lib/apiClient.ts",
     "apps/web/lib/api/auth.client.ts",
     "apps/api/src/routes/auth.ts",
@@ -416,15 +709,26 @@ async function buildRelevantFileContext(
   // RALPH Phase 4: prepend session context summary when context rotation is active
   const contextPreamble: string[] = [];
   if (state.ralphConfig.enabled && state.contextRotationNeeded) {
-    const sessionCtx = await fsRead(".ralph/session-context.md", state.outputDir);
-    if (!sessionCtx.startsWith("FILE_NOT_FOUND") && !sessionCtx.startsWith("REJECTED")) {
-      contextPreamble.push(`## Prior session context (context rotation active)\n${sessionCtx.slice(0, 2000)}`);
+    const sessionCtx = await fsRead(
+      ".ralph/session-context.md",
+      state.outputDir,
+    );
+    if (
+      !sessionCtx.startsWith("FILE_NOT_FOUND") &&
+      !sessionCtx.startsWith("REJECTED")
+    ) {
+      contextPreamble.push(
+        `## Prior session context (context rotation active)\n${sessionCtx.slice(0, 2000)}`,
+      );
     }
   }
 
   // Build export map from key files so agents know exactly what is available
   const exportMapFiles = [
     "packages/shared/src/index.ts",
+    "frontend/src/api/client.ts",
+    "frontend/src/router.tsx",
+    "frontend/src/main.tsx",
     "apps/web/src/lib/api.ts",
     "apps/web/src/lib/apiClient.ts",
     "apps/web/src/lib/auth.ts",
@@ -434,7 +738,11 @@ async function buildRelevantFileContext(
   const exportMapLines: string[] = [];
   for (const emf of exportMapFiles) {
     const emContent = await fsRead(emf, state.outputDir);
-    if (emContent.startsWith("FILE_NOT_FOUND") || emContent.startsWith("REJECTED")) continue;
+    if (
+      emContent.startsWith("FILE_NOT_FOUND") ||
+      emContent.startsWith("REJECTED")
+    )
+      continue;
     const exports = extractExportNames(emContent);
     if (exports.length > 0) {
       exportMapLines.push(`- \`${emf}\`: ${exports.join(", ")}`);
@@ -453,7 +761,10 @@ async function buildRelevantFileContext(
   const chunks: string[] = [];
   for (const rel of selected) {
     const content = await fsRead(rel, state.outputDir);
-    if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED")) {
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
       continue;
     }
     const block =
@@ -484,8 +795,7 @@ function parsePlanBlock(content: string): TaskSubStep[] {
     const colonIdx = cleanLine.indexOf(":");
     const action =
       colonIdx > 0 ? cleanLine.slice(0, colonIdx).trim() : cleanLine;
-    const detail =
-      colonIdx > 0 ? cleanLine.slice(colonIdx + 1).trim() : "";
+    const detail = colonIdx > 0 ? cleanLine.slice(colonIdx + 1).trim() : "";
     return { step: idx + 1, action, detail };
   });
 }
@@ -518,7 +828,9 @@ function pickNextTask(state: WorkerState) {
   const total = state.tasks.length;
   const currentTask = idx < total ? state.tasks[idx] : null;
   if (currentTask) {
-    console.log(`[Worker:${state.workerLabel}] Picking task ${idx + 1}/${total}: ${currentTask.title}`);
+    console.log(
+      `[Worker:${state.workerLabel}] Picking task ${idx + 1}/${total}: ${currentTask.title}`,
+    );
   } else {
     console.log(`[Worker:${state.workerLabel}] All ${total} tasks done.`);
   }
@@ -563,7 +875,9 @@ function routeAfterGenerate(state: WorkerState): string {
 
   // In Ralph mode: require the completion promise before accepting the output.
   if (state.ralphConfig.enabled) {
-    const promise = extractCompletionPromise(state.currentTaskLastRawContent ?? "");
+    const promise = extractCompletionPromise(
+      state.currentTaskLastRawContent ?? "",
+    );
     if (promise.failed) {
       // LLM explicitly signalled failure — escalate immediately.
       return "task_failed";
@@ -658,41 +972,26 @@ async function generateCode(state: WorkerState) {
         content: `## Project Context\n${contextParts.join("\n\n")}`,
       });
     }
-    const subStepsHint = task.subSteps && task.subSteps.length > 0
-      ? `\n\nPre-defined sub-steps:\n${task.subSteps.map((s) => `${s.step}. ${s.action}: ${s.detail}`).join("\n")}`
-      : "";
+    const subStepsHint =
+      task.subSteps && task.subSteps.length > 0
+        ? `\n\nPre-defined sub-steps:\n${task.subSteps.map((s) => `${s.step}. ${s.action}: ${s.detail}`).join("\n")}`
+        : "";
 
     messages.push({
       role: "user",
-      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate the complete code for this task.\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
+      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate the complete code for this task.\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
     });
 
     const startMs = Date.now();
-    const response = await invokeCodegenOrOpenRouter(messages, {
-      temperature: 0.3,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      openRouterVariant: "codeGen",
-    });
+    const response = await runCodegenWorkerLoop(messages, state.outputDir);
     const durationMs = Date.now() - startMs;
 
-    const content = response.choices[0]?.message?.content ?? "";
-    const costUsd = estimateCost(response.model, response.usage);
-    const usage = response.usage as
-      | {
-          prompt_tokens?: number;
-          completion_tokens?: number;
-          total_tokens?: number;
-          promptTokens?: number;
-          completionTokens?: number;
-          totalTokens?: number;
-        }
-      | undefined;
-    const promptTokens = usage?.prompt_tokens ?? usage?.promptTokens ?? 0;
-    const completionTokens =
-      usage?.completion_tokens ?? usage?.completionTokens ?? 0;
-    const totalTokens =
-      usage?.total_tokens ?? usage?.totalTokens ?? promptTokens + completionTokens;
+    const content = response.content;
     const parsedFiles = parseFileOutput(content);
+    const costUsd = response.costUsd;
+    const promptTokens = response.promptTokens;
+    const completionTokens = response.completionTokens;
+    const totalTokens = response.totalTokens;
 
     const fsOpts =
       state.scaffoldProtectedPaths.length > 0
@@ -868,7 +1167,8 @@ export function extractMissingPackages(tscOutput: string): string[] {
       : mod.split("/")[0];
     pkgs.add(pkg);
   }
-  const declRe = /Could not find a declaration file for module ['"]([^'"]+)['"]/g;
+  const declRe =
+    /Could not find a declaration file for module ['"]([^'"]+)['"]/g;
   while ((m = declRe.exec(tscOutput)) !== null) {
     const mod = m[1];
     if (mod.startsWith(".") || mod.startsWith("/")) continue;
@@ -909,8 +1209,9 @@ export async function installMissingDeps(
         }
       : undefined;
 
-  const needsJestDom =
-    /toBeInTheDocument|toHaveTextContent|toBeVisible/.test(tscOutput);
+  const needsJestDom = /toBeInTheDocument|toHaveTextContent|toBeVisible/.test(
+    tscOutput,
+  );
 
   if (needsJestDom) {
     pkgs.push("@testing-library/jest-dom");
@@ -948,11 +1249,7 @@ export async function installMissingDeps(
     `[Verify] Installing ${unique.length} missing package(s): ${unique.join(", ")}`,
   );
   const pm = await detectPackageManager(outputDir);
-  await shellExec(
-    buildAddCommand(pm, unique),
-    outputDir,
-    { timeout: 60_000 },
-  );
+  await shellExec(buildAddCommand(pm, unique), outputDir, { timeout: 60_000 });
 }
 
 export async function findBestTsconfigForFiles(
@@ -974,11 +1271,7 @@ export async function findBestTsconfigForFiles(
           .split("/")
           .slice(0, -1)
           .reduce((prefix, part, i) => {
-            if (
-              taskFiles.every(
-                (f) => f.split("/")[i] === part,
-              )
-            ) {
+            if (taskFiles.every((f) => f.split("/")[i] === part)) {
               return prefix ? `${prefix}/${part}` : part;
             }
             return prefix;
@@ -988,7 +1281,10 @@ export async function findBestTsconfigForFiles(
   for (let i = parts.length; i >= 1; i--) {
     const candidate = parts.slice(0, i).join("/") + "/tsconfig.json";
     const content = await fsRead(candidate, outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
       return candidate;
     }
   }
@@ -1006,7 +1302,9 @@ async function verifyCode(state: WorkerState) {
   const taskFiles =
     state.currentTaskGeneratedFiles.length > 0
       ? state.currentTaskGeneratedFiles
-      : state.generatedFiles.filter((f) => f.role === state.role).map((f) => f.path);
+      : state.generatedFiles
+          .filter((f) => f.role === state.role)
+          .map((f) => f.path);
 
   if (taskFiles.length === 0) {
     console.log(
@@ -1064,7 +1362,10 @@ function routeAfterVerify(state: WorkerState): string {
   if (!state.verifyErrors) return "task_done";
   if (!isWorkerTscVerifyError(state.verifyErrors)) return "task_done";
   const maxFix = state.ralphConfig.enabled
-    ? Math.min(state.ralphConfig.maxIterationsPerTask, MAX_PER_TASK_FIX_ATTEMPTS)
+    ? Math.min(
+        state.ralphConfig.maxIterationsPerTask,
+        MAX_PER_TASK_FIX_ATTEMPTS,
+      )
     : MAX_FIX_ATTEMPTS;
   if (state.fixAttempts >= maxFix) {
     console.log(
@@ -1126,8 +1427,13 @@ async function taskFix(state: WorkerState) {
   for (const filePath of taskFiles.slice(0, 8)) {
     alreadyRead.add(filePath);
     const content = await fsRead(filePath, state.outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
-      fileContents.push(`### ${filePath}\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      fileContents.push(
+        `### ${filePath}\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``,
+      );
     }
   }
 
@@ -1142,7 +1448,10 @@ async function taskFix(state: WorkerState) {
     if (alreadyRead.has(ef)) continue;
     alreadyRead.add(ef);
     const content = await fsRead(ef, state.outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
       fileContents.push(
         `### ${ef} (referenced in errors — read-only context)\n\`\`\`\n${content.slice(0, 1500)}\n\`\`\``,
       );
@@ -1158,14 +1467,20 @@ async function taskFix(state: WorkerState) {
     if (alreadyRead.has(cf)) continue;
     alreadyRead.add(cf);
     const content = await fsRead(cf, state.outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
       fileContents.push(`### ${cf}\n\`\`\`\n${content.slice(0, 1500)}\n\`\`\``);
     }
   }
 
   const versionConstraints = await buildVersionConstraints(state.outputDir);
 
-  const codeFixChain = resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
+  const codeFixChain = resolveModelChain(
+    MODEL_CONFIG.codeFix ?? "gpt-4o",
+    resolveModel,
+  );
   console.log(
     `[Worker:${state.workerLabel}] codeFix: model chain (fallback order): ${codeFixChain.join(" -> ")}`,
   );
@@ -1261,14 +1576,19 @@ async function taskFix(state: WorkerState) {
 
 async function taskDone(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
-  console.log(`[Worker:${state.workerLabel}] Task done: "${task.title}" (${state.currentTaskIndex + 1}/${state.tasks.length})`);
+  console.log(
+    `[Worker:${state.workerLabel}] Task done: "${task.title}" (${state.currentTaskIndex + 1}/${state.tasks.length})`,
+  );
   const filesForTask = state.currentTaskGeneratedFiles;
 
   // ── RALPH Phase 4: context rotation — write session-context.md when threshold hit ──
   if (state.ralphConfig.enabled && state.contextRotationNeeded) {
     const tracker = new ProgressTracker(state.outputDir);
     const completedTasks = state.taskResults;
-    const recentFiles = state.generatedFiles.slice(-20).map((f) => `- ${f.path} (${f.role}): ${f.summary}`).join("\n");
+    const recentFiles = state.generatedFiles
+      .slice(-20)
+      .map((f) => `- ${f.path} (${f.role}): ${f.summary}`)
+      .join("\n");
     const contextSummary = [
       `# Session Context (auto-generated for context rotation)`,
       `> Worker: ${state.workerLabel} | Role: ${state.role}`,
@@ -1276,7 +1596,10 @@ async function taskDone(state: WorkerState) {
       ``,
       `## Tasks completed so far (${completedTasks.length})`,
       completedTasks
-        .map((r) => `- ${r.taskId}: ${r.status} (${r.generatedFiles.length} files)`)
+        .map(
+          (r) =>
+            `- ${r.taskId}: ${r.status} (${r.generatedFiles.length} files)`,
+        )
         .join("\n"),
       ``,
       `## Recently generated files (last 20)`,
@@ -1284,9 +1607,13 @@ async function taskDone(state: WorkerState) {
     ].join("\n");
     try {
       await tracker.writeSessionContext(contextSummary);
-      console.log(`[Worker:${state.workerLabel}] RALPH: context rotation triggered — session-context.md written.`);
+      console.log(
+        `[Worker:${state.workerLabel}] RALPH: context rotation triggered — session-context.md written.`,
+      );
     } catch (e) {
-      console.warn(`[Worker:${state.workerLabel}] RALPH: failed to write session context: ${e}`);
+      console.warn(
+        `[Worker:${state.workerLabel}] RALPH: failed to write session context: ${e}`,
+      );
     }
   }
 
@@ -1301,7 +1628,9 @@ async function taskDone(state: WorkerState) {
         // Stage all generated files for this task
         if (filesForTask.length > 0) {
           const filePaths = filesForTask.map((f) => `"${f}"`).join(" ");
-          await shellExec(`git add ${filePaths}`, state.outputDir, { timeout: 15_000 });
+          await shellExec(`git add ${filePaths}`, state.outputDir, {
+            timeout: 15_000,
+          });
         }
         const msg = `feat(agent): complete ${task.id}: ${task.title.slice(0, 72)}`;
         const commitOut = await shellExec(
@@ -1309,18 +1638,26 @@ async function taskDone(state: WorkerState) {
           state.outputDir,
           { timeout: 20_000 },
         );
-        const commitOutText = (commitOut.stdout || commitOut.stderr || "").trim();
+        const commitOutText = (
+          commitOut.stdout ||
+          commitOut.stderr ||
+          ""
+        ).trim();
         const hashMatch = /\[[\w/]+ ([a-f0-9]{7,})\]/.exec(commitOutText);
         commitHash = hashMatch?.[1];
         if (commitHash) {
-          console.log(`[Worker:${state.workerLabel}] RALPH: committed ${task.id} → ${commitHash}`);
+          console.log(
+            `[Worker:${state.workerLabel}] RALPH: committed ${task.id} → ${commitHash}`,
+          );
         }
       }
       await tracker.markComplete(task.id, filesForTask, commitHash);
       await tracker.addCost(state.currentTaskCostUsd);
     } catch (e) {
       // Progress tracking / git errors must never abort the pipeline
-      console.warn(`[Worker:${state.workerLabel}] RALPH progress write failed: ${e}`);
+      console.warn(
+        `[Worker:${state.workerLabel}] RALPH progress write failed: ${e}`,
+      );
     }
   }
 
@@ -1351,7 +1688,11 @@ async function taskDone(state: WorkerState) {
     currentTaskGeneratedFiles: [],
     currentTaskCostUsd: 0,
     currentTaskDurationMs: 0,
-    currentTaskTokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    currentTaskTokenUsage: {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    },
     currentTaskRetryCount: 0,
     currentTaskLastError: "",
     currentTaskLastRawContent: "",
@@ -1373,9 +1714,15 @@ async function taskFailed(state: WorkerState) {
     const tracker = new ProgressTracker(state.outputDir);
     try {
       await tracker.markFailed(task.id, failureMsg);
-      await tracker.recordError(task.id, state.currentTaskRetryCount, failureMsg);
+      await tracker.recordError(
+        task.id,
+        state.currentTaskRetryCount,
+        failureMsg,
+      );
     } catch (e) {
-      console.warn(`[Worker:${state.workerLabel}] RALPH progress write failed: ${e}`);
+      console.warn(
+        `[Worker:${state.workerLabel}] RALPH progress write failed: ${e}`,
+      );
     }
   }
 
@@ -1400,7 +1747,11 @@ async function taskFailed(state: WorkerState) {
     currentTaskGeneratedFiles: [],
     currentTaskCostUsd: 0,
     currentTaskDurationMs: 0,
-    currentTaskTokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    currentTaskTokenUsage: {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    },
     currentTaskRetryCount: 0,
     currentTaskLastError: "",
     currentTaskLastRawContent: "",
@@ -1470,7 +1821,10 @@ export async function inferRelatedConfigFiles(
   const found: string[] = [];
   for (const candidate of candidates) {
     const content = await fsRead(candidate, outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
       found.push(candidate);
     }
   }
