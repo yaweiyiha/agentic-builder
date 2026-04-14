@@ -24,10 +24,10 @@ import { ProgressTracker } from "@/lib/ralph";
 
 const MAX_OUTPUT_TOKENS = 16384;
 const MAX_TASK_GENERATION_RETRIES = 2;
-/** Per-task tsc fix attempts when RALPH is off. */
+/** Per-task tsc fix attempts when RALPH is off (1 = single task_fix then done). */
 const MAX_FIX_ATTEMPTS = 1;
 /** Per-task tsc fix attempts cap when RALPH is on. */
-const MAX_PER_TASK_FIX_ATTEMPTS = 3;
+const MAX_PER_TASK_FIX_ATTEMPTS = 1;
 
 /** Approximate maximum context window for context-rotation threshold calculations. */
 const MAX_CONTEXT_TOKENS = 200_000;

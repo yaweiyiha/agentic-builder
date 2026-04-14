@@ -14,7 +14,7 @@ export interface RalphConfig {
 }
 
 export const DEFAULT_RALPH_CONFIG: RalphConfig = {
-  enabled: true,
+  enabled: false,
   maxIterationsPerTask: 20,
   maxIterationsPerPhase: 50,
   enableGitCommits: true,

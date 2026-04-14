@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   useCodingStore,
@@ -21,7 +21,8 @@ import type {
   CodingTask,
 } from "@/lib/pipeline/types";
 
-const ROLE_ORDER: CodingAgentRole[] = ["architect", "backend", "frontend", "test"];
+/** Roles shown in task topology and agent progress (test hidden per product choice). */
+const TASK_UI_ROLE_ORDER: CodingAgentRole[] = ["architect", "backend", "frontend"];
 
 const ROLE_META: Record<
   CodingAgentRole,
@@ -171,12 +172,17 @@ export default function CodingAgentGraph() {
     [agents],
   );
 
+  const visibleTasks = useMemo(
+    () => tasks.filter((t) => resolveTaskRole(t, agentById) !== "test"),
+    [tasks, agentById],
+  );
+
   const groups = useMemo<AgentGroup[]>(() => {
-    return ROLE_ORDER.map((role) => {
+    return TASK_UI_ROLE_ORDER.map((role) => {
       const roleAgents = agents.filter((agent) => agent.role === role);
       if (roleAgents.length === 0) return null;
 
-      const roleTasks = tasks.filter((task) => resolveTaskRole(task, agentById) === role);
+      const roleTasks = visibleTasks.filter((task) => resolveTaskRole(task, agentById) === role);
       const doneCount = roleTasks.filter((task) => isCompletedTask(task)).length;
       const failedCount = roleTasks.filter((task) => task.codingStatus === "failed").length;
       const hasWorking = roleAgents.some((agent) => agent.status === "working");
@@ -200,7 +206,20 @@ export default function CodingAgentGraph() {
               : "idle",
       } satisfies AgentGroup;
     }).filter((group): group is AgentGroup => group !== null);
-  }, [agentById, agents, tasks]);
+  }, [agentById, agents, visibleTasks]);
+
+  useEffect(() => {
+    if (
+      topologySelectedTaskId &&
+      !visibleTasks.some((t) => t.id === topologySelectedTaskId)
+    ) {
+      setTopologySelectedTaskId(null);
+    }
+  }, [topologySelectedTaskId, visibleTasks]);
+
+  useEffect(() => {
+    if (selectedRole === "test") setSelectedRole(null);
+  }, [selectedRole]);
 
   const visibleLogs = useMemo<CodingLogDisplayEntry[]>(() => {
     if (selectedAgent) {
@@ -252,17 +271,17 @@ export default function CodingAgentGraph() {
     }
   };
 
-  const completedTasks = tasks.filter((task) => isCompletedTask(task)).length;
-  const failedTasks = tasks.filter((task) => task.codingStatus === "failed").length;
-  const verifyingTasks = tasks.filter(
+  const completedTasks = visibleTasks.filter((task) => isCompletedTask(task)).length;
+  const failedTasks = visibleTasks.filter((task) => task.codingStatus === "failed").length;
+  const verifyingTasks = visibleTasks.filter(
     (task) =>
       task.codingStatus === "in_progress" && task.progressStage === "verifying",
   ).length;
-  const fixingTasks = tasks.filter(
+  const fixingTasks = visibleTasks.filter(
     (task) =>
       task.codingStatus === "in_progress" && task.progressStage === "fixing",
   ).length;
-  const totalTasks = tasks.length;
+  const totalTasks = visibleTasks.length;
 
   if (status === "idle") {
     return (
@@ -339,7 +358,7 @@ export default function CodingAgentGraph() {
         {/* Topology graph */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <CodingTaskTopologyView
-            tasks={tasks}
+            tasks={visibleTasks}
             agents={agents}
             agentById={agentById}
             selectedTaskId={topologySelectedTaskId}
