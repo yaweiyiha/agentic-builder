@@ -1,0 +1,39 @@
+# dependencies
+/node_modules
+# scaffold templates must stay source-only; local installs break copyScaffold
+scaffolds/**/node_modules
+generated-code
+generated-code/node_modules/
+generated-code/dist/
+generated-code/public/design/*.png
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# next.js
+/.next/
+/out/
+
+# electron
+/dist/
+
+# env files
+.env
+.env.local
+.env*.local
+
+# testing
+/coverage
+
+# pipeline snapshot (debug-only, may contain large doc content)
+.blueprint/pipeline-snapshot.json
+
+# misc
+*.pem
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts

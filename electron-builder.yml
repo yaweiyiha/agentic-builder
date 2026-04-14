@@ -1,0 +1,21 @@
+appId: com.agentic-builder.app
+productName: Agentic Builder
+directories:
+  output: dist
+files:
+  - electron/**/*
+  - out/**/*
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+    - zip
+linux:
+  target:
+    - AppImage
+    - deb
