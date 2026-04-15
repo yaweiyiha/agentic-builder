@@ -41,6 +41,18 @@ export interface OpenRouterImageConfig {
   image_size?: string;
 }
 
+export interface OpenRouterReasoningOptions {
+  enabled?: boolean;
+  effort?: "low" | "medium" | "high";
+  exclude?: boolean;
+  max_tokens?: number;
+}
+
+export interface OpenRouterThinkingOptions {
+  thinking_effort?: "low" | "medium" | "high";
+  verbosity?: "low" | "medium" | "high";
+}
+
 export interface OpenRouterOptions {
   model?: string;
   temperature?: number;
@@ -59,6 +71,10 @@ export interface OpenRouterOptions {
   response_format?:
     | { type: "json_object" }
     | { type: "json_schema"; json_schema: Record<string, unknown> };
+  /** Provider-specific reasoning config (e.g. OpenRouter reasoning-enabled models). */
+  reasoning?: OpenRouterReasoningOptions;
+  /** Provider-specific thinking config (e.g. GPT-5 gateway). */
+  thinking?: OpenRouterThinkingOptions | false;
 }
 
 export interface OpenRouterUsage {

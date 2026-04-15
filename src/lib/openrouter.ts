@@ -108,6 +108,7 @@ export async function chatCompletion(
       temperature: options.temperature,
       max_tokens: options.max_tokens,
       response_format: options.response_format,
+      thinking: options.thinking,
     });
   }
   console.log(`[LLM] provider=openrouter  model=${requestedModel}`);
@@ -202,6 +203,7 @@ export async function openRouterChatCompletion(
     modalities,
     image_config,
     response_format,
+    reasoning,
   } = options;
 
   const response = await fetch(OPENROUTER_API_URL, {
@@ -218,6 +220,7 @@ export async function openRouterChatCompletion(
       ...(modalities?.length ? { modalities } : {}),
       ...(image_config ? { image_config } : {}),
       ...(response_format ? { response_format } : {}),
+      ...(reasoning && reasoning.enabled !== false ? { reasoning } : {}),
     }),
   });
 

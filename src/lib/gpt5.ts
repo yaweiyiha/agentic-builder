@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import type {
   ChatMessage,
+  OpenRouterThinkingOptions,
   OpenRouterResponse,
   OpenRouterToolDefinition,
 } from "@/lib/llm-types";
@@ -46,9 +47,17 @@ function buildBody(
       | "required"
       | { type: "function"; function: { name: string } };
     response_format?: { type: string; json_schema?: Record<string, unknown> };
+    thinking?: OpenRouterThinkingOptions | false;
   },
   sessionId: string,
 ) {
+  const thinking =
+    opts.thinking === false
+      ? undefined
+      : {
+          thinking_effort: opts.thinking?.thinking_effort ?? "medium",
+          verbosity: opts.thinking?.verbosity ?? "medium",
+        };
   return {
     model: GPT5_MODEL_ID,
     messages,
@@ -57,10 +66,7 @@ function buildBody(
     stream: opts.stream ?? false,
     prompt_cache_key: sessionId,
     user: sessionId,
-    thinking: {
-      thinking_effort: "medium",
-      verbosity: "medium",
-    },
+    ...(thinking ? { thinking } : {}),
     ...(opts.tools?.length ? { tools: opts.tools } : {}),
     ...(opts.tool_choice ? { tool_choice: opts.tool_choice } : {}),
     ...(opts.response_format ? { response_format: opts.response_format } : {}),
@@ -133,6 +139,7 @@ export async function gpt5ChatCompletion(
       | "required"
       | { type: "function"; function: { name: string } };
     response_format?: { type: string; json_schema?: Record<string, unknown> };
+    thinking?: OpenRouterThinkingOptions | false;
   } = {},
 ): Promise<OpenRouterResponse> {
   const apiKey = getApiKey();

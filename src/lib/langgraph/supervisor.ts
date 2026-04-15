@@ -44,6 +44,7 @@ import {
   resolveModel,
   estimateCost,
   type ChatMessage,
+  type OpenRouterOptions,
   type OpenRouterToolDefinition,
 } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
@@ -2377,7 +2378,8 @@ const SUPERVISOR_VERIFY_TOOLS: OpenRouterToolDefinition[] = [
       description:
         "Run a shell command with cwd = project root. " +
         "Use for: pnpm/npm install, pnpm add <pkg> --filter <workspace>, " +
-        "npx tsc --noEmit, npx prisma generate, etc.",
+        "npx tsc --noEmit, npx prisma generate, etc. " +
+        "For integration validation, scope commands explicitly to frontend/ or backend/.",
       parameters: {
         type: "object",
         properties: {
@@ -2494,6 +2496,97 @@ function buildSupervisorSearchMatcher(
     const lowered = pattern.toLowerCase();
     return (line: string) => line.toLowerCase().includes(lowered);
   }
+}
+
+type ScopedValidationKind = "frontend_tsc" | "frontend_build" | "backend_tsc";
+
+function isSuccessfulSupervisorToolResult(result: string): boolean {
+  return /^exit_code:\s*0\b/m.test(result);
+}
+
+function isMutatingSupervisorBashCommand(command: string): boolean {
+  const normalized = command.replace(/\s+/g, " ").trim().toLowerCase();
+  return (
+    /\b(pnpm|npm|yarn)\s+(install|add|remove|unlink|update)\b/.test(
+      normalized,
+    ) ||
+    /\b(npx\s+)?prisma\s+generate\b/.test(normalized) ||
+    /\bmkdir\b|\btouch\b|\bcp\b|\bmv\b|\bsed\s+-i\b|\bperl\s+-pi\b/.test(
+      normalized,
+    )
+  );
+}
+
+function detectScopedValidationKind(
+  command: string,
+): ScopedValidationKind | null {
+  const normalized = command.replace(/\s+/g, " ").trim().toLowerCase();
+  const touchesFrontend =
+    normalized.includes("cd frontend") ||
+    normalized.includes("/frontend") ||
+    normalized.includes(" frontend/");
+  const touchesBackend =
+    normalized.includes("cd backend") ||
+    normalized.includes("/backend") ||
+    normalized.includes(" backend/");
+
+  if (touchesFrontend && /\b(tsc|npx tsc)\b/.test(normalized)) {
+    return "frontend_tsc";
+  }
+  if (
+    touchesFrontend &&
+    /\b(pnpm|npm|yarn)\s+(run\s+)?build\b/.test(normalized)
+  ) {
+    return "frontend_build";
+  }
+  if (touchesBackend && /\b(tsc|npx tsc)\b/.test(normalized)) {
+    return "backend_tsc";
+  }
+  return null;
+}
+
+function isValidationLikeBashCommand(command: string): boolean {
+  const normalized = command.replace(/\s+/g, " ").trim().toLowerCase();
+  return (
+    /\b(tsc|npx tsc)\b/.test(normalized) ||
+    /\b(pnpm|npm|yarn)\s+(run\s+)?build\b/.test(normalized)
+  );
+}
+
+function buildIntegrationReasoningOptions(): Pick<
+  OpenRouterOptions,
+  "reasoning" | "thinking"
+> {
+  const enabled =
+    (
+      process.env.INTEGRATION_VERIFYFIX_ENABLE_REASONING ?? "true"
+    ).toLowerCase() !== "false";
+  if (!enabled) {
+    return {};
+  }
+
+  const effortRaw =
+    process.env.INTEGRATION_VERIFYFIX_REASONING_EFFORT?.trim().toLowerCase() ??
+    "medium";
+  const effort =
+    effortRaw === "low" || effortRaw === "high" ? effortRaw : "medium";
+
+  const verbosityRaw =
+    process.env.INTEGRATION_VERIFYFIX_THINKING_VERBOSITY?.trim().toLowerCase() ??
+    "medium";
+  const verbosity =
+    verbosityRaw === "low" || verbosityRaw === "high" ? verbosityRaw : "medium";
+
+  return {
+    reasoning: {
+      enabled: true,
+      effort,
+    },
+    thinking: {
+      thinking_effort: effort,
+      verbosity,
+    },
+  };
 }
 
 async function executeSupervisorTool(
@@ -3768,20 +3861,17 @@ async function integrationVerifyAndFix(
     );
   }
 
-  // ── Determine tsc command ─────────────────────────────────────────────────
-  const allPaths = state.fileRegistry.map((f) => f.path);
-  const tscProject = await findBestTsconfigForFiles(allPaths, state.outputDir);
-  const tscCmd = tscProject
-    ? `npx tsc --noEmit --pretty false --skipLibCheck --project ${tscProject} 2>&1`
-    : `npx tsc --noEmit --pretty false --skipLibCheck 2>&1`;
-  if (tscProject) {
-    console.log(`${label}: using --project ${tscProject}`);
-  }
-
   // ── Package manager + version constraints ────────────────────────────────
   const pm = await detectPackageManager(state.outputDir);
-  const installCmd = buildInstallCommand(pm).replace("tail -30", "tail -10");
   const versionConstraints = await buildVersionConstraints(state.outputDir);
+  const frontendDir = path.join(state.outputDir, "frontend");
+  const backendDir = path.join(state.outputDir, "backend");
+  const hasFrontend = !(
+    await fsRead("frontend/package.json", state.outputDir)
+  ).startsWith("FILE_NOT_FOUND");
+  const hasBackend = !(
+    await fsRead("backend/package.json", state.outputDir)
+  ).startsWith("FILE_NOT_FOUND");
 
   // ── Protected files list ──────────────────────────────────────────────────
   const protectedPaths = state.scaffoldProtectedPaths ?? [];
@@ -3805,35 +3895,20 @@ async function integrationVerifyAndFix(
 
   const systemPrompt = [
     "You are a Senior Full-Stack Engineer performing the **Final Verification** of a fully generated codebase.",
-    "Your three objectives, in order:",
-    "  1. FIRST ensure route registration is complete:",
-    "     - Register frontend pages from `frontend/src/views` in `frontend/src/router.tsx`.",
-    "     - Register backend API module routes from `backend/src/api/modules` in `backend/src/api/modules/index.ts`.",
-    "  2. Fix ALL compile/type/build errors so the project builds cleanly.",
-    "  3. Review the PRD requirements and ensure every feature is correctly implemented and user-usable.",
+    "Your two objectives, in order:",
+    "  1. FIRST review PRD completeness and fill missing implementations so the product is actually usable.",
+    "  2. THEN run scoped compile/build verification and fix remaining TypeScript/build issues until all final gates pass.",
     "",
-    "## Phase 0 — Routing & Module Registration",
-    "Before running compile/build checks, inspect these two integration points first:",
+    "## Phase 0 — PRD Completeness & Routing/Module Registration",
+    "Before compile/build validation, inspect these integration points first:",
     "1. Read `frontend/src/router.tsx` and list files in `frontend/src/views`.",
     "   - Every actual page in `frontend/src/views` must be reachable via a registered route unless it is clearly dead code.",
     "2. Read `backend/src/api/modules/index.ts` and list module route files under `backend/src/api/modules`.",
     "   - Every implemented API module route must be registered from the API module index unless it is clearly unused/dead code.",
-    "3. Fix these registration gaps first, then continue with compile/build verification.",
+    "3. Review the PRD and identify missing pages, flows, handlers, and end-to-end feature gaps.",
+    "4. Fix these registration and PRD completeness gaps first, then continue with compile/build verification.",
     "",
-    "## Phase 1 — Compile & Build",
-    `1. Run: \`${tscCmd}\`  — check TypeScript errors across the whole project after route/module registration is fixed`,
-    "2. For each TypeScript error:",
-    "   a. Read the file with the error",
-    "   b. Read any imported modules that are missing exports",
-    "   c. Write the minimal fix",
-    "3. Re-run tsc after fixes",
-    "4. If tsc passes, also run the build:",
-    `   - Run: \`${installCmd}\` if needed`,
-    "   - Run: `pnpm run build 2>&1` (or `npm run build 2>&1`) to confirm no build errors",
-    "5. Repeat until tsc exits 0 AND build succeeds",
-    "",
-    "## Phase 2 — PRD Implementation Review",
-    "After the project compiles, perform a comprehensive review against the PRD:",
+    "## Phase 1 — PRD Implementation Review",
     "1. List all major features/requirements in the PRD",
     "2. For each feature, verify the implementation:",
     "   a. Use `grep` to find related files and handlers",
@@ -3845,7 +3920,19 @@ async function integrationVerifyAndFix(
     "   - Check that business logic was correctly added (not left as stub/TODO)",
     "   - Check that routes, controllers, services, and configs are wired up correctly",
     "   - Fix any implementation errors — you ARE allowed to edit these files in this phase",
-    "5. After all fixes, call `report_done(status='pass', summary=...)` with a brief feature coverage summary",
+    "",
+    "## Phase 2 — Scoped Compile & Build Validation",
+    "Use ONLY scoped validation commands under `frontend/` and `backend/`.",
+    `1. Frontend type-check: \`cd frontend && ${hasFrontend ? "npx tsc -p tsconfig.app.json --pretty false 2>&1" : "echo skip-frontend"}\``,
+    `2. Frontend build: \`cd frontend && ${hasFrontend ? (pm === "yarn" ? "yarn run build 2>&1" : pm === "npm" ? "npm run build 2>&1" : "pnpm run build 2>&1") : "echo skip-frontend"}\``,
+    `3. Backend type-check: \`cd backend && ${hasBackend ? "npx tsc --noEmit --pretty false 2>&1" : "echo skip-backend"}\``,
+    "4. For each TypeScript/build error:",
+    "   a. Read the file with the error",
+    "   b. Read any imported modules that are missing exports",
+    "   c. Write the minimal fix",
+    "5. Any `write_file` or mutating install/generate command makes prior validation STALE.",
+    "6. After the LAST mutation, re-run all three scoped validation gates in full.",
+    "7. Only after all three scoped validation gates pass may you call `report_done(status='pass', summary=...)`",
     "   OR `report_done(status='fail', summary=<unresolved issues>)` if critical features cannot be fixed",
     "",
     "## Hard rules",
@@ -3853,6 +3940,8 @@ async function integrationVerifyAndFix(
     "- For split M-tier projects, keep routing in frontend/src/router.tsx and backend API modules under backend/src/api/modules.",
     "- Route/module registration is mandatory: treat missing registrations in `frontend/src/router.tsx` and `backend/src/api/modules/index.ts` as top-priority integration defects.",
     "- Do not stop after making pages/controllers exist on disk; they must be wired into the actual router/module entrypoints.",
+    "- Run verification ONLY inside `frontend/` and `backend/`. Do not use root-level `npx tsc` against the whole generated-code tree in this phase.",
+    "- If you modify any file, treat previous validation as stale and re-run the full scoped validation sequence before finishing.",
     "- Minimal targeted changes — do not rewrite working code.",
     "- Install missing npm packages: `pnpm add <pkg> --filter <workspace-name>`",
     "- If errors include [CONVENTION], they are policy violations and MUST be fixed.",
@@ -3865,7 +3954,7 @@ async function integrationVerifyAndFix(
     `Package manager: ${pm}`,
     prdBlock,
     "",
-    "Begin Phase 1 (compile & build) first, then proceed to Phase 2 (PRD review) once the project compiles cleanly.",
+    "Begin with PRD completeness and route/module registration review first, then run scoped frontend/backend validation after the feature补写 is complete.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -3884,6 +3973,130 @@ async function integrationVerifyAndFix(
   let finalStatus: "pass" | "fail" = "fail";
   let finalSummary = "";
   let totalCostUsd = 0;
+  const integrationReasoningOptions = buildIntegrationReasoningOptions();
+  let validationStale = true;
+  let lastMutationAt: string | null = null;
+  let lastMutationReason = "initial integration review";
+  let lastFullValidationAt: string | null = null;
+  let frontendTscOkAt: string | null = null;
+  let frontendBuildOkAt: string | null = null;
+  let backendTscOkAt: string | null = null;
+
+  function nowIso(): string {
+    return new Date().toISOString();
+  }
+
+  function markValidationStale(reason: string): void {
+    validationStale = true;
+    lastMutationAt = nowIso();
+    lastMutationReason = reason;
+    lastFullValidationAt = null;
+    frontendTscOkAt = null;
+    frontendBuildOkAt = null;
+    backendTscOkAt = null;
+    console.log(`${label}: validation marked stale — ${reason}`);
+  }
+
+  function markScopedValidationSuccess(kind: ScopedValidationKind): void {
+    const ts = nowIso();
+    if (kind === "frontend_tsc") frontendTscOkAt = ts;
+    if (kind === "frontend_build") frontendBuildOkAt = ts;
+    if (kind === "backend_tsc") backendTscOkAt = ts;
+    const frontendReady =
+      !hasFrontend || (!!frontendTscOkAt && !!frontendBuildOkAt);
+    const backendReady = !hasBackend || !!backendTscOkAt;
+    if (frontendReady && backendReady) {
+      validationStale = false;
+      lastFullValidationAt = ts;
+      console.log(
+        `${label}: scoped validations now fresh — frontend_tsc=${frontendTscOkAt ?? "skip"} frontend_build=${frontendBuildOkAt ?? "skip"} backend_tsc=${backendTscOkAt ?? "skip"}`,
+      );
+    }
+  }
+
+  async function runFinalScopedValidationGates(): Promise<{
+    pass: boolean;
+    summary: string;
+  }> {
+    const failures: string[] = [];
+    const passes: string[] = [];
+
+    async function runCheck(
+      name: string,
+      command: string,
+      cwd: string,
+      kind: ScopedValidationKind,
+    ): Promise<void> {
+      const result = await shellExec(command, cwd, { timeout: 120_000 });
+      const combined = `${result.stdout}${result.stderr}`.trim();
+      if (result.exitCode === 0) {
+        markScopedValidationSuccess(kind);
+        passes.push(`${name}: pass`);
+        return;
+      }
+      failures.push(
+        `${name} failed:\n${combined.slice(0, 2000) || `exit_code=${result.exitCode}`}`,
+      );
+    }
+
+    console.log(
+      `${label}: running final scoped validation gates (stale=${validationStale}, lastMutationAt=${lastMutationAt ?? "never"})`,
+    );
+
+    if (hasFrontend) {
+      await runCheck(
+        "frontend_tsc",
+        "npx tsc -p tsconfig.app.json --pretty false 2>&1",
+        frontendDir,
+        "frontend_tsc",
+      );
+      const frontendPm = await detectPackageManager(frontendDir);
+      const frontendBuildCmd =
+        frontendPm === "yarn"
+          ? "yarn run build 2>&1"
+          : frontendPm === "npm"
+            ? "npm run build 2>&1"
+            : "pnpm run build 2>&1";
+      await runCheck(
+        "frontend_build",
+        frontendBuildCmd,
+        frontendDir,
+        "frontend_build",
+      );
+    } else {
+      passes.push("frontend gates: skipped (frontend/package.json not found)");
+    }
+
+    if (hasBackend) {
+      await runCheck(
+        "backend_tsc",
+        "npx tsc --noEmit --pretty false 2>&1",
+        backendDir,
+        "backend_tsc",
+      );
+    } else {
+      passes.push("backend gate: skipped (backend/package.json not found)");
+    }
+
+    const pass = failures.length === 0;
+    if (pass) {
+      validationStale = false;
+      lastFullValidationAt = nowIso();
+    }
+
+    console.log(
+      `${label}: final gates completed — pass=${pass} lastMutationAt=${lastMutationAt ?? "never"} lastFullValidationAt=${lastFullValidationAt ?? "never"} frontendTscOkAt=${frontendTscOkAt ?? "skip"} frontendBuildOkAt=${frontendBuildOkAt ?? "skip"} backendTscOkAt=${backendTscOkAt ?? "skip"}`,
+    );
+
+    return {
+      pass,
+      summary: [...passes, ...failures].join("\n\n"),
+    };
+  }
+
+  console.log(
+    `${label}: reasoning=${integrationReasoningOptions.reasoning?.enabled === false ? "off" : integrationReasoningOptions.reasoning ? `on(${integrationReasoningOptions.reasoning.effort ?? "medium"})` : "off"} thinking=${integrationReasoningOptions.thinking ? `on(${integrationReasoningOptions.thinking.thinking_effort ?? "medium"}/${integrationReasoningOptions.thinking.verbosity ?? "medium"})` : "off"}`,
+  );
 
   /**
    * Context compression: when messages exceed ~20k tokens, compact the middle
@@ -3917,6 +4130,13 @@ async function integrationVerifyAndFix(
     }
     const summary =
       `[Context compacted — ${middle.length} messages omitted]\n` +
+      `Validation state:\n` +
+      `- stale: ${validationStale}\n` +
+      `- last mutation: ${lastMutationAt ?? "never"} (${lastMutationReason})\n` +
+      `- last full validation: ${lastFullValidationAt ?? "never"}\n` +
+      `- frontend tsc ok at: ${frontendTscOkAt ?? "never"}\n` +
+      `- frontend build ok at: ${frontendBuildOkAt ?? "never"}\n` +
+      `- backend tsc ok at: ${backendTscOkAt ?? "never"}\n` +
       `Previous actions summary:\n${actionLines.slice(-30).join("\n")}`;
 
     messages.splice(
@@ -3944,6 +4164,7 @@ async function integrationVerifyAndFix(
         max_tokens: 36000,
         tools: SUPERVISOR_VERIFY_TOOLS,
         tool_choice: "auto",
+        ...integrationReasoningOptions,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -3983,7 +4204,7 @@ async function integrationVerifyAndFix(
         finalSummary = String(args.summary ?? "");
         doneSignaled = true;
         console.log(
-          `${label}: report_done status=${finalStatus} — ${finalSummary.slice(0, 120)}`,
+          `${label}: report_done status=${finalStatus} stale=${validationStale} lastMutationAt=${lastMutationAt ?? "never"} — ${finalSummary.slice(0, 120)}`,
         );
         messages.push({
           role: "tool",
@@ -3992,11 +4213,46 @@ async function integrationVerifyAndFix(
           name: "report_done",
         });
       } else {
+        const command =
+          tc.function.name === "bash" ? String(args.command ?? "") : "";
+        if (
+          tc.function.name === "bash" &&
+          isValidationLikeBashCommand(command) &&
+          !detectScopedValidationKind(command)
+        ) {
+          const result =
+            "Error: validation commands in IntegrationVerifyFix must be scoped to `frontend/` or `backend/` only. " +
+            "Use commands like `cd frontend && npx tsc -p tsconfig.app.json --pretty false 2>&1`, " +
+            "`cd frontend && pnpm run build 2>&1`, or `cd backend && npx tsc --noEmit --pretty false 2>&1`.";
+          console.log(
+            `${label}: rejected unscoped validation command=${command.slice(0, 120)}`,
+          );
+          messages.push({
+            role: "tool",
+            content: result,
+            tool_call_id: tc.id,
+            name: tc.function.name,
+          });
+          continue;
+        }
         const result = await executeSupervisorTool(
           tc.function.name,
           args,
           state.outputDir,
         );
+        if (tc.function.name === "write_file") {
+          markValidationStale(`write_file:${String(args.path ?? "")}`);
+        } else if (
+          tc.function.name === "bash" &&
+          isSuccessfulSupervisorToolResult(result)
+        ) {
+          const validationKind = detectScopedValidationKind(command);
+          if (validationKind) {
+            markScopedValidationSuccess(validationKind);
+          } else if (isMutatingSupervisorBashCommand(command)) {
+            markValidationStale(`mutating bash:${command.slice(0, 80)}`);
+          }
+        }
         console.log(
           `${label}: tool=${tc.function.name} result_preview=${result.slice(0, 100).replace(/\n/g, " ")}`,
         );
@@ -4012,38 +4268,33 @@ async function integrationVerifyAndFix(
     if (doneSignaled) break;
   }
 
-  // If no explicit report_done, run tsc one final time to determine status
+  // Always enforce final scoped validation gates before exiting.
   if (!finalSummary && finalStatus === "fail") {
-    console.log(
-      `${label}: no report_done received — running final tsc check...`,
-    );
-    try {
-      const { stdout, stderr } = await execFileAsync("bash", ["-c", tscCmd], {
-        cwd: state.outputDir,
-        maxBuffer: 10 * 1024 * 1024,
-        timeout: 90_000,
-      });
-      const lastOut = ((stdout ?? "") + (stderr ?? "")).trim();
-      if (!lastOut.includes("error TS")) {
-        finalStatus = "pass";
-        finalSummary = "tsc passed on final check";
-      } else {
-        finalSummary = lastOut.slice(0, 3000);
-      }
-    } catch (err: unknown) {
-      const e = err as { stdout?: string; stderr?: string };
-      const lastOut = ((e.stdout ?? "") + (e.stderr ?? "")).trim();
-      if (!lastOut.includes("error TS")) {
-        finalStatus = "pass";
-        finalSummary = "tsc passed on final check";
-      } else {
-        finalSummary = lastOut.slice(0, 3000);
-      }
-    }
+    finalSummary = "No report_done received from IntegrationVerifyFix.";
+  }
+
+  const finalGateResult = await runFinalScopedValidationGates();
+  if (!finalGateResult.pass) {
+    finalStatus = "fail";
+    finalSummary = [
+      finalSummary,
+      "Final scoped validation gates failed:",
+      finalGateResult.summary,
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 4000);
+  } else if (finalStatus === "pass") {
+    finalSummary = [finalSummary, "Final scoped validation gates passed."]
+      .filter(Boolean)
+      .join("\n\n");
+  } else if (finalSummary.startsWith("No report_done received")) {
+    finalStatus = "pass";
+    finalSummary = "Final scoped validation gates passed.";
   }
 
   console.log(
-    `${label}: done — status=${finalStatus} iterations=${iterations} cost=$${totalCostUsd.toFixed(4)}`,
+    `${label}: done — status=${finalStatus} iterations=${iterations} cost=$${totalCostUsd.toFixed(4)} lastMutationAt=${lastMutationAt ?? "never"} lastFullValidationAt=${lastFullValidationAt ?? "never"}`,
   );
 
   return {
