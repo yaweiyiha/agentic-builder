@@ -2736,7 +2736,7 @@ async function phaseVerifyAndFix(
    * into a single summary assistant message, keeping system + last 6 messages.
    */
   function compactMessagesIfNeeded(): void {
-    const COMPACT_THRESHOLD = 10_000 * 4; // ~10k tokens in chars
+    const COMPACT_THRESHOLD = 20_000 * 4; // ~20k tokens in chars
     const KEEP_TAIL = 6; // keep last N messages after system prompt
     const totalChars = messages.reduce(
       (sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0),
@@ -3886,11 +3886,11 @@ async function integrationVerifyAndFix(
   let totalCostUsd = 0;
 
   /**
-   * Context compression: when messages exceed ~10k tokens, compact the middle
+   * Context compression: when messages exceed ~20k tokens, compact the middle
    * portion into a summary, keeping system prompt + last 6 messages.
    */
   function compactMessagesIfNeeded(): void {
-    const COMPACT_THRESHOLD = 10_000 * 4;
+    const COMPACT_THRESHOLD = 20_000 * 4;
     const KEEP_TAIL = 6;
     const totalChars = messages.reduce(
       (sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0),

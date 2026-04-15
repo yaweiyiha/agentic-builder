@@ -1,4 +1,8 @@
-import type { CodingAgentInstance, CodingAgentRole, CodingTask } from "@/lib/pipeline/types";
+import type {
+  CodingAgentInstance,
+  CodingAgentRole,
+  CodingTask,
+} from "@/lib/pipeline/types";
 
 export const PHASE_TO_ROLE: Record<string, CodingAgentRole> = {
   Scaffolding: "architect",
@@ -31,10 +35,14 @@ export function resolveTaskRole(
 
   const lower = `${task.phase} ${task.title} ${task.description}`.toLowerCase();
   if (/test|spec|e2e|vitest|playwright|k6|coverage/.test(lower)) return "test";
-  if (/scaffold|infra|docker|helm|ci\/cd|deploy|config|schema|migrat/.test(lower)) {
+  if (
+    /scaffold|infra|docker|helm|ci\/cd|deploy|config|schema|migrat/.test(lower)
+  ) {
     return "architect";
   }
-  if (/frontend|react|component|page|ui|css|tailwind|hook|store|next/.test(lower)) {
+  if (
+    /frontend|react|component|page|ui|css|tailwind|hook|store|next/.test(lower)
+  ) {
     return "frontend";
   }
   return "backend";
@@ -54,7 +62,7 @@ export function formatTaskStatus(task: CodingTask): string {
   if (task.progressStage === "fixing") return "Fixing";
   if (task.progressStage === "verifying") return "Verifying";
   if (task.progressStage === "generating") return "Generating";
-  if (task.codingStatus === "in_progress") return "Running";
+  if (task.codingStatus === "in_progress") return "running";
   return "Pending";
 }
 

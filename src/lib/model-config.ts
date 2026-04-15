@@ -36,21 +36,33 @@ export const MODEL_CONFIG = {
   // ── Kick-off phase ─────────────────────────────────────────────────────────
 
   // claude-sonnet-4 supports 64K output tokens — much less likely to truncate large task lists
-  taskBreakdown: ["claude-sonnet", "gpt-4o"] as string[],
+  taskBreakdown: ["claude-sonnet-4", "openai/gpt-5.4"] as string[],
 
   // ── Coding phase ───────────────────────────────────────────────────────────
 
   /** Code generation: try primary, fall back to secondary on failure. */
-  codeGen: ["deepseek/deepseek-v3.2", "openai/gpt-5.3-codex"] as string[],
+  codeGen: [
+    "deepseek/deepseek-v3.2",
+    "openai/gpt-5.3-codex",
+    "claude-sonnet",
+  ] as string[],
 
   /** Error-fix pass: cheaper models suffice for targeted tsc/build fixes. */
-  codeFix: ["claude-sonnet", "openai/gpt-5.3-codex"] as string[],
+  codeFix: [
+    "deepseek/deepseek-v3.2",
+    "claude-sonnet",
+    "openai/gpt-5.3-codex",
+  ] as string[],
 
   /**
    * Phase verify+fix agentic loop (merged).
    * Needs strong tool-use / function-calling capability.
    */
-  phaseVerifyFix: ["claude-sonnet", "gpt-4o"] as string[],
+  phaseVerifyFix: [
+    "deepseek/deepseek-v3.2",
+    "openai/gpt-5.3-codex",
+    "gpt-4o",
+  ] as string[],
 } as const;
 
 export type ModelConfigKey = keyof typeof MODEL_CONFIG;

@@ -27,10 +27,10 @@ Even the smallest project MUST still specify **every screen’s layout**, **what
 
 List **every** distinct page, route, modal, drawer, or full-screen state (including dedicated empty/error states if they are separate views).
 
-### 3.1 [Page Name] (e.g. "Main Timer View", "Settings Panel")
+### 3.1 [Page Name] (e.g. "Dashboard Overview", "Settings Panel")
 - **URL / Route**: (e.g. \`/\`, \`/settings\`)
 - **Purpose**: one sentence
-- **Layout regions** (top → bottom or left → right): ordered bullets naming each region and what it contains (e.g. "Header: title + settings icon", "Body: timer readout", "Footer: primary actions").
+- **Layout regions** (top → bottom or left → right): ordered bullets naming each region and what it contains (e.g. "Header: title + primary action", "Body: content grid or list", "Sidebar: filters and secondary actions").
 - **On-screen inventory**: bullet list of **every** visible control or widget (buttons, inputs, toggles, sliders, links, lists, tabs, etc.).
 - **Key non-interactive elements**: static labels, decorative graphics, read-only text (brief).
 
@@ -43,8 +43,8 @@ One **consolidated table** for **all** interactive components on **all** pages. 
 
 | ID | Page | Component | Type | User interaction | Effect (feedback + outcome) |
 |----|------|-----------|------|------------------|-----------------------------|
-| IC-01 | Main | Start | Button | Click / tap | Timer starts; button label switches; optional sound/haptic |
-| IC-02 | Settings | Work duration | Number input | Type, blur, arrow keys | Value clamped; inline validation message if invalid |
+| IC-01 | Dashboard | Create Item | Button | Click / tap | Modal opens; button shows pressed state; draft form becomes available |
+| IC-02 | Settings | Display Name | Text input | Type, blur | Value updates locally; inline validation appears if invalid |
 
 Column rules:
 - **User interaction**: exact trigger (click, hover, focus, keyboard shortcut, drag, \`change\` event, etc.).
@@ -57,7 +57,7 @@ Include a **Mermaid** diagram showing how screens/states connect (primary naviga
 \`\`\`mermaid
 flowchart LR
   Home[Home] --> Settings[Settings]
-  Home --> Session[Focus session]
+  Home --> Detail[Item detail]
 \`\`\`
 
 Adapt nodes/edges to this product. Use \`flowchart\` or \`graph\`.

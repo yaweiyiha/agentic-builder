@@ -1,36 +1,40 @@
 import { chatCompletion } from "@/lib/openrouter";
 import { MODEL_CONFIG } from "@/lib/model-config";
-import type { PrdInteractiveComponent, PrdPage, PrdSpec } from "./prd-spec-types";
+import type {
+  PrdInteractiveComponent,
+  PrdPage,
+  PrdSpec,
+} from "./prd-spec-types";
 
 const SYSTEM_PROMPT = `You are a product analyst. Extract a structured page specification from a PRD.
-Return ONLY a valid JSON object — no markdown, no explanation. Follow this exact schema:
+Return ONLY a valid JSON object — no markdown, no explanation. The schema below is an example of the required structure and field shape, not a domain-specific content template:
 
 {
   "pages": [
     {
       "id": "PAGE-001",
-      "name": "Main Timer View",
+      "name": "Dashboard Overview",
       "route": "/",
       "layoutRegions": [
-        "Header: App title text",
-        "Body: Timer display + Start/Stop button + duration inputs",
-        "Footer: Session counter + Settings link"
+        "Header: Product title + primary action",
+        "Body: Summary cards + primary content panel",
+        "Sidebar: Filters + secondary navigation"
       ],
       "interactiveComponents": [
         {
           "id": "CMP-001",
-          "name": "Start/Stop Button",
+          "name": "Create Item Button",
           "type": "button",
-          "location": "Body",
+          "location": "Header",
           "interaction": "Click",
-          "effect": "Timer starts counting down; button label switches to 'Pause'; title changes to 'Focus session active'"
+          "effect": "Modal opens; button shows pressed state; user can begin creating a new record"
         }
       ],
       "staticElements": [
-        "Timer display (MM:SS format)",
-        "Session counter label"
+        "Section heading",
+        "Summary metric labels"
       ],
-      "states": ["idle", "running", "paused", "break"]
+      "states": ["default", "loading", "empty", "error"]
     }
   ]
 }
@@ -43,7 +47,7 @@ Assignment rules:
 - "interaction" is the user trigger: Click | Tap | Type | Change | Blur | Toggle | Select | Drag | Hover | Focus | Submit | Keyboard shortcut.
 - "effect" describes: (a) immediate visual feedback, AND (b) resulting state/action.
 - "staticElements": read-only labels, counters, headings, images — no interaction.
-- "states": ONLY states explicitly mentioned or clearly implied by the PRD (e.g. loading, empty, error, success, idle, running, paused).
+- "states": ONLY states explicitly mentioned or clearly implied by the PRD (e.g. loading, empty, error, success, default, editing, submitted).
 - If the PRD mentions a modal, drawer, or popover, treat it as a separate page entry (PAGE-xxx with route "modal:/name" or "drawer:/name").
 - Keep every field concise (≤ 25 words per field value).`;
 
@@ -72,7 +76,10 @@ interface RawPrdComponent {
 
 function normalizePage(raw: RawPrdPage, pageIdx: number): PrdPage {
   return {
-    id: typeof raw.id === "string" && raw.id ? raw.id : `PAGE-${String(pageIdx + 1).padStart(3, "0")}`,
+    id:
+      typeof raw.id === "string" && raw.id
+        ? raw.id
+        : `PAGE-${String(pageIdx + 1).padStart(3, "0")}`,
     name: typeof raw.name === "string" ? raw.name : `Page ${pageIdx + 1}`,
     route: typeof raw.route === "string" ? raw.route : "/",
     layoutRegions: Array.isArray(raw.layoutRegions)
@@ -92,9 +99,15 @@ function normalizePage(raw: RawPrdPage, pageIdx: number): PrdPage {
   };
 }
 
-function normalizeComponent(raw: RawPrdComponent, idx: number): PrdInteractiveComponent {
+function normalizeComponent(
+  raw: RawPrdComponent,
+  idx: number,
+): PrdInteractiveComponent {
   return {
-    id: typeof raw.id === "string" && raw.id ? raw.id : `CMP-${String(idx + 1).padStart(3, "0")}`,
+    id:
+      typeof raw.id === "string" && raw.id
+        ? raw.id
+        : `CMP-${String(idx + 1).padStart(3, "0")}`,
     name: typeof raw.name === "string" ? raw.name : `Component ${idx + 1}`,
     type: typeof raw.type === "string" ? raw.type : "other",
     location: typeof raw.location === "string" ? raw.location : "",
@@ -142,8 +155,7 @@ export async function extractPrdSpec(
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content:
-            `Extract the structured page specification from this PRD.\n\n---\n\n${prdMarkdown.slice(0, 24000)}`,
+          content: `Extract the structured page specification from this PRD.\n\n---\n\n${prdMarkdown.slice(0, 24000)}`,
         },
       ],
       { model, temperature: 0.1, max_tokens: 8192 },
@@ -151,7 +163,10 @@ export async function extractPrdSpec(
     const content = res.choices[0]?.message?.content ?? "";
     return parsePrdSpec(content);
   } catch (e) {
-    console.error("[PrdSpecExtractor] LLM call failed:", e instanceof Error ? e.message : e);
+    console.error(
+      "[PrdSpecExtractor] LLM call failed:",
+      e instanceof Error ? e.message : e,
+    );
     return null;
   }
 }
