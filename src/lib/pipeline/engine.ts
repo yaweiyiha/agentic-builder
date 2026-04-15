@@ -745,6 +745,7 @@ export class PipelineEngine {
             ? { taskBreakdownParseError }
             : {}),
           taskBreakdownSimulated: false,
+          taskBreakdownConfirmed: taskBreakdown.length === 0,
           taskCoverageGate,
         },
       });

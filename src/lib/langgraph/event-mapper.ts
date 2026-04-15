@@ -17,6 +17,10 @@ export type ErrorCategory =
   | "graph_error"
   | "unknown";
 
+interface EventMapperOptions {
+  emitGapAnalysisAfterIntegration?: boolean;
+}
+
 // ─── Internal tracker per worker subgraph instance ───
 
 interface WorkerTracker {
@@ -51,6 +55,7 @@ interface ExtractedTaskResult {
 
 export class EventMapper {
   private readonly sessionId: string;
+  private readonly emitGapAnalysisAfterIntegration: boolean;
 
   /** map from namespace-key → worker tracker */
   private readonly workers = new Map<string, WorkerTracker>();
@@ -69,9 +74,13 @@ export class EventMapper {
 
   /** true once integration_verify_start has been emitted */
   private integrationVerifyStartEmitted = false;
+  /** true once e2e_verify_start has been emitted */
+  private e2eVerifyStartEmitted = false;
 
-  constructor(sessionId: string) {
+  constructor(sessionId: string, options: EventMapperOptions = {}) {
     this.sessionId = sessionId;
+    this.emitGapAnalysisAfterIntegration =
+      options.emitGapAnalysisAfterIntegration ?? true;
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -124,14 +133,25 @@ export class EventMapper {
     update: Record<string, unknown>,
   ): string | null {
     const errorLines = (text: string) =>
-      text.split("\n").filter((l) => l.includes("error TS") || l.includes("[CONVENTION]")).length;
+      text
+        .split("\n")
+        .filter((l) => l.includes("error TS") || l.includes("[CONVENTION]"))
+        .length;
 
     switch (nodeName) {
       case "classify_tasks": {
-        const arch = Array.isArray(update.architectTasks) ? update.architectTasks.length : 0;
-        const be = Array.isArray(update.backendTasks) ? update.backendTasks.length : 0;
-        const fe = Array.isArray(update.frontendTasks) ? update.frontendTasks.length : 0;
-        const te = Array.isArray(update.testTasks) ? update.testTasks.length : 0;
+        const arch = Array.isArray(update.architectTasks)
+          ? update.architectTasks.length
+          : 0;
+        const be = Array.isArray(update.backendTasks)
+          ? update.backendTasks.length
+          : 0;
+        const fe = Array.isArray(update.frontendTasks)
+          ? update.frontendTasks.length
+          : 0;
+        const te = Array.isArray(update.testTasks)
+          ? update.testTasks.length
+          : 0;
         return `Tasks assigned — Architect: ${arch}, Backend: ${be}, Frontend: ${fe}, Test: ${te}`;
       }
       case "architect_phase":
@@ -142,8 +162,6 @@ export class EventMapper {
         return "Dependency baseline planned (DEPENDENCY_PLAN.md written)";
       case "generate_api_contracts":
         return "API contracts generated";
-      case "bootstrap_shared_contracts":
-        return "Shared contracts bootstrapped";
       case "generate_service_skeletons":
         return "Service skeletons generated";
       case "scaffold_verify": {
@@ -152,19 +170,23 @@ export class EventMapper {
         return `Scaffold verify: ${errorLines(errors)} error(s) found`;
       }
       case "scaffold_fix": {
-        const files = Array.isArray(update.fileRegistry) ? update.fileRegistry.length : 0;
+        const files = Array.isArray(update.fileRegistry)
+          ? update.fileRegistry.length
+          : 0;
         return `Scaffold fix: wrote ${files} file(s)`;
       }
       case "be_phase_verify": {
         const errors = update.scaffoldErrors as string | undefined;
         const iters = update.scaffoldFixAttempts as number | undefined;
-        if (!errors) return `Backend verify+fix: passed${iters ? ` (${iters} iteration(s))` : ""}`;
+        if (!errors)
+          return `Backend verify+fix: passed${iters ? ` (${iters} iteration(s))` : ""}`;
         return `Backend verify+fix: ${errorLines(errors)} error(s) remaining after ${iters ?? 0} iteration(s)`;
       }
       case "fe_phase_verify": {
         const errors = update.scaffoldErrors as string | undefined;
         const iters = update.scaffoldFixAttempts as number | undefined;
-        if (!errors) return `Frontend verify+fix: passed${iters ? ` (${iters} iteration(s))` : ""}`;
+        if (!errors)
+          return `Frontend verify+fix: passed${iters ? ` (${iters} iteration(s))` : ""}`;
         return `Frontend verify+fix: ${errorLines(errors)} error(s) remaining after ${iters ?? 0} iteration(s)`;
       }
       case "sync_deps":
@@ -188,13 +210,30 @@ export class EventMapper {
       }
       case "gap_analysis": {
         const tasks = update.supplementaryTasks as unknown[] | undefined;
-        if (!tasks || tasks.length === 0) return "Gap analysis: no critical gaps found";
+        if (!tasks || tasks.length === 0)
+          return "Gap analysis: no critical gaps found";
         return `Gap analysis: ${tasks.length} supplementary task(s) identified`;
       }
       case "supplementary_worker":
         return "Supplementary worker phase complete";
       case "supplementary_verify":
         return "Supplementary verification complete";
+      case "runtime_verify": {
+        const errors = update.runtimeVerifyErrors as string | undefined;
+        const attempts = update.runtimeVerifyAttempts as number | undefined;
+        if (!errors) {
+          return `Runtime verify: passed${attempts ? ` (attempt ${attempts})` : ""}`;
+        }
+        return `Runtime verify: failed${attempts ? ` (attempt ${attempts})` : ""}`;
+      }
+      case "e2e_verify": {
+        const errors = update.e2eVerifyErrors as string | undefined;
+        const attempts = update.e2eVerifyAttempts as number | undefined;
+        if (!errors) {
+          return `E2E verify: passed${attempts ? ` (attempt ${attempts})` : ""}`;
+        }
+        return `E2E verify: failed${attempts ? ` (attempt ${attempts})` : ""}`;
+      }
       case "supplementary_dispatch_gate":
         return "Dispatching supplementary workers...";
       default:
@@ -274,16 +313,25 @@ export class EventMapper {
           frontendCount: refinedFe,
           testCount: refinedTest,
           refinedTasks: [
-            ...(Array.isArray(refineUpdate.backendTasks) ? refineUpdate.backendTasks : []),
-            ...(Array.isArray(refineUpdate.frontendTasks) ? refineUpdate.frontendTasks : []),
-            ...(Array.isArray(refineUpdate.testTasks) ? refineUpdate.testTasks : []),
+            ...(Array.isArray(refineUpdate.backendTasks)
+              ? refineUpdate.backendTasks
+              : []),
+            ...(Array.isArray(refineUpdate.frontendTasks)
+              ? refineUpdate.frontendTasks
+              : []),
+            ...(Array.isArray(refineUpdate.testTasks)
+              ? refineUpdate.testTasks
+              : []),
           ],
         },
       });
     }
 
-    // integration_verify completing → gap analysis is about to start
-    if (updates.integration_verify !== undefined) {
+    // sync_deps completing → gap analysis is about to start
+    if (
+      this.emitGapAnalysisAfterIntegration &&
+      updates.sync_deps !== undefined
+    ) {
       events.push({
         type: "gap_analysis_start",
         sessionId: this.sessionId,
@@ -319,9 +367,16 @@ export class EventMapper {
     }
 
     // Phase nodes finishing → agent_completed for their workers ---------------
-    const phaseNodes = ["be_worker", "fe_worker", "architect_phase", "supplementary_worker"] as const;
+    const phaseNodes = [
+      "be_worker",
+      "fe_worker",
+      "architect_phase",
+      "supplementary_worker",
+    ] as const;
     for (const phaseNode of phaseNodes) {
-      const phaseResult = updates[phaseNode] as Record<string, unknown> | undefined;
+      const phaseResult = updates[phaseNode] as
+        | Record<string, unknown>
+        | undefined;
       if (phaseResult && Array.isArray(phaseResult.phaseResults)) {
         // Emit task-level events for prebuilt scaffold (architect tasks completed without LLM)
         if (phaseNode === "architect_phase") {
@@ -366,8 +421,7 @@ export class EventMapper {
           : errors
               .split("\n")
               .filter(
-                (l) =>
-                  l.includes("error TS") || l.includes("[CONVENTION]"),
+                (l) => l.includes("error TS") || l.includes("[CONVENTION]"),
               ).length;
         const iterations =
           typeof verifyUpdate.integrationFixAttempts === "number"
@@ -383,6 +437,41 @@ export class EventMapper {
             errorCount: errorLineCount > 0 ? errorLineCount : undefined,
             fixAttempts: iterations,
             maxFixAttempts: 80,
+          },
+        });
+      }
+    }
+
+    const e2eUpdate = updates.e2e_verify as Record<string, unknown> | undefined;
+    if (e2eUpdate !== undefined) {
+      if (!this.e2eVerifyStartEmitted) {
+        this.e2eVerifyStartEmitted = true;
+        events.push({
+          type: "e2e_verify_start",
+          sessionId: this.sessionId,
+        });
+      }
+
+      if (typeof e2eUpdate.e2eVerifyErrors === "string") {
+        const errors = e2eUpdate.e2eVerifyErrors;
+        const passed = errors === "";
+        const attempts =
+          typeof e2eUpdate.e2eVerifyAttempts === "number"
+            ? e2eUpdate.e2eVerifyAttempts
+            : 0;
+        events.push({
+          type: "e2e_verify_result",
+          sessionId: this.sessionId,
+          data: {
+            passed,
+            errors: passed ? undefined : errors,
+            errorCount: passed
+              ? 0
+              : errors
+                  .split("\n")
+                  .filter((line) => line.trim().length > 0).length,
+            fixAttempts: attempts,
+            maxFixAttempts: 3,
           },
         });
       }
@@ -561,7 +650,9 @@ export class EventMapper {
     }
 
     // task_failed → error (start already emitted by pick_next_task) ----------
-    const failUpdate = updates.task_failed as Record<string, unknown> | undefined;
+    const failUpdate = updates.task_failed as
+      | Record<string, unknown>
+      | undefined;
     if (failUpdate) {
       for (const result of this.extractTaskResults(failUpdate)) {
         worker.lastKnownTaskId = result.taskId;
@@ -605,7 +696,9 @@ export class EventMapper {
     phaseResult: Record<string, unknown>,
     events: SseEvent[],
   ): void {
-    const phaseResults = phaseResult.phaseResults as Array<Record<string, unknown>>;
+    const phaseResults = phaseResult.phaseResults as Array<
+      Record<string, unknown>
+    >;
     const agentId = "agent-architect-0";
 
     if (!this.workers.has("architect_phase")) {
@@ -649,7 +742,9 @@ export class EventMapper {
           taskId,
           data: {
             status: rec.status ?? "completed",
-            filesGenerated: Array.isArray(rec.generatedFiles) ? rec.generatedFiles : [],
+            filesGenerated: Array.isArray(rec.generatedFiles)
+              ? rec.generatedFiles
+              : [],
             modifiedFiles: [],
             costUsd: typeof rec.costUsd === "number" ? rec.costUsd : 0,
             fixCycles: 0,
@@ -715,8 +810,7 @@ export class EventMapper {
     if (baseNode === "architect_phase") return "Architect";
     if (baseNode === "be_worker") return `Backend Dev${suffix}`;
     if (baseNode === "fe_worker") return `Frontend Dev${suffix}`;
-    if (baseNode === "supplementary_worker")
-      return `Supplementary${suffix}`;
+    if (baseNode === "supplementary_worker") return `Supplementary${suffix}`;
     return `Worker${suffix}`;
   }
 }

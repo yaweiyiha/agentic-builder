@@ -15,7 +15,10 @@ const MAX_BUFFER = 5 * 1024 * 1024;
 const ALLOWED_COMMANDS = [
   "tsc",
   "npx tsc",
+  "npx ts-fix",
+  "npx --no-install ts-fix",
   "npx prisma",
+  "npx playwright",
   // npm
   "npm install",
   "npm run build",
@@ -29,7 +32,9 @@ const ALLOWED_COMMANDS = [
   "pnpm run build",
   "pnpm run dev",
   "pnpm run test",
+  "pnpm run e2e",
   "pnpm run lint",
+  "pnpm exec playwright",
   "pnpm install &&",
   "pnpm add",
   "pnpm approve-builds",

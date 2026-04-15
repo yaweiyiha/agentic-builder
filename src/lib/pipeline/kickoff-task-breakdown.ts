@@ -9,6 +9,13 @@ export function parseKickoffTaskBreakdownFromMetadata(
   return tb.filter(isKickoffWorkItem);
 }
 
+export function isKickoffTaskBreakdownConfirmed(
+  metadata: Record<string, unknown> | undefined,
+): boolean {
+  if (!metadata) return false;
+  return metadata.taskBreakdownConfirmed === true;
+}
+
 function isKickoffWorkItem(x: unknown): x is KickoffWorkItem {
   if (!x || typeof x !== "object") return false;
   const o = x as Record<string, unknown>;

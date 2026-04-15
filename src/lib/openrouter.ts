@@ -30,6 +30,9 @@ export type {
 } from "./llm-types";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_CHAT_TIMEOUT_MS = Number(
+  process.env.OPENROUTER_CHAT_TIMEOUT_MS ?? "600000",
+);
 
 const OPENROUTER_DEFAULT_MODEL = "openai/gpt-4o";
 
@@ -141,7 +144,9 @@ export async function chatCompletionWithFallback(
       }
       // Output was cut off at token limit — treat as transient failure and try next model
       if (finishReason === "length") {
-        throw new Error(`Model ${model} hit max_tokens limit (output truncated)`);
+        throw new Error(
+          `Model ${model} hit max_tokens limit (output truncated)`,
+        );
       }
 
       return resp;
@@ -204,25 +209,47 @@ export async function openRouterChatCompletion(
     image_config,
     response_format,
     reasoning,
+    thinking,
   } = options;
 
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: openRouterHeaders(apiKey),
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      max_tokens,
-      stream,
-      ...(tools?.length ? { tools } : {}),
-      ...(tool_choice ? { tool_choice } : {}),
-      ...(modalities?.length ? { modalities } : {}),
-      ...(image_config ? { image_config } : {}),
-      ...(response_format ? { response_format } : {}),
-      ...(reasoning && reasoning.enabled !== false ? { reasoning } : {}),
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutMs =
+    Number.isFinite(OPENROUTER_CHAT_TIMEOUT_MS) &&
+    OPENROUTER_CHAT_TIMEOUT_MS > 0
+      ? OPENROUTER_CHAT_TIMEOUT_MS
+      : 90_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: openRouterHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens,
+        stream,
+        ...(tools?.length ? { tools } : {}),
+        ...(tool_choice ? { tool_choice } : {}),
+        ...(modalities?.length ? { modalities } : {}),
+        ...(image_config ? { image_config } : {}),
+        ...(response_format ? { response_format } : {}),
+        ...(reasoning && reasoning.enabled !== false ? { reasoning } : {}),
+        ...(thinking ? { thinking } : {}),
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if ((error as { name?: string })?.name === "AbortError") {
+      throw new Error(
+        `OpenRouter request timeout after ${timeoutMs}ms (model=${model})`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const raw = await response.text();
@@ -261,15 +288,41 @@ export async function openRouterVisionChatCompletion(
 ): Promise<OpenRouterResponse> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
-  const { model = OPENROUTER_DEFAULT_MODEL, temperature = 0.7, max_tokens = 4096 } = options;
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: openRouterHeaders(apiKey),
-    body: JSON.stringify({ model, messages, temperature, max_tokens }),
-  });
+  const {
+    model = OPENROUTER_DEFAULT_MODEL,
+    temperature = 0.7,
+    max_tokens = 4096,
+  } = options;
+  const controller = new AbortController();
+  const timeoutMs =
+    Number.isFinite(OPENROUTER_CHAT_TIMEOUT_MS) &&
+    OPENROUTER_CHAT_TIMEOUT_MS > 0
+      ? OPENROUTER_CHAT_TIMEOUT_MS
+      : 90_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: openRouterHeaders(apiKey),
+      body: JSON.stringify({ model, messages, temperature, max_tokens }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if ((error as { name?: string })?.name === "AbortError") {
+      throw new Error(
+        `OpenRouter vision request timeout after ${timeoutMs}ms (model=${model})`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!response.ok) {
     const raw = await response.text();
-    throw new Error(`OpenRouter vision API error: ${response.status} - ${raw.slice(0, 300)}`);
+    throw new Error(
+      `OpenRouter vision API error: ${response.status} - ${raw.slice(0, 300)}`,
+    );
   }
   return JSON.parse(await response.text()) as OpenRouterResponse;
 }
@@ -296,6 +349,10 @@ export async function openRouterStreamChatCompletion(
       stream: true,
       ...(options.tools?.length ? { tools: options.tools } : {}),
       ...(options.tool_choice ? { tool_choice: options.tool_choice } : {}),
+      ...(options.reasoning && options.reasoning.enabled !== false
+        ? { reasoning: options.reasoning }
+        : {}),
+      ...(options.thinking ? { thinking: options.thinking } : {}),
     }),
   });
 

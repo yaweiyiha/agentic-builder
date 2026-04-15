@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     prdSpec,
     sessionId,
     tier,
+    improvementNotes,
   } = body as {
     prd?: string;
     trd?: string;
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
     prdSpec?: PrdSpec | null;
     sessionId?: string;
     tier?: string;
+    improvementNotes?: string[];
   };
 
   if (!prd || !prd.trim()) {
@@ -41,6 +43,9 @@ export async function POST(request: NextRequest) {
     prdSpec: prdSpec ?? null,
     sessionId,
     tier: ((tier ?? "M").toUpperCase() as ProjectTier) ?? "M",
+    improvementNotes: Array.isArray(improvementNotes)
+      ? improvementNotes.filter((n) => typeof n === "string" && n.trim().length > 0)
+      : undefined,
   });
 
   return Response.json({

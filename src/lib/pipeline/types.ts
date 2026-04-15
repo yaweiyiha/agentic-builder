@@ -220,6 +220,8 @@ export interface CodingSessionEvent {
     | "integration_verify_start"
     | "integration_verify_result"
     | "integration_fix_result"
+    | "e2e_verify_start"
+    | "e2e_verify_result"
     | "task_refinement_start"
     | "task_refinement_complete"
     | "agent_task_substeps"

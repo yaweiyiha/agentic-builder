@@ -27,6 +27,7 @@ import {
   formatGeneratedCodeDotEnv,
   resolveBlueprintGeneratedDatabaseUrl,
 } from "@/lib/pipeline/generated-code-env";
+import { runRuntimeVerification } from "./runtime-verify";
 import {
   shellExec,
   execPrismaGenerate,
@@ -114,9 +115,204 @@ function chunkTasks<T>(tasks: T[], chunks: number): T[][] {
   return result.filter((c) => c.length > 0);
 }
 
+function isToolSequenceValidationError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("messages with role 'tool'") &&
+    m.includes("tool_calls")
+  );
+}
+
+function countRemovedOrphanToolMessages(messages: ChatMessage[]): number {
+  let removed = 0;
+  const cleaned: ChatMessage[] = [];
+  let pendingToolCallIds = new Set<string>();
+
+  for (const msg of messages) {
+    if (msg.role === "assistant" && (msg.tool_calls?.length ?? 0) > 0) {
+      pendingToolCallIds = new Set(
+        (msg.tool_calls ?? []).map((tc) => tc.id).filter(Boolean),
+      );
+      cleaned.push(msg);
+      continue;
+    }
+
+    if (msg.role === "tool") {
+      const toolCallId = msg.tool_call_id ?? "";
+      if (toolCallId && pendingToolCallIds.has(toolCallId)) {
+        cleaned.push(msg);
+        pendingToolCallIds.delete(toolCallId);
+      } else {
+        removed++;
+      }
+      continue;
+    }
+
+    pendingToolCallIds = new Set<string>();
+    cleaned.push(msg);
+  }
+
+  messages.splice(0, messages.length, ...cleaned);
+  return removed;
+}
+
+function calculateSafeTailStart(messages: ChatMessage[], desiredStart: number): number {
+  let safeStart = desiredStart;
+
+  const findAssistantIndexForTool = (
+    toolIdx: number,
+    toolCallId: string,
+  ): number => {
+    if (!toolCallId) return -1;
+    for (let i = toolIdx - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (!msg || msg.role !== "assistant") continue;
+      const hasMatch = (msg.tool_calls ?? []).some((tc) => tc.id === toolCallId);
+      if (hasMatch) return i;
+    }
+    return -1;
+  };
+
+  for (let i = desiredStart; i < messages.length; i++) {
+    const msg = messages[i];
+    if (!msg || msg.role !== "tool") continue;
+    const assistantIdx = findAssistantIndexForTool(i, msg.tool_call_id ?? "");
+    if (assistantIdx >= 0) {
+      safeStart = Math.min(safeStart, assistantIdx);
+    }
+  }
+
+  return Math.max(1, Math.min(safeStart, messages.length - 1));
+}
+
+async function callWithOrphanToolRetry(
+  label: string,
+  messages: ChatMessage[],
+  modelChain: string[],
+  options: Omit<OpenRouterOptions, "model">,
+) {
+  try {
+    return await chatCompletionWithFallback(messages, modelChain, options);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isToolSequenceValidationError(msg)) {
+      throw e;
+    }
+    const removed = countRemovedOrphanToolMessages(messages);
+    console.warn(
+      `${label}: detected tool-call sequence error; cleaned ${removed} orphan tool message(s) and retrying once.`,
+    );
+    if (removed <= 0) {
+      throw e;
+    }
+    return chatCompletionWithFallback(messages, modelChain, options);
+  }
+}
+
+function formatTaskBreakdownMarkdown(
+  title: string,
+  tasks: CodingTask[],
+  roleBuckets?: Record<CodingAgentRole, CodingTask[]>,
+  notes?: string[],
+): string {
+  const lines: string[] = [
+    `# ${title}`,
+    "",
+    `- Generated at: ${new Date().toISOString()}`,
+    `- Total tasks: ${tasks.length}`,
+  ];
+
+  if (roleBuckets) {
+    lines.push(
+      `- Role buckets: architect=${roleBuckets.architect.length}, backend=${roleBuckets.backend.length}, frontend=${roleBuckets.frontend.length}, test=${roleBuckets.test.length}`,
+    );
+  }
+
+  if (notes && notes.length > 0) {
+    lines.push(...notes.map((n) => `- Note: ${n}`));
+  }
+
+  lines.push("", "## Tasks", "");
+
+  for (const task of tasks) {
+    lines.push(`### [${task.id}] ${task.title}`);
+    lines.push(
+      `- Phase: ${task.phase} | Priority: ${task.priority} | Execution: ${task.executionKind}`,
+    );
+    lines.push(`- Estimated hours: ${task.estimatedHours}`);
+    lines.push(`- Description: ${task.description}`);
+
+    const files = task.files;
+    const creates =
+      files && !Array.isArray(files) ? (files.creates ?? []) : [];
+    const modifies =
+      files && !Array.isArray(files) ? (files.modifies ?? []) : [];
+    const reads = files && !Array.isArray(files) ? (files.reads ?? []) : [];
+    lines.push(`- Files (create/modify/read): ${creates.length}/${modifies.length}/${reads.length}`);
+
+    if (creates.length > 0) {
+      lines.push("  - Creates:");
+      lines.push(...creates.map((f: string) => `    - \`${f}\``));
+    }
+    if (modifies.length > 0) {
+      lines.push("  - Modifies:");
+      lines.push(...modifies.map((f: string) => `    - \`${f}\``));
+    }
+    if (reads.length > 0) {
+      lines.push("  - Reads:");
+      lines.push(...reads.map((f: string) => `    - \`${f}\``));
+    }
+
+    const dependencies = task.dependencies ?? [];
+    if (dependencies.length > 0) {
+      lines.push(`- Dependencies: ${dependencies.join(", ")}`);
+    } else {
+      lines.push("- Dependencies: (none)");
+    }
+
+    const subSteps = task.subSteps ?? [];
+    if (subSteps.length > 0) {
+      lines.push("- Sub-steps:");
+      for (const step of subSteps) {
+        lines.push(`  - ${step.step}. ${step.action}: ${step.detail}`);
+      }
+    }
+
+    const acceptanceCriteria = task.acceptanceCriteria ?? [];
+    if (acceptanceCriteria.length > 0) {
+      lines.push("- Acceptance criteria:");
+      lines.push(...acceptanceCriteria.map((ac: string) => `  - ${ac}`));
+    }
+
+    const coversRequirementIds = task.coversRequirementIds ?? [];
+    if (coversRequirementIds.length > 0) {
+      lines.push(`- Covers requirements: ${coversRequirementIds.join(", ")}`);
+    }
+
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+async function writeTaskBreakdownMarkdown(
+  outputDir: string,
+  fileName: string,
+  content: string,
+): Promise<void> {
+  try {
+    await fsWrite(fileName, content, outputDir);
+    console.log(`[Supervisor] wrote ${fileName}`);
+  } catch (e) {
+    console.warn(
+      `[Supervisor] failed to write ${fileName}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
 // ─── Nodes ───
 
-function classifyTasks(state: SupervisorState) {
+async function classifyTasks(state: SupervisorState) {
   const tasks = stripTestingPhaseTasks(state.tasks);
   const byRole: Record<CodingAgentRole, CodingTask[]> = {
     architect: [],
@@ -145,6 +341,17 @@ function classifyTasks(state: SupervisorState) {
       `## PROJECT TYPE: FRONTEND-ONLY\nThis is a frontend-only project. Use React + Vite + TypeScript + Tailwind CSS.\nDo NOT use Next.js, Express, Prisma, or any server-side technology.\n\n` +
       projectContext;
   }
+
+  const originalTaskDoc = formatTaskBreakdownMarkdown(
+    "Task Breakdown (Original)",
+    tasks,
+    byRole,
+  );
+  await writeTaskBreakdownMarkdown(
+    state.outputDir,
+    "TASK_BREAKDOWN_ORIGINAL.md",
+    originalTaskDoc,
+  );
 
   return {
     tasks,
@@ -1147,10 +1354,25 @@ async function collectConventionViolations(
 // ─── Two-phase task refinement: after scaffold exists, refine coarse tasks ───
 
 const MAX_SUPPLEMENTARY_ROUNDS = 1;
+const MAX_RUNTIME_VERIFY_RETRIES = 1;
+const MAX_E2E_VERIFY_FIX_ATTEMPTS = 3;
 
 async function refineTaskBreakdown(
   state: SupervisorState,
 ): Promise<Partial<SupervisorState>> {
+  const skipRefine =
+    (process.env.TASK_BREAKDOWN_SKIP_REFINE ?? "0").trim().toLowerCase() ===
+      "1" ||
+    (process.env.TASK_BREAKDOWN_SKIP_REFINE ?? "0")
+      .trim()
+      .toLowerCase() === "true";
+  if (skipRefine) {
+    console.log(
+      "[Supervisor] refineTaskBreakdown: skipped by TASK_BREAKDOWN_SKIP_REFINE.",
+    );
+    return { taskRefinementDone: true };
+  }
+
   const coarseTasks = [
     ...state.backendTasks,
     ...state.frontendTasks,
@@ -1159,6 +1381,13 @@ async function refineTaskBreakdown(
 
   if (coarseTasks.length === 0) {
     console.log("[Supervisor] refineTaskBreakdown: no tasks to refine.");
+    await writeTaskBreakdownMarkdown(
+      state.outputDir,
+      "TASK_BREAKDOWN_REFINED.md",
+      formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
+        "No tasks were available for refinement.",
+      ]),
+    );
     return { taskRefinementDone: true };
   }
 
@@ -1262,12 +1491,26 @@ async function refineTaskBreakdown(
       console.warn(
         "[Supervisor] refineTaskBreakdown: failed to parse LLM output, keeping original tasks.",
       );
+      await writeTaskBreakdownMarkdown(
+        state.outputDir,
+        "TASK_BREAKDOWN_REFINED.md",
+        formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
+          "LLM output parse failed; kept original tasks.",
+        ]),
+      );
       return { taskRefinementDone: true, totalCostUsd: costUsd };
     }
 
     if (refined.length === 0) {
       console.warn(
         "[Supervisor] refineTaskBreakdown: empty result, keeping original tasks.",
+      );
+      await writeTaskBreakdownMarkdown(
+        state.outputDir,
+        "TASK_BREAKDOWN_REFINED.md",
+        formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
+          "LLM returned an empty task list; kept original tasks.",
+        ]),
       );
       return { taskRefinementDone: true, totalCostUsd: costUsd };
     }
@@ -1278,6 +1521,13 @@ async function refineTaskBreakdown(
     if (validRefined.length === 0) {
       console.warn(
         "[Supervisor] refineTaskBreakdown: no valid tasks after filtering, keeping original.",
+      );
+      await writeTaskBreakdownMarkdown(
+        state.outputDir,
+        "TASK_BREAKDOWN_REFINED.md",
+        formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
+          "No valid task IDs in refined output; kept original tasks.",
+        ]),
       );
       return { taskRefinementDone: true, totalCostUsd: costUsd };
     }
@@ -1305,6 +1555,21 @@ async function refineTaskBreakdown(
       (t) => inferRole(t) === "test",
     ) as CodingTask[];
 
+    await writeTaskBreakdownMarkdown(
+      state.outputDir,
+      "TASK_BREAKDOWN_REFINED.md",
+      formatTaskBreakdownMarkdown(
+        "Task Breakdown (Refined)",
+        mergedTasks,
+        {
+          architect: mergedTasks.filter((t) => inferRole(t) === "architect"),
+          backend: newBackend,
+          frontend: newFrontend,
+          test: newTest,
+        },
+      ),
+    );
+
     console.log(
       `[Supervisor] refineTaskBreakdown: refined ${validRefined.length}/${coarseTasks.length} tasks (model=${response.model}, cost=$${costUsd.toFixed(4)})`,
     );
@@ -1319,6 +1584,13 @@ async function refineTaskBreakdown(
   } catch (e) {
     console.warn(
       `[Supervisor] refineTaskBreakdown: LLM call failed: ${e instanceof Error ? e.message : String(e)}. Keeping original tasks.`,
+    );
+    await writeTaskBreakdownMarkdown(
+      state.outputDir,
+      "TASK_BREAKDOWN_REFINED.md",
+      formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
+        "LLM call failed; kept original tasks.",
+      ]),
     );
     return { taskRefinementDone: true };
   }
@@ -1482,7 +1754,7 @@ function shouldDispatchSupplementary(state: SupervisorState): string {
   ) {
     return "supplementary_dispatch_gate";
   }
-  return "summary";
+  return "integration_verify";
 }
 
 function dispatchSupplementaryWorkers(state: SupervisorState): Send[] {
@@ -1595,6 +1867,252 @@ async function supplementaryVerify(
     supplementaryRound: state.supplementaryRound + 1,
     supplementaryTasks: [],
   };
+}
+
+async function runtimeVerify(state: SupervisorState): Promise<Partial<SupervisorState>> {
+  const attempt = state.runtimeVerifyAttempts + 1;
+  console.log(
+    `[Supervisor] runtimeVerify: attempt ${attempt}/${MAX_RUNTIME_VERIFY_RETRIES + 1}...`,
+  );
+
+  const result = await runRuntimeVerification(state.outputDir);
+  if (result.pass) {
+    console.log("[Supervisor] runtimeVerify: PASSED.");
+    return {
+      runtimeVerifyAttempts: attempt,
+      runtimeVerifyErrors: "",
+    };
+  }
+
+  console.warn(
+    `[Supervisor] runtimeVerify: FAILED with ${result.failures.length} check failure(s).`,
+  );
+  return {
+    runtimeVerifyAttempts: attempt,
+    runtimeVerifyErrors: result.summary.slice(0, 4000),
+  };
+}
+
+function parseFileBlocksFromContent(
+  raw: string,
+): { filePath: string; fileContent: string }[] {
+  const files: { filePath: string; fileContent: string }[] = [];
+  const regex = /```file:([^\n]+)\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(raw)) !== null) {
+    const filePath = match[1]?.trim();
+    const fileContent = match[2] ?? "";
+    if (filePath && fileContent) {
+      files.push({ filePath, fileContent });
+    }
+  }
+  return files;
+}
+
+function summarizeE2eTaskContext(tasks: CodingTask[]): string {
+  if (tasks.length === 0) return "No explicit test tasks were generated.";
+  return tasks
+    .slice(0, 20)
+    .map((t) => `- [${t.id}] ${t.title}: ${t.description}`)
+    .join("\n");
+}
+
+async function detectE2eCommand(
+  outputDir: string,
+): Promise<{ command: string; cwd: string; label: string } | null> {
+  const frontendPkgRaw = await fsRead("frontend/package.json", outputDir);
+  if (
+    frontendPkgRaw.startsWith("FILE_NOT_FOUND") ||
+    frontendPkgRaw.startsWith("REJECTED")
+  ) {
+    return null;
+  }
+  let scripts: Record<string, string> = {};
+  try {
+    scripts = (JSON.parse(frontendPkgRaw) as { scripts?: Record<string, string> })
+      .scripts ?? {};
+  } catch {
+    scripts = {};
+  }
+
+  const pm = await detectPackageManager(outputDir);
+  const frontendDir = path.join(outputDir, "frontend");
+  if (scripts.e2e) {
+    const command =
+      pm === "pnpm"
+        ? "pnpm run e2e 2>&1"
+        : pm === "yarn"
+          ? "yarn run e2e 2>&1"
+          : "npm run e2e 2>&1";
+    return { command, cwd: frontendDir, label: "frontend:e2e-script" };
+  }
+
+  const hasPlaywrightConfig = !(
+    await fsRead("frontend/playwright.config.ts", outputDir)
+  ).startsWith("FILE_NOT_FOUND");
+  if (hasPlaywrightConfig) {
+    return {
+      command: "npx playwright test 2>&1",
+      cwd: frontendDir,
+      label: "frontend:playwright",
+    };
+  }
+  return null;
+}
+
+async function e2eVerifyAndFix(
+  state: SupervisorState,
+): Promise<Partial<SupervisorState>> {
+  const attempt = state.e2eVerifyAttempts + 1;
+  console.log(
+    `[Supervisor] e2eVerify: attempt ${attempt}/${MAX_E2E_VERIFY_FIX_ATTEMPTS + 1}...`,
+  );
+
+  const plan = await detectE2eCommand(state.outputDir);
+  if (!plan) {
+    return {
+      e2eVerifyAttempts: attempt,
+      e2eVerifyErrors:
+        "No executable E2E command found. Expected frontend package script `e2e` or playwright config.",
+    };
+  }
+
+  const runResult = await shellExec(plan.command, plan.cwd, {
+    timeout: 180_000,
+  });
+  const output = `${runResult.stdout}${runResult.stderr}`.trim();
+  if (runResult.exitCode === 0) {
+    return {
+      e2eVerifyAttempts: attempt,
+      e2eVerifyErrors: "",
+    };
+  }
+
+  const failureSummary = output.slice(-12_000);
+  if (attempt > MAX_E2E_VERIFY_FIX_ATTEMPTS) {
+    console.warn("[Supervisor] e2eVerify: max attempts reached.");
+    return {
+      e2eVerifyAttempts: attempt,
+      e2eVerifyErrors: failureSummary,
+    };
+  }
+
+  const e2eModelChain = resolveModelChain(
+    MODEL_CONFIG.e2eGen ?? MODEL_CONFIG.codeFix ?? "gpt-4o",
+    resolveModel,
+  );
+  const testTaskContext = summarizeE2eTaskContext(state.testTasks);
+  const testFiles = (await listFiles("frontend", state.outputDir))
+    .filter((f) => /\.(spec|test)\.(ts|tsx|js|jsx)$/.test(f))
+    .slice(0, 6);
+  const testFileContents: string[] = [];
+  for (const tf of testFiles) {
+    const c = await fsRead(tf, state.outputDir);
+    if (!c.startsWith("FILE_NOT_FOUND") && !c.startsWith("REJECTED")) {
+      testFileContents.push(`### ${tf}\n\`\`\`\n${c.slice(0, 2500)}\n\`\`\``);
+    }
+  }
+
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: [
+        "You are an E2E test repair specialist.",
+        "Fix the generated project so E2E tests pass.",
+        "Output ONLY modified files using ```file:path``` blocks.",
+        "Do not add explanations.",
+      ].join("\n"),
+    },
+    {
+      role: "user",
+      content: [
+        `Project root: ${state.outputDir}`,
+        `E2E command: ${plan.command}`,
+        `Attempt: ${attempt}`,
+        "",
+        "## PRD context",
+        state.projectContext.slice(0, 8000),
+        "",
+        "## Test tasks",
+        testTaskContext,
+        "",
+        "## E2E failure output",
+        "```",
+        failureSummary,
+        "```",
+        "",
+        testFileContents.length > 0
+          ? `## Existing test files\n${testFileContents.join("\n\n")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  ];
+
+  try {
+    const response = await chatCompletionWithFallback(messages, e2eModelChain, {
+      temperature: 0.1,
+      max_tokens: 12000,
+    });
+    const content = response.choices[0]?.message?.content ?? "";
+    const fileBlocks = parseFileBlocksFromContent(content);
+    if (fileBlocks.length === 0) {
+      console.warn(
+        "[Supervisor] e2eVerify: model returned no file blocks, keeping failure for next retry.",
+      );
+      return {
+        e2eVerifyAttempts: attempt,
+        e2eVerifyErrors: failureSummary,
+      };
+    }
+
+    for (const file of fileBlocks) {
+      await fsWrite(file.filePath, file.fileContent, state.outputDir, {
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
+      });
+    }
+    console.log(
+      `[Supervisor] e2eVerify: wrote ${fileBlocks.length} file(s), will re-verify next iteration.`,
+    );
+  } catch (e) {
+    console.warn(
+      `[Supervisor] e2eVerify: auto-fix call failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  return {
+    e2eVerifyAttempts: attempt,
+    e2eVerifyErrors: failureSummary,
+  };
+}
+
+function routeAfterIntegrationVerify(state: SupervisorState): string {
+  if (state.integrationErrors) return "summary";
+  return "runtime_verify";
+}
+
+function routeAfterRuntimeVerify(state: SupervisorState): string {
+  if (
+    state.runtimeVerifyErrors &&
+    state.runtimeVerifyAttempts <= MAX_RUNTIME_VERIFY_RETRIES
+  ) {
+    return "integration_verify";
+  }
+  if (!state.runtimeVerifyErrors) {
+    return "e2e_verify";
+  }
+  return "summary";
+}
+
+function routeAfterE2eVerify(state: SupervisorState): string {
+  if (
+    state.e2eVerifyErrors &&
+    state.e2eVerifyAttempts <= MAX_E2E_VERIFY_FIX_ATTEMPTS
+  ) {
+    return "e2e_verify";
+  }
+  return "summary";
 }
 
 // ─── API Contract generation ───
@@ -2748,6 +3266,7 @@ async function phaseVerifyAndFix(
   // Skip backend verify+fix when the project has no backend tasks (frontend-only project).
   // Frontend TypeScript errors will be caught by fe_phase_verify that runs afterwards.
   const isBackendPhase = options?.workerHintRoles?.includes("backend");
+  const isFrontendPhase = options?.workerHintRoles?.includes("frontend");
   if (isBackendPhase && state.backendTasks.length === 0) {
     console.log(
       `${label}: skipping backend verify (frontend-only project, no backend tasks).`,
@@ -2769,6 +3288,90 @@ async function phaseVerifyAndFix(
   const pm = await detectPackageManager(state.outputDir);
   const installCmd = buildInstallCommand(pm).replace("tail -30", "tail -10");
   const versionConstraints = await buildVersionConstraints(state.outputDir);
+
+  type TsFixPlan = {
+    scope: "backend" | "frontend" | "root";
+    cwd: string;
+    tscCommand: string;
+  };
+
+  const tsFixPlans: TsFixPlan[] = [];
+  if (isFrontendPhase) {
+    const hasFrontendTsconfig = !(
+      await fsRead("frontend/tsconfig.json", state.outputDir)
+    ).startsWith("FILE_NOT_FOUND");
+    if (hasFrontendTsconfig) {
+      const hasFrontendAppTsconfig = !(
+        await fsRead("frontend/tsconfig.app.json", state.outputDir)
+      ).startsWith("FILE_NOT_FOUND");
+      tsFixPlans.push({
+        scope: "frontend",
+        cwd: path.join(state.outputDir, "frontend"),
+        tscCommand: hasFrontendAppTsconfig
+          ? "npx tsc -p tsconfig.app.json --pretty false 2>&1"
+          : "npx tsc --noEmit --skipLibCheck --pretty false 2>&1",
+      });
+    }
+  }
+  if (isBackendPhase) {
+    const hasBackendTsconfig = !(
+      await fsRead("backend/tsconfig.json", state.outputDir)
+    ).startsWith("FILE_NOT_FOUND");
+    if (hasBackendTsconfig) {
+      tsFixPlans.push({
+        scope: "backend",
+        cwd: path.join(state.outputDir, "backend"),
+        tscCommand: "npx tsc --noEmit --skipLibCheck --pretty false 2>&1",
+      });
+    }
+  }
+  if (!isFrontendPhase && !isBackendPhase) {
+    const hasRootTsconfig = !(
+      await fsRead("tsconfig.json", state.outputDir)
+    ).startsWith("FILE_NOT_FOUND");
+    if (hasRootTsconfig) {
+      tsFixPlans.push({
+        scope: "root",
+        cwd: state.outputDir,
+        tscCommand: "npx tsc --noEmit --skipLibCheck --pretty false 2>&1",
+      });
+    }
+  }
+
+  const autoFixNotes: string[] = [];
+  let autoFixAllPassed = tsFixPlans.length > 0;
+  for (const plan of tsFixPlans) {
+    const tsFixCommand = "npx --no-install ts-fix --tsconfig ./tsconfig.json 2>&1";
+    console.log(
+      `${label}: pre-LLM ts-fix (${plan.scope}) running: ${tsFixCommand}`,
+    );
+    const fixResult = await shellExec(tsFixCommand, plan.cwd, { timeout: 120_000 });
+    autoFixNotes.push(
+      `${plan.scope}: ts-fix exit=${fixResult.exitCode}`,
+    );
+
+    const checkResult = await shellExec(plan.tscCommand, plan.cwd, {
+      timeout: 120_000,
+    });
+    const checkOutput = `${checkResult.stdout}${checkResult.stderr}`.trim();
+    if (checkResult.exitCode !== 0 && checkOutput.includes("error TS")) {
+      autoFixAllPassed = false;
+      autoFixNotes.push(
+        `${plan.scope}: remaining tsc errors after ts-fix:\n${checkOutput.slice(0, 1200)}`,
+      );
+    } else {
+      autoFixNotes.push(`${plan.scope}: tsc passed after ts-fix`);
+    }
+  }
+
+  if (tsFixPlans.length > 0 && autoFixAllPassed) {
+    console.log(`${label}: pre-LLM ts-fix fully resolved errors.`);
+    return {
+      scaffoldErrors: "",
+      scaffoldFixAttempts: 0,
+      totalCostUsd: 0,
+    };
+  }
 
   const systemPrompt = [
     "You are a Senior Engineer. Your job: verify the generated codebase compiles cleanly and fix ALL errors.",
@@ -2805,11 +3408,16 @@ async function phaseVerifyAndFix(
         )
       : "";
 
+  const autoFixHints =
+    autoFixNotes.length > 0
+      ? `\n## Pre-LLM auto ts-fix report\n${autoFixNotes.join("\n")}\n`
+      : "";
+
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: `Project directory: ${state.outputDir}\nPackage manager: ${pm}${workerHints}\nBegin verification and fix now.`,
+      content: `Project directory: ${state.outputDir}\nPackage manager: ${pm}${workerHints}${autoFixHints}\nBegin verification and fix now.`,
     },
   ];
 
@@ -2838,8 +3446,10 @@ async function phaseVerifyAndFix(
     if (totalChars < COMPACT_THRESHOLD) return;
 
     const systemMsg = messages[0];
-    const tail = messages.slice(-KEEP_TAIL);
-    const middle = messages.slice(1, messages.length - KEEP_TAIL);
+    const desiredStart = Math.max(1, messages.length - KEEP_TAIL);
+    const tailStart = calculateSafeTailStart(messages, desiredStart);
+    const tail = messages.slice(tailStart);
+    const middle = messages.slice(1, tailStart);
 
     // Build a summary of the compacted middle
     const actionLines: string[] = [];
@@ -2866,8 +3476,9 @@ async function phaseVerifyAndFix(
       { role: "assistant", content: summary },
       ...tail,
     );
+    const removed = countRemovedOrphanToolMessages(messages);
     console.log(
-      `${label}: context compacted — removed ${middle.length} messages (was ~${Math.round(totalChars / 4)} tokens)`,
+      `${label}: context compacted — removed ${middle.length} messages (was ~${Math.round(totalChars / 4)} tokens), orphan_tools_removed=${removed}`,
     );
   }
 
@@ -2880,7 +3491,7 @@ async function phaseVerifyAndFix(
 
     let resp;
     try {
-      resp = await chatCompletionWithFallback(messages, modelChain, {
+      resp = await callWithOrphanToolRetry(label, messages, modelChain, {
         temperature: 0.2,
         max_tokens: 36000,
         tools: SUPERVISOR_VERIFY_TOOLS,
@@ -3953,6 +4564,9 @@ async function integrationVerifyAndFix(
     `Project directory: ${state.outputDir}`,
     `Package manager: ${pm}`,
     prdBlock,
+    state.runtimeVerifyErrors
+      ? `\n## Runtime verification failures from previous round\n${state.runtimeVerifyErrors}`
+      : "",
     "",
     "Begin with PRD completeness and route/module registration review first, then run scoped frontend/backend validation after the feature补写 is complete.",
   ]
@@ -4112,8 +4726,10 @@ async function integrationVerifyAndFix(
     if (totalChars < COMPACT_THRESHOLD) return;
 
     const systemMsg = messages[0];
-    const tail = messages.slice(-KEEP_TAIL);
-    const middle = messages.slice(1, messages.length - KEEP_TAIL);
+    const desiredStart = Math.max(1, messages.length - KEEP_TAIL);
+    const tailStart = calculateSafeTailStart(messages, desiredStart);
+    const tail = messages.slice(tailStart);
+    const middle = messages.slice(1, tailStart);
 
     const actionLines: string[] = [];
     for (const m of middle) {
@@ -4146,8 +4762,9 @@ async function integrationVerifyAndFix(
       { role: "assistant", content: summary },
       ...tail,
     );
+    const removed = countRemovedOrphanToolMessages(messages);
     console.log(
-      `${label}: context compacted — removed ${middle.length} messages (was ~${Math.round(totalChars / 4)} tokens)`,
+      `${label}: context compacted — removed ${middle.length} messages (was ~${Math.round(totalChars / 4)} tokens), orphan_tools_removed=${removed}`,
     );
   }
 
@@ -4159,7 +4776,7 @@ async function integrationVerifyAndFix(
 
     let resp;
     try {
-      resp = await chatCompletionWithFallback(messages, modelChain, {
+      resp = await callWithOrphanToolRetry(label, messages, modelChain, {
         temperature: 0.2,
         max_tokens: 36000,
         tools: SUPERVISOR_VERIFY_TOOLS,
@@ -4342,8 +4959,6 @@ export function createSupervisorGraph() {
     .addNode("dispatch_gate", dispatchGate)
     .addNode("refine_task_breakdown", refineTaskBreakdown)
     .addNode("dependency_baseline", dependencyBaseline)
-    .addNode("generate_api_contracts", generateApiContracts)
-    .addNode("bootstrap_shared_contracts", bootstrapSharedContracts)
     .addNode("generate_service_skeletons", generateServiceSkeletons)
     .addNode("be_worker", parallelWorkerNode)
     .addNode("be_phase_verify", (s) =>
@@ -4356,11 +4971,13 @@ export function createSupervisorGraph() {
       phaseVerifyAndFix(s, { workerHintRoles: ["frontend"] }),
     )
     .addNode("sync_deps", syncDeps)
-    .addNode("integration_verify", integrationVerifyAndFix)
     .addNode("gap_analysis", gapAnalysis)
     .addNode("supplementary_dispatch_gate", (_s: SupervisorState) => ({}))
     .addNode("supplementary_worker", parallelWorkerNode)
     .addNode("supplementary_verify", supplementaryVerify)
+    .addNode("integration_verify", integrationVerifyAndFix)
+    .addNode("runtime_verify", runtimeVerify)
+    .addNode("e2e_verify", e2eVerifyAndFix)
     .addNode("summary", summary)
 
     .addEdge(START, "classify_tasks")
@@ -4373,9 +4990,7 @@ export function createSupervisorGraph() {
     .addEdge("scaffold_fix", "scaffold_verify")
     .addEdge("dispatch_gate", "refine_task_breakdown")
     .addEdge("refine_task_breakdown", "dependency_baseline")
-    .addEdge("dependency_baseline", "generate_api_contracts")
-    .addEdge("generate_api_contracts", "bootstrap_shared_contracts")
-    .addEdge("bootstrap_shared_contracts", "generate_service_skeletons")
+    .addEdge("dependency_baseline", "generate_service_skeletons")
     .addConditionalEdges(
       "generate_service_skeletons",
       dispatchBackendAndTestWorkers,
@@ -4386,18 +5001,41 @@ export function createSupervisorGraph() {
     .addConditionalEdges("fe_dispatch_gate", dispatchFrontendWorkers)
     .addEdge("fe_worker", "fe_phase_verify")
     .addEdge("fe_phase_verify", "sync_deps")
-    .addEdge("sync_deps", "integration_verify")
-    .addEdge("integration_verify", "gap_analysis")
+    .addEdge("sync_deps", "gap_analysis")
     .addConditionalEdges("gap_analysis", shouldDispatchSupplementary, {
       supplementary_dispatch_gate: "supplementary_dispatch_gate",
-      summary: "summary",
+      integration_verify: "integration_verify",
     })
     .addConditionalEdges(
       "supplementary_dispatch_gate",
       dispatchSupplementaryWorkers,
     )
     .addEdge("supplementary_worker", "supplementary_verify")
-    .addEdge("supplementary_verify", "summary")
+    .addEdge("supplementary_verify", "integration_verify")
+    .addConditionalEdges("integration_verify", routeAfterIntegrationVerify, {
+      runtime_verify: "runtime_verify",
+      summary: "summary",
+    })
+    .addConditionalEdges("runtime_verify", routeAfterRuntimeVerify, {
+      integration_verify: "integration_verify",
+      e2e_verify: "e2e_verify",
+      summary: "summary",
+    })
+    .addConditionalEdges("e2e_verify", routeAfterE2eVerify, {
+      e2e_verify: "e2e_verify",
+      summary: "summary",
+    })
+    .addEdge("summary", END);
+
+  return graph.compile();
+}
+
+export function createIntegrationRetryGraph() {
+  const graph = new StateGraph(SupervisorStateAnnotation)
+    .addNode("integration_verify", integrationVerifyAndFix)
+    .addNode("summary", summary)
+    .addEdge(START, "integration_verify")
+    .addEdge("integration_verify", "summary")
     .addEdge("summary", END);
 
   return graph.compile();

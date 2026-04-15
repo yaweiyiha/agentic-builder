@@ -134,6 +134,70 @@ function parseJsonArrayFromLlmOutput(raw: string): {
   }
 }
 
+function extractPrdRequirementIds(prd: string): Set<string> {
+  const ids = new Set<string>();
+  const re = /\b(?:AC|FR|US|IC)-[A-Z0-9]+(?:-[A-Z0-9]+)?\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(prd)) !== null) ids.add(m[0]);
+  return ids;
+}
+
+function normalizeDependencyIds(task: KickoffWorkItem, validTaskIds: Set<string>): string[] {
+  const deps = Array.isArray(task.dependencies) ? task.dependencies : [];
+  return deps.filter((d) => typeof d === "string" && validTaskIds.has(d));
+}
+
+function normalizeCoverageIds(
+  task: KickoffWorkItem,
+  prdIds: Set<string>,
+): string[] {
+  const raw = Array.isArray(task.coversRequirementIds)
+    ? task.coversRequirementIds
+    : [];
+
+  const out = new Set<string>();
+  for (const idRaw of raw) {
+    if (typeof idRaw !== "string") continue;
+    const id = idRaw.trim();
+    if (!id) continue;
+
+    // Common hallucination/typo fallback: FR-TMxx -> FR-TSxx (Task Management)
+    if (/^FR-TM\d+$/i.test(id)) {
+      const mapped = id.replace(/^FR-TM/i, "FR-TS");
+      if (prdIds.has(mapped)) {
+        out.add(mapped);
+        continue;
+      }
+    }
+
+    // Keep AC/FR/US/IC only when they exist in PRD.
+    if (/^(AC|FR|US|IC)-/i.test(id)) {
+      if (prdIds.has(id)) out.add(id);
+      continue;
+    }
+
+    // Keep structured IDs from PRD spec context if present.
+    if (/^(PAGE|CMP|F)-/i.test(id)) {
+      out.add(id);
+    }
+  }
+  return [...out];
+}
+
+function normalizeOriginalTaskBreakdown(
+  tasks: KickoffWorkItem[],
+  prd: string,
+): KickoffWorkItem[] {
+  const validTaskIds = new Set(tasks.map((t) => t.id));
+  const prdIds = extractPrdRequirementIds(prd);
+
+  return tasks.map((t) => ({
+    ...t,
+    dependencies: normalizeDependencyIds(t, validTaskIds),
+    coversRequirementIds: normalizeCoverageIds(t, prdIds),
+  }));
+}
+
 /**
  * Use the LLM to analyze all pipeline documents and produce a real coding task breakdown.
  * Falls back to an empty list if the LLM output cannot be parsed.
@@ -148,6 +212,8 @@ export async function buildTaskBreakdownFromDocuments(params: {
   prdSpec?: PrdSpec | null;
   sessionId?: string;
   tier?: ProjectTier;
+  /** Optional user-selected guidance for improving a previously generated breakdown. */
+  improvementNotes?: string[];
 }): Promise<{
   tasks: KickoffWorkItem[];
   costUsd: number;
@@ -175,14 +241,16 @@ export async function buildTaskBreakdownFromDocuments(params: {
       implGuide: params.implGuide,
       designSpec: params.designSpec,
       prdSpecText,
+      improvementNotes: params.improvementNotes,
     },
     params.sessionId,
   );
 
   const parsed = parseJsonArrayFromLlmOutput(result.content);
+  const normalized = normalizeOriginalTaskBreakdown(parsed.tasks, params.prd);
 
   return {
-    tasks: stripTestingPhaseTasks(parsed.tasks),
+    tasks: stripTestingPhaseTasks(normalized),
     costUsd: result.costUsd,
     durationMs: result.durationMs,
     model: result.model,

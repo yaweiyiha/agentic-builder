@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   useCodingStore,
   type IntegrationVerifyState,
+  type E2EVerifyState,
   type TaskRefinementState,
   type GapAnalysisState,
 } from "@/store/coding-store";
+import { usePipelineStore } from "@/store/pipeline-store";
 import Loading from "@/components/Loading";
 import { CodingLogLine, type CodingLogDisplayEntry } from "@/components/CodingLogLine";
 import CodingTaskTopologyView from "@/components/CodingTaskTopologyView";
@@ -21,8 +23,13 @@ import type {
   CodingTask,
 } from "@/lib/pipeline/types";
 
-/** Roles shown in task topology and agent progress (test hidden per product choice). */
-const TASK_UI_ROLE_ORDER: CodingAgentRole[] = ["architect", "backend", "frontend"];
+/** Roles shown in task topology and agent progress. */
+const TASK_UI_ROLE_ORDER: CodingAgentRole[] = [
+  "architect",
+  "backend",
+  "frontend",
+  "test",
+];
 
 const ROLE_META: Record<
   CodingAgentRole,
@@ -159,8 +166,11 @@ function ProgressBar({
 export default function CodingAgentGraph() {
   const {
     status, agents, tasks, selectedAgentId, totalCostUsd, error,
-    selectAgent, reset, integrationVerify, taskRefinement, gapAnalysis, supervisorLogs,
+    selectAgent, reset, retryIntegrationVerify, integrationVerify, e2eVerify, taskRefinement, gapAnalysis, supervisorLogs,
   } = useCodingStore();
+  const codeOutputDir = usePipelineStore((s) => s.codeOutputDir);
+  const intentStep = usePipelineStore((s) => s.steps.intent);
+  const kickoffStep = usePipelineStore((s) => s.steps.kickoff);
 
   const [selectedRole, setSelectedRole] = useState<CodingAgentRole | null>(null);
   const [topologySelectedTaskId, setTopologySelectedTaskId] = useState<string | null>(null);
@@ -172,10 +182,7 @@ export default function CodingAgentGraph() {
     [agents],
   );
 
-  const visibleTasks = useMemo(
-    () => tasks.filter((t) => resolveTaskRole(t, agentById) !== "test"),
-    [tasks, agentById],
-  );
+  const visibleTasks = useMemo(() => tasks, [tasks]);
 
   const groups = useMemo<AgentGroup[]>(() => {
     return TASK_UI_ROLE_ORDER.map((role) => {
@@ -216,10 +223,6 @@ export default function CodingAgentGraph() {
       setTopologySelectedTaskId(null);
     }
   }, [topologySelectedTaskId, visibleTasks]);
-
-  useEffect(() => {
-    if (selectedRole === "test") setSelectedRole(null);
-  }, [selectedRole]);
 
   const visibleLogs = useMemo<CodingLogDisplayEntry[]>(() => {
     if (selectedAgent) {
@@ -282,6 +285,15 @@ export default function CodingAgentGraph() {
       task.codingStatus === "in_progress" && task.progressStage === "fixing",
   ).length;
   const totalTasks = visibleTasks.length;
+  const projectTier = (
+    intentStep?.metadata as
+      | { classification?: { tier?: string } }
+      | undefined
+  )?.classification?.tier;
+  const retryRunId =
+    typeof kickoffStep?.metadata?.runId === "string"
+      ? kickoffStep.metadata.runId
+      : `integration-retry-${Date.now()}`;
 
   if (status === "idle") {
     return (
@@ -368,8 +380,16 @@ export default function CodingAgentGraph() {
 
         {/* Final Verification */}
         {integrationVerify && (
-          <IntegrationVerifyCard verify={integrationVerify} />
+          <IntegrationVerifyCard
+            verify={integrationVerify}
+            retrying={status === "running" && integrationVerify.status !== "failed"}
+            onRetry={() =>
+              retryIntegrationVerify(retryRunId, codeOutputDir, projectTier)
+            }
+          />
         )}
+
+        {e2eVerify && <E2EVerifyCard verify={e2eVerify} />}
 
         {/* Gap Analysis */}
         {gapAnalysis && <GapAnalysisCard analysis={gapAnalysis} />}
@@ -576,7 +596,15 @@ function GapAnalysisCard({ analysis }: { analysis: GapAnalysisState }) {
   );
 }
 
-function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
+function IntegrationVerifyCard({
+  verify,
+  retrying,
+  onRetry,
+}: {
+  verify: IntegrationVerifyState;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const statusConfig: Record<
@@ -654,6 +682,122 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-zinc-900">
             Final Verification
+          </p>
+          <p className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</p>
+        </div>
+        {verify.errors && (
+          <motion.span
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.12 }}
+            className="shrink-0 text-[10px] text-zinc-400"
+          >
+            ▾
+          </motion.span>
+        )}
+      </button>
+      {verify.status === "failed" && (
+        <div className="mt-2.5 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {retrying ? "Retrying..." : "Retry Final Verification"}
+          </button>
+        </div>
+      )}
+      <AnimatePresence initial={false}>
+        {expanded && verify.errors && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <pre className="mt-2.5 max-h-[200px] overflow-y-auto rounded-lg bg-zinc-900 p-3 font-mono text-[10px] leading-5 text-zinc-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
+              {verify.errors}
+            </pre>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function E2EVerifyCard({ verify }: { verify: E2EVerifyState }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusConfig: Record<
+    E2EVerifyState["status"],
+    { icon: React.ReactNode; label: string; bg: string; text: string }
+  > = {
+    verifying: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin text-purple-500">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      ),
+      label: "Running E2E verification...",
+      bg: "border-purple-200 bg-purple-50/60",
+      text: "text-purple-800",
+    },
+    fixing: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500">
+          <path d="M12 9v4" />
+          <path d="M12 17h.01" />
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        </svg>
+      ),
+      label: `${verify.errorCount ?? 0} issue(s) found — auto-fixing in E2E stage (attempt ${verify.fixAttempts}/${verify.maxFixAttempts})...`,
+      bg: "border-amber-200 bg-amber-50/60",
+      text: "text-amber-800",
+    },
+    passed: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      ),
+      label: `E2E passed${verify.fixAttempts > 0 ? ` after ${verify.fixAttempts} attempt${verify.fixAttempts === 1 ? "" : "s"}` : ""}`,
+      bg: "border-emerald-200 bg-emerald-50/60",
+      text: "text-emerald-800",
+    },
+    failed: {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+      ),
+      label: `E2E failed after ${verify.fixAttempts} attempt${verify.fixAttempts === 1 ? "" : "s"}`,
+      bg: "border-red-200 bg-red-50/60",
+      text: "text-red-800",
+    },
+  };
+
+  const cfg = statusConfig[verify.status];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`rounded-xl border ${cfg.bg} px-4 py-3`}
+    >
+      <button
+        type="button"
+        onClick={() => verify.errors && setExpanded((v) => !v)}
+        className="flex w-full items-center gap-3 text-left"
+      >
+        {cfg.icon}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-zinc-900">
+            E2E Verification
           </p>
           <p className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</p>
         </div>

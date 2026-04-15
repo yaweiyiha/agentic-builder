@@ -27,6 +27,7 @@ import type { ProjectTier } from "@/lib/agents/project-classifier";
 import { DEBUG_SAMPLE_KICKOFF_TASKS } from "@/lib/pipeline/debug-sample-tasks";
 import { DEBUG_CRITICAL_ILLNESS_KICKOFF_TASKS } from "@/lib/pipeline/debug-critical-illness-tasks";
 import { parseKickoffTaskBreakdownFromMetadata } from "@/lib/pipeline/kickoff-task-breakdown";
+import { isKickoffTaskBreakdownConfirmed } from "@/lib/pipeline/kickoff-task-breakdown";
 import {
   isContinueCommand,
   isRegenerateCommand,
@@ -532,12 +533,16 @@ export default function PipelinePage() {
   const kickoffTasks = steps.kickoff
     ? parseKickoffTaskBreakdownFromMetadata(steps.kickoff.metadata)
     : [];
+  const kickoffTasksConfirmed = isKickoffTaskBreakdownConfirmed(
+    steps.kickoff?.metadata as Record<string, unknown> | undefined,
+  );
   const kickoffAwaitingCodingContinue =
     displayedStepId === "kickoff" &&
     steps.kickoff?.status === "completed" &&
     !activeOverridePhase &&
     codingStatus === "idle" &&
-    kickoffTasks.length > 0;
+    kickoffTasks.length > 0 &&
+    kickoffTasksConfirmed;
 
   const commandBarGateActive =
     showPrdReview || showGenerationPlan || kickoffAwaitingCodingContinue;
@@ -557,6 +562,10 @@ export default function PipelinePage() {
           st.kickoff?.metadata,
         );
         if (tasks.length > 0) {
+          const confirmed = isKickoffTaskBreakdownConfirmed(
+            st.kickoff?.metadata as Record<string, unknown> | undefined,
+          );
+          if (!confirmed) return;
           if (!isContinueCommand(raw)) return;
           const runId =
             typeof st.kickoff.metadata?.runId === "string"

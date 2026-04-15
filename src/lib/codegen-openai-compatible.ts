@@ -15,6 +15,59 @@ const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 3_000;
 const FETCH_TIMEOUT_MS = 300_000;
 
+type ReasoningEffort = "low" | "medium" | "high";
+type ThinkingVerbosity = "low" | "medium" | "high";
+
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+}
+
+function parseEffort(value: string | undefined): ReasoningEffort {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "low" || normalized === "high") return normalized;
+  return "medium";
+}
+
+function parseVerbosity(value: string | undefined): ThinkingVerbosity {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "low" || normalized === "high") return normalized;
+  return "medium";
+}
+
+function buildCodegenReasoningOptions(
+  variant: CodegenOpenRouterVariant,
+): Pick<OpenRouterOptions, "reasoning" | "thinking"> {
+  const prefix = variant === "codeFix" ? "CODEFIX" : "CODEGEN";
+  const enableReasoning = isTruthyEnvFlag(
+    process.env[`${prefix}_ENABLE_REASONING`],
+  );
+  const enableThinking = isTruthyEnvFlag(
+    process.env[`${prefix}_ENABLE_THINKING`],
+  );
+
+  const out: Pick<OpenRouterOptions, "reasoning" | "thinking"> = {};
+  if (enableReasoning) {
+    out.reasoning = {
+      enabled: true,
+      effort: parseEffort(process.env[`${prefix}_REASONING_EFFORT`]),
+    };
+  }
+  if (enableThinking) {
+    out.thinking = {
+      thinking_effort: parseEffort(process.env[`${prefix}_THINKING_EFFORT`]),
+      verbosity: parseVerbosity(process.env[`${prefix}_THINKING_VERBOSITY`]),
+    };
+  }
+  return out;
+}
+
 /** When set, coding agents use this OpenAI-compatible API instead of OpenRouter. */
 export function isCodegenCustomProvider(): boolean {
   return Boolean(process.env.CODEGEN_API_KEY?.trim());
@@ -101,16 +154,11 @@ async function chatCompletionsOpenAICompatible(
       continue;
     }
 
-    throw new Error(
-      `Codegen API error: ${res.status} — ${raw.slice(0, 800)}`,
-    );
+    throw new Error(`Codegen API error: ${res.status} — ${raw.slice(0, 800)}`);
   }
 
   if (!res || !res.ok) {
-    throw (
-      lastErr ??
-      new Error("Codegen API failed after all retries")
-    );
+    throw lastErr ?? new Error("Codegen API failed after all retries");
   }
 
   let json: {
@@ -180,6 +228,9 @@ export async function invokeCodegenOrOpenRouter(
     tool_choice?: OpenRouterOptions["tool_choice"];
   },
 ): Promise<OpenRouterResponse> {
+  const key = options.openRouterVariant ?? "codeGen";
+  const reasoningOptions = buildCodegenReasoningOptions(key);
+
   if (isCodegenCustomProvider()) {
     const customModel =
       process.env.CODEGEN_MODEL?.trim() || DEFAULT_CODEGEN_MODEL;
@@ -188,9 +239,13 @@ export async function invokeCodegenOrOpenRouter(
     console.log(
       `[LLM] provider=codegen-custom  model=${customModel}  base=${customBase}`,
     );
+    if (reasoningOptions.reasoning || reasoningOptions.thinking) {
+      console.log(
+        `[LLM] codegen-custom ignores reasoning/thinking options (variant=${key})`,
+      );
+    }
     return chatCompletionsOpenAICompatible(messages, options);
   }
-  const key = options.openRouterVariant ?? "codeGen";
   const configValue = MODEL_CONFIG[key] ?? "gpt-4o";
   const chain = resolveModelChain(configValue, resolveModel);
   console.log(
@@ -199,5 +254,6 @@ export async function invokeCodegenOrOpenRouter(
   return chatCompletionWithFallback(messages, chain, {
     temperature: options.temperature,
     max_tokens: options.max_tokens,
+    ...reasoningOptions,
   });
 }

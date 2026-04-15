@@ -145,6 +145,24 @@ export const SupervisorStateAnnotation = Annotation.Root({
     default: () => 0,
   }),
 
+  runtimeVerifyErrors: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+  runtimeVerifyAttempts: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+
+  e2eVerifyErrors: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+  e2eVerifyAttempts: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+
   /** Whether fine-grained task refinement has been applied after scaffold. */
   taskRefinementDone: Annotation<boolean>({
     reducer: (_prev, next) => next,

@@ -10,6 +10,14 @@ import type { KickoffWorkItem, StepResult } from "@/lib/pipeline/types";
 
 type KickoffSubTab = "summary" | "tasks";
 
+type TaskBreakdownReviewSuggestion = {
+  id: string;
+  title: string;
+  reason: string;
+  instruction: string;
+  severity: "high" | "medium" | "low";
+};
+
 export default function KickoffStepPanel({
   result,
   onStartCoding,
@@ -42,8 +50,30 @@ export default function KickoffStepPanel({
   const [retryBreakdownError, setRetryBreakdownError] = useState<string | null>(
     null,
   );
+  const [reviewingBreakdown, setReviewingBreakdown] = useState(false);
+  const [reviewBreakdownError, setReviewBreakdownError] = useState<string | null>(
+    null,
+  );
+  const [regeneratingWithSuggestions, setRegeneratingWithSuggestions] =
+    useState(false);
+
+  const kickoffMetadata = (result.metadata ?? {}) as Record<string, unknown>;
+  const reviewSuggestions = Array.isArray(kickoffMetadata.taskBreakdownReviewSuggestions)
+    ? (kickoffMetadata.taskBreakdownReviewSuggestions as TaskBreakdownReviewSuggestion[])
+    : [];
+  const taskBreakdownConfirmed = kickoffMetadata.taskBreakdownConfirmed === true;
+
+  const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<string[]>(
+    [],
+  );
+
+  useEffect(() => {
+    const defaultSelected = reviewSuggestions.map((s) => s.id);
+    setSelectedSuggestionIds(defaultSelected);
+  }, [result.timestamp, reviewSuggestions.length]);
 
   const handleConfirmAndCode = () => {
+    if (!taskBreakdownConfirmed) return;
     const runId =
       typeof result.metadata?.runId === "string"
         ? result.metadata.runId
@@ -120,6 +150,8 @@ export default function KickoffStepPanel({
         ...(result.metadata ?? {}),
         taskBreakdown: data.taskBreakdown ?? [],
         taskBreakdownSimulated: false,
+        taskBreakdownConfirmed: false,
+        taskBreakdownReviewSuggestions: [],
         taskBreakdownParseFailed: data.taskBreakdownParseFailed === true,
         ...(data.taskBreakdownParseError
           ? { taskBreakdownParseError: data.taskBreakdownParseError }
@@ -161,6 +193,161 @@ export default function KickoffStepPanel({
     } finally {
       setRetryingBreakdown(false);
     }
+  };
+
+  const handleAnalyzeTaskBreakdown = async () => {
+    if (tasks.length === 0 || reviewingBreakdown) return;
+    setReviewBreakdownError(null);
+    setReviewingBreakdown(true);
+    try {
+      const tierRaw = (steps.intent?.metadata as Record<string, unknown> | undefined)
+        ?.classification as { tier?: string } | undefined;
+      const resp = await fetch("/api/agents/task-breakdown-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prd: steps.prd?.content ?? "",
+          trd: steps.trd?.content ?? "",
+          sysdesign: steps.sysdesign?.content ?? "",
+          implguide: steps.implguide?.content ?? "",
+          design: steps.design?.content ?? "",
+          taskBreakdown: tasks,
+          tier: tierRaw?.tier ?? "M",
+        }),
+      });
+      const data = (await resp.json()) as {
+        error?: string;
+        suggestions?: TaskBreakdownReviewSuggestion[];
+        model?: string;
+      };
+      if (!resp.ok) {
+        throw new Error(data.error || "Task breakdown review failed");
+      }
+      const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+      const nextMetadata = {
+        ...(result.metadata ?? {}),
+        taskBreakdownReviewSuggestions: suggestions,
+        taskBreakdownReviewModel: data.model ?? "unknown",
+        taskBreakdownReviewAt: new Date().toISOString(),
+        taskBreakdownConfirmed: false,
+      };
+      updateSteps({
+        kickoff: {
+          ...result,
+          stepId: "kickoff",
+          status: "completed",
+          metadata: nextMetadata,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      setReviewBreakdownError(
+        err instanceof Error ? err.message : "Task breakdown review failed",
+      );
+    } finally {
+      setReviewingBreakdown(false);
+    }
+  };
+
+  const handleRegenerateWithSelectedSuggestions = async () => {
+    const selected = reviewSuggestions.filter((s) =>
+      selectedSuggestionIds.includes(s.id),
+    );
+    if (selected.length === 0 || regeneratingWithSuggestions) return;
+    setReviewBreakdownError(null);
+    setRegeneratingWithSuggestions(true);
+    try {
+      const tierRaw = (steps.intent?.metadata as Record<string, unknown> | undefined)
+        ?.classification as { tier?: string } | undefined;
+      const resp = await fetch("/api/agents/task-breakdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prd: steps.prd?.content ?? "",
+          trd: steps.trd?.content ?? "",
+          sysdesign: steps.sysdesign?.content ?? "",
+          implguide: steps.implguide?.content ?? "",
+          design: steps.design?.content ?? "",
+          prdSpec: steps.prd?.metadata?.prdSpec,
+          sessionId:
+            typeof result.metadata?.runId === "string"
+              ? result.metadata.runId
+              : undefined,
+          tier: tierRaw?.tier ?? "M",
+          improvementNotes: selected.map((s) => s.instruction),
+        }),
+      });
+      const data = (await resp.json()) as {
+        error?: string;
+        taskBreakdown?: KickoffWorkItem[];
+        taskBreakdownParseFailed?: boolean;
+        taskBreakdownParseError?: string;
+        taskBreakdownRawOutput?: string;
+        model?: string;
+      };
+      if (!resp.ok) {
+        throw new Error(data.error || "Task breakdown regeneration failed");
+      }
+      const retryTime = new Date().toISOString();
+      const nextMetadata = {
+        ...(result.metadata ?? {}),
+        taskBreakdown: data.taskBreakdown ?? [],
+        taskBreakdownSimulated: false,
+        taskBreakdownParseFailed: data.taskBreakdownParseFailed === true,
+        taskBreakdownConfirmed: false,
+        taskBreakdownReviewSuggestions: [],
+        taskBreakdownRegeneratedAt: retryTime,
+        ...(data.taskBreakdownParseError
+          ? { taskBreakdownParseError: data.taskBreakdownParseError }
+          : {}),
+        ...(data.taskBreakdownRawOutput
+          ? { taskBreakdownRawOutput: data.taskBreakdownRawOutput }
+          : {}),
+      };
+      const nextContent = [
+        result.content ?? "",
+        "",
+        "### Task Breakdown Regeneration",
+        "",
+        `- Regenerated at: ${retryTime}`,
+        `- Model: \`${data.model ?? "unknown"}\``,
+        `- Selected suggestions: ${selected.length}`,
+      ].join("\n");
+      updateSteps({
+        kickoff: {
+          ...result,
+          stepId: "kickoff",
+          status: "completed",
+          content: nextContent,
+          metadata: nextMetadata,
+          timestamp: retryTime,
+        },
+      });
+    } catch (err) {
+      setReviewBreakdownError(
+        err instanceof Error ? err.message : "Task breakdown regeneration failed",
+      );
+    } finally {
+      setRegeneratingWithSuggestions(false);
+    }
+  };
+
+  const handleConfirmTaskBreakdown = () => {
+    if (tasks.length === 0) return;
+    const nextMetadata = {
+      ...(result.metadata ?? {}),
+      taskBreakdownConfirmed: true,
+      taskBreakdownConfirmedAt: new Date().toISOString(),
+    };
+    updateSteps({
+      kickoff: {
+        ...result,
+        stepId: "kickoff",
+        status: "completed",
+        metadata: nextMetadata,
+        timestamp: new Date().toISOString(),
+      },
+    });
   };
 
   return (
@@ -342,6 +529,89 @@ export default function KickoffStepPanel({
               )}
             </div>
           )}
+          {!parseFailed && tasks.length > 0 && (
+            <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAnalyzeTaskBreakdown}
+                  disabled={reviewingBreakdown || regeneratingWithSuggestions || isRunning}
+                  className="rounded-md border border-zinc-300 bg-zinc-900 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {reviewingBreakdown
+                    ? "Analyzing task breakdown..."
+                    : "Review with second model"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmTaskBreakdown}
+                  disabled={taskBreakdownConfirmed || reviewingBreakdown || regeneratingWithSuggestions}
+                  className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {taskBreakdownConfirmed ? "Task breakdown confirmed" : "Confirm task breakdown"}
+                </button>
+              </div>
+              {reviewBreakdownError && (
+                <p className="mt-2 text-[12px] text-red-700">{reviewBreakdownError}</p>
+              )}
+
+              {reviewSuggestions.length > 0 && (
+                <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/40 p-3">
+                  <p className="mb-2 text-[12px] font-semibold text-indigo-900">
+                    Improvement suggestions ({reviewSuggestions.length})
+                  </p>
+                  <div className="space-y-2">
+                    {reviewSuggestions.map((s) => (
+                      <label
+                        key={s.id}
+                        className="block rounded border border-indigo-100 bg-white px-3 py-2"
+                      >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedSuggestionIds.includes(s.id)}
+                            onChange={(e) => {
+                              setSelectedSuggestionIds((prev) =>
+                                e.target.checked
+                                  ? [...new Set([...prev, s.id])]
+                                  : prev.filter((id) => id !== s.id),
+                              );
+                            }}
+                            className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold text-zinc-900">
+                              {s.title}{" "}
+                              <span className="ml-1 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-600">
+                                {s.severity}
+                              </span>
+                            </p>
+                            <p className="mt-1 text-[11px] text-zinc-600">{s.reason}</p>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRegenerateWithSelectedSuggestions}
+                      disabled={
+                        regeneratingWithSuggestions ||
+                        reviewingBreakdown ||
+                        selectedSuggestionIds.length === 0
+                      }
+                      className="rounded-md border border-indigo-300 bg-indigo-600 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {regeneratingWithSuggestions
+                        ? "Regenerating task breakdown..."
+                        : `Regenerate with selected suggestions (${selectedSuggestionIds.length})`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <TaskBreakdownSection
             tasks={tasks}
             totalHours={totalHours}
@@ -358,11 +628,10 @@ export default function KickoffStepPanel({
                 Start coding agents
               </p>
               <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-600">
-                Press{" "}
-                <span className="font-semibold text-zinc-800">
-                  Start coding
-                </span>{" "}
-                in the command bar to start the session ({tasks.length} tasks).
+                {taskBreakdownConfirmed
+                  ? "Press Start coding in the command bar to start the session."
+                  : "Confirm task breakdown first, then press Start coding in the command bar."}{" "}
+                ({tasks.length} tasks).
               </p>
             </div>
           )}
@@ -371,7 +640,8 @@ export default function KickoffStepPanel({
               <button
                 type="button"
                 onClick={handleConfirmAndCode}
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800"
+                disabled={!taskBreakdownConfirmed}
+                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />

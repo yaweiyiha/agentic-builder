@@ -37,21 +37,22 @@ export const MODEL_CONFIG = {
 
   // claude-sonnet-4 supports 64K output tokens — much less likely to truncate large task lists
   taskBreakdown: ["claude-sonnet-4", "openai/gpt-5.4"] as string[],
+  taskBreakdownReview: ["openai/gpt-5.4", "claude-sonnet-4"] as string[],
 
   // ── Coding phase ───────────────────────────────────────────────────────────
 
   /** Code generation: try primary, fall back to secondary on failure. */
   codeGen: [
-    "deepseek/deepseek-v3.2",
     "openai/gpt-5.3-codex",
+    "deepseek/deepseek-v3.2",
     "claude-sonnet",
   ] as string[],
 
   /** Error-fix pass: cheaper models suffice for targeted tsc/build fixes. */
   codeFix: [
+    "openai/gpt-5.3-codex",
     "deepseek/deepseek-v3.2",
     "claude-sonnet",
-    "openai/gpt-5.3-codex",
   ] as string[],
 
   /**
@@ -59,9 +60,19 @@ export const MODEL_CONFIG = {
    * Needs strong tool-use / function-calling capability.
    */
   phaseVerifyFix: [
+    "claude-sonnet-4",
     "deepseek/deepseek-v3.2",
-    "openai/gpt-5.3-codex",
     "gpt-4o",
+  ] as string[],
+
+  /**
+   * E2E coverage generation / repair.
+   * Prefer stronger first model because this step must align test cases to PRD.
+   */
+  e2eGen: [
+    "openai/gpt-5.4",
+    "claude-sonnet-4",
+    "openai/gpt-5.3-codex",
   ] as string[],
 } as const;
 

@@ -15,6 +15,17 @@ const SKIP_DIR_NAMES = new Set([
 ]);
 
 /**
+ * Some scaffold files should stay editable during coding runs (not protected).
+ * These are app entry wiring points that workers must be able to rewrite.
+ */
+const UNPROTECTED_SCAFFOLD_PATHS = new Set([
+  "frontend/src/main.tsx",
+  "frontend/src/router.tsx",
+  "frontend/src/views/NotFound.tsx",
+  "rontend/src/index.css",
+]);
+
+/**
  * Copy the scaffold template for the given tier into outputDir.
  * By default, existing files are not overwritten.
  * Pass { forceOverwrite: true } to always write scaffold files (safe for fresh coding sessions).
@@ -40,7 +51,14 @@ export async function copyScaffold(
   const copied: string[] = [];
   const skipped: string[] = [];
 
-  await copyDir(scaffoldRoot, outputDir, scaffoldRoot, copied, skipped, forceOverwrite);
+  await copyDir(
+    scaffoldRoot,
+    outputDir,
+    scaffoldRoot,
+    copied,
+    skipped,
+    forceOverwrite,
+  );
 
   console.log(
     `[Scaffold] Tier ${tier}: copied ${copied.length} file(s), skipped ${skipped.length} existing file(s).`,
@@ -85,7 +103,11 @@ export async function listScaffoldTemplateRelativePaths(
       if (entry.isDirectory()) {
         await walk(srcPath, rootDir);
       } else if (entry.isFile()) {
-        paths.push(relPath.split(path.sep).join("/"));
+        const normalizedRel = relPath.split(path.sep).join("/");
+        if (UNPROTECTED_SCAFFOLD_PATHS.has(normalizedRel)) {
+          continue;
+        }
+        paths.push(normalizedRel);
       }
     }
   }
@@ -138,7 +160,14 @@ async function copyDir(
     }
 
     if (entry.isDirectory()) {
-      await copyDir(srcPath, destPath, rootSrcDir, copied, skipped, forceOverwrite);
+      await copyDir(
+        srcPath,
+        destPath,
+        rootSrcDir,
+        copied,
+        skipped,
+        forceOverwrite,
+      );
       continue;
     }
 

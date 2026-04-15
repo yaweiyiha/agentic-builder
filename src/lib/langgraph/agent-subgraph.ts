@@ -34,14 +34,66 @@ import type {
 } from "@/lib/llm-types";
 import { ProgressTracker } from "@/lib/ralph";
 
-const MAX_OUTPUT_TOKENS = 16384;
+const DEFAULT_WORKER_CODEGEN_MAX_OUTPUT_TOKENS = 32768;
+const MAX_OUTPUT_TOKENS = (() => {
+  const raw = Number(process.env.WORKER_CODEGEN_MAX_OUTPUT_TOKENS ?? "");
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return DEFAULT_WORKER_CODEGEN_MAX_OUTPUT_TOKENS;
+  }
+  return Math.min(Math.max(Math.floor(raw), 1024), 32768);
+})();
 const MAX_TASK_GENERATION_RETRIES = 2;
 const MAX_WORKER_TOOL_ITERATIONS = 6;
 const MAX_WORKER_TOOL_OUTPUT_CHARS = 4000;
-/** Per-task tsc fix attempts when RALPH is off (1 = single task_fix then done). */
-const MAX_FIX_ATTEMPTS = 1;
-/** Per-task tsc fix attempts cap when RALPH is on. */
-const MAX_PER_TASK_FIX_ATTEMPTS = 1;
+const WORKER_LLM_HEARTBEAT_MS = 10_000;
+const CODEGEN_MULTI_ROUND_ENABLED = (() => {
+  const raw = (process.env.CODEGEN_MULTI_ROUND_ENABLED ?? "1")
+    .trim()
+    .toLowerCase();
+  return raw !== "0" && raw !== "false" && raw !== "off";
+})();
+const CODEGEN_FILE_BATCH_SIZE = (() => {
+  const raw = Number(process.env.CODEGEN_FILE_BATCH_SIZE ?? "2");
+  if (!Number.isFinite(raw) || raw <= 0) return 2;
+  return Math.min(Math.max(Math.floor(raw), 1), 8);
+})();
+const CODEGEN_MULTI_ROUND_MAX_ROUNDS = (() => {
+  const raw = Number(process.env.CODEGEN_MULTI_ROUND_MAX_ROUNDS ?? "8");
+  if (!Number.isFinite(raw) || raw <= 0) return 8;
+  return Math.min(Math.max(Math.floor(raw), 1), 20);
+})();
+const DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS = 1;
+const DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP = 1;
+const DEFAULT_WORKER_TSC_ERROR_CONTEXT_MAX_CHARS = 3000;
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.floor(n);
+}
+
+function getWorkerTscFixConfig(): {
+  maxFixAttempts: number;
+  maxFixAttemptsRalphCap: number;
+  errorContextMaxChars: number;
+} {
+  return {
+    maxFixAttempts: readPositiveIntEnv(
+      "WORKER_TSC_FIX_MAX_ATTEMPTS",
+      DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS,
+    ),
+    maxFixAttemptsRalphCap: readPositiveIntEnv(
+      "WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP",
+      DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP,
+    ),
+    errorContextMaxChars: readPositiveIntEnv(
+      "WORKER_TSC_ERROR_CONTEXT_MAX_CHARS",
+      DEFAULT_WORKER_TSC_ERROR_CONTEXT_MAX_CHARS,
+    ),
+  };
+}
 
 /** Approximate maximum context window for context-rotation threshold calculations. */
 const MAX_CONTEXT_TOKENS = 200_000;
@@ -443,12 +495,21 @@ async function runCodegenWorkerLoop(
   let totalTokens = 0;
 
   for (let i = 0; i < MAX_WORKER_TOOL_ITERATIONS; i++) {
+    const callStartedAt = Date.now();
+    const heartbeat = setInterval(() => {
+      const waitedSec = Math.floor((Date.now() - callStartedAt) / 1000);
+      console.log(
+        `[Worker] codegen still waiting... loop=${i + 1}/${MAX_WORKER_TOOL_ITERATIONS} waited=${waitedSec}s`,
+      );
+    }, WORKER_LLM_HEARTBEAT_MS);
     const response = await invokeCodegenOrOpenRouter(messages, {
       temperature: 0.3,
       max_tokens: MAX_OUTPUT_TOKENS,
       openRouterVariant: "codeGen",
       tools: WORKER_READONLY_TOOLS,
       tool_choice: "auto",
+    }).finally(() => {
+      clearInterval(heartbeat);
     });
     const choice = response.choices[0];
     const content = choice?.message?.content ?? "";
@@ -800,6 +861,12 @@ function parsePlanBlock(content: string): TaskSubStep[] {
   });
 }
 
+function parseCodegenRoundStatus(content: string): "done" | "continue" | null {
+  const m = /STATUS:\s*(DONE|CONTINUE)/i.exec(content);
+  if (!m) return null;
+  return m[1].toUpperCase() === "DONE" ? "done" : "continue";
+}
+
 // ─── RALPH helpers ───
 
 /**
@@ -977,50 +1044,103 @@ async function generateCode(state: WorkerState) {
         ? `\n\nPre-defined sub-steps:\n${task.subSteps.map((s) => `${s.step}. ${s.action}: ${s.detail}`).join("\n")}`
         : "";
 
+    const multiRoundInstruction = CODEGEN_MULTI_ROUND_ENABLED
+      ? `\n\nMULTI-ROUND OUTPUT MODE:\n- In this round, output at most ${CODEGEN_FILE_BATCH_SIZE} file block(s) using \`\`\`file:path\`\`\` format.\n- If more files are still needed for this task, end your response with: STATUS: CONTINUE\n- If task implementation is complete, end your response with: STATUS: DONE`
+      : "";
+
     messages.push({
       role: "user",
-      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate the complete code for this task.\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
+      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
     });
 
     const startMs = Date.now();
-    const response = await runCodegenWorkerLoop(messages, state.outputDir);
-    const durationMs = Date.now() - startMs;
-
-    const content = response.content;
-    const parsedFiles = parseFileOutput(content);
-    const costUsd = response.costUsd;
-    const promptTokens = response.promptTokens;
-    const completionTokens = response.completionTokens;
-    const totalTokens = response.totalTokens;
-
     const fsOpts =
       state.scaffoldProtectedPaths.length > 0
         ? { scaffoldProtectedPaths: state.scaffoldProtectedPaths }
         : undefined;
 
     const writtenFiles: string[] = [];
+    const writtenSet = new Set<string>();
     const newFileEntries: GeneratedFile[] = [];
-    for (const [fp, fc] of Object.entries(parsedFiles)) {
-      const msg = await fsWrite(fp, fc, state.outputDir, fsOpts);
-      if (msg.startsWith("SKIPPED_PROTECTED")) {
-        console.log(`[Worker:${state.workerLabel}] ${msg}`);
-        continue;
+    let totalCostUsd = 0;
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let totalTokens = 0;
+    let aggregateRawContent = "";
+    let rounds = 0;
+    let lastModel = "unknown";
+
+    while (rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS) {
+      rounds += 1;
+      const response = await runCodegenWorkerLoop(messages, state.outputDir);
+      const content = response.content;
+      const parsedFiles = parseFileOutput(content);
+      const roundStatus = parseCodegenRoundStatus(content);
+      totalCostUsd += response.costUsd;
+      promptTokens += response.promptTokens;
+      completionTokens += response.completionTokens;
+      totalTokens += response.totalTokens;
+      aggregateRawContent +=
+        `\n\n<!-- round:${rounds} model:${response.model} -->\n` +
+        response.rawContent;
+      lastModel = response.model;
+
+      let roundWrites = 0;
+      for (const [fp, fc] of Object.entries(parsedFiles)) {
+        const msg = await fsWrite(fp, fc, state.outputDir, fsOpts);
+        if (msg.startsWith("SKIPPED_PROTECTED")) {
+          console.log(`[Worker:${state.workerLabel}] ${msg}`);
+          continue;
+        }
+        if (!writtenSet.has(fp)) {
+          writtenSet.add(fp);
+          writtenFiles.push(fp);
+        }
+        newFileEntries.push({
+          path: fp,
+          role: state.role,
+          summary: `Generated for task: ${task.title}`,
+        });
+        roundWrites += 1;
       }
-      writtenFiles.push(fp);
-      newFileEntries.push({
-        path: fp,
-        role: state.role,
-        summary: `Generated for task: ${task.title}`,
+
+      console.log(
+        `[Worker:${state.workerLabel}] codegen round ${rounds}/${CODEGEN_MULTI_ROUND_MAX_ROUNDS}: wrote ${roundWrites} file(s), status=${roundStatus ?? "implicit_done"}, model=${response.model}`,
+      );
+
+      const shouldContinue =
+        CODEGEN_MULTI_ROUND_ENABLED &&
+        roundStatus === "continue" &&
+        rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS;
+      if (!shouldContinue) break;
+
+      const knownFiles = writtenFiles
+        .slice(-40)
+        .map((f) => `- ${f}`)
+        .join("\n");
+      messages.push({
+        role: "user",
+        content: [
+          "Continue with the next batch of files for this SAME task.",
+          `Output at most ${CODEGEN_FILE_BATCH_SIZE} file block(s) in this round.`,
+          "Do not rewrite already generated files unless absolutely required.",
+          "End with STATUS: CONTINUE or STATUS: DONE.",
+          "",
+          knownFiles ? `Already generated files:\n${knownFiles}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
       });
     }
+    const durationMs = Date.now() - startMs;
 
     console.log(
-      `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+      `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (rounds=${rounds}, model=${lastModel}, cost: $${totalCostUsd.toFixed(4)})`,
     );
 
     // RALPH: check for missing promise and log a warning (enforcement happens in routeAfterGenerate)
     if (state.ralphConfig.enabled) {
-      const promise = extractCompletionPromise(content);
+      const promise = extractCompletionPromise(aggregateRawContent);
       if (!promise.found) {
         console.warn(
           `[Worker:${state.workerLabel}] RALPH: completion promise absent for "${task.title}" (attempt ${attempt})`,
@@ -1029,7 +1149,7 @@ async function generateCode(state: WorkerState) {
     }
 
     // Parse dynamic sub-steps from the LLM output
-    const dynamicSubSteps = parsePlanBlock(content);
+    const dynamicSubSteps = parsePlanBlock(aggregateRawContent);
     if (dynamicSubSteps.length > 0) {
       console.log(
         `[Worker:${state.workerLabel}] Parsed ${dynamicSubSteps.length} dynamic sub-step(s) for "${task.title}"`,
@@ -1046,18 +1166,18 @@ async function generateCode(state: WorkerState) {
     return {
       generatedFiles: newFileEntries,
       currentTaskGeneratedFiles: writtenFiles,
-      currentTaskCostUsd: costUsd,
+      currentTaskCostUsd: totalCostUsd,
       currentTaskDurationMs: durationMs,
       currentTaskTokenUsage: {
         promptTokens,
         completionTokens,
         totalTokens,
       },
-      workerCostUsd: costUsd,
+      workerCostUsd: totalCostUsd,
       verifyErrors: "",
       fixAttempts: 0,
       currentTaskLastError: "",
-      currentTaskLastRawContent: content,
+      currentTaskLastRawContent: aggregateRawContent,
       currentTaskSubSteps: dynamicSubSteps,
       // Accumulate for context-rotation tracking (additive reducer)
       estimatedContextTokens: promptTokens,
@@ -1361,12 +1481,13 @@ async function verifyCode(state: WorkerState) {
 function routeAfterVerify(state: WorkerState): string {
   if (!state.verifyErrors) return "task_done";
   if (!isWorkerTscVerifyError(state.verifyErrors)) return "task_done";
+  const cfg = getWorkerTscFixConfig();
   const maxFix = state.ralphConfig.enabled
     ? Math.min(
         state.ralphConfig.maxIterationsPerTask,
-        MAX_PER_TASK_FIX_ATTEMPTS,
+        cfg.maxFixAttemptsRalphCap,
       )
-    : MAX_FIX_ATTEMPTS;
+    : cfg.maxFixAttempts;
   if (state.fixAttempts >= maxFix) {
     console.log(
       `[Worker:${state.workerLabel}] Per-task tsc fix: max attempts (${maxFix}) reached, continuing with warnings.`,
@@ -1398,8 +1519,12 @@ function logCodeFixErrorDetail(
 async function taskFix(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
   const attempt = state.fixAttempts + 1;
+  const cfg = getWorkerTscFixConfig();
   console.log(
-    `[Worker:${state.workerLabel}] Per-task tsc fix attempt ${attempt} for "${task.title}" (MODEL_CONFIG.codeFix chain)...`,
+    `[Worker:${state.workerLabel}] Per-task tsc fix attempt ${attempt} for "${task.title}"...`,
+  );
+  console.log(
+    `[Worker:${state.workerLabel}] codeFix env: WORKER_TSC_FIX_MAX_ATTEMPTS=${cfg.maxFixAttempts}, WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP=${cfg.maxFixAttemptsRalphCap}, WORKER_TSC_ERROR_CONTEXT_MAX_CHARS=${cfg.errorContextMaxChars}`,
   );
 
   logCodeFixErrorDetail(
@@ -1477,10 +1602,20 @@ async function taskFix(state: WorkerState) {
 
   const versionConstraints = await buildVersionConstraints(state.outputDir);
 
-  const codeFixChain = resolveModelChain(
-    MODEL_CONFIG.codeFix ?? "gpt-4o",
-    resolveModel,
-  );
+  const overrideModelChainRaw = process.env.CODEFIX_MODEL_CHAIN?.trim() ?? "";
+  const overrideModelChain = overrideModelChainRaw
+    .split(/[,\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const codeFixChain =
+    overrideModelChain.length > 0
+      ? resolveModelChain(overrideModelChain, resolveModel)
+      : resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
+  if (overrideModelChain.length > 0) {
+    console.log(
+      `[Worker:${state.workerLabel}] codeFix: using CODEFIX_MODEL_CHAIN override (${overrideModelChainRaw})`,
+    );
+  }
   console.log(
     `[Worker:${state.workerLabel}] codeFix: model chain (fallback order): ${codeFixChain.join(" -> ")}`,
   );
@@ -1510,7 +1645,7 @@ async function taskFix(state: WorkerState) {
       content: [
         `## Errors (attempt ${attempt})`,
         "```",
-        state.verifyErrors.slice(0, 3000),
+        state.verifyErrors.slice(0, cfg.errorContextMaxChars),
         "```",
         "",
         versionConstraints

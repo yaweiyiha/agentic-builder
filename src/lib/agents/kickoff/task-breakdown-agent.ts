@@ -1,6 +1,62 @@
 import { BaseAgent } from "../shared/base-agent";
 import type { ProjectTier } from "../shared/project-classifier";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import { chatCompletionWithFallback, resolveModel } from "@/lib/openrouter";
+import { resolveModelChain } from "@/lib/model-config";
+import type { OpenRouterOptions } from "@/lib/llm-types";
+
+type ReasoningEffort = "low" | "medium" | "high";
+type ThinkingVerbosity = "low" | "medium" | "high";
+
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+}
+
+function parseEffort(value: string | undefined): ReasoningEffort {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "low" || normalized === "high") return normalized;
+  return "medium";
+}
+
+function parseVerbosity(value: string | undefined): ThinkingVerbosity {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "low" || normalized === "high") return normalized;
+  return "medium";
+}
+
+function buildTaskBreakdownReasoningOptions(): Pick<
+  OpenRouterOptions,
+  "reasoning" | "thinking"
+> {
+  const enableReasoning = isTruthyEnvFlag(
+    process.env.TASK_BREAKDOWN_ENABLE_REASONING,
+  );
+  const enableThinking = isTruthyEnvFlag(
+    process.env.TASK_BREAKDOWN_ENABLE_THINKING,
+  );
+
+  const out: Pick<OpenRouterOptions, "reasoning" | "thinking"> = {};
+  if (enableReasoning) {
+    out.reasoning = {
+      enabled: true,
+      effort: parseEffort(process.env.TASK_BREAKDOWN_REASONING_EFFORT),
+    };
+  }
+  if (enableThinking) {
+    out.thinking = {
+      thinking_effort: parseEffort(process.env.TASK_BREAKDOWN_THINKING_EFFORT),
+      verbosity: parseVerbosity(process.env.TASK_BREAKDOWN_THINKING_VERBOSITY),
+    };
+  }
+  return out;
+}
 
 /**
  * Tier affects *how* to shape tasks (breadth, monorepo conventions), not how many tasks to emit.
@@ -243,6 +299,10 @@ export class TaskBreakdownAgent extends BaseAgent {
   private tier: ProjectTier;
 
   constructor(tier: ProjectTier = "L", scaffoldBlock?: string) {
+    const modelChain = resolveModelChain(
+      MODEL_CONFIG.taskBreakdown,
+      resolveModel,
+    );
     super({
       name: "Task Breakdown Agent",
       role: "Engineering Lead",
@@ -250,6 +310,14 @@ export class TaskBreakdownAgent extends BaseAgent {
       defaultModel: MODEL_CONFIG.taskBreakdown,
       temperature: 0.3,
       maxTokens: 16384,
+      customChatCompletion: async (messages, opts) => {
+        const { model: _ignoredModel, ...rest } = opts;
+        const reasoningOptions = buildTaskBreakdownReasoningOptions();
+        return chatCompletionWithFallback(messages, modelChain, {
+          ...rest,
+          ...reasoningOptions,
+        });
+      },
     });
     this.tier = tier;
   }
@@ -263,6 +331,8 @@ export class TaskBreakdownAgent extends BaseAgent {
       designSpec?: string;
       /** Formatted structured PRD spec (pages + component IDs). Injected for coverage. */
       prdSpecText?: string;
+      /** User-selected guidance from task breakdown review pass. */
+      improvementNotes?: string[];
     },
     sessionId?: string,
   ) {
@@ -298,7 +368,11 @@ export class TaskBreakdownAgent extends BaseAgent {
     const userMessage =
       `Analyze all provided documents and generate a coding task breakdown as a JSON array. ` +
       `Respect the **ProjectTier** and any **Pipeline coding tier** / scaffold section in the system prompt. ` +
-      `${focusHint}\n\n` +
+      `${focusHint}` +
+      (documents.improvementNotes && documents.improvementNotes.length > 0
+        ? `\n\nApply these selected improvement suggestions while regenerating:\n- ${documents.improvementNotes.join("\n- ")}`
+        : "") +
+      `\n\n` +
       sections[0];
 
     return this.run(

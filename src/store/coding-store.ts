@@ -29,6 +29,14 @@ export interface GapAnalysisState {
   supplementaryTaskIds: string[];
 }
 
+export interface E2EVerifyState {
+  status: "verifying" | "fixing" | "passed" | "failed";
+  errors?: string;
+  errorCount?: number;
+  fixAttempts: number;
+  maxFixAttempts: number;
+}
+
 interface CodingState {
   sessionId: string | null;
   status: "idle" | "running" | "completed" | "failed";
@@ -38,6 +46,7 @@ interface CodingState {
   totalCostUsd: number;
   error: string | null;
   integrationVerify: IntegrationVerifyState | null;
+  e2eVerify: E2EVerifyState | null;
   taskRefinement: TaskRefinementState | null;
   gapAnalysis: GapAnalysisState | null;
   /** Supervisor-level logs (phase verify, fix, install, etc.) */
@@ -46,6 +55,11 @@ interface CodingState {
   startCoding: (
     runId: string,
     tasks: KickoffWorkItem[],
+    codeOutputDir: string,
+    projectTier?: string,
+  ) => void;
+  retryIntegrationVerify: (
+    runId: string,
     codeOutputDir: string,
     projectTier?: string,
   ) => void;
@@ -62,6 +76,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
   totalCostUsd: 0,
   error: null,
   integrationVerify: null,
+  e2eVerify: null,
   taskRefinement: null,
   gapAnalysis: null,
   supervisorLogs: [],
@@ -78,6 +93,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       totalCostUsd: 0,
       sessionId: null,
       integrationVerify: null,
+      e2eVerify: null,
       taskRefinement: null,
       gapAnalysis: null,
       supervisorLogs: [],
@@ -146,6 +162,90 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       });
   },
 
+  retryIntegrationVerify: (runId, codeOutputDir, projectTier) => {
+    const current = get();
+    if (current.status === "running") return;
+
+    set({
+      status: "running",
+      error: null,
+      integrationVerify: {
+        status: "verifying",
+        fixAttempts: 0,
+        maxFixAttempts: current.integrationVerify?.maxFixAttempts ?? 3,
+      },
+      e2eVerify: null,
+    });
+
+    fetch("/api/agents/coding/retry-integration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId,
+        tasks: current.tasks,
+        codeOutputDir,
+        projectTier,
+      }),
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          set({
+            status: "failed",
+            error:
+              (errData as { error?: string }).error ||
+              "Integration retry request failed",
+          });
+          return;
+        }
+
+        const reader = resp.body?.getReader();
+        if (!reader) {
+          set({ status: "failed", error: "No response body" });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const payload = JSON.parse(line.slice(6));
+              handleCodingEvent(payload, set, get);
+            } catch {
+              /* skip */
+            }
+          }
+        }
+
+        if (buffer.startsWith("data: ")) {
+          try {
+            handleCodingEvent(JSON.parse(buffer.slice(6)), set, get);
+          } catch {
+            /* skip */
+          }
+        }
+
+        const state = get();
+        if (state.status === "running") set({ status: "completed" });
+      })
+      .catch((err) => {
+        set({
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      });
+  },
+
   reset: () => {
     set({
       sessionId: null,
@@ -156,6 +256,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       totalCostUsd: 0,
       error: null,
       integrationVerify: null,
+      e2eVerify: null,
       taskRefinement: null,
       gapAnalysis: null,
       supervisorLogs: [],
@@ -736,6 +837,48 @@ function handleCodingEvent(
         filesFixed,
         errors: undefined,
         errorCount: undefined,
+      },
+    });
+    return;
+  }
+
+  if (type === "e2e_verify_start") {
+    set({
+      e2eVerify: {
+        status: "verifying",
+        fixAttempts: 0,
+        maxFixAttempts: 3,
+      },
+    });
+    return;
+  }
+
+  if (type === "e2e_verify_result") {
+    const passed = payload.data?.passed as boolean;
+    const errors = payload.data?.errors as string | undefined;
+    const errorCount = payload.data?.errorCount as number | undefined;
+    const fixAttempts = (payload.data?.fixAttempts as number) ?? 0;
+    const maxFixAttempts = (payload.data?.maxFixAttempts as number) ?? 3;
+
+    if (passed) {
+      set({
+        e2eVerify: {
+          status: "passed",
+          fixAttempts,
+          maxFixAttempts,
+        },
+      });
+      return;
+    }
+
+    const atMax = fixAttempts >= maxFixAttempts;
+    set({
+      e2eVerify: {
+        status: atMax ? "failed" : "fixing",
+        errors,
+        errorCount,
+        fixAttempts,
+        maxFixAttempts,
       },
     });
     return;
