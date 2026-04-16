@@ -27,7 +27,6 @@ import {
   formatGeneratedCodeDotEnv,
   resolveBlueprintGeneratedDatabaseUrl,
 } from "@/lib/pipeline/generated-code-env";
-import { runRuntimeVerification } from "./runtime-verify";
 import {
   shellExec,
   execPrismaGenerate,
@@ -1357,7 +1356,6 @@ async function collectConventionViolations(
 // ─── Two-phase task refinement: after scaffold exists, refine coarse tasks ───
 
 const MAX_SUPPLEMENTARY_ROUNDS = 1;
-const MAX_RUNTIME_VERIFY_RETRIES = 1;
 const MAX_E2E_VERIFY_FIX_ATTEMPTS = 3;
 
 async function refineTaskBreakdown(
@@ -1882,32 +1880,6 @@ async function supplementaryVerify(
   };
 }
 
-async function runtimeVerify(
-  state: SupervisorState,
-): Promise<Partial<SupervisorState>> {
-  const attempt = state.runtimeVerifyAttempts + 1;
-  console.log(
-    `[Supervisor] runtimeVerify: attempt ${attempt}/${MAX_RUNTIME_VERIFY_RETRIES + 1}...`,
-  );
-
-  const result = await runRuntimeVerification(state.outputDir);
-  if (result.pass) {
-    console.log("[Supervisor] runtimeVerify: PASSED.");
-    return {
-      runtimeVerifyAttempts: attempt,
-      runtimeVerifyErrors: "",
-    };
-  }
-
-  console.warn(
-    `[Supervisor] runtimeVerify: FAILED with ${result.failures.length} check failure(s).`,
-  );
-  return {
-    runtimeVerifyAttempts: attempt,
-    runtimeVerifyErrors: result.summary.slice(0, 4000),
-  };
-}
-
 function parseFileBlocksFromContent(
   raw: string,
 ): { filePath: string; fileContent: string }[] {
@@ -1984,12 +1956,22 @@ async function e2eVerifyAndFix(
     `[Supervisor] e2eVerify: attempt ${attempt}/${MAX_E2E_VERIFY_FIX_ATTEMPTS + 1}...`,
   );
 
+  const e2eSpecDoc = await fsRead("PRD_E2E_SPEC.md", state.outputDir);
+  const e2eCoverageDoc = await fsRead("E2E_COVERAGE.md", state.outputDir);
+  const hasE2eSpecDoc =
+    !e2eSpecDoc.startsWith("FILE_NOT_FOUND") &&
+    !e2eSpecDoc.startsWith("REJECTED");
+  const hasE2eCoverageDoc =
+    !e2eCoverageDoc.startsWith("FILE_NOT_FOUND") &&
+    !e2eCoverageDoc.startsWith("REJECTED");
+
   const plan = await detectE2eCommand(state.outputDir);
   if (!plan) {
     return {
       e2eVerifyAttempts: attempt,
-      e2eVerifyErrors:
-        "No executable E2E command found. Expected frontend package script `e2e` or playwright config.",
+      e2eVerifyErrors: hasE2eSpecDoc
+        ? "No executable E2E command found. PRD_E2E_SPEC.md exists, but the project is still missing a runnable frontend e2e script or Playwright config."
+        : "No executable E2E command found. Expected frontend package script `e2e` or playwright config.",
     };
   }
 
@@ -2049,6 +2031,12 @@ async function e2eVerifyAndFix(
         "## PRD context",
         state.projectContext.slice(0, 8000),
         "",
+        hasE2eSpecDoc ? `## PRD E2E spec\n${e2eSpecDoc.slice(0, 8000)}` : "",
+        "",
+        hasE2eCoverageDoc
+          ? `## E2E coverage report\n${e2eCoverageDoc.slice(0, 4000)}`
+          : "",
+        "",
         "## Test tasks",
         testTaskContext,
         "",
@@ -2105,20 +2093,7 @@ async function e2eVerifyAndFix(
 
 function routeAfterIntegrationVerify(state: SupervisorState): string {
   if (state.integrationErrors) return "summary";
-  return "runtime_verify";
-}
-
-function routeAfterRuntimeVerify(state: SupervisorState): string {
-  if (
-    state.runtimeVerifyErrors &&
-    state.runtimeVerifyAttempts <= MAX_RUNTIME_VERIFY_RETRIES
-  ) {
-    return "integration_verify";
-  }
-  if (!state.runtimeVerifyErrors) {
-    return "e2e_verify";
-  }
-  return "summary";
+  return "e2e_verify";
 }
 
 function routeAfterE2eVerify(state: SupervisorState): string {
@@ -4597,9 +4572,6 @@ async function integrationVerifyAndFix(
     `Project directory: ${state.outputDir}`,
     `Package manager: ${pm}`,
     prdBlock,
-    state.runtimeVerifyErrors
-      ? `\n## Runtime verification failures from previous round\n${state.runtimeVerifyErrors}`
-      : "",
     "",
     "Begin with PRD completeness review and shared registration closure first, then run scoped frontend/backend validation after the feature补写 is complete.",
   ]
@@ -5009,7 +4981,6 @@ export function createSupervisorGraph() {
     .addNode("supplementary_worker", parallelWorkerNode)
     .addNode("supplementary_verify", supplementaryVerify)
     .addNode("integration_verify", integrationVerifyAndFix)
-    .addNode("runtime_verify", runtimeVerify)
     .addNode("e2e_verify", e2eVerifyAndFix)
     .addNode("summary", summary)
 
@@ -5046,11 +5017,6 @@ export function createSupervisorGraph() {
     .addEdge("supplementary_worker", "supplementary_verify")
     .addEdge("supplementary_verify", "integration_verify")
     .addConditionalEdges("integration_verify", routeAfterIntegrationVerify, {
-      runtime_verify: "runtime_verify",
-      summary: "summary",
-    })
-    .addConditionalEdges("runtime_verify", routeAfterRuntimeVerify, {
-      integration_verify: "integration_verify",
       e2e_verify: "e2e_verify",
       summary: "summary",
     })

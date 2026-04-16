@@ -1,10 +1,17 @@
 import type { KickoffWorkItem } from "./types";
 
 /**
- * Drops tasks with phase "Testing" and removes dependency edges to removed ids.
- * Automated test tasks are disabled until the pipeline runs test workers again.
+ * Normalizes task lists for coding runs.
+ * By default, Testing tasks are preserved because the pipeline now supports
+ * dedicated E2E/unit test generation again.
+ *
+ * Set `BLUEPRINT_ENABLE_TEST_TASKS=0` to keep the old stripping behavior.
  */
 export function stripTestingPhaseTasks<T extends KickoffWorkItem>(tasks: T[]): T[] {
+  if (process.env.BLUEPRINT_ENABLE_TEST_TASKS !== "0") {
+    return tasks;
+  }
+
   const removed = new Set(
     tasks.filter((t) => t.phase === "Testing").map((t) => t.id),
   );

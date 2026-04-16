@@ -218,14 +218,6 @@ export class EventMapper {
         return "Supplementary worker phase complete";
       case "supplementary_verify":
         return "Supplementary verification complete";
-      case "runtime_verify": {
-        const errors = update.runtimeVerifyErrors as string | undefined;
-        const attempts = update.runtimeVerifyAttempts as number | undefined;
-        if (!errors) {
-          return `Runtime verify: passed${attempts ? ` (attempt ${attempts})` : ""}`;
-        }
-        return `Runtime verify: failed${attempts ? ` (attempt ${attempts})` : ""}`;
-      }
       case "e2e_verify": {
         const errors = update.e2eVerifyErrors as string | undefined;
         const attempts = update.e2eVerifyAttempts as number | undefined;

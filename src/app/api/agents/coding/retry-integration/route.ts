@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
+import { prepareE2eArtifacts } from "@/lib/e2e/e2e-artifacts";
 import { createIntegrationRetryGraph } from "@/lib/langgraph/supervisor";
 import { EventMapper, type ErrorCategory } from "@/lib/langgraph/event-mapper";
 import {
@@ -113,12 +114,6 @@ export async function POST(request: NextRequest) {
 
   const inputTasks = Array.isArray(tasks) ? tasks : [];
   const tasksAfterStrip = stripTestingPhaseTasks(inputTasks);
-  const codingTasks: CodingTask[] = tasksAfterStrip.map((t) => ({
-    ...t,
-    assignedAgentId: null,
-    codingStatus: "pending" as const,
-  }));
-
   const ralphConfig: RalphConfig = {
     ...DEFAULT_RALPH_CONFIG,
     ...(ralphOverride ?? {}),
@@ -172,10 +167,28 @@ export async function POST(request: NextRequest) {
     getTierScaffoldSpecForCodingContext(tier),
   ].join("\n");
 
+  const preparedE2e = await prepareE2eArtifacts({
+    outputRoot,
+    prdDoc,
+    tasks: tasksAfterStrip,
+  });
+
   const projectContext =
     baseContextParts.length > 0
-      ? `${baseContextParts.join("\n\n---\n\n")}\n\n---\n\n${scaffoldContextBlock}`
-      : `No project documents found. Generate code based on task description only.\n\n---\n\n${scaffoldContextBlock}`;
+      ? [
+          baseContextParts.join("\n\n---\n\n"),
+          scaffoldContextBlock,
+          preparedE2e.e2eContextBlock,
+        ]
+          .filter(Boolean)
+          .join("\n\n---\n\n")
+      : [
+          "No project documents found. Generate code based on task description only.",
+          scaffoldContextBlock,
+          preparedE2e.e2eContextBlock,
+        ]
+          .filter(Boolean)
+          .join("\n\n---\n\n");
 
   const frontendDesignContext = [
     designSpecDoc ? `## Design Specification\n\n${designSpecDoc}` : "",
@@ -183,6 +196,13 @@ export async function POST(request: NextRequest) {
   ]
     .filter(Boolean)
     .join("\n\n---\n\n");
+
+  const normalizedTasks = [...tasksAfterStrip, ...preparedE2e.extraTasks];
+  const codingTasks: CodingTask[] = normalizedTasks.map((t) => ({
+    ...t,
+    assignedAgentId: null,
+    codingStatus: "pending" as const,
+  }));
 
   const sessionId = uuidv4();
   const mapper = new EventMapper(sessionId, {

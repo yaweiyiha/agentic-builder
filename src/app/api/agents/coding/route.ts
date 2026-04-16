@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 import { createSupervisorGraph } from "@/lib/langgraph/supervisor";
 import { EventMapper, type ErrorCategory } from "@/lib/langgraph/event-mapper";
+import { prepareE2eArtifacts } from "@/lib/e2e/e2e-artifacts";
 import {
   copyScaffold,
   listScaffoldTemplateRelativePaths,
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
   const tasksAfterStrip = stripTestingPhaseTasks(tasks);
   if (tasksAfterStrip.length === 0) {
     return Response.json(
-      { error: "No tasks to run after excluding Testing-phase tasks" },
+      { error: "No tasks to run after task normalization" },
       { status: 400 },
     );
   }
@@ -143,6 +144,8 @@ export async function POST(request: NextRequest) {
     "ImplementationGuide.md",
     "DesignSpec.md",
     "PencilDesign.md",
+    "PRD_E2E_SPEC.md",
+    "E2E_COVERAGE.md",
   ]);
   await fs.mkdir(outputRoot, { recursive: true });
   const entries = await fs.readdir(outputRoot).catch(() => [] as string[]);
@@ -302,10 +305,28 @@ export async function POST(request: NextRequest) {
     getTierScaffoldSpecForCodingContext(tier),
   ].join("\n");
 
+  const preparedE2e = await prepareE2eArtifacts({
+    outputRoot,
+    prdDoc,
+    tasks: tasksAfterStrip,
+  });
+
   const projectContext =
     baseContextParts.length > 0
-      ? `${baseContextParts.join("\n\n---\n\n")}\n\n---\n\n${scaffoldContextBlock}`
-      : `No project documents found. Generate code based on task description only.\n\n---\n\n${scaffoldContextBlock}`;
+      ? [
+          baseContextParts.join("\n\n---\n\n"),
+          scaffoldContextBlock,
+          preparedE2e.e2eContextBlock,
+        ]
+          .filter(Boolean)
+          .join("\n\n---\n\n")
+      : [
+          "No project documents found. Generate code based on task description only.",
+          scaffoldContextBlock,
+          preparedE2e.e2eContextBlock,
+        ]
+          .filter(Boolean)
+          .join("\n\n---\n\n");
 
   const frontendDesignContext = [
     designSpecDoc ? `## Design Specification\n\n${designSpecDoc}` : "",
@@ -314,7 +335,8 @@ export async function POST(request: NextRequest) {
     .filter(Boolean)
     .join("\n\n---\n\n");
 
-  const codingTasks: CodingTask[] = tasksAfterStrip.map((t) => ({
+  const normalizedTasks = [...tasksAfterStrip, ...preparedE2e.extraTasks];
+  const codingTasks: CodingTask[] = normalizedTasks.map((t) => ({
     ...t,
     assignedAgentId: null,
     codingStatus: "pending" as const,

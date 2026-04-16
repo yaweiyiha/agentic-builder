@@ -145,15 +145,6 @@ export const SupervisorStateAnnotation = Annotation.Root({
     default: () => 0,
   }),
 
-  runtimeVerifyErrors: Annotation<string>({
-    reducer: (_prev, next) => next,
-    default: () => "",
-  }),
-  runtimeVerifyAttempts: Annotation<number>({
-    reducer: (_prev, next) => next,
-    default: () => 0,
-  }),
-
   e2eVerifyErrors: Annotation<string>({
     reducer: (_prev, next) => next,
     default: () => "",
