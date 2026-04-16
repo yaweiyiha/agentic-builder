@@ -117,10 +117,7 @@ function chunkTasks<T>(tasks: T[], chunks: number): T[][] {
 
 function isToolSequenceValidationError(message: string): boolean {
   const m = message.toLowerCase();
-  return (
-    m.includes("messages with role 'tool'") &&
-    m.includes("tool_calls")
-  );
+  return m.includes("messages with role 'tool'") && m.includes("tool_calls");
 }
 
 function countRemovedOrphanToolMessages(messages: ChatMessage[]): number {
@@ -156,7 +153,10 @@ function countRemovedOrphanToolMessages(messages: ChatMessage[]): number {
   return removed;
 }
 
-function calculateSafeTailStart(messages: ChatMessage[], desiredStart: number): number {
+function calculateSafeTailStart(
+  messages: ChatMessage[],
+  desiredStart: number,
+): number {
   let safeStart = desiredStart;
 
   const findAssistantIndexForTool = (
@@ -167,7 +167,9 @@ function calculateSafeTailStart(messages: ChatMessage[], desiredStart: number): 
     for (let i = toolIdx - 1; i >= 0; i--) {
       const msg = messages[i];
       if (!msg || msg.role !== "assistant") continue;
-      const hasMatch = (msg.tool_calls ?? []).some((tc) => tc.id === toolCallId);
+      const hasMatch = (msg.tool_calls ?? []).some(
+        (tc) => tc.id === toolCallId,
+      );
       if (hasMatch) return i;
     }
     return -1;
@@ -243,12 +245,13 @@ function formatTaskBreakdownMarkdown(
     lines.push(`- Description: ${task.description}`);
 
     const files = task.files;
-    const creates =
-      files && !Array.isArray(files) ? (files.creates ?? []) : [];
+    const creates = files && !Array.isArray(files) ? (files.creates ?? []) : [];
     const modifies =
       files && !Array.isArray(files) ? (files.modifies ?? []) : [];
     const reads = files && !Array.isArray(files) ? (files.reads ?? []) : [];
-    lines.push(`- Files (create/modify/read): ${creates.length}/${modifies.length}/${reads.length}`);
+    lines.push(
+      `- Files (create/modify/read): ${creates.length}/${modifies.length}/${reads.length}`,
+    );
 
     if (creates.length > 0) {
       lines.push("  - Creates:");
@@ -1363,9 +1366,8 @@ async function refineTaskBreakdown(
   const skipRefine =
     (process.env.TASK_BREAKDOWN_SKIP_REFINE ?? "0").trim().toLowerCase() ===
       "1" ||
-    (process.env.TASK_BREAKDOWN_SKIP_REFINE ?? "0")
-      .trim()
-      .toLowerCase() === "true";
+    (process.env.TASK_BREAKDOWN_SKIP_REFINE ?? "0").trim().toLowerCase() ===
+      "true";
   if (skipRefine) {
     console.log(
       "[Supervisor] refineTaskBreakdown: skipped by TASK_BREAKDOWN_SKIP_REFINE.",
@@ -1384,9 +1386,12 @@ async function refineTaskBreakdown(
     await writeTaskBreakdownMarkdown(
       state.outputDir,
       "TASK_BREAKDOWN_REFINED.md",
-      formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
-        "No tasks were available for refinement.",
-      ]),
+      formatTaskBreakdownMarkdown(
+        "Task Breakdown (Refined)",
+        coarseTasks,
+        undefined,
+        ["No tasks were available for refinement."],
+      ),
     );
     return { taskRefinementDone: true };
   }
@@ -1494,9 +1499,12 @@ async function refineTaskBreakdown(
       await writeTaskBreakdownMarkdown(
         state.outputDir,
         "TASK_BREAKDOWN_REFINED.md",
-        formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
-          "LLM output parse failed; kept original tasks.",
-        ]),
+        formatTaskBreakdownMarkdown(
+          "Task Breakdown (Refined)",
+          coarseTasks,
+          undefined,
+          ["LLM output parse failed; kept original tasks."],
+        ),
       );
       return { taskRefinementDone: true, totalCostUsd: costUsd };
     }
@@ -1508,9 +1516,12 @@ async function refineTaskBreakdown(
       await writeTaskBreakdownMarkdown(
         state.outputDir,
         "TASK_BREAKDOWN_REFINED.md",
-        formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
-          "LLM returned an empty task list; kept original tasks.",
-        ]),
+        formatTaskBreakdownMarkdown(
+          "Task Breakdown (Refined)",
+          coarseTasks,
+          undefined,
+          ["LLM returned an empty task list; kept original tasks."],
+        ),
       );
       return { taskRefinementDone: true, totalCostUsd: costUsd };
     }
@@ -1525,9 +1536,12 @@ async function refineTaskBreakdown(
       await writeTaskBreakdownMarkdown(
         state.outputDir,
         "TASK_BREAKDOWN_REFINED.md",
-        formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
-          "No valid task IDs in refined output; kept original tasks.",
-        ]),
+        formatTaskBreakdownMarkdown(
+          "Task Breakdown (Refined)",
+          coarseTasks,
+          undefined,
+          ["No valid task IDs in refined output; kept original tasks."],
+        ),
       );
       return { taskRefinementDone: true, totalCostUsd: costUsd };
     }
@@ -1558,16 +1572,12 @@ async function refineTaskBreakdown(
     await writeTaskBreakdownMarkdown(
       state.outputDir,
       "TASK_BREAKDOWN_REFINED.md",
-      formatTaskBreakdownMarkdown(
-        "Task Breakdown (Refined)",
-        mergedTasks,
-        {
-          architect: mergedTasks.filter((t) => inferRole(t) === "architect"),
-          backend: newBackend,
-          frontend: newFrontend,
-          test: newTest,
-        },
-      ),
+      formatTaskBreakdownMarkdown("Task Breakdown (Refined)", mergedTasks, {
+        architect: mergedTasks.filter((t) => inferRole(t) === "architect"),
+        backend: newBackend,
+        frontend: newFrontend,
+        test: newTest,
+      }),
     );
 
     console.log(
@@ -1588,9 +1598,12 @@ async function refineTaskBreakdown(
     await writeTaskBreakdownMarkdown(
       state.outputDir,
       "TASK_BREAKDOWN_REFINED.md",
-      formatTaskBreakdownMarkdown("Task Breakdown (Refined)", coarseTasks, undefined, [
-        "LLM call failed; kept original tasks.",
-      ]),
+      formatTaskBreakdownMarkdown(
+        "Task Breakdown (Refined)",
+        coarseTasks,
+        undefined,
+        ["LLM call failed; kept original tasks."],
+      ),
     );
     return { taskRefinementDone: true };
   }
@@ -1869,7 +1882,9 @@ async function supplementaryVerify(
   };
 }
 
-async function runtimeVerify(state: SupervisorState): Promise<Partial<SupervisorState>> {
+async function runtimeVerify(
+  state: SupervisorState,
+): Promise<Partial<SupervisorState>> {
   const attempt = state.runtimeVerifyAttempts + 1;
   console.log(
     `[Supervisor] runtimeVerify: attempt ${attempt}/${MAX_RUNTIME_VERIFY_RETRIES + 1}...`,
@@ -1929,8 +1944,9 @@ async function detectE2eCommand(
   }
   let scripts: Record<string, string> = {};
   try {
-    scripts = (JSON.parse(frontendPkgRaw) as { scripts?: Record<string, string> })
-      .scripts ?? {};
+    scripts =
+      (JSON.parse(frontendPkgRaw) as { scripts?: Record<string, string> })
+        .scripts ?? {};
   } catch {
     scripts = {};
   }
@@ -2928,7 +2944,8 @@ const SUPERVISOR_VERIFY_TOOLS: OpenRouterToolDefinition[] = [
     type: "function",
     function: {
       name: "write_file",
-      description: "Write or replace a file at the given relative path.",
+      description:
+        "Write or replace a file at the given relative path. In IntegrationVerifyFix this may overwrite scaffold-protected files when needed.",
       parameters: {
         type: "object",
         properties: {
@@ -3341,13 +3358,19 @@ async function phaseVerifyAndFix(
   const autoFixNotes: string[] = [];
   let autoFixAllPassed = tsFixPlans.length > 0;
   for (const plan of tsFixPlans) {
-    const tsFixCommand = "npx --no-install ts-fix --tsconfig ./tsconfig.json 2>&1";
+    const autoFixCommand =
+      plan.scope === "frontend"
+        ? 'npx eslint --fix "src/**/*.{ts,tsx}" 2>&1'
+        : "npx --no-install ts-fix --tsconfig ./tsconfig.json 2>&1";
+    const autoFixLabel = plan.scope === "frontend" ? "eslint --fix" : "ts-fix";
     console.log(
-      `${label}: pre-LLM ts-fix (${plan.scope}) running: ${tsFixCommand}`,
+      `${label}: pre-LLM ${autoFixLabel} (${plan.scope}) running: ${autoFixCommand}`,
     );
-    const fixResult = await shellExec(tsFixCommand, plan.cwd, { timeout: 120_000 });
+    const fixResult = await shellExec(autoFixCommand, plan.cwd, {
+      timeout: 120_000,
+    });
     autoFixNotes.push(
-      `${plan.scope}: ts-fix exit=${fixResult.exitCode}`,
+      `${plan.scope}: ${autoFixLabel} exit=${fixResult.exitCode}`,
     );
 
     const checkResult = await shellExec(plan.tscCommand, plan.cwd, {
@@ -3357,15 +3380,15 @@ async function phaseVerifyAndFix(
     if (checkResult.exitCode !== 0 && checkOutput.includes("error TS")) {
       autoFixAllPassed = false;
       autoFixNotes.push(
-        `${plan.scope}: remaining tsc errors after ts-fix:\n${checkOutput.slice(0, 1200)}`,
+        `${plan.scope}: remaining tsc errors after ${autoFixLabel}:\n${checkOutput.slice(0, 1200)}`,
       );
     } else {
-      autoFixNotes.push(`${plan.scope}: tsc passed after ts-fix`);
+      autoFixNotes.push(`${plan.scope}: tsc passed after ${autoFixLabel}`);
     }
   }
 
   if (tsFixPlans.length > 0 && autoFixAllPassed) {
-    console.log(`${label}: pre-LLM ts-fix fully resolved errors.`);
+    console.log(`${label}: pre-LLM auto-fix fully resolved errors.`);
     return {
       scaffoldErrors: "",
       scaffoldFixAttempts: 0,
@@ -3410,7 +3433,7 @@ async function phaseVerifyAndFix(
 
   const autoFixHints =
     autoFixNotes.length > 0
-      ? `\n## Pre-LLM auto ts-fix report\n${autoFixNotes.join("\n")}\n`
+      ? `\n## Pre-LLM auto-fix report\n${autoFixNotes.join("\n")}\n`
       : "";
 
   const messages: ChatMessage[] = [
@@ -4508,16 +4531,24 @@ async function integrationVerifyAndFix(
     "You are a Senior Full-Stack Engineer performing the **Final Verification** of a fully generated codebase.",
     "Your two objectives, in order:",
     "  1. FIRST review PRD completeness and fill missing implementations so the product is actually usable.",
-    "  2. THEN run scoped compile/build verification and fix remaining TypeScript/build issues until all final gates pass.",
+    "  2. THEN perform registration closure plus scoped compile/build verification until all final gates pass.",
     "",
     "## Phase 0 — PRD Completeness & Routing/Module Registration",
     "Before compile/build validation, inspect these integration points first:",
-    "1. Read `frontend/src/router.tsx` and list files in `frontend/src/views`.",
-    "   - Every actual page in `frontend/src/views` must be reachable via a registered route unless it is clearly dead code.",
-    "2. Read `backend/src/api/modules/index.ts` and list module route files under `backend/src/api/modules`.",
-    "   - Every implemented API module route must be registered from the API module index unless it is clearly unused/dead code.",
-    "3. Review the PRD and identify missing pages, flows, handlers, and end-to-end feature gaps.",
-    "4. Fix these registration and PRD completeness gaps first, then continue with compile/build verification.",
+    "1. Review the PRD and identify missing pages, flows, handlers, middlewares, and end-to-end feature gaps.",
+    "2. Frontend route closure:",
+    "   - Scan `frontend/src/views` for actual page files.",
+    "   - Read `frontend/src/router.tsx`.",
+    "   - Import and register every real page that should be reachable unless it is clearly dead code.",
+    "3. Backend API module closure:",
+    "   - Scan `backend/src/api/modules` for implemented module route files.",
+    "   - Read `backend/src/api/modules/index.ts`.",
+    "   - Import and register every implemented module route unless it is clearly unused/dead code.",
+    "4. Backend middleware closure:",
+    "   - Scan `backend/src/middlewares` for implemented middleware files.",
+    "   - Read `backend/src/app.ts`.",
+    "   - Register missing middleware usage in the correct app bootstrap order when the middleware is part of the actual server pipeline.",
+    "5. Fix these registration and PRD completeness gaps first, then continue with compile/build verification.",
     "",
     "## Phase 1 — PRD Implementation Review",
     "1. List all major features/requirements in the PRD",
@@ -4543,16 +4574,18 @@ async function integrationVerifyAndFix(
     "   c. Write the minimal fix",
     "5. Any `write_file` or mutating install/generate command makes prior validation STALE.",
     "6. After the LAST mutation, re-run all three scoped validation gates in full.",
-    "7. Only after all three scoped validation gates pass may you call `report_done(status='pass', summary=...)`",
+    "7. Only after registration closure is complete and all three scoped validation gates pass may you call `report_done(status='pass', summary=...)`",
     "   OR `report_done(status='fail', summary=<unresolved issues>)` if critical features cannot be fixed",
     "",
     "## Hard rules",
     "- Do NOT switch HTTP frameworks (Express ↔ Fastify ↔ Koa) or frontend frameworks.",
     "- For split M-tier projects, keep routing in frontend/src/router.tsx and backend API modules under backend/src/api/modules.",
-    "- Route/module registration is mandatory: treat missing registrations in `frontend/src/router.tsx` and `backend/src/api/modules/index.ts` as top-priority integration defects.",
-    "- Do not stop after making pages/controllers exist on disk; they must be wired into the actual router/module entrypoints.",
+    "- Coding-stage tasks may leave shared registration files incomplete by design; IntegrationVerifyFix owns the final registration closure.",
+    "- Registration closure is mandatory: treat missing registrations in `frontend/src/router.tsx`, `backend/src/api/modules/index.ts`, and `backend/src/app.ts` as top-priority integration defects.",
+    "- Do not stop after making pages/controllers/middlewares exist on disk; they must be wired into the actual router/module/app entrypoints.",
     "- Run verification ONLY inside `frontend/` and `backend/`. Do not use root-level `npx tsc` against the whole generated-code tree in this phase.",
     "- If you modify any file, treat previous validation as stale and re-run the full scoped validation sequence before finishing.",
+    "- In this phase, scaffold-protected files do NOT block edits. You may overwrite protected scaffold files when registration or PRD completeness requires it.",
     "- Minimal targeted changes — do not rewrite working code.",
     "- Install missing npm packages: `pnpm add <pkg> --filter <workspace-name>`",
     "- If errors include [CONVENTION], they are policy violations and MUST be fixed.",
@@ -4568,7 +4601,7 @@ async function integrationVerifyAndFix(
       ? `\n## Runtime verification failures from previous round\n${state.runtimeVerifyErrors}`
       : "",
     "",
-    "Begin with PRD completeness and route/module registration review first, then run scoped frontend/backend validation after the feature补写 is complete.",
+    "Begin with PRD completeness review and shared registration closure first, then run scoped frontend/backend validation after the feature补写 is complete.",
   ]
     .filter(Boolean)
     .join("\n");

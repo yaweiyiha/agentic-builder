@@ -65,7 +65,7 @@ function buildTaskBreakdownReasoningOptions(): Pick<
 const TIER_CODING_STYLE: Record<ProjectTier, string> = {
   S: `Pipeline tier **S** (small scope): prefer **fewer, broader** tasks when the PRD is thin — scaffolding + core feature. Merge related work; do not pad with filler tasks to "look busy".`,
 
-  M: `Pipeline tier **M** (split frontend/backend app): stack is \`frontend/\` (**Vite + React + React Router + Ant Design**, NOT Next.js) plus \`backend/\` (**Koa + Sequelize + PostgreSQL**). **NEVER use Next.js for M-tier.** The scaffold is prebuilt and already copied; **do not plan a Scaffolding task that recreates the repo structure**. Keep backend/data tasks reasonably broad; split **frontend by page or major flow** when the PRD lists multiple surfaces — first a **route shell/layout** task, then page-level tasks. Add an **early contracts/client** task so API shapes and the web client stay aligned with PRD requirement IDs. Route registration belongs in \`frontend/src/router.tsx\`; backend API modules belong under \`backend/src/api/modules\`.`,
+  M: `Pipeline tier **M** (split frontend/backend app): stack is \`frontend/\` (**Vite + React + React Router + Ant Design**, NOT Next.js) plus \`backend/\` (**Koa + Sequelize + PostgreSQL**). **NEVER use Next.js for M-tier.** The scaffold is prebuilt and already copied; **do not plan a Scaffolding task that recreates the repo structure**. Keep backend/data tasks reasonably broad; split **frontend by page or major flow** when the PRD lists multiple surfaces — first an **app shell/layout** task, then page-level tasks. Add an **early contracts/client** task so API shapes and the web client stay aligned with PRD requirement IDs. Coding tasks should implement pages, API modules, and middleware files, but final registration closure is handled later by \`integrationVerifyAndFix\` in \`frontend/src/router.tsx\`, \`backend/src/api/modules/index.ts\`, and \`backend/src/app.ts\`.`,
 
   L: `Pipeline tier **L** (broad product): expect **thorough** coverage across phases the PRD actually requires — scaffolding, data, auth, backend services, frontend, integration, infrastructure — but **only** where the documents call for them; still derive *how many* tasks from requirement breadth, not from a quota.`,
 };
@@ -79,13 +79,13 @@ Use **coarse-grained** tasks unless the PRD forces more splits. Typical **phase*
 - **Data Layer** — Prefer **one** broad task: Sequelize models, migrations/bootstrap SQL if needed, request validation, and persistence wiring in \`backend/src\`.
 - **Backend Services** — **REQUIRED for full-stack.** Prefer **one** broad task for \`backend/src\` (Koa routes, controllers, services, domain logic), unless the API surface is unusually large. This task implements the actual feature code — the scaffold only ships a starter Koa app.
 - **Integration (contracts/client)** — Add an **early** task that defines/aligns API contracts + frontend API client in \`frontend/src/api\` with PRD IDs before page implementation.
-- **Frontend** — First create **one** route shell/layout task, then split into **page-level** tasks (one task per page/flow, not per tiny component).
-  - Route shell/layout task must explicitly include \`frontend/src/router.tsx\` route registration and "/" homepage navigation entry links.
+- **Frontend** — First create **one** app shell/layout task, then split into **page-level** tasks (one task per page/flow, not per tiny component).
+  - Coding tasks should build the shell, navigation UI, and pages, but **must not** do the final route registration in \`frontend/src/router.tsx\`; that closure is handled by \`integrationVerifyAndFix\`.
 - **Integration** — **Optional** single task: Vite proxy assumptions, Koa CORS/auth headers, frontend API client error handling, and env/config alignment between frontend and backend.
 - **Testing** — **Do not** add tasks with phase "Testing" (automated test tasks are disabled in the pipeline).
 
 **Bad for M:** separate tasks per endpoint or per tiny UI component, or \"create frontend/package.json from scratch\".
-**Good for M:** one contracts/client task, one route-shell/layout task, one broad backend services task, then page-level tasks like \"Implement Dashboard view\" and \"Implement Project detail flow\".
+**Good for M:** one contracts/client task, one app-shell/layout task, one broad backend services task, then page-level tasks like "Implement Dashboard view" and "Implement Project detail flow".
 `;
 }
 
@@ -240,19 +240,24 @@ The scaffold is also prebuilt (Vite + React + TypeScript + Tailwind CSS). If a S
 
 If a scaffolding task is generated, its acceptanceCriteria MUST include: "npm install && npm run build succeeds without errors" and "npm run dev starts the dev server".
 
-## CRITICAL: Route & Page Registration Closure
-Every task that creates a new route/controller/handler file MUST complete the full wiring path — not just create the file:
+## CRITICAL: Route / Module / Middleware Registration Ownership
+Coding tasks should **implement feature files**, but they should **not** perform the final shared-entry registration closure.
 
-**Backend route tasks:**
-- The server entry file (e.g. \`backend/src/app.ts\`, \`backend/src/api/modules/index.ts\`, \`apps/api/src/index.ts\`, \`src/index.ts\`) must appear in \`files.modifies\`.
-- subSteps MUST include a final step: \`"MODIFY [entry file]: import [routerName] from './routes/[name]', then app.use('/api/[resource]', [routerName])"\`.
-- If the entry file is created by a Scaffolding task, it will already be on disk — list it in \`modifies\`, never in \`creates\`.
-- acceptanceCriteria MUST include at least one end-to-end HTTP assertion, e.g. \`"POST /api/items returns 201 with { id, name }"\`, \`"GET /api/users returns 200 with array"\`. Never write vague criteria like "endpoints are implemented".
+**Backend feature tasks:**
+- Do **NOT** require shared entry files such as \`backend/src/app.ts\` or \`backend/src/api/modules/index.ts\` in \`files.modifies\` just for route/middleware registration.
+- Create or modify the concrete feature files instead (e.g. \`backend/src/api/modules/*/*.routes.ts\`, controllers, services, validation, middleware implementation files).
+- acceptanceCriteria should verify that handlers/modules are implemented and ready for registration, not that the shared entrypoint is already wired.
 
 **Frontend page tasks:**
-- The route registration file (\`frontend/src/router.tsx\`, \`App.tsx\`, \`src/routes.tsx\`, or whichever file the route shell task created) must appear in \`files.modifies\`.
-- subSteps MUST include: \`"MODIFY router file: add route registration for '/[path]' and import PageName"\`.
-- acceptanceCriteria MUST include navigation verification: e.g. \`"Navigating to /[path] renders the page without crashing"\`.
+- Do **NOT** require \`frontend/src/router.tsx\` in \`files.modifies\` for page registration.
+- Implement the page/view/component files and any local navigation UI, but defer final route registration to \`integrationVerifyAndFix\`.
+- acceptanceCriteria should verify the page/component implementation itself, not final path reachability through the global router.
+
+**Final registration closure owner:**
+- \`integrationVerifyAndFix\` is responsible for scanning and registering:
+  - frontend pages from \`frontend/src/views\` into \`frontend/src/router.tsx\`
+  - backend module routes from \`backend/src/api/modules\` into \`backend/src/api/modules/index.ts\`
+  - backend middlewares from \`backend/src/middlewares\` into \`backend/src/app.ts\`
 
 ## CRITICAL: Database & Infrastructure
 Scan the PRD for any persistence requirement (database, file storage, cache, queues). If found:
@@ -281,8 +286,8 @@ Scan the PRD for any persistence requirement (database, file storage, cache, que
   - Add an early **contracts/client** task (phase can be "Data Layer" or "Integration") that aligns request/response schemas, shared types, and frontend API client with PRD IDs.
   - Ensure this contracts/client task appears before backend endpoint implementation and before page-level frontend tasks.
 - Frontend task granularity:
-  - Create one **route shell/layout** frontend task first (routing table, app shell, navigation/layout wiring).
-  - Route shell/layout task must include explicit edits to the active route registry (\`frontend/src/router.tsx\`, \`apps/web/src/App.tsx\`, or \`src/routes.tsx\`) and ensure "/" has real navigation entries.
+  - Create one **app shell/layout** frontend task first (app shell, navigation/layout wiring).
+  - Do not assign final edits to shared route registries (\`frontend/src/router.tsx\`, \`apps/web/src/App.tsx\`, or \`src/routes.tsx\`) to Coding tasks; \`integrationVerifyAndFix\` handles final registration closure.
   - Then split frontend implementation by **page/flow** (one task per page), not by tiny component.
 - Merge related work aggressively for backend/data: combine multiple API endpoints and models into broader tasks unless scale clearly requires more split.
 - Order tasks by execution sequence (respecting dependencies).

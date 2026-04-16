@@ -15,6 +15,7 @@ const MAX_BUFFER = 5 * 1024 * 1024;
 const ALLOWED_COMMANDS = [
   "tsc",
   "npx tsc",
+  "npx eslint",
   "npx ts-fix",
   "npx --no-install ts-fix",
   "npx prisma",
@@ -208,12 +209,16 @@ export async function execPrismaGenerate(
   const timeout = options?.timeout ?? 90_000;
   const env = { ...process.env, ...extraEnv } as NodeJS.ProcessEnv;
   try {
-    const { stdout, stderr } = await execFileAsync("npx", ["prisma", "generate"], {
-      cwd,
-      maxBuffer: MAX_BUFFER,
-      timeout,
-      env,
-    });
+    const { stdout, stderr } = await execFileAsync(
+      "npx",
+      ["prisma", "generate"],
+      {
+        cwd,
+        maxBuffer: MAX_BUFFER,
+        timeout,
+        env,
+      },
+    );
     return { stdout, stderr, exitCode: 0 };
   } catch (e) {
     const err = e as {
@@ -276,7 +281,9 @@ export async function listFiles(
  *         yarn.lock → 'yarn'
  *         otherwise → 'npm'
  */
-export async function detectPackageManager(outputDir: string): Promise<"pnpm" | "yarn" | "npm"> {
+export async function detectPackageManager(
+  outputDir: string,
+): Promise<"pnpm" | "yarn" | "npm"> {
   const abs = path.resolve(outputDir);
   for (const lockFile of ["pnpm-workspace.yaml", "pnpm-lock.yaml"]) {
     try {
@@ -313,16 +320,13 @@ export function buildAddCommand(
   pkgs: string[],
   opts?: { filter?: string; dev?: boolean },
 ): string {
-  const devFlag = opts?.dev
-    ? pm === "yarn"
-      ? " --dev"
-      : " --save-dev"
-    : "";
+  const devFlag = opts?.dev ? (pm === "yarn" ? " --dev" : " --save-dev") : "";
   if (pm === "pnpm") {
     const filter = opts?.filter ? ` --filter ${opts.filter}` : "";
     return `pnpm add${filter}${devFlag} ${pkgs.join(" ")} 2>&1 | tail -15`;
   }
-  if (pm === "yarn") return `yarn add${devFlag} ${pkgs.join(" ")} 2>&1 | tail -15`;
+  if (pm === "yarn")
+    return `yarn add${devFlag} ${pkgs.join(" ")} 2>&1 | tail -15`;
   const saveFlag = opts?.dev ? "--save-dev" : "--save";
   return `npm install ${saveFlag} ${pkgs.join(" ")} 2>&1 | tail -15`;
 }
