@@ -45,14 +45,15 @@ export const MODEL_CONFIG = {
   codeGen: [
     "openai/gpt-5.3-codex",
     "deepseek/deepseek-v3.2",
+    "qwen/qwen3.6-plus",
     "claude-sonnet",
   ] as string[],
 
   /** Error-fix pass: cheaper models suffice for targeted tsc/build fixes. */
   codeFix: [
-    "openai/gpt-5.3-codex",
-    "deepseek/deepseek-v3.2",
     "claude-sonnet",
+    "qwen/qwen3.6-plus",
+    "deepseek/deepseek-v3.2",
   ] as string[],
 
   /**
@@ -60,7 +61,8 @@ export const MODEL_CONFIG = {
    * Needs strong tool-use / function-calling capability.
    */
   phaseVerifyFix: [
-    "claude-sonnet-4",
+    "openai/gpt-5.3-codex",
+    "qwen/qwen3.6-plus",
     "deepseek/deepseek-v3.2",
     "gpt-4o",
   ] as string[],
@@ -70,8 +72,8 @@ export const MODEL_CONFIG = {
    * Prefer stronger first model because this step must align test cases to PRD.
    */
   e2eGen: [
-    "openai/gpt-5.4",
     "claude-sonnet-4",
+    "openai/gpt-5.4",
     "openai/gpt-5.3-codex",
   ] as string[],
 } as const;

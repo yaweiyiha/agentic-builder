@@ -22,7 +22,10 @@ const UNPROTECTED_SCAFFOLD_PATHS = new Set([
   "frontend/src/main.tsx",
   "frontend/src/router.tsx",
   "frontend/src/views/NotFound.tsx",
-  "rontend/src/index.css",
+  "frontend/src/index.css",
+  // E2E files — agents write generated test specs here; scaffold only ships a baseline
+  "frontend/e2e/smoke.spec.ts",
+  "frontend/playwright.config.ts",
 ]);
 
 /**

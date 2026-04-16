@@ -8,7 +8,9 @@
     "dev:compile": "pnpm exec concurrently \"tsc -b --watch --preserveWatchOutput\" \"vite build --watch\" \"vite\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "playwright install chromium --with-deps && playwright test",
+    "e2e:headed": "playwright install chromium --with-deps && playwright test --headed"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.1",
@@ -18,6 +20,7 @@
     "react-router-dom": "^7.14.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^24.12.2",

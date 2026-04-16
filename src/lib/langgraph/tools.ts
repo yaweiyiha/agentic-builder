@@ -15,7 +15,6 @@ const MAX_BUFFER = 5 * 1024 * 1024;
 const ALLOWED_COMMANDS = [
   "tsc",
   "npx tsc",
-  "npx eslint",
   "npx ts-fix",
   "npx --no-install ts-fix",
   "npx prisma",
@@ -35,6 +34,10 @@ const ALLOWED_COMMANDS = [
   "pnpm run test",
   "pnpm run e2e",
   "pnpm run lint",
+  // npm e2e (mirrors pnpm/yarn)
+  "npm run e2e",
+  // yarn e2e
+  "yarn run e2e",
   "pnpm exec playwright",
   "pnpm install &&",
   "pnpm add",

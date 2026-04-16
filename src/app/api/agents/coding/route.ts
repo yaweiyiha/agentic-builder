@@ -28,6 +28,10 @@ import type {
 } from "@/lib/pipeline/types";
 import { stripTestingPhaseTasks } from "@/lib/pipeline/strip-testing-tasks";
 import { DEFAULT_RALPH_CONFIG } from "@/lib/pipeline/types";
+import {
+  buildFrontendDesignContextForCodegen,
+  readPencilDesignDoc,
+} from "@/lib/pipeline/frontend-design-context";
 
 const execFileAsync = promisify(execFile);
 
@@ -102,6 +106,7 @@ export async function POST(request: NextRequest) {
     projectTier,
     ralph: ralphOverride,
     databaseUrl: databaseUrlBody,
+    prd: prdBody,
   } = body as {
     runId: string;
     tasks: KickoffWorkItem[];
@@ -110,6 +115,8 @@ export async function POST(request: NextRequest) {
     ralph?: Partial<RalphConfig>;
     /** Optional override; otherwise `BLUEPRINT_GENERATED_DATABASE_URL` (server .env.local). */
     databaseUrl?: string;
+    /** PRD content passed from the UI to guarantee the correct project PRD is used. */
+    prd?: string;
   };
 
   const ralphConfig: RalphConfig = {
@@ -133,6 +140,21 @@ export async function POST(request: NextRequest) {
   }
 
   const outputRoot = resolveCodeOutputRoot(process.cwd(), codeOutputDir);
+
+  // Pencil exports live under frontend/public/design; cleanup removes `frontend/`. Stash PNGs
+  // so they survive scaffold refresh (markdown stays at repo root via KEEP_MD).
+  const pencilDesignStash = path.join(outputRoot, ".agentic-pencil-design-stash");
+  const pencilDesignSrc = path.join(outputRoot, "frontend", "public", "design");
+  try {
+    await fs.rm(pencilDesignStash, { recursive: true, force: true });
+    await fs.access(pencilDesignSrc);
+    await fs.cp(pencilDesignSrc, pencilDesignStash, { recursive: true });
+    console.log(
+      "[CodingAPI] Stashed frontend/public/design (Pencil exports) before cleanup.",
+    );
+  } catch {
+    /* no prior exports */
+  }
 
   // Robust cleanup: handle each entry individually so one failure doesn't stop the rest.
   // Keep .git (RALPH commits), specific doc .md files, and .ralph tracking dir.
@@ -183,6 +205,18 @@ export async function POST(request: NextRequest) {
     console.warn(
       `[CodingAPI] Scaffold copy warning: ${e instanceof Error ? e.message : String(e)}`,
     );
+  }
+
+  try {
+    await fs.access(pencilDesignStash);
+    await fs.mkdir(pencilDesignSrc, { recursive: true });
+    await fs.cp(pencilDesignStash, pencilDesignSrc, { recursive: true });
+    await fs.rm(pencilDesignStash, { recursive: true, force: true });
+    console.log(
+      "[CodingAPI] Restored frontend/public/design after scaffold (Pencil PNG exports).",
+    );
+  } catch {
+    /* nothing stashed */
   }
 
   try {
@@ -256,12 +290,26 @@ export async function POST(request: NextRequest) {
     }
   };
 
+  // If the caller passed PRD content directly, write it to disk before reading.
+  // This guarantees the correct project PRD is used even when the file on disk
+  // belongs to a previous session (e.g. after a retry without a fresh kickoff).
+  if (prdBody && prdBody.trim().length > 0) {
+    try {
+      await fs.writeFile(path.join(outputRoot, "PRD.md"), prdBody, "utf-8");
+      console.log("[CodingAPI] PRD.md overwritten from request body (session PRD pinning).");
+    } catch (e) {
+      console.warn(
+        `[CodingAPI] Failed to write PRD.md from request body: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
   const prdDoc = await readDoc("PRD.md");
   const trdDoc = await readDoc("TRD.md", 6000);
   const sysDesignDoc = await readDoc("SystemDesign.md", 6000);
   const implGuideDoc = await readDoc("ImplementationGuide.md", 6000);
   const designSpecDoc = await readDoc("DesignSpec.md", 8000);
-  const pencilDesignDoc = await readDoc("PencilDesign.md");
+  const pencilDesignDoc = await readPencilDesignDoc(outputRoot);
   const scaffoldReadmePath = path.resolve(
     process.cwd(),
     "scaffolds",
@@ -328,12 +376,11 @@ export async function POST(request: NextRequest) {
           .filter(Boolean)
           .join("\n\n---\n\n");
 
-  const frontendDesignContext = [
-    designSpecDoc ? `## Design Specification\n\n${designSpecDoc}` : "",
-    pencilDesignDoc ? `## Pencil Design Tokens\n\n${pencilDesignDoc}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n---\n\n");
+  const frontendDesignContext = await buildFrontendDesignContextForCodegen(
+    outputRoot,
+    designSpecDoc,
+    pencilDesignDoc,
+  );
 
   const normalizedTasks = [...tasksAfterStrip, ...preparedE2e.extraTasks];
   const codingTasks: CodingTask[] = normalizedTasks.map((t) => ({

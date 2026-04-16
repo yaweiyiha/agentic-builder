@@ -20,7 +20,10 @@ import PrdSpecWireframesSection, {
 } from "@/components/PrdSpecWireframesSection";
 import DocReviewPanel from "@/components/DocReviewPanel";
 import PencilEditPanel from "@/components/PencilEditPanel";
-import { PrepStyleChatTranscript, type PrepDocChatMsg } from "@/components/PrepStyleChatPanel";
+import {
+  PrepStyleChatTranscript,
+  type PrepDocChatMsg,
+} from "@/components/PrepStyleChatPanel";
 import Loading from "@/components/Loading";
 import type { PipelineStepId, StepResult } from "@/lib/pipeline/types";
 import type { ProjectTier } from "@/lib/agents/project-classifier";
@@ -102,6 +105,7 @@ export default function PipelinePage() {
   >(null);
   const codingStatus = useCodingStore((s) => s.status);
   const startCoding = useCodingStore((s) => s.startCoding);
+  const retryE2eVerify = useCodingStore((s) => s.retryE2eVerify);
 
   const [prdConfirmed, setPrdConfirmed] = useState(false);
   const [genPhase, setGenPhase] = useState<
@@ -125,13 +129,14 @@ export default function PipelinePage() {
   const [selectedParallelDocIds, setSelectedParallelDocIds] = useState<
     PipelineStepId[]
   >([]);
-  const [designStyleId, setDesignStyleId] = useState<DesignStyleId>(
-    defaultDesignStyleId,
+  const [designStyleId, setDesignStyleId] =
+    useState<DesignStyleId>(defaultDesignStyleId);
+  const [styleReferenceImage, setStyleReferenceImage] = useState<string | null>(
+    null,
   );
-  const [styleReferenceImage, setStyleReferenceImage] = useState<string | null>(null);
-  const [prepDocChatHistory, setPrepDocChatHistory] = useState<PrepDocChatMsg[]>(
-    [],
-  );
+  const [prepDocChatHistory, setPrepDocChatHistory] = useState<
+    PrepDocChatMsg[]
+  >([]);
   /** False after a Design Spec is generated until the user explicitly confirms it (unlocks Pencil). */
   const [designSpecConfirmed, setDesignSpecConfirmed] = useState(true);
   /** False after Pencil output exists until the user confirms before kick-off. */
@@ -433,7 +438,10 @@ export default function PipelinePage() {
       const resp = await fetch("/api/agents/load-pipeline-snapshot");
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        console.error("Load snapshot failed:", (err as { error?: string }).error);
+        console.error(
+          "Load snapshot failed:",
+          (err as { error?: string }).error,
+        );
         return;
       }
       const { snapshot } = (await resp.json()) as {
@@ -470,6 +478,13 @@ export default function PipelinePage() {
     setActiveOverridePhase("coding");
     startCoding(runId, DEBUG_CRITICAL_ILLNESS_KICKOFF_TASKS, codeOutputDir);
   }, [isRunning, codingStatus, codeOutputDir, startCoding]);
+
+  const handleDebugE2eVerify = useCallback(() => {
+    if (isRunning || codingStatus === "running") return;
+    const runId = `debug-e2e-${Date.now()}`;
+    setActiveOverridePhase("coding");
+    retryE2eVerify(runId, codeOutputDir, projectTier);
+  }, [isRunning, codingStatus, codeOutputDir, projectTier, retryE2eVerify]);
 
   const displayedStepId: PipelineStepId =
     activePhase === "preparation" ? effectivePrepSub : activeTab;
@@ -571,7 +586,13 @@ export default function PipelinePage() {
             typeof st.kickoff.metadata?.runId === "string"
               ? st.kickoff.metadata.runId
               : "run-" + Date.now();
-          startCoding(runId, tasks, codeOutputDir);
+          startCoding(
+            runId,
+            tasks,
+            codeOutputDir,
+            undefined,
+            steps.prd?.content,
+          );
           setActiveOverridePhase("coding");
           setFeatureBrief("");
           return;
@@ -1091,22 +1112,22 @@ export default function PipelinePage() {
                     </>
                   )}
                   {showGenerationPlan && genPhase === "planning" && (
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 420,
-                          damping: 28,
-                        }}
-                        disabled={parallelGenBusy || prdRefining}
-                        onClick={() => void processCommandBarInput("continue")}
-                        className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Generate documents
-                      </motion.button>
-                    )}
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 28,
+                      }}
+                      disabled={parallelGenBusy || prdRefining}
+                      onClick={() => void processCommandBarInput("continue")}
+                      className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Generate documents
+                    </motion.button>
+                  )}
                   {showGenerationPlan && genPhase === "awaiting_kickoff" && (
                     <>
                       {parallelGenResults?.design?.content &&
@@ -1462,6 +1483,26 @@ export default function PipelinePage() {
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
               Debug Coding · Critical Illness
+            </button>
+            <span className="text-zinc-200">&middot;</span>
+            <button
+              type="button"
+              onClick={handleDebugE2eVerify}
+              disabled={isRunning || codingStatus === "running"}
+              className="flex items-center gap-1 text-purple-400 transition-colors hover:text-purple-600 disabled:opacity-40"
+              title="Skip coding — run E2E verify directly against existing generated-code"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Debug E2E Verify
             </button>
           </div>
 

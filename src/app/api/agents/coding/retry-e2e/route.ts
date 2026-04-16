@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 import { prepareE2eArtifacts } from "@/lib/e2e/e2e-artifacts";
-import { createIntegrationRetryGraph } from "@/lib/langgraph/supervisor";
+import { createE2eRetryGraph } from "@/lib/langgraph/supervisor";
 import { EventMapper, type ErrorCategory } from "@/lib/langgraph/event-mapper";
 import {
   listScaffoldTemplateRelativePaths,
@@ -31,24 +31,18 @@ export const maxDuration = 600;
 function classifyError(
   error: unknown,
   clientAborted: boolean,
-): {
-  category: ErrorCategory;
-  message: string;
-} {
+): { category: ErrorCategory; message: string } {
   if (clientAborted) {
     return {
       category: "client_disconnect",
       message: "Client disconnected (SSE closed)",
     };
   }
-
   if (!(error instanceof Error)) {
     return { category: "unknown", message: String(error) };
   }
-
   const msg = error.message.toLowerCase();
   const name = error.name;
-
   if (
     name === "AbortError" ||
     msg.includes("aborted") ||
@@ -59,7 +53,6 @@ function classifyError(
       message: `Client aborted: ${error.message}`,
     };
   }
-
   if (
     msg.includes("timeout") ||
     msg.includes("timed out") ||
@@ -72,19 +65,6 @@ function classifyError(
       message: `Timeout/terminated: ${error.message}`,
     };
   }
-
-  if (
-    msg.includes("openrouter") ||
-    msg.includes("api error") ||
-    msg.includes("rate limit") ||
-    msg.includes("model") ||
-    msg.includes("codegen api") ||
-    msg.includes("empty content") ||
-    msg.includes("non-json response")
-  ) {
-    return { category: "llm_error", message: `LLM error: ${error.message}` };
-  }
-
   return { category: "graph_error", message: error.message };
 }
 
@@ -106,7 +86,7 @@ export async function POST(request: NextRequest) {
 
   if (!codeOutputDir || !String(codeOutputDir).trim()) {
     return Response.json(
-      { error: "codeOutputDir is required for integration retry" },
+      { error: "codeOutputDir is required for E2E retry" },
       { status: 400 },
     );
   }
@@ -114,7 +94,7 @@ export async function POST(request: NextRequest) {
   const runId =
     typeof runIdRaw === "string" && runIdRaw.trim()
       ? runIdRaw.trim()
-      : `integration-retry-${Date.now()}`;
+      : `e2e-retry-${Date.now()}`;
 
   const inputTasks = Array.isArray(tasks) ? tasks : [];
   const tasksAfterStrip = stripTestingPhaseTasks(inputTasks);
@@ -131,7 +111,7 @@ export async function POST(request: NextRequest) {
     await writeScaffoldSpecFile(outputRoot, tier);
   } catch (e) {
     console.warn(
-      `[CodingAPI][retry-integration] writeScaffoldSpecFile warning: ${e instanceof Error ? e.message : String(e)}`,
+      `[CodingAPI][retry-e2e] writeScaffoldSpecFile warning: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
 
@@ -208,16 +188,14 @@ export async function POST(request: NextRequest) {
   }));
 
   const sessionId = uuidv4();
-  const mapper = new EventMapper(sessionId, {
-    emitGapAnalysisAfterIntegration: false,
-  });
+  const mapper = new EventMapper(sessionId);
   const encoder = new TextEncoder();
 
   let clientAborted = false;
   request.signal.addEventListener("abort", () => {
     clientAborted = true;
     console.warn(
-      `[CodingAPI][retry-integration] Session ${sessionId}: client disconnected`,
+      `[CodingAPI][retry-e2e] Session ${sessionId}: client disconnected`,
     );
   });
 
@@ -235,12 +213,12 @@ export async function POST(request: NextRequest) {
       }
 
       console.log(
-        `[CodingAPI][retry-integration] Session ${sessionId}: runId=${runId}, output=${outputRoot}`,
+        `[CodingAPI][retry-e2e] Session ${sessionId}: runId=${runId}, output=${outputRoot}`,
       );
 
       send(mapper.buildSessionStart(codingTasks));
 
-      const graph = createIntegrationRetryGraph();
+      const graph = createE2eRetryGraph();
 
       try {
         const streamIterator = await graph.stream(
@@ -251,8 +229,11 @@ export async function POST(request: NextRequest) {
             frontendDesignContext,
             scaffoldProtectedPaths,
             ralphConfig,
+            // Reset E2E attempt counter so the retry gets a fresh set of attempts
+            e2eVerifyAttempts: 0,
+            e2eVerifyErrors: "",
           },
-          { subgraphs: true, streamMode: "updates", recursionLimit: 100 },
+          { subgraphs: true, streamMode: "updates", recursionLimit: 50 },
         );
 
         for await (const chunk of streamIterator) {
@@ -271,7 +252,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         const classified = classifyError(error, clientAborted);
         console.error(
-          `[CodingAPI][retry-integration] Session ${sessionId} error [${classified.category}]: ${classified.message}`,
+          `[CodingAPI][retry-e2e] Session ${sessionId} error [${classified.category}]: ${classified.message}`,
         );
         send(mapper.buildSessionError(classified.message, classified.category));
       } finally {

@@ -1,4 +1,5 @@
 import path from "path";
+import type { Dirent } from "fs";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { PencilMcpClient } from "@/lib/pencil-mcp";
@@ -10,6 +11,7 @@ import {
   type ChatMessage,
   type OpenRouterToolDefinition,
   type OpenRouterToolCall,
+  type OpenRouterUsage,
 } from "@/lib/openrouter";
 import { MODEL_CONFIG } from "@/lib/model-config";
 import {
@@ -120,7 +122,25 @@ function buildUserPrompt(
     "- 每完成一个小步骤后，观察工具返回结果再继续。",
     "- 遇到语法或属性错误时，先修正再继续。",
     "- 优先完成主屏，再扩展次要屏。",
-    "- 完成后给出简短中文总结。",
+    "- 全部主屏绘制完成后，在**最后一次纯文字回复**（不再调用工具）中同时给出：",
+    "  1）简短中文总结；",
+    "  2）下方 **Codegen handoff** 英文块（供前端自动生成代码使用，与 PNG 配套）。",
+    "",
+    "## Mandatory final message shape (after all tools are done)",
+    "Your last assistant message MUST include a markdown section starting exactly with:",
+    "",
+    "## Codegen handoff",
+    "",
+    "Write in **English**. For **each** top-level screen/frame (match Pencil `name` / purpose):",
+    "- **Screen**: <short title>",
+    "- **Route / purpose**: <e.g. `/login` — user authentication>",
+    "- **Layout**: <flex direction, main regions: header / sidebar / content>",
+    "- **Colors**: background, surface/card, primary CTA, body text (use **#RRGGBB**)",
+    "- **Typography**: roles (title, body, caption) and approximate sizes if visible",
+    "- **Key components**: buttons, inputs, nav items (labels as shown in the design)",
+    "- **Export**: which exported PNG under `/design/` corresponds to this screen (filename)",
+    "",
+    "This text is consumed by the codegen pipeline together with **DesignSpec.md** and PNGs. Be specific; do not skip screens.",
     "",
     "## PRD",
     truncate(prd, 24000),
@@ -158,6 +178,7 @@ function buildSystemPrompt(styleAugment?: string) {
     "不要更新 document，不要输出透明 fill 字符串。",
     "当所有主屏完成后，可以调用 get_screenshot 或 batch_get 检查结果。",
     "你可以在结束前调用 export_nodes，但即使不调用，宿主也会自动导出。",
+    "结束前必须用纯文字输出 **## Codegen handoff**（英文、按上面用户消息中的结构），否则下游前端无法对照设计还原页面。",
   ];
   if (styleAugment?.trim()) {
     base.push("", "## 风格指令（必须遵守）", styleAugment.trim());
@@ -380,20 +401,98 @@ async function getTopLevelNodeIds(mcp: PencilMcpClient): Promise<string[]> {
   return [...new Set(ids)].slice(0, 32);
 }
 
+const CODEGEN_HANDOFF_MARKER = "## Codegen handoff";
+
+function splitSummaryForDoc(summary: string): {
+  preamble: string;
+  handoff: string;
+} {
+  const idx = summary.indexOf(CODEGEN_HANDOFF_MARKER);
+  if (idx >= 0) {
+    return {
+      preamble: summary.slice(0, idx).trim(),
+      handoff: summary.slice(idx).trim(),
+    };
+  }
+  return { preamble: summary.trim(), handoff: "" };
+}
+
+async function listExportedPngRelativePaths(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  async function walk(abs: string, prefix: string): Promise<void> {
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(abs, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      const name = String(ent.name);
+      const rel = prefix ? `${prefix}/${name}` : name;
+      const full = path.join(abs, name);
+      if (ent.isDirectory()) {
+        await walk(full, rel);
+      } else if (name.toLowerCase().endsWith(".png")) {
+        out.push(rel.replace(/\\/g, "/"));
+      }
+    }
+  }
+  await walk(dir, "");
+  return out.sort();
+}
+
 function transcriptMarkdown(
   transcript: PencilTranscriptEntry[],
   summary: string,
   artifacts: string[],
+  pngRelativePaths: string[],
 ) {
-  const lines = [
+  const { preamble, handoff } = splitSummaryForDoc(summary);
+
+  const lines: string[] = [
     "# PencilDesign",
     "",
-    summary || "Pencil live session completed.",
+    "## Session summary",
+    "",
+    preamble || "_Session completed._",
     "",
   ];
-  if (artifacts.length > 0) {
-    lines.push("## Artifacts", ...artifacts.map((item) => `- ${item}`), "");
+
+  if (handoff) {
+    lines.push(handoff, "");
+  } else {
+    lines.push(
+      "## Codegen handoff",
+      "",
+      "_No `## Codegen handoff` block was found in the final message. The Pencil agent should end with the structured English section described in the live session prompt (per-screen layout, colors, typography, and PNG mapping). Until then, rely on **DesignSpec.md** and the PNG list below._",
+      "",
+    );
   }
+
+  if (pngRelativePaths.length > 0) {
+    lines.push(
+      "## Exported PNG assets",
+      "",
+      "Vite serves `frontend/public/design/` at URL `/design/...`. Example: `src={\"/design/" +
+        pngRelativePaths[0] +
+        "\"}`. Pair each file with the matching screen in **Codegen handoff**.",
+      "",
+    );
+    for (const rel of pngRelativePaths) {
+      lines.push(`- \`/design/${rel}\``);
+    }
+    lines.push("");
+  }
+
+  if (artifacts.length > 0) {
+    lines.push(
+      "## Output directories",
+      "",
+      ...artifacts.map((item) => `- ${item}`),
+      "",
+    );
+  }
+
   lines.push("## Tool Transcript", "");
   transcript.forEach((entry, index) => {
     lines.push(`### ${index + 1}. ${entry.toolName}`, "");
@@ -498,13 +597,27 @@ async function executeTool(
   }
 }
 
+/**
+ * PNG exports must land under `frontend/public/design` so Vite serves them at `/design/*`.
+ * Markdown is written to the codegen root as `PencilDesign.md` (same file coding agents read).
+ */
+async function resolvePencilAssetsDir(projectRoot: string): Promise<string> {
+  const fePkg = path.join(projectRoot, "frontend", "package.json");
+  try {
+    await fs.access(fePkg);
+    return path.join(projectRoot, "frontend", "public", "design");
+  } catch {
+    return path.join(projectRoot, "public", "design");
+  }
+}
+
 export async function runPencilLiveSession(
   input: RunPencilLiveInput,
 ): Promise<AgentResult> {
   const traceId = uuidv4();
   const startedAt = Date.now();
   const model = resolveModel(MODEL);
-  const outputDir = path.join(input.projectRoot, "public", "design");
+  const outputDir = await resolvePencilAssetsDir(input.projectRoot);
   const transcript: PencilTranscriptEntry[] = [];
   const artifactUrls: string[] = [];
   const messages: ChatMessage[] = [
@@ -520,10 +633,10 @@ export async function runPencilLiveSession(
   ];
   const tools = buildTools(outputDir);
   const mcp = PencilMcpClient.getInstance();
-  let totalUsage = {
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
+  let totalUsage: OpenRouterUsage = {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
   };
   let totalCostUsd = 0;
   let finalSummary = "";
@@ -549,6 +662,8 @@ export async function runPencilLiveSession(
     LIVE_COMPLETION_MAX_TOKENS,
   });
 
+  let automaticExportFailureMessage: string | undefined;
+
   await runWithPencilMcpExclusive(async () => {
     await mcp.connect();
     try {
@@ -566,13 +681,19 @@ export async function runPencilLiveSession(
         const assistantContent = assistant?.content?.trim() ?? "";
         const toolCalls = assistant?.tool_calls ?? [];
 
-        totalUsage = {
-          promptTokens: totalUsage.promptTokens + response.usage.prompt_tokens,
-          completionTokens:
-            totalUsage.completionTokens + response.usage.completion_tokens,
-          totalTokens: totalUsage.totalTokens + response.usage.total_tokens,
+        const usage = response.usage ?? {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
         };
-        totalCostUsd += estimateCost(response.model, response.usage);
+
+        totalUsage = {
+          prompt_tokens: totalUsage.prompt_tokens + usage.prompt_tokens,
+          completion_tokens:
+            totalUsage.completion_tokens + usage.completion_tokens,
+          total_tokens: totalUsage.total_tokens + usage.total_tokens,
+        };
+        totalCostUsd += estimateCost(response.model, usage);
 
         logGeneration({
           traceId,
@@ -584,11 +705,11 @@ export async function runPencilLiveSession(
             toolCalls,
           },
           usage: {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
+            promptTokens: usage.prompt_tokens,
+            completionTokens: usage.completion_tokens,
+            totalTokens: usage.total_tokens,
           },
-          costUsd: estimateCost(response.model, response.usage),
+          costUsd: estimateCost(response.model, usage),
           durationMs: Date.now() - startedAt,
         });
 
@@ -643,32 +764,51 @@ export async function runPencilLiveSession(
         }
       }
 
-      const nodeIds = await getTopLevelNodeIds(mcp);
-      if (nodeIds.length > 0) {
-        const exportResult = await mcp.exportNodes({
-          filePath: path.join(outputDir, "design.pen"),
-          nodeIds,
-          outputDir,
-          format: "png",
-        });
-        transcript.push({
-          toolName: "export_nodes",
-          args: {
+      try {
+        const nodeIds = await getTopLevelNodeIds(mcp);
+        if (nodeIds.length > 0) {
+          const exportResult = await mcp.exportNodes({
             filePath: path.join(outputDir, "design.pen"),
             nodeIds,
             outputDir,
             format: "png",
-          },
-          result: exportResult,
-          ok: true,
+          });
+          transcript.push({
+            toolName: "export_nodes",
+            args: {
+              filePath: path.join(outputDir, "design.pen"),
+              nodeIds,
+              outputDir,
+              format: "png",
+            },
+            result: exportResult,
+            ok: true,
+          });
+          artifactUrls.push(outputDir);
+          emit(input.onEvent, {
+            type: "tool_call_result",
+            toolName: "export_nodes",
+            ok: true,
+            result: truncate(exportResult, 1000),
+            artifactUrl: outputDir,
+          });
+        }
+      } catch (exportErr) {
+        const msg =
+          exportErr instanceof Error ? exportErr.message : String(exportErr);
+        automaticExportFailureMessage = msg;
+        console.warn("[PencilLive] Automatic PNG export failed (session saved):", msg);
+        transcript.push({
+          toolName: "export_nodes",
+          args: { phase: "final_automatic" },
+          result: `Automatic export failed: ${msg}`,
+          ok: false,
         });
-        artifactUrls.push(outputDir);
         emit(input.onEvent, {
           type: "tool_call_result",
           toolName: "export_nodes",
-          ok: true,
-          result: truncate(exportResult, 1000),
-          artifactUrl: outputDir,
+          ok: false,
+          result: truncate(msg, 1000),
         });
       }
     } finally {
@@ -676,19 +816,37 @@ export async function runPencilLiveSession(
     }
   });
 
-  const markdown = transcriptMarkdown(transcript, finalSummary, artifactUrls);
-  await fs.writeFile(
-    path.join(outputDir, "PencilDesign.md"),
-    markdown,
-    "utf-8",
+  const pngList = await listExportedPngRelativePaths(outputDir);
+  let markdown = transcriptMarkdown(
+    transcript,
+    finalSummary,
+    artifactUrls,
+    pngList,
   );
-  await fs.writeFile(
-    path.join(outputDir, "PENCIL_DESIGN.md"),
-    markdown,
-    "utf-8",
-  );
+  if (automaticExportFailureMessage) {
+    const oneLine = automaticExportFailureMessage.replace(/\s+/g, " ").trim();
+    markdown = [
+      "> **Automatic PNG export failed after the live session.** The transcript and handoff below were still saved.",
+      `> ${oneLine}`,
+      "",
+      "If the canvas in Pencil looks complete, you can export frames manually from Pencil or re-run this step.",
+      "",
+      markdown,
+    ].join("\n");
+  }
+  const designDocRoot = path.join(input.projectRoot, "PencilDesign.md");
+  const designDocDup = path.join(input.projectRoot, "PENCIL_DESIGN.md");
+  await fs.writeFile(designDocRoot, markdown, "utf-8");
+  await fs.writeFile(designDocDup, markdown, "utf-8");
 
-  await flushLangfuse();
+  try {
+    await flushLangfuse();
+  } catch (lfErr) {
+    console.warn(
+      "[PencilLive] flushLangfuse failed (non-fatal):",
+      lfErr instanceof Error ? lfErr.message : lfErr,
+    );
+  }
 
   emit(input.onEvent, {
     type: "session_complete",

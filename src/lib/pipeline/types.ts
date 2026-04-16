@@ -225,9 +225,6 @@ export interface CodingSessionEvent {
     | "task_refinement_start"
     | "task_refinement_complete"
     | "agent_task_substeps"
-    | "gap_analysis_start"
-    | "gap_analysis_complete"
-    | "supplementary_dispatch"
     | "session_complete"
     | "session_error";
   sessionId: string;

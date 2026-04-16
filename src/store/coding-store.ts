@@ -23,12 +23,6 @@ export interface TaskRefinementState {
   taskCountAfter?: number;
 }
 
-export interface GapAnalysisState {
-  status: "running" | "dispatching" | "completed" | "no_gaps";
-  gapCount: number;
-  supplementaryTaskIds: string[];
-}
-
 export interface E2EVerifyState {
   status: "verifying" | "fixing" | "passed" | "failed";
   errors?: string;
@@ -48,7 +42,6 @@ interface CodingState {
   integrationVerify: IntegrationVerifyState | null;
   e2eVerify: E2EVerifyState | null;
   taskRefinement: TaskRefinementState | null;
-  gapAnalysis: GapAnalysisState | null;
   /** Supervisor-level logs (phase verify, fix, install, etc.) */
   supervisorLogs: AgentLogEntry[];
 
@@ -57,8 +50,14 @@ interface CodingState {
     tasks: KickoffWorkItem[],
     codeOutputDir: string,
     projectTier?: string,
+    prdContent?: string,
   ) => void;
   retryIntegrationVerify: (
+    runId: string,
+    codeOutputDir: string,
+    projectTier?: string,
+  ) => void;
+  retryE2eVerify: (
     runId: string,
     codeOutputDir: string,
     projectTier?: string,
@@ -83,7 +82,7 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
 
   selectAgent: (agentId) => set({ selectedAgentId: agentId }),
 
-  startCoding: (runId, taskItems, codeOutputDir, projectTier) => {
+  startCoding: (runId, taskItems, codeOutputDir, projectTier, prdContent) => {
     set({
       status: "running",
       error: null,
@@ -95,14 +94,13 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       integrationVerify: null,
       e2eVerify: null,
       taskRefinement: null,
-      gapAnalysis: null,
       supervisorLogs: [],
     });
 
     fetch("/api/agents/coding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ runId, tasks: taskItems, codeOutputDir, projectTier }),
+      body: JSON.stringify({ runId, tasks: taskItems, codeOutputDir, projectTier, prd: prdContent }),
     })
       .then(async (resp) => {
         if (!resp.ok) {
@@ -246,6 +244,89 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       });
   },
 
+  retryE2eVerify: (runId, codeOutputDir, projectTier) => {
+    const current = get();
+    if (current.status === "running") return;
+
+    set({
+      status: "running",
+      error: null,
+      e2eVerify: {
+        status: "verifying",
+        fixAttempts: 0,
+        maxFixAttempts: current.e2eVerify?.maxFixAttempts ?? 3,
+      },
+    });
+
+    fetch("/api/agents/coding/retry-e2e", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId,
+        tasks: current.tasks,
+        codeOutputDir,
+        projectTier,
+      }),
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          set({
+            status: "failed",
+            error:
+              (errData as { error?: string }).error ||
+              "E2E retry request failed",
+          });
+          return;
+        }
+
+        const reader = resp.body?.getReader();
+        if (!reader) {
+          set({ status: "failed", error: "No response body" });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const payload = JSON.parse(line.slice(6));
+              handleCodingEvent(payload, set, get);
+            } catch {
+              /* skip */
+            }
+          }
+        }
+
+        if (buffer.startsWith("data: ")) {
+          try {
+            handleCodingEvent(JSON.parse(buffer.slice(6)), set, get);
+          } catch {
+            /* skip */
+          }
+        }
+
+        const state = get();
+        if (state.status === "running") set({ status: "completed" });
+      })
+      .catch((err) => {
+        set({
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      });
+  },
+
   reset: () => {
     set({
       sessionId: null,
@@ -258,7 +339,6 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       integrationVerify: null,
       e2eVerify: null,
       taskRefinement: null,
-      gapAnalysis: null,
       supervisorLogs: [],
     });
   },
@@ -634,81 +714,6 @@ function handleCodingEvent(
           timestamp: new Date().toISOString(),
           type: "info",
           message: `Task breakdown refined: backend=${payload.data?.backendCount ?? 0}, frontend=${payload.data?.frontendCount ?? 0}, test=${payload.data?.testCount ?? 0}`,
-        },
-      ],
-    });
-    return;
-  }
-
-  if (type === "gap_analysis_start") {
-    const logs = get().supervisorLogs;
-    set({
-      gapAnalysis: {
-        status: "running",
-        gapCount: 0,
-        supplementaryTaskIds: [],
-      },
-      supervisorLogs: [
-        ...logs,
-        {
-          timestamp: new Date().toISOString(),
-          type: "info",
-          message: "Running gap analysis to find missing functionality...",
-        },
-      ],
-    });
-    return;
-  }
-
-  if (type === "gap_analysis_complete") {
-    const gapCount = (payload.data?.gapCount as number) ?? 0;
-    const supplementaryTasks = (payload.data?.supplementaryTasks as CodingTask[]) ?? [];
-    const logs = get().supervisorLogs;
-    const existingTasks = get().tasks;
-
-    const newTasks = supplementaryTasks
-      .filter((st) => !existingTasks.some((t) => t.id === st.id))
-      .map((st) => ({
-        ...st,
-        assignedAgentId: null,
-        codingStatus: "pending" as const,
-      }));
-
-    set({
-      tasks: [...existingTasks, ...newTasks],
-      gapAnalysis: {
-        status: gapCount > 0 ? "completed" : "no_gaps",
-        gapCount,
-        supplementaryTaskIds: newTasks.map((t) => t.id),
-      },
-      supervisorLogs: [
-        ...logs,
-        {
-          timestamp: new Date().toISOString(),
-          type: "info",
-          message:
-            gapCount > 0
-              ? `Gap analysis: ${gapCount} supplementary task(s) identified`
-              : "Gap analysis: no critical gaps found",
-        },
-      ],
-    });
-    return;
-  }
-
-  if (type === "supplementary_dispatch") {
-    const logs = get().supervisorLogs;
-    const prev = get().gapAnalysis;
-    set({
-      gapAnalysis: prev
-        ? { ...prev, status: "dispatching" }
-        : { status: "dispatching", gapCount: 0, supplementaryTaskIds: [] },
-      supervisorLogs: [
-        ...logs,
-        {
-          timestamp: new Date().toISOString(),
-          type: "info",
-          message: "Dispatching supplementary workers for gap tasks...",
         },
       ],
     });

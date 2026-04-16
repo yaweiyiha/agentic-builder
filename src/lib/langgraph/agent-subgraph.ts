@@ -210,7 +210,11 @@ Generate React + TypeScript + Tailwind code for the assigned task.
 Rules:
 - Keep routing/page structure consistent with existing project layout.
 - If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` or \`@repo/shared/*\`).
-- When Design Tokens are provided in context, implement them accurately in UI code.
+- **Design compliance (MANDATORY)**: The merged **Project Context** includes \`## Design Specification\`, \`## Pencil design (implementation summary)\`, and often an English \`## Codegen handoff\` block (per-screen colors, typography, layout, route hints, PNG mapping). Treat these as the source of truth above generic templates; **Codegen handoff** is the structured counterpart to exported PNGs.
+  - Match page structure, section order, and component hierarchy from Design Specification.
+  - Apply colors, typography, spacing, and radii stated in the Pencil summary or Design Specification using Tailwind (use exact values, e.g. arbitrary colors \`bg-[#0a0a0a]\` when specified).
+  - If **Design assets on disk** lists files under \`public/design/\`, reference them in JSX (e.g. \`<img src="/design/..." />\` or imports) where they correspond to screens in the spec.
+  - Do not replace the design-driven layout with a minimal placeholder UI when the spec is present.
 - Keep edits scoped to this task.
 - ALWAYS type every event handler and callback parameter explicitly:
     ✅  (e: React.ChangeEvent<HTMLInputElement>) => ...
@@ -220,6 +224,17 @@ Rules:
 - ALWAYS type every function parameter and return value; never rely on implicit \`any\`.
 - Only import from files that are listed in "Already generated files" or in this task's file hints.
   If a dependency file does not exist yet, create a minimal stub for it in this same response.
+
+## MANDATORY: No Mock / Hardcoded Data — Real API Calls Only
+These rules are NON-NEGOTIABLE and override any other consideration:
+- ❌ FORBIDDEN: \`const mockData = [...]\`, \`const fakeItems = [...]\`, \`useState([{ id: 1, ... }])\` initialized with hardcoded objects, any inline array literal used as substitute for API data.
+- ❌ FORBIDDEN: \`// TODO: replace with real API\`, \`// temporary mock\`, placeholder data of any kind.
+- ✅ REQUIRED: Every list, table, card grid, or detail view that displays data from the backend MUST use \`useEffect\` + the existing API client (\`frontend/src/api/client.ts\` or equivalent) to fetch from the real endpoint.
+- ✅ REQUIRED: Before coding, use the \`read_file\` tool to read \`frontend/src/api/client.ts\` and any relevant backend route files to know exactly which endpoints exist and what they return.
+- ✅ REQUIRED: Show a loading state while data is being fetched (e.g. \`isLoading\` flag) and an error state if the fetch fails. Render the real response data, not static arrays.
+- ✅ REQUIRED: All mutations (create, update, delete) MUST call the corresponding API endpoint via the API client, not update local state only.
+- If an endpoint is listed in the task description, use that exact path. If not listed, use the \`grep\` tool to find the backend route files and determine the correct endpoint path before coding.
+
 ${FRONTEND_IMPORT_RULES}
 ${WORKER_READONLY_TOOLS_GUIDE}
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
@@ -1013,9 +1028,25 @@ async function generateCode(state: WorkerState) {
 
     if (state.apiContractsSnapshot.length > 0) {
       const apis = state.apiContractsSnapshot
-        .map((a) => `- ${a.method} ${a.endpoint} (${a.service})`)
+        .map((a) => {
+          const parts = [`- **${a.method} ${a.endpoint}** [auth: ${a.authType ?? "none"}]`];
+          if (a.requestFields && a.requestFields !== "none") {
+            parts.push(`  - Request: \`${a.requestFields}\``);
+          }
+          if (a.responseFields && a.responseFields !== "none") {
+            parts.push(`  - Response: \`${a.responseFields}\``);
+          } else if (a.schema && a.schema !== "extracted from source" && a.schema !== "extracted by regex") {
+            parts.push(`  - Schema: ${a.schema}`);
+          }
+          if (a.description) {
+            parts.push(`  - ${a.description}`);
+          }
+          return parts.join("\n");
+        })
         .join("\n");
-      contextParts.push(`## Available API endpoints\n${apis}`);
+      contextParts.push(
+        `## Available API endpoints\n⚠️ Use ONLY these real endpoints. Do NOT use mock data or invent endpoints.\n${apis}`,
+      );
     }
 
     const relevantFilesContext = await buildRelevantFileContext(state, task);
@@ -1050,7 +1081,7 @@ async function generateCode(state: WorkerState) {
 
     messages.push({
       role: "user",
-      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
+      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.\n7. [FRONTEND DATA RULE] If this task renders any list, table, card grid, or detail view that displays backend data: ALL data MUST be fetched from the real API endpoint via the API client. ZERO hardcoded arrays, ZERO mock objects, ZERO placeholder data. Use useEffect + loading/error state. Read \`frontend/src/api/client.ts\` with read_file before coding to get the correct method signatures.`,
     });
 
     const startMs = Date.now();

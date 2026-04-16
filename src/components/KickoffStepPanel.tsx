@@ -78,7 +78,7 @@ export default function KickoffStepPanel({
       typeof result.metadata?.runId === "string"
         ? result.metadata.runId
         : "run-" + Date.now();
-    startCoding(runId, tasks, codeOutputDir);
+    startCoding(runId, tasks, codeOutputDir, undefined, steps.prd?.content);
     onStartCoding?.();
   };
 

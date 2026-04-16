@@ -7,16 +7,15 @@ import {
   type IntegrationVerifyState,
   type E2EVerifyState,
   type TaskRefinementState,
-  type GapAnalysisState,
 } from "@/store/coding-store";
 import { usePipelineStore } from "@/store/pipeline-store";
 import Loading from "@/components/Loading";
-import { CodingLogLine, type CodingLogDisplayEntry } from "@/components/CodingLogLine";
-import CodingTaskTopologyView from "@/components/CodingTaskTopologyView";
 import {
-  isCompletedTask,
-  resolveTaskRole,
-} from "@/lib/coding-task-ui";
+  CodingLogLine,
+  type CodingLogDisplayEntry,
+} from "@/components/CodingLogLine";
+import CodingTaskTopologyView from "@/components/CodingTaskTopologyView";
+import { isCompletedTask, resolveTaskRole } from "@/lib/coding-task-ui";
 import type {
   CodingAgentInstance,
   CodingAgentRole,
@@ -165,17 +164,34 @@ function ProgressBar({
 
 export default function CodingAgentGraph() {
   const {
-    status, agents, tasks, selectedAgentId, totalCostUsd, error,
-    selectAgent, reset, retryIntegrationVerify, integrationVerify, e2eVerify, taskRefinement, gapAnalysis, supervisorLogs,
+    status,
+    agents,
+    tasks,
+    selectedAgentId,
+    totalCostUsd,
+    error,
+    selectAgent,
+    reset,
+    retryIntegrationVerify,
+    retryE2eVerify,
+    integrationVerify,
+    e2eVerify,
+    taskRefinement,
+    supervisorLogs,
   } = useCodingStore();
   const codeOutputDir = usePipelineStore((s) => s.codeOutputDir);
   const intentStep = usePipelineStore((s) => s.steps.intent);
   const kickoffStep = usePipelineStore((s) => s.steps.kickoff);
 
-  const [selectedRole, setSelectedRole] = useState<CodingAgentRole | null>(null);
-  const [topologySelectedTaskId, setTopologySelectedTaskId] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<CodingAgentRole | null>(
+    null,
+  );
+  const [topologySelectedTaskId, setTopologySelectedTaskId] = useState<
+    string | null
+  >(null);
 
-  const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) ?? null;
+  const selectedAgent =
+    agents.find((agent) => agent.id === selectedAgentId) ?? null;
 
   const agentById = useMemo(
     () => new Map(agents.map((agent) => [agent.id, agent] as const)),
@@ -189,13 +205,24 @@ export default function CodingAgentGraph() {
       const roleAgents = agents.filter((agent) => agent.role === role);
       if (roleAgents.length === 0) return null;
 
-      const roleTasks = visibleTasks.filter((task) => resolveTaskRole(task, agentById) === role);
-      const doneCount = roleTasks.filter((task) => isCompletedTask(task)).length;
-      const failedCount = roleTasks.filter((task) => task.codingStatus === "failed").length;
+      const roleTasks = visibleTasks.filter(
+        (task) => resolveTaskRole(task, agentById) === role,
+      );
+      const doneCount = roleTasks.filter((task) =>
+        isCompletedTask(task),
+      ).length;
+      const failedCount = roleTasks.filter(
+        (task) => task.codingStatus === "failed",
+      ).length;
       const hasWorking = roleAgents.some((agent) => agent.status === "working");
-      const hasFailed = roleAgents.some((agent) => agent.status === "failed") || failedCount > 0;
+      const hasFailed =
+        roleAgents.some((agent) => agent.status === "failed") ||
+        failedCount > 0;
       const allCompleted =
-        roleTasks.length > 0 && doneCount === roleTasks.length && !hasWorking && !hasFailed;
+        roleTasks.length > 0 &&
+        doneCount === roleTasks.length &&
+        !hasWorking &&
+        !hasFailed;
 
       return {
         role,
@@ -226,13 +253,21 @@ export default function CodingAgentGraph() {
 
   const visibleLogs = useMemo<CodingLogDisplayEntry[]>(() => {
     if (selectedAgent) {
-      return selectedAgent.logs.map((log) => ({ ...log, agentLabel: selectedAgent.label }));
+      return selectedAgent.logs.map((log) => ({
+        ...log,
+        agentLabel: selectedAgent.label,
+      }));
     }
     if (selectedRole) {
       return agents
         .filter((agent) => agent.role === selectedRole)
-        .flatMap((agent) => agent.logs.map((log) => ({ ...log, agentLabel: agent.label })))
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        .flatMap((agent) =>
+          agent.logs.map((log) => ({ ...log, agentLabel: agent.label })),
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
     }
     // "All workers" view: merge agent logs + supervisor logs
     const agentLogs = agents.flatMap((agent) =>
@@ -243,7 +278,8 @@ export default function CodingAgentGraph() {
       agentLabel: "Supervisor",
     }));
     return [...agentLogs, ...sysLogs].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
   }, [agents, selectedAgent, selectedRole, supervisorLogs]);
 
@@ -274,8 +310,12 @@ export default function CodingAgentGraph() {
     }
   };
 
-  const completedTasks = visibleTasks.filter((task) => isCompletedTask(task)).length;
-  const failedTasks = visibleTasks.filter((task) => task.codingStatus === "failed").length;
+  const completedTasks = visibleTasks.filter((task) =>
+    isCompletedTask(task),
+  ).length;
+  const failedTasks = visibleTasks.filter(
+    (task) => task.codingStatus === "failed",
+  ).length;
   const verifyingTasks = visibleTasks.filter(
     (task) =>
       task.codingStatus === "in_progress" && task.progressStage === "verifying",
@@ -286,9 +326,7 @@ export default function CodingAgentGraph() {
   ).length;
   const totalTasks = visibleTasks.length;
   const projectTier = (
-    intentStep?.metadata as
-      | { classification?: { tier?: string } }
-      | undefined
+    intentStep?.metadata as { classification?: { tier?: string } } | undefined
   )?.classification?.tier;
   const retryRunId =
     typeof kickoffStep?.metadata?.runId === "string"
@@ -298,7 +336,9 @@ export default function CodingAgentGraph() {
   if (status === "idle") {
     return (
       <div className="flex h-full min-h-[300px] items-center justify-center">
-        <p className="text-sm text-zinc-400">Confirm the task breakdown to start multi-agent coding.</p>
+        <p className="text-sm text-zinc-400">
+          Confirm the task breakdown to start multi-agent coding.
+        </p>
       </div>
     );
   }
@@ -321,8 +361,12 @@ export default function CodingAgentGraph() {
         <div className="flex shrink-0 flex-col gap-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[15px] font-semibold text-zinc-900">Task Progress</p>
-              <p className="mt-0.5 text-[11px] text-zinc-400">All agents · {totalTasks} tasks</p>
+              <p className="text-[15px] font-semibold text-zinc-900">
+                Task Progress
+              </p>
+              <p className="mt-0.5 text-[11px] text-zinc-400">
+                All agents · {totalTasks} tasks
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 rounded-[10px] bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-600">
@@ -341,7 +385,9 @@ export default function CodingAgentGraph() {
                   {failedTasks} failed
                 </span>
               )}
-              <span className="font-mono text-[11px] text-emerald-600">${totalCostUsd.toFixed(4)}</span>
+              <span className="font-mono text-[11px] text-emerald-600">
+                ${totalCostUsd.toFixed(4)}
+              </span>
               {status === "completed" && (
                 <button
                   type="button"
@@ -382,17 +428,22 @@ export default function CodingAgentGraph() {
         {integrationVerify && (
           <IntegrationVerifyCard
             verify={integrationVerify}
-            retrying={status === "running" && integrationVerify.status !== "failed"}
+            retrying={
+              status === "running" && integrationVerify.status !== "failed"
+            }
             onRetry={() =>
               retryIntegrationVerify(retryRunId, codeOutputDir, projectTier)
             }
           />
         )}
 
-        {e2eVerify && <E2EVerifyCard verify={e2eVerify} />}
-
-        {/* Gap Analysis */}
-        {gapAnalysis && <GapAnalysisCard analysis={gapAnalysis} />}
+        {e2eVerify && (
+          <E2EVerifyCard
+            verify={e2eVerify}
+            retrying={status === "running" && e2eVerify.status !== "failed"}
+            onRetry={() => retryE2eVerify(retryRunId, codeOutputDir, projectTier)}
+          />
+        )}
 
         {/* Agent log panel */}
         {agents.length > 0 && (
@@ -418,15 +469,22 @@ export default function CodingAgentGraph() {
                   </optgroup>
                 ))}
               </select>
-              <span className="font-mono text-[11px] text-zinc-900">{logPanelLabel}</span>
+              <span className="font-mono text-[11px] text-zinc-900">
+                {logPanelLabel}
+              </span>
             </div>
             <div className="max-h-[220px] overflow-y-auto rounded-lg bg-zinc-50 p-3.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-200 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
               {visibleLogs.length === 0 ? (
-                <p className="font-mono text-[11px] text-zinc-400">No activity yet.</p>
+                <p className="font-mono text-[11px] text-zinc-400">
+                  No activity yet.
+                </p>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {visibleLogs.map((log, index) => (
-                    <CodingLogLine key={`${log.timestamp}-${index}`} entry={log} />
+                    <CodingLogLine
+                      key={`${log.timestamp}-${index}`}
+                      entry={log}
+                    />
                   ))}
                 </div>
               )}
@@ -438,7 +496,11 @@ export default function CodingAgentGraph() {
   );
 }
 
-function TaskRefinementCard({ refinement }: { refinement: TaskRefinementState }) {
+function TaskRefinementCard({
+  refinement,
+}: {
+  refinement: TaskRefinementState;
+}) {
   const isRunning = refinement.status === "running";
   const delta =
     refinement.taskCountAfter && refinement.taskCountBefore
@@ -484,9 +546,7 @@ function TaskRefinementCard({ refinement }: { refinement: TaskRefinementState })
           </svg>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-zinc-900">
-            Task Refinement
-          </p>
+          <p className="text-xs font-semibold text-zinc-900">Task Refinement</p>
           <p className="text-[11px] font-medium text-cyan-800">
             {isRunning
               ? "Refining tasks using scaffold context..."
@@ -500,101 +560,6 @@ function TaskRefinementCard({ refinement }: { refinement: TaskRefinementState })
   );
 }
 
-function GapAnalysisCard({ analysis }: { analysis: GapAnalysisState }) {
-  const isRunning = analysis.status === "running";
-  const noGaps = analysis.status === "no_gaps";
-  const isDispatching = analysis.status === "dispatching";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className={`rounded-xl border px-4 py-3 ${
-        isRunning
-          ? "border-orange-200 bg-orange-50/60"
-          : noGaps
-            ? "border-emerald-200 bg-emerald-50/40"
-            : isDispatching
-              ? "border-orange-200 bg-orange-50/40"
-              : "border-orange-200 bg-orange-50/40"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {isRunning ? (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="animate-spin text-orange-500"
-          >
-            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-          </svg>
-        ) : noGaps ? (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            className="text-emerald-600"
-          >
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-        ) : isDispatching ? (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="animate-spin text-orange-500"
-          >
-            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-          </svg>
-        ) : (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-orange-600"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="16" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-          </svg>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-zinc-900">
-            Gap Analysis
-          </p>
-          <p
-            className={`text-[11px] font-medium ${
-              noGaps ? "text-emerald-800" : "text-orange-800"
-            }`}
-          >
-            {isRunning
-              ? "Analyzing for missing functionality..."
-              : noGaps
-                ? "No critical gaps found — all requirements covered"
-                : isDispatching
-                  ? `Dispatching ${analysis.gapCount} supplementary task(s)...`
-                  : `${analysis.gapCount} supplementary task(s) identified`}
-          </p>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 function IntegrationVerifyCard({
   verify,
@@ -613,7 +578,15 @@ function IntegrationVerifyCard({
   > = {
     verifying: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin text-indigo-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="animate-spin text-indigo-500"
+        >
           <path d="M21 12a9 9 0 1 1-6.219-8.56" />
         </svg>
       ),
@@ -626,7 +599,15 @@ function IntegrationVerifyCard({
     },
     fixing: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-amber-500"
+        >
           <path d="M12 9v4" />
           <path d="M12 17h.01" />
           <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -638,7 +619,15 @@ function IntegrationVerifyCard({
     },
     passed: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="text-emerald-500"
+        >
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
@@ -652,7 +641,15 @@ function IntegrationVerifyCard({
     },
     failed: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-red-500"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="15" y1="9" x2="9" y2="15" />
           <line x1="9" y1="9" x2="15" y2="15" />
@@ -726,7 +723,15 @@ function IntegrationVerifyCard({
   );
 }
 
-function E2EVerifyCard({ verify }: { verify: E2EVerifyState }) {
+function E2EVerifyCard({
+  verify,
+  retrying,
+  onRetry,
+}: {
+  verify: E2EVerifyState;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const statusConfig: Record<
@@ -735,7 +740,15 @@ function E2EVerifyCard({ verify }: { verify: E2EVerifyState }) {
   > = {
     verifying: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin text-purple-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="animate-spin text-purple-500"
+        >
           <path d="M21 12a9 9 0 1 1-6.219-8.56" />
         </svg>
       ),
@@ -745,7 +758,15 @@ function E2EVerifyCard({ verify }: { verify: E2EVerifyState }) {
     },
     fixing: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-amber-500"
+        >
           <path d="M12 9v4" />
           <path d="M12 17h.01" />
           <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -757,7 +778,15 @@ function E2EVerifyCard({ verify }: { verify: E2EVerifyState }) {
     },
     passed: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="text-emerald-500"
+        >
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
@@ -768,7 +797,15 @@ function E2EVerifyCard({ verify }: { verify: E2EVerifyState }) {
     },
     failed: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-red-500"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="15" y1="9" x2="9" y2="15" />
           <line x1="9" y1="9" x2="15" y2="15" />
@@ -811,6 +848,18 @@ function E2EVerifyCard({ verify }: { verify: E2EVerifyState }) {
           </motion.span>
         )}
       </button>
+      {verify.status === "failed" && (
+        <div className="mt-2.5 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {retrying ? "Retrying..." : "Retry E2E Verification"}
+          </button>
+        </div>
+      )}
       <AnimatePresence initial={false}>
         {expanded && verify.errors && (
           <motion.div

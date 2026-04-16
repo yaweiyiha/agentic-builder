@@ -20,6 +20,14 @@ export interface ApiContract {
   service: string;
   endpoint: string;
   method: string;
+  /** TypeScript type literal for the request body/params, e.g. "{ email: string; password: string }" */
+  requestFields?: string;
+  /** TypeScript type literal for the success response body */
+  responseFields?: string;
+  /** "none" | "bearer" | "session" */
+  authType: string;
+  description?: string;
+  /** Legacy: kept for backward compat, prefer requestFields + responseFields */
   schema: string;
   generatedBy: string;
 }
@@ -145,6 +153,15 @@ export const SupervisorStateAnnotation = Annotation.Root({
     default: () => 0,
   }),
 
+  runtimeVerifyErrors: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+  runtimeVerifyAttempts: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+
   e2eVerifyErrors: Annotation<string>({
     reducer: (_prev, next) => next,
     default: () => "",
@@ -158,18 +175,6 @@ export const SupervisorStateAnnotation = Annotation.Root({
   taskRefinementDone: Annotation<boolean>({
     reducer: (_prev, next) => next,
     default: () => false,
-  }),
-
-  /** Supplementary tasks discovered by gap analysis after integration verify. */
-  supplementaryTasks: Annotation<CodingTask[]>({
-    reducer: (_prev, next) => next,
-    default: () => [],
-  }),
-
-  /** How many supplementary rounds have been executed. */
-  supplementaryRound: Annotation<number>({
-    reducer: (_prev, next) => next,
-    default: () => 0,
   }),
 
   /** RALPH loop configuration. Passed down to every worker. */

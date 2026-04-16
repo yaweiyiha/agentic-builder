@@ -17,9 +17,7 @@ export type ErrorCategory =
   | "graph_error"
   | "unknown";
 
-interface EventMapperOptions {
-  emitGapAnalysisAfterIntegration?: boolean;
-}
+type EventMapperOptions = Record<string, never>;
 
 // ─── Internal tracker per worker subgraph instance ───
 
@@ -55,8 +53,6 @@ interface ExtractedTaskResult {
 
 export class EventMapper {
   private readonly sessionId: string;
-  private readonly emitGapAnalysisAfterIntegration: boolean;
-
   /** map from namespace-key → worker tracker */
   private readonly workers = new Map<string, WorkerTracker>();
 
@@ -77,10 +73,8 @@ export class EventMapper {
   /** true once e2e_verify_start has been emitted */
   private e2eVerifyStartEmitted = false;
 
-  constructor(sessionId: string, options: EventMapperOptions = {}) {
+  constructor(sessionId: string, _options: EventMapperOptions = {}) {
     this.sessionId = sessionId;
-    this.emitGapAnalysisAfterIntegration =
-      options.emitGapAnalysisAfterIntegration ?? true;
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -208,16 +202,14 @@ export class EventMapper {
         if (!errors) return `Integration verify+fix: passed${iterStr}`;
         return `Integration verify+fix: ${errorLines(errors)} error(s) remaining${iterStr}`;
       }
-      case "gap_analysis": {
-        const tasks = update.supplementaryTasks as unknown[] | undefined;
-        if (!tasks || tasks.length === 0)
-          return "Gap analysis: no critical gaps found";
-        return `Gap analysis: ${tasks.length} supplementary task(s) identified`;
+      case "runtime_verify": {
+        const errors = update.runtimeVerifyErrors as string | undefined;
+        const attempts = update.runtimeVerifyAttempts as number | undefined;
+        if (!errors) {
+          return `Runtime verify: passed${attempts ? ` (attempt ${attempts})` : ""}`;
+        }
+        return `Runtime verify: failed${attempts ? ` (attempt ${attempts})` : ""}`;
       }
-      case "supplementary_worker":
-        return "Supplementary worker phase complete";
-      case "supplementary_verify":
-        return "Supplementary verification complete";
       case "e2e_verify": {
         const errors = update.e2eVerifyErrors as string | undefined;
         const attempts = update.e2eVerifyAttempts as number | undefined;
@@ -226,8 +218,6 @@ export class EventMapper {
         }
         return `E2E verify: failed${attempts ? ` (attempt ${attempts})` : ""}`;
       }
-      case "supplementary_dispatch_gate":
-        return "Dispatching supplementary workers...";
       default:
         return null;
     }
@@ -319,51 +309,11 @@ export class EventMapper {
       });
     }
 
-    // sync_deps completing → gap analysis is about to start
-    if (
-      this.emitGapAnalysisAfterIntegration &&
-      updates.sync_deps !== undefined
-    ) {
-      events.push({
-        type: "gap_analysis_start",
-        sessionId: this.sessionId,
-        data: {},
-      });
-    }
-
-    // gap_analysis → gap analysis events ---------------------------------------
-    const gapUpdate = updates.gap_analysis as
-      | Record<string, unknown>
-      | undefined;
-    if (gapUpdate) {
-      const supTasks = Array.isArray(gapUpdate.supplementaryTasks)
-        ? gapUpdate.supplementaryTasks
-        : [];
-      events.push({
-        type: "gap_analysis_complete",
-        sessionId: this.sessionId,
-        data: {
-          gapCount: supTasks.length,
-          supplementaryTasks: supTasks,
-        },
-      });
-    }
-
-    // supplementary_dispatch_gate → dispatch event
-    if (updates.supplementary_dispatch_gate !== undefined) {
-      events.push({
-        type: "supplementary_dispatch",
-        sessionId: this.sessionId,
-        data: {},
-      });
-    }
-
     // Phase nodes finishing → agent_completed for their workers ---------------
     const phaseNodes = [
       "be_worker",
       "fe_worker",
       "architect_phase",
-      "supplementary_worker",
     ] as const;
     for (const phaseNode of phaseNodes) {
       const phaseResult = updates[phaseNode] as
@@ -459,9 +409,8 @@ export class EventMapper {
             errors: passed ? undefined : errors,
             errorCount: passed
               ? 0
-              : errors
-                  .split("\n")
-                  .filter((line) => line.trim().length > 0).length,
+              : errors.split("\n").filter((line) => line.trim().length > 0)
+                  .length,
             fixAttempts: attempts,
             maxFixAttempts: 3,
           },
@@ -793,7 +742,6 @@ export class EventMapper {
       return "frontend";
     if (baseNode === "be_worker" || baseNode.startsWith("be_"))
       return "backend";
-    if (baseNode === "supplementary_worker") return "backend";
     return "backend";
   }
 
@@ -802,7 +750,6 @@ export class EventMapper {
     if (baseNode === "architect_phase") return "Architect";
     if (baseNode === "be_worker") return `Backend Dev${suffix}`;
     if (baseNode === "fe_worker") return `Frontend Dev${suffix}`;
-    if (baseNode === "supplementary_worker") return `Supplementary${suffix}`;
     return `Worker${suffix}`;
   }
 }

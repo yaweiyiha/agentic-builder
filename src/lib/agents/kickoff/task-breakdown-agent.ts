@@ -81,6 +81,8 @@ Use **coarse-grained** tasks unless the PRD forces more splits. Typical **phase*
 - **Integration (contracts/client)** — Add an **early** task that defines/aligns API contracts + frontend API client in \`frontend/src/api\` with PRD IDs before page implementation.
 - **Frontend** — First create **one** app shell/layout task, then split into **page-level** tasks (one task per page/flow, not per tiny component).
   - Coding tasks should build the shell, navigation UI, and pages, but **must not** do the final route registration in \`frontend/src/router.tsx\`; that closure is handled by \`integrationVerifyAndFix\`.
+  - **MANDATORY for every page-level frontend task**: the task \`description\` and at least one \`subStep\` MUST explicitly list every backend API endpoint the page reads from or writes to (e.g. \`GET /api/projects\`, \`POST /api/projects\`, \`DELETE /api/projects/:id\`). Derive these from the PRD and the Backend Services task's file list. If no endpoint applies (e.g. a static layout task), state "no API calls required" explicitly.
+  - **FORBIDDEN in frontend tasks**: any subStep that says "use mock data", "hardcode data", or "TODO: replace with API". All data must come from real API calls via the frontend API client.
 - **Integration** — **Optional** single task: Vite proxy assumptions, Koa CORS/auth headers, frontend API client error handling, and env/config alignment between frontend and backend.
 - **Testing** — **Do not** add tasks with phase "Testing" (automated test tasks are disabled in the pipeline).
 
@@ -213,6 +215,7 @@ Field rules:
   - "totalTokens": inputTokens + outputTokens
   - "estimatedCostUsd": totalTokens / 1000000 * 0 (Gemini is free) — set to 0 for now
 - **acceptanceCriteria**: 2-4 concrete, testable conditions that verify the task is done correctly.
+  - For **Frontend page tasks**: MUST include at least one criterion like "Page fetches [resource] from \`GET /api/[path]\` via the API client — no mock/hardcoded data". If the page has mutations, also include "Form submits to \`POST /api/[path]\` and reflects the server response".
 - **coversRequirementIds**: string array of PRD IDs this task fully or materially implements.
   Include **every** relevant **AC-***, **FR-*** (and **F-** if used in PRD) ID that this task addresses.
   Across all tasks, these IDs should cover as much of the PRD’s AC/FR list as possible (pipeline validates coverage).
@@ -289,6 +292,11 @@ Scan the PRD for any persistence requirement (database, file storage, cache, que
   - Create one **app shell/layout** frontend task first (app shell, navigation/layout wiring).
   - Do not assign final edits to shared route registries (\`frontend/src/router.tsx\`, \`apps/web/src/App.tsx\`, or \`src/routes.tsx\`) to Coding tasks; \`integrationVerifyAndFix\` handles final registration closure.
   - Then split frontend implementation by **page/flow** (one task per page), not by tiny component.
+- **Frontend API binding (CRITICAL)**: Every frontend page task that renders data from the backend MUST:
+  1. List in its \`description\` the specific API endpoints it consumes (e.g. \`GET /api/users\`, \`POST /api/orders\`).
+  2. Include a \`subStep\` that explicitly says: "Call \`[METHOD] /api/[path]\` via the API client to load/submit data".
+  3. Include in \`acceptanceCriteria\` a criterion asserting no mock/hardcoded data is used.
+  This information allows the AI coding agent to know which real endpoints to call instead of inventing mock data.
 - Merge related work aggressively for backend/data: combine multiple API endpoints and models into broader tasks unless scale clearly requires more split.
 - Order tasks by execution sequence (respecting dependencies).
 - Focus on CODING tasks — skip pure planning, meeting, or documentation-only items.
