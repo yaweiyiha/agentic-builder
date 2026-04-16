@@ -13,6 +13,7 @@ export { TaskBreakdownAgent } from "./kickoff/task-breakdown-agent";
 export { CodeGenAgent } from "./kickoff/code-gen-agent";
 export {
   classifyProject,
+  normalizeProjectTier,
   type ProjectTier,
   type ProjectClassification,
 } from "./shared/project-classifier";

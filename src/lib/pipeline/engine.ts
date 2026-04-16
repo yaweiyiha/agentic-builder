@@ -23,6 +23,7 @@ import {
   QAAgent,
   VerifierAgent,
   classifyProject,
+  normalizeProjectTier,
 } from "@/lib/agents";
 import type { AgentResult } from "@/lib/agents";
 import type { ProjectTier, ProjectClassification } from "@/lib/agents";
@@ -170,7 +171,7 @@ export class PipelineEngine {
     let tier: ProjectTier = "M";
     try {
       classification = await classifyProject(run.featureBrief);
-      tier = classification.tier;
+      tier = normalizeProjectTier(classification.tier);
       run.totalCostUsd += classification.costUsd;
 
       this.emit({
@@ -191,7 +192,7 @@ export class PipelineEngine {
         },
       });
     } catch {
-      tier = "M";
+      tier = normalizeProjectTier("M");
     }
 
     const plan = stepsForTier(tier);
@@ -544,11 +545,13 @@ export class PipelineEngine {
     }
 
     const tierFromMeta =
-      (
+      normalizeProjectTier(
+        (
         run.steps.intent?.metadata?.classification as
           | { tier?: ProjectTier }
           | undefined
-      )?.tier ?? "M";
+        )?.tier ?? "M",
+      );
 
     run = await this.runKickoffStep(run, fileMap, outputRoot, tierFromMeta);
 

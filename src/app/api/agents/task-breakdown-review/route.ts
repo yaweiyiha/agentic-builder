@@ -6,6 +6,7 @@ import {
   resolveModel,
   type ChatMessage,
 } from "@/lib/openrouter";
+import { normalizeProjectTier } from "@/lib/agents/project-classifier";
 import type { KickoffWorkItem } from "@/lib/pipeline/types";
 
 type SuggestionSeverity = "high" | "medium" | "low";
@@ -51,23 +52,18 @@ function parseSuggestions(raw: string): TaskBreakdownSuggestion[] {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const {
-    prd,
-    trd,
-    sysdesign,
-    implguide,
-    design,
-    taskBreakdown,
-    tier,
-  } = body as {
-    prd?: string;
-    trd?: string;
-    sysdesign?: string;
-    implguide?: string;
-    design?: string;
-    taskBreakdown?: KickoffWorkItem[];
-    tier?: string;
-  };
+  const { prd, trd, sysdesign, implguide, design, taskBreakdown, tier } =
+    body as {
+      prd?: string;
+      trd?: string;
+      sysdesign?: string;
+      implguide?: string;
+      design?: string;
+      taskBreakdown?: KickoffWorkItem[];
+      tier?: string;
+    };
+
+  const normalizedTier = normalizeProjectTier(tier);
 
   if (!prd || !Array.isArray(taskBreakdown) || taskBreakdown.length === 0) {
     return Response.json(
@@ -108,7 +104,7 @@ export async function POST(request: NextRequest) {
     {
       role: "user",
       content: [
-        `Project tier: ${tier ?? "M"}`,
+        `Project tier: ${normalizedTier}`,
         "",
         docs.slice(0, 12000),
         "",
@@ -140,4 +136,3 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: msg }, { status: 500 });
   }
 }
-

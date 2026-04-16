@@ -1,5 +1,8 @@
 import { TaskBreakdownAgent } from "@/lib/agents/task-breakdown-agent";
-import type { ProjectTier } from "@/lib/agents/project-classifier";
+import {
+  normalizeProjectTier,
+  type ProjectTier,
+} from "@/lib/agents/shared/project-classifier";
 import { formatPrdSpecForContext } from "@/lib/requirements/prd-spec-extractor";
 import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
 import {
@@ -64,12 +67,30 @@ function recoverTasksFromTruncatedJson(raw: string): KickoffWorkItem[] {
 
     while (j < raw.length) {
       const ch = raw[j]!;
-      if (escape) { escape = false; j++; continue; }
-      if (ch === "\\" && inString) { escape = true; j++; continue; }
-      if (ch === '"') { inString = !inString; j++; continue; }
+      if (escape) {
+        escape = false;
+        j++;
+        continue;
+      }
+      if (ch === "\\" && inString) {
+        escape = true;
+        j++;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        j++;
+        continue;
+      }
       if (!inString) {
         if (ch === "{") depth++;
-        else if (ch === "}") { depth--; if (depth === 0) { j++; break; } }
+        else if (ch === "}") {
+          depth--;
+          if (depth === 0) {
+            j++;
+            break;
+          }
+        }
       }
       j++;
     }
@@ -116,7 +137,10 @@ function parseJsonArrayFromLlmOutput(raw: string): {
         parseError: "LLM output is not a JSON array.",
       };
     }
-    return { tasks: (parsed as unknown[]).filter(isKickoffWorkItem), parseFailed: false };
+    return {
+      tasks: (parsed as unknown[]).filter(isKickoffWorkItem),
+      parseFailed: false,
+    };
   } catch {
     // Output was likely truncated at the token limit.
     // Try to salvage every complete task object from the partial JSON.
@@ -128,7 +152,8 @@ function parseJsonArrayFromLlmOutput(raw: string): {
       return { tasks: recovered, parseFailed: false };
     }
 
-    const msg = "Truncated or malformed JSON — no complete tasks could be recovered.";
+    const msg =
+      "Truncated or malformed JSON — no complete tasks could be recovered.";
     console.error("[TaskBreakdown] Failed to parse LLM JSON output");
     return { tasks: [], parseFailed: true, parseError: msg };
   }
@@ -142,7 +167,10 @@ function extractPrdRequirementIds(prd: string): Set<string> {
   return ids;
 }
 
-function normalizeDependencyIds(task: KickoffWorkItem, validTaskIds: Set<string>): string[] {
+function normalizeDependencyIds(
+  task: KickoffWorkItem,
+  validTaskIds: Set<string>,
+): string[] {
   const deps = Array.isArray(task.dependencies) ? task.dependencies : [];
   return deps.filter((d) => typeof d === "string" && validTaskIds.has(d));
 }
@@ -223,10 +251,13 @@ export async function buildTaskBreakdownFromDocuments(params: {
   parseError?: string;
   rawOutput: string;
 }> {
-  const tier = params.tier ?? "M";
+  const tier = normalizeProjectTier(params.tier ?? "M");
   const scaffoldTier = tier as ScaffoldTier;
   const templatePaths = await listScaffoldTemplateRelativePaths(scaffoldTier);
-  const scaffoldBlock = buildTaskBreakdownScaffoldBlock(scaffoldTier, templatePaths);
+  const scaffoldBlock = buildTaskBreakdownScaffoldBlock(
+    scaffoldTier,
+    templatePaths,
+  );
   const agent = new TaskBreakdownAgent(tier, scaffoldBlock);
 
   const prdSpecText = params.prdSpec

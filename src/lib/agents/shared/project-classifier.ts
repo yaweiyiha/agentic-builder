@@ -20,6 +20,10 @@ export interface ProjectClassification {
   durationMs: number;
 }
 
+export function normalizeProjectTier(_tier?: string | null): ProjectTier {
+  return "M";
+}
+
 const CLASSIFIER_PROMPT = `You are a project complexity classifier. Given a feature brief, classify the project into one of three tiers.
 
 ## Tiers
@@ -74,7 +78,9 @@ export async function classifyProject(
 
   try {
     const parsed = JSON.parse(jsonMatch[0]);
-    const tier = (["S", "M", "L"].includes(parsed.tier) ? parsed.tier : "M") as ProjectTier;
+    const tier = normalizeProjectTier(
+      ["S", "M", "L"].includes(parsed.tier) ? parsed.tier : "M",
+    );
 
     return {
       tier,
@@ -112,7 +118,7 @@ function fallbackClassification(
 
   if (simpleSignals.some((p) => p.test(lower))) {
     return {
-      tier: "S",
+      tier: normalizeProjectTier("S"),
       type: "tool",
       needsBackend: false,
       needsDatabase: false,
@@ -125,7 +131,7 @@ function fallbackClassification(
   }
   if (complexSignals.some((p) => p.test(lower))) {
     return {
-      tier: "L",
+      tier: normalizeProjectTier("L"),
       type: "platform",
       needsBackend: true,
       needsDatabase: true,
@@ -138,7 +144,7 @@ function fallbackClassification(
   }
 
   return {
-    tier: "M",
+    tier: normalizeProjectTier("M"),
     type: "app",
     needsBackend: true,
     needsDatabase: true,

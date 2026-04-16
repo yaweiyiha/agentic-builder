@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
-import type { ProjectTier } from "@/lib/agents/project-classifier";
+import {
+  normalizeProjectTier,
+  type ProjectTier,
+} from "@/lib/agents/project-classifier";
 import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
 import { buildTaskBreakdownFromDocuments } from "@/lib/pipeline/kickoff-task-breakdown.server";
 
@@ -42,7 +45,9 @@ export async function POST(request: NextRequest) {
     designSpec: design || undefined,
     prdSpec: prdSpec ?? null,
     sessionId,
-    tier: ((tier ?? "M").toUpperCase() as ProjectTier) ?? "M",
+    tier: normalizeProjectTier(
+      ((tier ?? "M").toUpperCase() as ProjectTier) ?? "M",
+    ),
     improvementNotes: Array.isArray(improvementNotes)
       ? improvementNotes.filter((n) => typeof n === "string" && n.trim().length > 0)
       : undefined,
@@ -59,4 +64,3 @@ export async function POST(request: NextRequest) {
     model: result.model,
   });
 }
-

@@ -4,6 +4,7 @@
  */
 export {
   classifyProject,
+  normalizeProjectTier,
   type ProjectTier,
   type ProjectClassification,
 } from "./shared/project-classifier";
