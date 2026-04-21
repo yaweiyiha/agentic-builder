@@ -9,6 +9,7 @@
  */
 
 import type { CodingTask } from "@/lib/pipeline/types";
+import type { RepairEvent } from "@/lib/pipeline/self-heal";
 
 export type ErrorCategory =
   | "client_disconnect"
@@ -100,6 +101,19 @@ export class EventMapper {
   }
 
   /**
+   * Wrap a self-heal `RepairEvent` for the SSE channel.
+   * The front-end can render these in a dedicated "self-heal log" panel.
+   */
+  buildRepairEvent(event: RepairEvent): SseEvent {
+    return {
+      type: "repair_event",
+      sessionId: this.sessionId,
+      taskId: event.taskId,
+      data: event as unknown as Record<string, unknown>,
+    };
+  }
+
+  /**
    * Translate one LangGraph stream chunk into zero or more SSE events.
    * Returns an empty array for chunks that produce no meaningful events.
    */
@@ -157,7 +171,7 @@ export class EventMapper {
       case "generate_api_contracts":
         return "API contracts generated";
       case "generate_service_skeletons":
-        return "Service skeletons generated";
+        return "Service skeletons generated (step removed — no-op)";
       case "scaffold_verify": {
         const errors = update.scaffoldErrors as string | undefined;
         if (!errors) return "Scaffold verify: passed";
@@ -189,11 +203,6 @@ export class EventMapper {
         return "Backend worker phase complete";
       case "fe_worker":
         return "Frontend worker phase complete";
-      case "refine_task_breakdown": {
-        const done = update.taskRefinementDone as boolean | undefined;
-        if (done) return "Task breakdown refined with scaffold context";
-        return "Refining task breakdown...";
-      }
       // integration_verify is now the merged agentic verify+fix node
       case "integration_verify": {
         const errors = update.integrationErrors as string | undefined;
@@ -262,51 +271,6 @@ export class EventMapper {
           data: { assignments },
         });
       }
-    }
-
-    // dispatch_gate completing → task refinement is about to start
-    if (updates.dispatch_gate !== undefined) {
-      events.push({
-        type: "task_refinement_start",
-        sessionId: this.sessionId,
-        data: {},
-      });
-    }
-
-    // refine_task_breakdown → task_refinement events --------------------------
-    const refineUpdate = updates.refine_task_breakdown as
-      | Record<string, unknown>
-      | undefined;
-    if (refineUpdate) {
-      const refinedBe = Array.isArray(refineUpdate.backendTasks)
-        ? refineUpdate.backendTasks.length
-        : 0;
-      const refinedFe = Array.isArray(refineUpdate.frontendTasks)
-        ? refineUpdate.frontendTasks.length
-        : 0;
-      const refinedTest = Array.isArray(refineUpdate.testTasks)
-        ? refineUpdate.testTasks.length
-        : 0;
-      events.push({
-        type: "task_refinement_complete",
-        sessionId: this.sessionId,
-        data: {
-          backendCount: refinedBe,
-          frontendCount: refinedFe,
-          testCount: refinedTest,
-          refinedTasks: [
-            ...(Array.isArray(refineUpdate.backendTasks)
-              ? refineUpdate.backendTasks
-              : []),
-            ...(Array.isArray(refineUpdate.frontendTasks)
-              ? refineUpdate.frontendTasks
-              : []),
-            ...(Array.isArray(refineUpdate.testTasks)
-              ? refineUpdate.testTasks
-              : []),
-          ],
-        },
-      });
     }
 
     // Phase nodes finishing → agent_completed for their workers ---------------

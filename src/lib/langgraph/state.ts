@@ -6,6 +6,7 @@ import type {
   TaskSubStep,
 } from "@/lib/pipeline/types";
 import { type RalphConfig, DEFAULT_RALPH_CONFIG } from "@/lib/ralph";
+import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
 
 // ─── Shared types ───
 
@@ -171,16 +172,30 @@ export const SupervisorStateAnnotation = Annotation.Root({
     default: () => 0,
   }),
 
-  /** Whether fine-grained task refinement has been applied after scaffold. */
-  taskRefinementDone: Annotation<boolean>({
-    reducer: (_prev, next) => next,
-    default: () => false,
-  }),
-
   /** RALPH loop configuration. Passed down to every worker. */
   ralphConfig: Annotation<RalphConfig>({
     reducer: (_prev, next) => next,
     default: () => ({ ...DEFAULT_RALPH_CONFIG }),
+  }),
+
+  /**
+   * Session id for this coding run. Used by self-heal code to look up the
+   * correct `RepairEmitter` via `getRepairEmitter(sessionId)` without having
+   * to pass the function through LangGraph state (which is JSON-serialised).
+   */
+  sessionId: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+
+  /**
+   * Structured PRD spec (pages + interactive components) — forwarded from
+   * the kickoff engine via `.blueprint/PRD_SPEC.json`. Frontend workers
+   * use it to turn PAGE / CMP ids into concrete view/component outputs.
+   */
+  prdSpec: Annotation<PrdSpec | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
   }),
 });
 
@@ -310,6 +325,29 @@ export const WorkerStateAnnotation = Annotation.Root({
   contextRotationNeeded: Annotation<boolean>({
     reducer: (_prev, next) => next,
     default: () => false,
+  }),
+
+  /** Session id propagated from supervisor — used to look up the RepairEmitter. */
+  sessionId: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+
+  /**
+   * Snapshot of sha256 hashes for every file in the current task's
+   * `files.modifies` list, captured at task start. The file-plan verifier
+   * diffs these against post-generation hashes to detect "modified" files
+   * that were never actually touched.
+   */
+  currentTaskModifiesSnapshot: Annotation<Record<string, string>>({
+    reducer: (_prev, next) => next,
+    default: () => ({}),
+  }),
+
+  /** Structured PRD spec forwarded from supervisor — shared with workers. */
+  prdSpec: Annotation<PrdSpec | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
   }),
 });
 

@@ -43,21 +43,42 @@ function isKickoffWorkItem(x: unknown): x is KickoffWorkItem {
   );
 }
 
+interface RecoveryResult {
+  tasks: KickoffWorkItem[];
+  /** Count of `{` we saw but could not close or validate. Approximates
+   *  "how many tasks did the LLM start but we lost to truncation/noise." */
+  droppedCount: number;
+  /** Truncated-at offset in the raw string, if any (useful for continuation prompts). */
+  truncationOffset: number | null;
+}
+
 /**
  * Walk `raw` character by character to extract every syntactically complete
  * JSON object `{…}` that appears at the top level of the array.
  * Works even when the LLM output is cut off mid-way through the last task.
+ *
+ * Also reports how many task objects appeared to start but could not be
+ * recovered (truncation, malformed JSON, failed validation), so the pipeline
+ * can surface an explicit "truncation_detected" telemetry event instead of
+ * silently dropping tasks.
  */
-function recoverTasksFromTruncatedJson(raw: string): KickoffWorkItem[] {
+function recoverTasksFromTruncatedJson(raw: string): RecoveryResult {
   const tasks: KickoffWorkItem[] = [];
   const start = raw.indexOf("[");
-  if (start === -1) return tasks;
+  if (start === -1) {
+    return { tasks, droppedCount: 0, truncationOffset: null };
+  }
 
   let i = start + 1;
+  let seenOpenBrace = 0;
+  let truncationOffset: number | null = null;
+
   while (i < raw.length) {
     // Skip whitespace, commas, and newlines between objects
     while (i < raw.length && " \n\r\t,".includes(raw[i]!)) i++;
     if (i >= raw.length || raw[i] !== "{") break;
+
+    seenOpenBrace++;
 
     // Track balanced braces to find the end of the current object
     let depth = 0;
@@ -95,7 +116,12 @@ function recoverTasksFromTruncatedJson(raw: string): KickoffWorkItem[] {
       j++;
     }
 
-    if (depth !== 0) break; // Object was cut off — stop here
+    if (depth !== 0) {
+      // Last object was cut off mid-way — record the offset so a continuation
+      // prompt can quote the fragment and resume from the last valid task id.
+      truncationOffset = i;
+      break;
+    }
 
     try {
       const obj: unknown = JSON.parse(raw.slice(i, j));
@@ -106,13 +132,21 @@ function recoverTasksFromTruncatedJson(raw: string): KickoffWorkItem[] {
     i = j;
   }
 
-  return tasks;
+  return {
+    tasks,
+    droppedCount: Math.max(0, seenOpenBrace - tasks.length),
+    truncationOffset,
+  };
 }
 
-function parseJsonArrayFromLlmOutput(raw: string): {
+export function parseJsonArrayFromLlmOutput(raw: string): {
   tasks: KickoffWorkItem[];
   parseFailed: boolean;
   parseError?: string;
+  /** Approximate number of tasks lost to truncation/malformed objects. */
+  droppedCount?: number;
+  /** Offset in `raw` where the final incomplete object starts (if any). */
+  truncationOffset?: number;
 } {
   let cleaned = raw.trim();
 
@@ -145,17 +179,28 @@ function parseJsonArrayFromLlmOutput(raw: string): {
     // Output was likely truncated at the token limit.
     // Try to salvage every complete task object from the partial JSON.
     const recovered = recoverTasksFromTruncatedJson(raw);
-    if (recovered.length > 0) {
+    if (recovered.tasks.length > 0) {
       console.warn(
-        `[TaskBreakdown] JSON truncated — recovered ${recovered.length} complete tasks out of partial output (${raw.length} chars).`,
+        `[TaskBreakdown] JSON truncated — recovered ${recovered.tasks.length} complete tasks; ${recovered.droppedCount} dropped from partial output (${raw.length} chars).`,
       );
-      return { tasks: recovered, parseFailed: false };
+      return {
+        tasks: recovered.tasks,
+        parseFailed: false,
+        droppedCount: recovered.droppedCount,
+        truncationOffset: recovered.truncationOffset ?? undefined,
+      };
     }
 
     const msg =
       "Truncated or malformed JSON — no complete tasks could be recovered.";
     console.error("[TaskBreakdown] Failed to parse LLM JSON output");
-    return { tasks: [], parseFailed: true, parseError: msg };
+    return {
+      tasks: [],
+      parseFailed: true,
+      parseError: msg,
+      droppedCount: recovered.droppedCount,
+      truncationOffset: recovered.truncationOffset ?? undefined,
+    };
   }
 }
 
@@ -212,7 +257,7 @@ function normalizeCoverageIds(
   return [...out];
 }
 
-function normalizeOriginalTaskBreakdown(
+export function normalizeOriginalTaskBreakdown(
   tasks: KickoffWorkItem[],
   prd: string,
 ): KickoffWorkItem[] {
@@ -250,6 +295,8 @@ export async function buildTaskBreakdownFromDocuments(params: {
   parseFailed: boolean;
   parseError?: string;
   rawOutput: string;
+  droppedFromTruncation?: number;
+  truncationOffset?: number;
 }> {
   const tier = normalizeProjectTier(params.tier ?? "M");
   const scaffoldTier = tier as ScaffoldTier;
@@ -288,5 +335,7 @@ export async function buildTaskBreakdownFromDocuments(params: {
     parseFailed: parsed.parseFailed,
     parseError: parsed.parseError,
     rawOutput: result.content,
+    droppedFromTruncation: parsed.droppedCount,
+    truncationOffset: parsed.truncationOffset,
   };
 }

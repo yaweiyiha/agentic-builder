@@ -1,10 +1,23 @@
 import { chatCompletion } from "@/lib/openrouter";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import { chunkMarkdown } from "./prd-chunker";
+// Import only from the narrow `events` module — the self-heal barrel pulls
+// server-only modules (agent-subgraph, child_process) which break client
+// bundles that transitively import this file via `formatPrdSpecForContext`.
+import { getRepairEmitter } from "@/lib/pipeline/self-heal/events";
 import type {
   PrdInteractiveComponent,
   PrdPage,
   PrdSpec,
 } from "./prd-spec-types";
+
+const PRD_CHUNK_MAX_CHARS = Number(
+  process.env.PRD_SPEC_CHUNK_MAX_CHARS ?? "18000",
+);
+const PRD_CHUNK_OVERLAP = Number(
+  process.env.PRD_SPEC_CHUNK_OVERLAP ?? "1200",
+);
+const PRD_SINGLE_SHOT_FALLBACK_LIMIT = 24_000;
 
 const SYSTEM_PROMPT = `You are a product analyst. Extract a structured page specification from a PRD.
 Return ONLY a valid JSON object — no markdown, no explanation. The schema below is an example of the required structure and field shape, not a domain-specific content template:
@@ -140,31 +153,232 @@ function parsePrdSpec(raw: string): PrdSpec | null {
   }
 }
 
+async function callExtractor(
+  model: string,
+  chunkContent: string,
+  chunkLabel: string,
+): Promise<PrdSpec | null> {
+  const res = await chatCompletion(
+    [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content:
+          `Extract the structured page specification from this PRD segment (${chunkLabel}).\n\n` +
+          `---\n\n${chunkContent}`,
+      },
+    ],
+    { model, temperature: 0.1, max_tokens: 8192 },
+  );
+  const content = res.choices[0]?.message?.content ?? "";
+  return parsePrdSpec(content);
+}
+
+/**
+ * Merge an array of `PrdSpec` partials into a single spec, deduplicating
+ * pages by `name + route` and components by `name + location + type`, then
+ * renumbering every surviving id so PAGE-* and CMP-* are globally unique
+ * and sequential again.
+ */
+function mergePrdSpecs(partials: PrdSpec[]): PrdSpec | null {
+  const filtered = partials.filter(
+    (p): p is PrdSpec => !!p && Array.isArray(p.pages),
+  );
+  if (filtered.length === 0) return null;
+
+  const pageMap = new Map<string, PrdPage>();
+  const orderedPageKeys: string[] = [];
+
+  for (const part of filtered) {
+    for (const page of part.pages) {
+      const key = pageKey(page);
+      const existing = pageMap.get(key);
+      if (existing) {
+        mergePageInPlace(existing, page);
+      } else {
+        pageMap.set(key, clonePage(page));
+        orderedPageKeys.push(key);
+      }
+    }
+  }
+
+  let nextPageNum = 1;
+  let nextCmpNum = 1;
+  const pages: PrdPage[] = [];
+  for (const key of orderedPageKeys) {
+    const page = pageMap.get(key)!;
+    page.id = `PAGE-${String(nextPageNum++).padStart(3, "0")}`;
+    for (const cmp of page.interactiveComponents) {
+      cmp.id = `CMP-${String(nextCmpNum++).padStart(3, "0")}`;
+    }
+    pages.push(page);
+  }
+
+  const allComponentIds = pages.flatMap((p) =>
+    p.interactiveComponents.map((c) => c.id),
+  );
+  return { pages, allComponentIds };
+}
+
+function pageKey(p: PrdPage): string {
+  return [
+    (p.name ?? "").trim().toLowerCase(),
+    (p.route ?? "").trim().toLowerCase(),
+  ].join("||");
+}
+
+function componentKey(c: PrdInteractiveComponent): string {
+  return [
+    (c.name ?? "").trim().toLowerCase(),
+    (c.location ?? "").trim().toLowerCase(),
+    (c.type ?? "").trim().toLowerCase(),
+  ].join("||");
+}
+
+function clonePage(p: PrdPage): PrdPage {
+  return {
+    id: p.id,
+    name: p.name,
+    route: p.route,
+    layoutRegions: [...p.layoutRegions],
+    interactiveComponents: p.interactiveComponents.map((c) => ({ ...c })),
+    staticElements: [...p.staticElements],
+    states: [...p.states],
+  };
+}
+
+function mergePageInPlace(target: PrdPage, incoming: PrdPage): void {
+  mergeUniqueStrings(target.layoutRegions, incoming.layoutRegions);
+  mergeUniqueStrings(target.staticElements, incoming.staticElements);
+  mergeUniqueStrings(target.states, incoming.states);
+  const seen = new Set(target.interactiveComponents.map(componentKey));
+  for (const c of incoming.interactiveComponents) {
+    const key = componentKey(c);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    target.interactiveComponents.push({ ...c });
+  }
+}
+
+function mergeUniqueStrings(target: string[], incoming: string[]): void {
+  const seen = new Set(target.map((s) => s.trim().toLowerCase()));
+  for (const s of incoming) {
+    const key = s.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    target.push(s);
+  }
+}
+
 /**
  * Uses a cheap LLM call to extract a structured `PrdSpec` (pages + component IDs) from PRD markdown.
  * Returns `null` when the LLM output cannot be parsed.
+ *
+ * PRDs longer than `PRD_CHUNK_MAX_CHARS` are split on H2/H3 boundaries and
+ * each chunk is extracted in parallel; results are merged and globally
+ * renumbered. A single-shot fallback preserves the legacy truncation
+ * behaviour if chunked extraction yields nothing.
  */
 export async function extractPrdSpec(
   prdMarkdown: string,
   sessionId?: string,
 ): Promise<PrdSpec | null> {
   const model = MODEL_CONFIG.prdSpecExtract;
+  const emitter = getRepairEmitter(sessionId);
+  const source = prdMarkdown ?? "";
+
+  if (source.length === 0) return null;
+
+  const chunks = chunkMarkdown(source, {
+    maxChars: PRD_CHUNK_MAX_CHARS,
+    overlap: PRD_CHUNK_OVERLAP,
+  });
+
+  // Small PRD → skip chunking overhead entirely.
+  if (chunks.length <= 1) {
+    try {
+      return await callExtractor(model, source, "single");
+    } catch (e) {
+      console.error(
+        "[PrdSpecExtractor] LLM call failed:",
+        e instanceof Error ? e.message : e,
+      );
+      emitter({
+        stage: "prd-spec",
+        event: "single_shot_failed",
+        details: { error: e instanceof Error ? e.message : String(e) },
+      });
+      return null;
+    }
+  }
+
+  emitter({
+    stage: "prd-spec",
+    event: "chunking_started",
+    details: {
+      chunks: chunks.length,
+      totalChars: source.length,
+      maxChars: PRD_CHUNK_MAX_CHARS,
+    },
+  });
+
+  const partials = await Promise.all(
+    chunks.map(async (chunk) => {
+      const label = `chunk ${chunk.index + 1}/${chunk.total}`;
+      const content = chunk.preamble
+        ? `${chunk.preamble}\n\n---\n\n${chunk.body}`
+        : chunk.body;
+      try {
+        return await callExtractor(model, content, label);
+      } catch (err) {
+        emitter({
+          stage: "prd-spec",
+          event: "chunk_parse_failed",
+          details: {
+            chunkIdx: chunk.index,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+        return null;
+      }
+    }),
+  );
+
+  const successful = partials.filter(
+    (p): p is PrdSpec => p !== null && Array.isArray(p.pages),
+  );
+  const merged = mergePrdSpecs(successful);
+
+  if (merged && merged.pages.length > 0) {
+    emitter({
+      stage: "prd-spec",
+      event: "merge_done",
+      details: {
+        chunks: chunks.length,
+        successful: successful.length,
+        pages: merged.pages.length,
+        components: merged.allComponentIds.length,
+      },
+    });
+    return merged;
+  }
+
+  // Fallback: try a single-shot call with the legacy truncation. Better to
+  // ship a truncated spec than no spec at all.
+  emitter({
+    stage: "prd-spec",
+    event: "fallback_single_shot",
+    details: { reason: "chunked extraction produced no pages" },
+  });
   try {
-    const res = await chatCompletion(
-      [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Extract the structured page specification from this PRD.\n\n---\n\n${prdMarkdown.slice(0, 24000)}`,
-        },
-      ],
-      { model, temperature: 0.1, max_tokens: 8192 },
+    return await callExtractor(
+      model,
+      source.slice(0, PRD_SINGLE_SHOT_FALLBACK_LIMIT),
+      "fallback-single",
     );
-    const content = res.choices[0]?.message?.content ?? "";
-    return parsePrdSpec(content);
   } catch (e) {
     console.error(
-      "[PrdSpecExtractor] LLM call failed:",
+      "[PrdSpecExtractor] Fallback single-shot failed:",
       e instanceof Error ? e.message : e,
     );
     return null;

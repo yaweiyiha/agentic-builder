@@ -17,12 +17,6 @@ export interface IntegrationVerifyState {
   filesFixed?: number;
 }
 
-export interface TaskRefinementState {
-  status: "running" | "completed";
-  taskCountBefore?: number;
-  taskCountAfter?: number;
-}
-
 export interface E2EVerifyState {
   status: "verifying" | "fixing" | "passed" | "failed";
   errors?: string;
@@ -41,7 +35,6 @@ interface CodingState {
   error: string | null;
   integrationVerify: IntegrationVerifyState | null;
   e2eVerify: E2EVerifyState | null;
-  taskRefinement: TaskRefinementState | null;
   /** Supervisor-level logs (phase verify, fix, install, etc.) */
   supervisorLogs: AgentLogEntry[];
 
@@ -76,7 +69,6 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
   error: null,
   integrationVerify: null,
   e2eVerify: null,
-  taskRefinement: null,
   gapAnalysis: null,
   supervisorLogs: [],
 
@@ -93,7 +85,6 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       sessionId: null,
       integrationVerify: null,
       e2eVerify: null,
-      taskRefinement: null,
       supervisorLogs: [],
     });
 
@@ -338,7 +329,6 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       error: null,
       integrationVerify: null,
       e2eVerify: null,
-      taskRefinement: null,
       supervisorLogs: [],
     });
   },
@@ -666,57 +656,6 @@ function handleCodingEvent(
       return { ...t, subSteps };
     });
     set({ tasks });
-    return;
-  }
-
-  if (type === "task_refinement_start") {
-    const logs = get().supervisorLogs;
-    set({
-      taskRefinement: {
-        status: "running",
-        taskCountBefore: get().tasks.length,
-      },
-      supervisorLogs: [
-        ...logs,
-        {
-          timestamp: new Date().toISOString(),
-          type: "info",
-          message: "Refining task breakdown with scaffold context...",
-        },
-      ],
-    });
-    return;
-  }
-
-  if (type === "task_refinement_complete") {
-    const refinedTasks = (payload.data?.refinedTasks as CodingTask[]) ?? [];
-    const logs = get().supervisorLogs;
-    const taskCountBefore = get().taskRefinement?.taskCountBefore ?? 0;
-
-    if (refinedTasks.length > 0) {
-      const existingTasks = get().tasks;
-      const mergedTasks = refinedTasks.map((rt) => {
-        const existing = existingTasks.find((t) => t.id === rt.id);
-        return existing ? { ...existing, ...rt } : rt;
-      });
-      set({ tasks: mergedTasks });
-    }
-
-    set({
-      taskRefinement: {
-        status: "completed",
-        taskCountBefore,
-        taskCountAfter: refinedTasks.length || get().tasks.length,
-      },
-      supervisorLogs: [
-        ...logs,
-        {
-          timestamp: new Date().toISOString(),
-          type: "info",
-          message: `Task breakdown refined: backend=${payload.data?.backendCount ?? 0}, frontend=${payload.data?.frontendCount ?? 0}, test=${payload.data?.testCount ?? 0}`,
-        },
-      ],
-    });
     return;
   }
 

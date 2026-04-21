@@ -6,7 +6,6 @@ import {
   useCodingStore,
   type IntegrationVerifyState,
   type E2EVerifyState,
-  type TaskRefinementState,
 } from "@/store/coding-store";
 import { usePipelineStore } from "@/store/pipeline-store";
 import Loading from "@/components/Loading";
@@ -176,7 +175,6 @@ export default function CodingAgentGraph() {
     retryE2eVerify,
     integrationVerify,
     e2eVerify,
-    taskRefinement,
     supervisorLogs,
   } = useCodingStore();
   const codeOutputDir = usePipelineStore((s) => s.codeOutputDir);
@@ -410,9 +408,6 @@ export default function CodingAgentGraph() {
           )}
         </div>
 
-        {/* Task Refinement */}
-        {taskRefinement && <TaskRefinementCard refinement={taskRefinement} />}
-
         {/* Topology graph */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <CodingTaskTopologyView
@@ -493,70 +488,6 @@ export default function CodingAgentGraph() {
         )}
       </main>
     </div>
-  );
-}
-
-function TaskRefinementCard({
-  refinement,
-}: {
-  refinement: TaskRefinementState;
-}) {
-  const isRunning = refinement.status === "running";
-  const delta =
-    refinement.taskCountAfter && refinement.taskCountBefore
-      ? refinement.taskCountAfter - refinement.taskCountBefore
-      : 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className={`rounded-xl border px-4 py-3 ${
-        isRunning
-          ? "border-cyan-200 bg-cyan-50/60"
-          : "border-cyan-200 bg-cyan-50/40"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {isRunning ? (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="animate-spin text-cyan-500"
-          >
-            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-          </svg>
-        ) : (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            className="text-cyan-600"
-          >
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-zinc-900">Task Refinement</p>
-          <p className="text-[11px] font-medium text-cyan-800">
-            {isRunning
-              ? "Refining tasks using scaffold context..."
-              : delta !== 0
-                ? `Refined — ${Math.abs(delta)} task(s) ${delta > 0 ? "added" : "removed"} (${refinement.taskCountAfter} total)`
-                : `Refined — ${refinement.taskCountAfter ?? "?"} tasks confirmed`}
-          </p>
-        </div>
-      </div>
-    </motion.div>
   );
 }
 

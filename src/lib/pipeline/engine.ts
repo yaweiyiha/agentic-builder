@@ -11,6 +11,7 @@ import {
   runPrdSpecGate,
   runQaCoverageGate,
   runTaskCoverageGate,
+  runPhaseRequirementGate,
 } from "@/lib/pipeline/gates";
 import {
   PMAgent,
@@ -43,6 +44,13 @@ import {
 } from "./code-output";
 import { runKickoffIntegrations } from "./kickoff-integrations";
 import { buildTaskBreakdownFromDocuments } from "./kickoff-task-breakdown.server";
+import {
+  createRepairEmitter,
+  createJsonlRepairSink,
+  consoleRepairSink,
+  repairTaskCoverage,
+  repairMissingBackendPhase,
+} from "./self-heal";
 
 type EventHandler = (event: PipelineEvent) => void;
 
@@ -620,6 +628,26 @@ export class PipelineEngine {
       const prdSpec =
         (run.steps.prd?.metadata?.prdSpec as PrdSpec | undefined) ?? null;
 
+      // Persist the structured PRD spec to a sidecar so the coding API (a
+      // separate HTTP request) can pick it up and forward it to the frontend
+      // worker. Without this, PAGE-*/CMP-* context never reaches code-gen.
+      if (prdSpec) {
+        try {
+          const blueprintDir = path.join(outputRoot, ".blueprint");
+          await fs.mkdir(blueprintDir, { recursive: true });
+          await fs.writeFile(
+            path.join(blueprintDir, "PRD_SPEC.json"),
+            JSON.stringify(prdSpec, null, 2),
+            "utf-8",
+          );
+        } catch (e) {
+          console.warn(
+            `[Engine] Failed to persist .blueprint/PRD_SPEC.json (ignored):`,
+            e instanceof Error ? e.message : e,
+          );
+        }
+      }
+
       const {
         tasks: taskBreakdown,
         costUsd: tbCost,
@@ -628,6 +656,7 @@ export class PipelineEngine {
         parseFailed: taskBreakdownParseFailed,
         parseError: taskBreakdownParseError,
         rawOutput: taskBreakdownRawOutput,
+        droppedFromTruncation: taskBreakdownDroppedFromTruncation,
       } = await buildTaskBreakdownFromDocuments({
         prd: prdBody,
         trd: trdBody || undefined,
@@ -653,10 +682,87 @@ export class PipelineEngine {
         (run.steps.prd?.metadata?.prdRequirementIndex as
           | PrdRequirementIndex
           | undefined) ?? extractPrdRequirementIndex(prdBody);
-      const taskCoverageGate = runTaskCoverageGate(
+      let taskCoverageGate = runTaskCoverageGate(
         prdIndexForTasks,
         taskBreakdown,
       );
+
+      // P0 self-heal: if the gate failed, try to synthesise supplementary
+      // tasks that cover the missing PRD requirement IDs. Non-fatal on
+      // exhaustion; the UI still shows a warning, but the pipeline proceeds.
+      const coverageRepairEmitter = createRepairEmitter([
+        createJsonlRepairSink(outputRoot),
+        consoleRepairSink,
+      ]);
+
+      // Surface task-breakdown truncation honestly. The Coverage Gate
+      // self-heal below will still try to cover the missing PRD ids with
+      // supplementary tasks, but the telemetry here tells us the root cause
+      // so we can tune token limits / model choice.
+      if (
+        typeof taskBreakdownDroppedFromTruncation === "number" &&
+        taskBreakdownDroppedFromTruncation > 0
+      ) {
+        coverageRepairEmitter({
+          stage: "task-breakdown",
+          event: "truncation_detected",
+          details: {
+            recovered: taskBreakdown.length,
+            dropped: taskBreakdownDroppedFromTruncation,
+            rawLength: taskBreakdownRawOutput?.length ?? 0,
+          },
+        });
+      }
+      let coverageRepairSummary: {
+        attempts: number;
+        added: number;
+        finalMissing: string[];
+        costUsd: number;
+      } | null = null;
+      let finalTaskBreakdown = taskBreakdown;
+
+      if (!taskCoverageGate.passed && taskCoverageGate.missingIds.length > 0) {
+        try {
+          const repairResult = await repairTaskCoverage({
+            missingIds: taskCoverageGate.missingIds,
+            existingTasks: taskBreakdown,
+            prd: prdBody,
+            trd: trdBody || undefined,
+            sysDesign: sysDesignBody || undefined,
+            implGuide: implGuideBody || undefined,
+            prdSpec,
+            tier,
+            sessionId: run.sessionId,
+            emitter: coverageRepairEmitter,
+          });
+          finalTaskBreakdown = repairResult.tasks;
+          taskCoverageGate = runTaskCoverageGate(
+            prdIndexForTasks,
+            finalTaskBreakdown,
+          );
+          coverageRepairSummary = {
+            attempts: repairResult.attempts,
+            added: repairResult.added.length,
+            finalMissing: repairResult.finalMissing,
+            costUsd: repairResult.costUsd,
+          };
+        } catch (repairErr) {
+          console.warn(
+            `[Engine] Coverage Gate self-heal threw:`,
+            repairErr instanceof Error ? repairErr.message : repairErr,
+          );
+          coverageRepairEmitter({
+            stage: "coverage-gate",
+            event: "repair_loop_error",
+            details: {
+              error:
+                repairErr instanceof Error
+                  ? repairErr.message
+                  : String(repairErr),
+            },
+          });
+        }
+      }
 
       let coverageWarningBlock = "";
       if (!taskCoverageGate.passed && taskCoverageGate.missingIds.length > 0) {
@@ -668,6 +774,9 @@ export class PipelineEngine {
           taskCoverageGate.missingIds.length > 10
             ? `\n- ...and ${taskCoverageGate.missingIds.length - 10} more`
             : "";
+        const repairLine = coverageRepairSummary
+          ? `_Self-heal ran ${coverageRepairSummary.attempts} attempt(s), added ${coverageRepairSummary.added} task(s); ${coverageRepairSummary.finalMissing.length} id(s) remain._`
+          : "";
         coverageWarningBlock = [
           "",
           "### Coverage Gate Warning",
@@ -676,14 +785,86 @@ export class PipelineEngine {
           "",
           missingList + moreCount,
           "",
+          repairLine,
+          "",
           "These requirements may not be implemented. Consider adding tasks that reference these IDs,",
           "or verify the task breakdown covers them implicitly.",
+        ]
+          .filter(Boolean)
+          .join("\n");
+      } else if (coverageRepairSummary && coverageRepairSummary.added > 0) {
+        coverageWarningBlock = [
+          "",
+          "### Coverage Gate self-heal",
+          "",
+          `Added **${coverageRepairSummary.added}** supplementary task(s) across ${coverageRepairSummary.attempts} attempt(s) — all PRD requirement IDs now referenced.`,
         ].join("\n");
       }
 
+      // P0 phase requirement gate + self-heal. Guarantees that a full-stack
+      // project has at least one Backend Services-class task. Without this,
+      // PRDs that depend on APIs / data layer silently ship with zero backend
+      // code generated. Non-fatal: worst case we insert a synthetic task.
+      let phaseGateReport = runPhaseRequirementGate({
+        tier,
+        tasks: finalTaskBreakdown,
+      });
+      let phaseRepairSummary: {
+        addedByLlm: number;
+        synthetic: boolean;
+        costUsd: number;
+      } | null = null;
+      if (!phaseGateReport.passed) {
+        try {
+          const phaseResult = await repairMissingBackendPhase({
+            existingTasks: finalTaskBreakdown,
+            prd: prdBody,
+            trd: trdBody || undefined,
+            sysDesign: sysDesignBody || undefined,
+            implGuide: implGuideBody || undefined,
+            prdSpec,
+            tier,
+            uncoveredIds: taskCoverageGate.missingIds,
+            sessionId: run.sessionId,
+            emitter: coverageRepairEmitter,
+          });
+          finalTaskBreakdown = phaseResult.tasks;
+          phaseGateReport = runPhaseRequirementGate({
+            tier,
+            tasks: finalTaskBreakdown,
+          });
+          phaseRepairSummary = {
+            addedByLlm: phaseResult.addedByLlm.length,
+            synthetic: phaseResult.synthetic !== null,
+            costUsd: phaseResult.costUsd,
+          };
+          // After phase-repair we may have covered new ids too — refresh the
+          // coverage gate so the warning block reflects reality.
+          taskCoverageGate = runTaskCoverageGate(
+            prdIndexForTasks,
+            finalTaskBreakdown,
+          );
+        } catch (phaseErr) {
+          console.warn(
+            `[Engine] Phase gate self-heal threw:`,
+            phaseErr instanceof Error ? phaseErr.message : phaseErr,
+          );
+          coverageRepairEmitter({
+            stage: "phase-gate",
+            event: "repair_loop_error",
+            details: {
+              error:
+                phaseErr instanceof Error
+                  ? phaseErr.message
+                  : String(phaseErr),
+            },
+          });
+        }
+      }
+
       const tbSummary =
-        taskBreakdown.length > 0
-          ? `Task breakdown generated: **${taskBreakdown.length}** coding tasks (see sub-tab).`
+        finalTaskBreakdown.length > 0
+          ? `Task breakdown generated: **${finalTaskBreakdown.length}** coding tasks (see sub-tab).`
           : taskBreakdownParseFailed
             ? "Task breakdown generation returned non-JSON output and could not be parsed."
             : "Task breakdown could not be generated from documents.";
@@ -739,7 +920,7 @@ export class PipelineEngine {
           errors,
           fileCount: written.length,
           integrations: integrationMeta,
-          taskBreakdown,
+          taskBreakdown: finalTaskBreakdown,
           taskBreakdownParseFailed,
           ...(taskBreakdownRawOutput
             ? { taskBreakdownRawOutput }
@@ -748,8 +929,15 @@ export class PipelineEngine {
             ? { taskBreakdownParseError }
             : {}),
           taskBreakdownSimulated: false,
-          taskBreakdownConfirmed: taskBreakdown.length === 0,
+          taskBreakdownConfirmed: finalTaskBreakdown.length === 0,
           taskCoverageGate,
+          ...(coverageRepairSummary
+            ? { coverageRepair: coverageRepairSummary }
+            : {}),
+          phaseRequirementGate: phaseGateReport,
+          ...(phaseRepairSummary
+            ? { phaseRepair: phaseRepairSummary }
+            : {}),
         },
       });
 

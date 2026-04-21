@@ -222,8 +222,6 @@ export interface CodingSessionEvent {
     | "integration_fix_result"
     | "e2e_verify_start"
     | "e2e_verify_result"
-    | "task_refinement_start"
-    | "task_refinement_complete"
     | "agent_task_substeps"
     | "session_complete"
     | "session_error";

@@ -19,10 +19,24 @@ const SKIP_DIR_NAMES = new Set([
  * These are app entry wiring points that workers must be able to rewrite.
  */
 const UNPROTECTED_SCAFFOLD_PATHS = new Set([
+  // Frontend app wiring and shared client/context entry points
   "frontend/src/main.tsx",
   "frontend/src/router.tsx",
+  "frontend/src/api/client.ts",
+  "frontend/src/providers/AppProviders.tsx",
+  "frontend/src/context/AuthContext.tsx",
   "frontend/src/views/NotFound.tsx",
   "frontend/src/index.css",
+  "frontend/src/App.css",
+  // Backend app wiring, module registration, and runtime entry points
+  "backend/src/app.ts",
+  "backend/src/server.ts",
+  "backend/src/api/modules/index.ts",
+  "backend/src/db.ts",
+  "backend/src/config/env.ts",
+  "backend/src/models/index.ts",
+  "backend/src/middlewares/errorHandler.ts",
+  "backend/src/middlewares/cors.ts",
   // E2E files — agents write generated test specs here; scaffold only ships a baseline
   "frontend/e2e/smoke.spec.ts",
   "frontend/playwright.config.ts",

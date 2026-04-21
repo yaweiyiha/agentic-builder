@@ -32,6 +32,26 @@ import {
   buildFrontendDesignContextForCodegen,
   readPencilDesignDoc,
 } from "@/lib/pipeline/frontend-design-context";
+import {
+  createRepairEmitter,
+  createJsonlRepairSink,
+  consoleRepairSink,
+  registerRepairEmitter,
+  unregisterRepairEmitter,
+  runFeatureChecklistAudit,
+  dispatchAuditRepair,
+  type RepairEmitter,
+  type RepairEvent,
+  type AuditTaskSummary,
+  type FeatureChecklistAuditResult,
+} from "@/lib/pipeline/self-heal";
+import { extractPrdRequirementIndex } from "@/lib/requirements/extract-prd-spec";
+import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
+import type { ApiContract, GeneratedFile } from "@/lib/langgraph/state";
+import {
+  writeCodingSessionReport,
+  clearCodingSessionLlmUsage,
+} from "@/lib/pipeline/coding-session-report";
 
 const execFileAsync = promisify(execFile);
 
@@ -95,6 +115,201 @@ function classifyError(
   }
 
   return { category: "graph_error", message: error.message };
+}
+
+/**
+ * Walk a LangGraph stream chunk and extract any {taskId, status, generatedFiles}
+ * triples. Used to build `AuditTaskSummary[]` for the feature-checklist audit.
+ * Robust to both top-level `taskResults` arrays (worker output) and nested
+ * `phaseResults[].taskResults[]` shapes (supervisor output).
+ */
+function collectTaskResultsFromChunk(
+  updates: Record<string, unknown>,
+  codingTasks: CodingTask[],
+  out: Map<string, AuditTaskSummary>,
+): void {
+  const taskMeta = new Map(codingTasks.map((t) => [t.id, t] as const));
+
+  const ingest = (rec: Record<string, unknown>): void => {
+    const taskId = typeof rec.taskId === "string" ? rec.taskId : null;
+    if (!taskId) return;
+    const files = Array.isArray(rec.generatedFiles)
+      ? (rec.generatedFiles as unknown[]).filter(
+          (f): f is string => typeof f === "string",
+        )
+      : [];
+    const status =
+      rec.status === "completed" ||
+      rec.status === "completed_with_warnings" ||
+      rec.status === "failed"
+        ? (rec.status as AuditTaskSummary["status"])
+        : ("unknown" as const);
+    const meta = taskMeta.get(taskId);
+    const prev = out.get(taskId);
+    const mergedFiles = prev
+      ? [...new Set([...prev.generatedFiles, ...files])]
+      : files;
+    out.set(taskId, {
+      id: taskId,
+      title: meta?.title ?? (typeof rec.title === "string" ? rec.title : taskId),
+      coversRequirementIds: meta?.coversRequirementIds ?? [],
+      generatedFiles: mergedFiles,
+      status,
+    });
+  };
+
+  for (const node of Object.keys(updates)) {
+    const payload = updates[node];
+    if (!payload || typeof payload !== "object") continue;
+    const rec = payload as Record<string, unknown>;
+
+    if (Array.isArray(rec.taskResults)) {
+      for (const tr of rec.taskResults) {
+        if (tr && typeof tr === "object") ingest(tr as Record<string, unknown>);
+      }
+    }
+    if (Array.isArray(rec.phaseResults)) {
+      for (const pr of rec.phaseResults) {
+        if (!pr || typeof pr !== "object") continue;
+        const phase = pr as Record<string, unknown>;
+        if (Array.isArray(phase.taskResults)) {
+          for (const tr of phase.taskResults) {
+            if (tr && typeof tr === "object") {
+              ingest(tr as Record<string, unknown>);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function collectWorkerContextFromChunk(
+  updates: Record<string, unknown>,
+  fileRegistryOut: Map<string, GeneratedFile>,
+  apiContractsOut: Map<string, ApiContract>,
+): void {
+  const ingestGeneratedFile = (value: unknown): void => {
+    if (!value || typeof value !== "object") return;
+    const rec = value as Record<string, unknown>;
+    if (
+      typeof rec.path !== "string" ||
+      typeof rec.role !== "string" ||
+      typeof rec.summary !== "string"
+    ) {
+      return;
+    }
+    const exports = Array.isArray(rec.exports)
+      ? rec.exports.filter((item): item is string => typeof item === "string")
+      : undefined;
+    fileRegistryOut.set(rec.path, {
+      path: rec.path,
+      role: rec.role as GeneratedFile["role"],
+      summary: rec.summary,
+      exports,
+    });
+  };
+
+  const ingestApiContract = (value: unknown): void => {
+    if (!value || typeof value !== "object") return;
+    const rec = value as Record<string, unknown>;
+    if (
+      typeof rec.service !== "string" ||
+      typeof rec.endpoint !== "string" ||
+      typeof rec.method !== "string" ||
+      typeof rec.authType !== "string" ||
+      typeof rec.schema !== "string" ||
+      typeof rec.generatedBy !== "string"
+    ) {
+      return;
+    }
+    const key = [
+      rec.service,
+      rec.method.toUpperCase(),
+      rec.endpoint,
+      rec.generatedBy,
+    ].join("::");
+    apiContractsOut.set(key, {
+      service: rec.service,
+      endpoint: rec.endpoint,
+      method: rec.method,
+      requestFields:
+        typeof rec.requestFields === "string" ? rec.requestFields : undefined,
+      responseFields:
+        typeof rec.responseFields === "string" ? rec.responseFields : undefined,
+      authType: rec.authType,
+      description:
+        typeof rec.description === "string" ? rec.description : undefined,
+      schema: rec.schema,
+      generatedBy: rec.generatedBy,
+    });
+  };
+
+  for (const payload of Object.values(updates)) {
+    if (!payload || typeof payload !== "object") continue;
+    const rec = payload as Record<string, unknown>;
+
+    if (Array.isArray(rec.fileRegistry)) {
+      for (const item of rec.fileRegistry) ingestGeneratedFile(item);
+    }
+    if (Array.isArray(rec.apiContracts)) {
+      for (const item of rec.apiContracts) ingestApiContract(item);
+    }
+  }
+}
+
+interface SupervisorGateSnapshot {
+  integrationErrors: string;
+  runtimeVerifyErrors: string;
+  e2eVerifyErrors: string;
+}
+
+function collectSupervisorGateStateFromChunk(
+  updates: Record<string, unknown>,
+  snapshot: SupervisorGateSnapshot,
+): void {
+  for (const payload of Object.values(updates)) {
+    if (!payload || typeof payload !== "object") continue;
+    const rec = payload as Record<string, unknown>;
+    if (typeof rec.integrationErrors === "string") {
+      snapshot.integrationErrors = rec.integrationErrors;
+    }
+    if (typeof rec.runtimeVerifyErrors === "string") {
+      snapshot.runtimeVerifyErrors = rec.runtimeVerifyErrors;
+    }
+    if (typeof rec.e2eVerifyErrors === "string") {
+      snapshot.e2eVerifyErrors = rec.e2eVerifyErrors;
+    }
+  }
+}
+
+function summarizeBlockingGateErrors(snapshot: SupervisorGateSnapshot): string[] {
+  const failures: string[] = [];
+  if (snapshot.integrationErrors.trim()) {
+    failures.push(
+      [
+        "Integration verify gate failed.",
+        snapshot.integrationErrors.trim().slice(0, 3000),
+      ].join("\n"),
+    );
+  }
+  if (snapshot.runtimeVerifyErrors.trim()) {
+    failures.push(
+      [
+        "Runtime verify gate failed.",
+        snapshot.runtimeVerifyErrors.trim().slice(0, 3000),
+      ].join("\n"),
+    );
+  }
+  if (snapshot.e2eVerifyErrors.trim()) {
+    failures.push(
+      [
+        "E2E verify gate failed.",
+        snapshot.e2eVerifyErrors.trim().slice(0, 3000),
+      ].join("\n"),
+    );
+  }
+  return failures;
 }
 
 export async function POST(request: NextRequest) {
@@ -304,11 +519,30 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Docs are passed through to the supervisor/worker graph as-is; the
+  // downstream `pickRelevantSections` helper trims per-task. Keep a
+  // generous safety cap here purely to protect against runaway docs.
+  const DOC_HARD_CAP = 60_000;
   const prdDoc = await readDoc("PRD.md");
-  const trdDoc = await readDoc("TRD.md", 6000);
-  const sysDesignDoc = await readDoc("SystemDesign.md", 6000);
-  const implGuideDoc = await readDoc("ImplementationGuide.md", 6000);
-  const designSpecDoc = await readDoc("DesignSpec.md", 8000);
+  const trdDoc = await readDoc("TRD.md", DOC_HARD_CAP);
+  const sysDesignDoc = await readDoc("SystemDesign.md", DOC_HARD_CAP);
+  const implGuideDoc = await readDoc("ImplementationGuide.md", DOC_HARD_CAP);
+  const designSpecDoc = await readDoc("DesignSpec.md", DOC_HARD_CAP);
+
+  // Read the structured PRD spec sidecar written by the kickoff engine.
+  // Non-fatal: if absent or unparseable, frontend workers just won't get
+  // PAGE-*/CMP-* context (the pre-existing behaviour).
+  let prdSpec: PrdSpec | null = null;
+  try {
+    const raw = await fs.readFile(
+      path.join(outputRoot, ".blueprint", "PRD_SPEC.json"),
+      "utf-8",
+    );
+    const parsed = JSON.parse(raw) as PrdSpec;
+    if (parsed && Array.isArray(parsed.pages)) prdSpec = parsed;
+  } catch {
+    /* sidecar missing — proceed without it */
+  }
   const pencilDesignDoc = await readPencilDesignDoc(outputRoot);
   const scaffoldReadmePath = path.resolve(
     process.cwd(),
@@ -403,6 +637,7 @@ export async function POST(request: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      const startedAt = new Date().toISOString();
       function send(data: unknown) {
         if (clientAborted) return;
         try {
@@ -413,6 +648,32 @@ export async function POST(request: NextRequest) {
           clientAborted = true;
         }
       }
+
+      // ── Self-heal telemetry ────────────────────────────────────────────────
+      // Fan out repair events to: (1) SSE channel (front-end log panel),
+      // (2) .ralph/repair-log.jsonl on disk, (3) stdout for dev observability.
+      const sseRepairSink: RepairEmitter = (event) => {
+        send(mapper.buildRepairEvent(event as RepairEvent));
+      };
+      const repairEmitter = createRepairEmitter([
+        sseRepairSink,
+        createJsonlRepairSink(outputRoot),
+        consoleRepairSink,
+      ]);
+      registerRepairEmitter(sessionId, repairEmitter);
+      const collectedTaskResults = new Map<string, AuditTaskSummary>();
+      const collectedFileRegistry = new Map<string, GeneratedFile>();
+      const collectedApiContracts = new Map<string, ApiContract>();
+      const collectedGateSnapshot: SupervisorGateSnapshot = {
+        integrationErrors: "",
+        runtimeVerifyErrors: "",
+        e2eVerifyErrors: "",
+      };
+      let reportTaskResults: AuditTaskSummary[] = [];
+      let finalAuditResult: FeatureChecklistAuditResult | null = null;
+      let reportStatus: "pass" | "fail" | "aborted" = "fail";
+      let terminalSummary = "";
+      let fatalError = "";
 
       console.log(
         `[CodingAPI] Session ${sessionId}: starting with ${codingTasks.length} tasks, output: ${outputRoot}`,
@@ -462,6 +723,8 @@ export async function POST(request: NextRequest) {
             prebuiltScaffold,
             scaffoldProtectedPaths,
             ralphConfig,
+            sessionId,
+            prdSpec,
           },
           { subgraphs: true, streamMode: "updates", recursionLimit: 100 },
         );
@@ -480,6 +743,18 @@ export async function POST(request: NextRequest) {
             `[CodingAPI] Stream chunk: ns=[${ns.join(",")}] nodes=[${nodeNames.join(",")}]`,
           );
 
+          collectTaskResultsFromChunk(
+            updates,
+            codingTasks,
+            collectedTaskResults,
+          );
+          collectWorkerContextFromChunk(
+            updates,
+            collectedFileRegistry,
+            collectedApiContracts,
+          );
+          collectSupervisorGateStateFromChunk(updates, collectedGateSnapshot);
+
           const events = mapper.mapChunk(
             chunk as [string[], Record<string, unknown>],
           );
@@ -490,10 +765,98 @@ export async function POST(request: NextRequest) {
 
         if (!clientAborted) {
           console.log(`[CodingAPI] Session ${sessionId}: stream complete.`);
+
+          const prdIndex = extractPrdRequirementIndex(prdDoc ?? "");
+          const auditTaskResults: AuditTaskSummary[] = codingTasks.map(
+            (t) =>
+              collectedTaskResults.get(t.id) ?? {
+                id: t.id,
+                title: t.title,
+                coversRequirementIds: t.coversRequirementIds ?? [],
+                generatedFiles: [],
+                status: "unknown" as const,
+              },
+          );
+          reportTaskResults = auditTaskResults;
+          let finalAudit = await runFeatureChecklistAudit({
+            prdIndex,
+            prdSpec,
+            tasks: codingTasks,
+            taskResults: auditTaskResults,
+            outputDir: outputRoot,
+            sessionId,
+            emitter: repairEmitter,
+          });
+
+          if (finalAudit.uncovered.length > 0) {
+            const dispatchResult = await dispatchAuditRepair({
+              uncovered: finalAudit.uncovered,
+              outputDir: outputRoot,
+              projectContext,
+              fileRegistrySnapshot: [...collectedFileRegistry.values()],
+              apiContractsSnapshot: [...collectedApiContracts.values()],
+              scaffoldProtectedPaths,
+              ralphConfig,
+              sessionId,
+              emitter: repairEmitter,
+            });
+
+            if (
+              dispatchResult.backendGeneratedFiles.length +
+                dispatchResult.frontendGeneratedFiles.length >
+              0
+            ) {
+              // Backfill wrote something — re-run the audit to see what
+              // actually got closed. We intentionally do NOT loop again;
+              // one repair round is the hard upper bound.
+              finalAudit = await runFeatureChecklistAudit({
+                prdIndex,
+                prdSpec,
+                tasks: [...codingTasks, ...dispatchResult.repairTasks],
+                taskResults: [
+                  ...auditTaskResults,
+                  ...dispatchResult.repairTaskResults,
+                ],
+                outputDir: outputRoot,
+                sessionId,
+                emitter: repairEmitter,
+              });
+              reportTaskResults = [
+                ...auditTaskResults,
+                ...dispatchResult.repairTaskResults,
+              ];
+            }
+          }
+          finalAuditResult = finalAudit;
+
+          const blockingFailures = summarizeBlockingGateErrors(
+            collectedGateSnapshot,
+          );
+          if (!finalAudit.passed) {
+            const remainingIds = finalAudit.uncovered.map((entry) => entry.id);
+            blockingFailures.push(
+              [
+                `Feature audit gate failed: ${remainingIds.length} requirement id(s) still unresolved.`,
+                remainingIds.slice(0, 40).join(", "),
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            );
+          }
+          if (blockingFailures.length > 0) {
+            throw new Error(blockingFailures.join("\n\n"));
+          }
+
+          reportStatus = "pass";
+          terminalSummary =
+            "Coding session completed with integration, runtime/E2E, and feature-audit gates passing.";
           send(mapper.buildSessionComplete());
         }
       } catch (error) {
         const classified = classifyError(error, clientAborted);
+        reportStatus = clientAborted ? "aborted" : "fail";
+        terminalSummary = classified.message;
+        fatalError = classified.message;
         console.error(
           `[CodingAPI] Session ${sessionId} error [${classified.category}]:`,
           classified.message,
@@ -504,6 +867,47 @@ export async function POST(request: NextRequest) {
         );
         send(mapper.buildSessionError(classified.message, classified.category));
       } finally {
+        if (clientAborted && reportStatus === "fail" && !fatalError) {
+          reportStatus = "aborted";
+          terminalSummary = "Client disconnected before the coding session completed.";
+          fatalError = terminalSummary;
+        }
+        try {
+          await writeCodingSessionReport({
+            sessionId,
+            outputDir: outputRoot,
+            startedAt,
+            endedAt: new Date().toISOString(),
+            status: reportStatus,
+            terminalSummary:
+              terminalSummary || "Coding session ended without an explicit summary.",
+            integrationErrors: collectedGateSnapshot.integrationErrors,
+            runtimeVerifyErrors: collectedGateSnapshot.runtimeVerifyErrors,
+            e2eVerifyErrors: collectedGateSnapshot.e2eVerifyErrors,
+            finalAudit: finalAuditResult,
+            taskResults:
+              reportTaskResults.length > 0
+                ? reportTaskResults
+                : codingTasks.map((task) => ({
+                    id: task.id,
+                    title: task.title,
+                    coversRequirementIds: task.coversRequirementIds ?? [],
+                    generatedFiles:
+                      collectedTaskResults.get(task.id)?.generatedFiles ?? [],
+                    status:
+                      collectedTaskResults.get(task.id)?.status ?? "unknown",
+                  })),
+            fileRegistry: [...collectedFileRegistry.values()],
+            fatalError,
+          });
+        } catch (reportErr) {
+          console.warn(
+            `[CodingAPI] Failed to write coding session report (ignored):`,
+            reportErr instanceof Error ? reportErr.message : reportErr,
+          );
+        }
+        clearCodingSessionLlmUsage(sessionId);
+        unregisterRepairEmitter(sessionId);
         controller.close();
       }
     },

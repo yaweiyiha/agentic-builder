@@ -1,4 +1,5 @@
 import path from "path";
+import fs from "fs/promises";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { StateGraph, START, END, Send } from "@langchain/langgraph";
@@ -54,8 +55,61 @@ import type {
   KickoffWorkItem,
 } from "@/lib/pipeline/types";
 import { stripTestingPhaseTasks } from "@/lib/pipeline/strip-testing-tasks";
+import { triagePrebuiltArchitectTasks } from "./architect-triage";
+import { getRepairEmitter } from "@/lib/pipeline/self-heal";
+import { recordCodingSessionLlmUsage } from "@/lib/pipeline/coding-session-report";
+import { pickRelevantSections } from "./doc-section-picker";
+import {
+  triageE2eFailures,
+  hasInfraSignal,
+  type FailedTestRecord,
+} from "./e2e-triage";
 
 const execFileAsync = promisify(execFile);
+
+function getOpenRouterUsageCounts(usage: unknown): {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+} {
+  const raw = usage as
+    | {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+      }
+    | undefined;
+  const promptTokens = raw?.prompt_tokens ?? raw?.promptTokens ?? 0;
+  const completionTokens =
+    raw?.completion_tokens ?? raw?.completionTokens ?? 0;
+  const totalTokens =
+    raw?.total_tokens ?? raw?.totalTokens ?? promptTokens + completionTokens;
+  return { promptTokens, completionTokens, totalTokens };
+}
+
+function recordSupervisorLlmUsage(args: {
+  sessionId: string;
+  stage: string;
+  label?: string;
+  model: string;
+  usage: unknown;
+  costUsd: number;
+}): void {
+  const usageCounts = getOpenRouterUsageCounts(args.usage);
+  recordCodingSessionLlmUsage({
+    sessionId: args.sessionId,
+    stage: args.stage,
+    label: args.label,
+    model: args.model,
+    costUsd: args.costUsd,
+    promptTokens: usageCounts.promptTokens,
+    completionTokens: usageCounts.completionTokens,
+    totalTokens: usageCounts.totalTokens,
+  });
+}
 
 // ─── Role inference ───
 
@@ -474,11 +528,45 @@ async function runArchitectPhase(state: SupervisorState) {
   }
 
   if (state.prebuiltScaffold) {
-    console.log(
-      `[Supervisor] Architect phase: prebuiltScaffold=true — skipping LLM for ${state.architectTasks.length} task(s); registering template files.`,
+    // P0-A: prebuiltScaffold no longer implies "skip every architect task".
+    // Triage each task: scaffold-only tasks can legitimately no-op, but any
+    // task touching files outside the scaffold (migrations, domain models,
+    // infra glue, etc.) must still run through the LLM — otherwise PRD
+    // requirements routed to Data Layer / Infrastructure silently vanish.
+    const triaged = triagePrebuiltArchitectTasks(
+      state.architectTasks,
+      state.scaffoldProtectedPaths ?? [],
     );
+    const noopTasks = triaged.filter((t) => t.decision === "noop");
+    const mustRunTasks = triaged.filter((t) => t.decision === "must_run_llm");
+
+    console.log(
+      `[Supervisor] Architect phase: prebuiltScaffold=true — triaged ${state.architectTasks.length} task(s): ${noopTasks.length} scaffold-only (no-op), ${mustRunTasks.length} must run LLM.`,
+    );
+
+    const emitter = getRepairEmitter(state.sessionId);
+    for (const t of mustRunTasks) {
+      emitter({
+        stage: "architect-triage",
+        event: "task_forced_to_llm",
+        taskId: t.task.id,
+        files: t.outsideFiles,
+        details: { reason: t.reason, title: t.task.title, phase: t.task.phase },
+      });
+    }
+    for (const t of noopTasks) {
+      emitter({
+        stage: "architect-triage",
+        event: "task_noop_scaffold_only",
+        taskId: t.task.id,
+        details: { reason: t.reason, title: t.task.title, phase: t.task.phase },
+      });
+    }
+
+    // Always build the scaffold doc + registry; both branches rely on it.
     const registry = await buildPrebuiltScaffoldRegistryAndDoc(state.outputDir);
-    const taskResults: TaskResult[] = state.architectTasks.map((task) => ({
+
+    const noopResults: TaskResult[] = noopTasks.map(({ task, reason }) => ({
       taskId: task.id,
       status: "completed",
       generatedFiles: [],
@@ -487,19 +575,56 @@ async function runArchitectPhase(state: SupervisorState) {
       verifyPassed: true,
       fixCycles: 0,
       warnings: [
-        "Completed via prebuilt tier scaffold (no LLM). See ARCHITECTURE_SCAFFOLD.md.",
+        `Completed via prebuilt tier scaffold (no LLM). ${reason} See ARCHITECTURE_SCAFFOLD.md.`,
       ],
     }));
+
+    if (mustRunTasks.length === 0) {
+      const phaseResult: PhaseResult = {
+        role: "architect",
+        workerLabel: "Architect",
+        taskResults: noopResults,
+        totalCostUsd: 0,
+      };
+      return {
+        phaseResults: [phaseResult],
+        fileRegistry: registry,
+        totalCostUsd: 0,
+      };
+    }
+
+    console.log(
+      `[Supervisor] Architect phase: running LLM for ${mustRunTasks.length} non-scaffold task(s)...`,
+    );
+    const result = await workerGraph.invoke(
+      {
+        role: "architect" as CodingAgentRole,
+        workerLabel: "Architect",
+        tasks: mustRunTasks.map((t) => t.task),
+        outputDir: state.outputDir,
+        projectContext: state.projectContext,
+        fileRegistrySnapshot: registry,
+        apiContractsSnapshot: state.apiContracts,
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
+        currentTaskIndex: 0,
+        ralphConfig: state.ralphConfig,
+        sessionId: state.sessionId,
+      },
+      { recursionLimit: 150 },
+    );
+
+    const workerState = result as WorkerState;
+    const combinedTaskResults = [...noopResults, ...workerState.taskResults];
     const phaseResult: PhaseResult = {
       role: "architect",
       workerLabel: "Architect",
-      taskResults,
-      totalCostUsd: 0,
+      taskResults: combinedTaskResults,
+      totalCostUsd: workerState.workerCostUsd,
     };
     return {
       phaseResults: [phaseResult],
-      fileRegistry: registry,
-      totalCostUsd: 0,
+      fileRegistry: [...registry, ...workerState.generatedFiles],
+      totalCostUsd: workerState.workerCostUsd,
     };
   }
 
@@ -518,6 +643,8 @@ async function runArchitectPhase(state: SupervisorState) {
       scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
       currentTaskIndex: 0,
       ralphConfig: state.ralphConfig,
+      sessionId: state.sessionId,
+      prdSpec: state.prdSpec,
     },
     { recursionLimit: 150 },
   );
@@ -1067,6 +1194,13 @@ Rules:
 
   const content = response.choices[0]?.message?.content ?? "";
   const costUsd = estimateCost(response.model, response.usage);
+  recordSupervisorLlmUsage({
+    sessionId: state.sessionId,
+    stage: "scaffold_fix",
+    model: response.model,
+    usage: response.usage,
+    costUsd,
+  });
   const fixes = parseFileOutput(content);
 
   const fixedFiles: GeneratedFile[] = [];
@@ -1251,6 +1385,13 @@ async function collectConventionViolations(
         );
         touchedFiles.add(rel);
       }
+      const isForbiddenPagesDir = rel.startsWith("frontend/src/pages/");
+      if (isForbiddenPagesDir) {
+        violations.push(
+          `[CONVENTION] ${rel}: M-tier uses "frontend/src/views" for page-level screens, NOT "frontend/src/pages" (that is a Next.js convention). Move this file to "frontend/src/views/${rel.split("/").pop() ?? rel}".`,
+        );
+        touchedFiles.add(rel);
+      }
     }
   }
 
@@ -1353,265 +1494,19 @@ async function collectConventionViolations(
   };
 }
 
-// ─── Two-phase task refinement: after scaffold exists, refine coarse tasks ───
-
 const MAX_E2E_VERIFY_FIX_ATTEMPTS = 10;
 
-async function refineTaskBreakdown(
-  state: SupervisorState,
-): Promise<Partial<SupervisorState>> {
-  const skipRefine =
-    (process.env.TASK_BREAKDOWN_SKIP_REFINE ?? "0").trim().toLowerCase() ===
-      "1" ||
-    (process.env.TASK_BREAKDOWN_SKIP_REFINE ?? "0").trim().toLowerCase() ===
-      "true";
-  if (skipRefine) {
-    console.log(
-      "[Supervisor] refineTaskBreakdown: skipped by TASK_BREAKDOWN_SKIP_REFINE.",
-    );
-    return { taskRefinementDone: true };
-  }
-
-  const coarseTasks = [
-    ...state.backendTasks,
-    ...state.frontendTasks,
-    ...state.testTasks,
-  ];
-
-  if (coarseTasks.length === 0) {
-    console.log("[Supervisor] refineTaskBreakdown: no tasks to refine.");
-    await writeTaskBreakdownMarkdown(
-      state.outputDir,
-      "TASK_BREAKDOWN_REFINED.md",
-      formatTaskBreakdownMarkdown(
-        "Task Breakdown (Refined)",
-        coarseTasks,
-        undefined,
-        ["No tasks were available for refinement."],
-      ),
-    );
-    return { taskRefinementDone: true };
-  }
-
-  console.log(
-    `[Supervisor] refineTaskBreakdown: refining ${coarseTasks.length} task(s) with scaffold context...`,
-  );
-
-  const scaffoldFiles = state.fileRegistry
-    .filter((f) => f.role === "architect")
-    .map((f) => `- ${f.path}: ${f.summary}`)
-    .slice(0, 50);
-
-  const sharedContractsContent: string[] = [];
-  for (const f of state.fileRegistry
-    .filter(
-      (f) =>
-        f.role === "architect" &&
-        (f.path.includes("shared") || f.path.includes("type")) &&
-        /\.(ts|tsx)$/.test(f.path),
-    )
-    .slice(0, 5)) {
-    const content = await fsRead(f.path, state.outputDir);
-    if (
-      !content.startsWith("FILE_NOT_FOUND") &&
-      !content.startsWith("REJECTED")
-    ) {
-      sharedContractsContent.push(
-        `### ${f.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``,
-      );
-    }
-  }
-
-  const taskSummary = coarseTasks
-    .map(
-      (t) =>
-        `- [${t.id}] (${t.phase}) ${t.title}: ${t.description.slice(0, 200)}${
-          t.files ? ` | files: ${JSON.stringify(t.files).slice(0, 150)}` : ""
-        }`,
-    )
-    .join("\n");
-
-  const modelChain = resolveModelChain(
-    MODEL_CONFIG.codeFix ?? "claude-sonnet",
-    resolveModel,
-  );
-
-  const messages: ChatMessage[] = [
-    {
-      role: "system",
-      content: [
-        "You are a Senior Technical Lead refining a coarse task breakdown into detailed implementation tasks.",
-        "You have access to the actual scaffold structure and shared contracts.",
-        "",
-        "Rules:",
-        "- Keep the same task IDs from the original breakdown. Do NOT invent new IDs.",
-        "- For each task, refine the `description` with specific implementation details based on the scaffold.",
-        "- Update `files` (creates/modifies/reads) to reflect actual file paths in the scaffold.",
-        "- Add or update `subSteps` with concrete implementation steps.",
-        "- Add `acceptanceCriteria` where missing.",
-        "- Do NOT change `phase`, `priority`, or `executionKind`.",
-        "- If a task is already well-specified, keep it as-is.",
-        "",
-        "Frontend task rules (CRITICAL — apply to every task with phase 'Frontend'):",
-        "- The `description` MUST explicitly list every backend API endpoint this page consumes (e.g. 'Fetches data from GET /api/projects, creates via POST /api/projects').",
-        '- At least one `subStep` MUST say: "Call [METHOD] /api/[path] via the API client to load/submit data".',
-        '- `acceptanceCriteria` MUST include: "Page fetches [resource] from [endpoint] via the API client — no mock or hardcoded data".',
-        "- NEVER add a subStep that says 'use mock data', 'hardcode data', or 'TODO: replace with API'.",
-        "- If the original task does not specify endpoints, infer them from the Backend Services tasks in the same breakdown.",
-        "",
-        "Output a JSON array of refined tasks with the same schema as input. Output ONLY the JSON array, no markdown fences or explanation.",
-      ].join("\n"),
-    },
-    {
-      role: "user",
-      content: [
-        "## Scaffold structure (actual files after architect phase)",
-        scaffoldFiles.length > 0
-          ? scaffoldFiles.join("\n")
-          : "(no scaffold files)",
-        "",
-        sharedContractsContent.length > 0
-          ? `## Shared contracts\n${sharedContractsContent.join("\n\n")}`
-          : "",
-        "",
-        `## Tasks to refine\n${taskSummary}`,
-        "",
-        `## Original tasks (full JSON)\n${JSON.stringify(coarseTasks, null, 2).slice(0, 20000)}`,
-      ].join("\n"),
-    },
-  ];
-
-  try {
-    const response = await chatCompletionWithFallback(messages, modelChain, {
-      temperature: 0.2,
-      max_tokens: 16384,
-    });
-
-    const content = response.choices[0]?.message?.content ?? "";
-    const costUsd = estimateCost(response.model, response.usage);
-
-    let refined: CodingTask[] = [];
-    try {
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        refined = JSON.parse(jsonMatch[0]) as CodingTask[];
-      }
-    } catch {
-      console.warn(
-        "[Supervisor] refineTaskBreakdown: failed to parse LLM output, keeping original tasks.",
-      );
-      await writeTaskBreakdownMarkdown(
-        state.outputDir,
-        "TASK_BREAKDOWN_REFINED.md",
-        formatTaskBreakdownMarkdown(
-          "Task Breakdown (Refined)",
-          coarseTasks,
-          undefined,
-          ["LLM output parse failed; kept original tasks."],
-        ),
-      );
-      return { taskRefinementDone: true, totalCostUsd: costUsd };
-    }
-
-    if (refined.length === 0) {
-      console.warn(
-        "[Supervisor] refineTaskBreakdown: empty result, keeping original tasks.",
-      );
-      await writeTaskBreakdownMarkdown(
-        state.outputDir,
-        "TASK_BREAKDOWN_REFINED.md",
-        formatTaskBreakdownMarkdown(
-          "Task Breakdown (Refined)",
-          coarseTasks,
-          undefined,
-          ["LLM returned an empty task list; kept original tasks."],
-        ),
-      );
-      return { taskRefinementDone: true, totalCostUsd: costUsd };
-    }
-
-    const originalIds = new Set(coarseTasks.map((t) => t.id));
-    const validRefined = refined.filter((t) => originalIds.has(t.id));
-
-    if (validRefined.length === 0) {
-      console.warn(
-        "[Supervisor] refineTaskBreakdown: no valid tasks after filtering, keeping original.",
-      );
-      await writeTaskBreakdownMarkdown(
-        state.outputDir,
-        "TASK_BREAKDOWN_REFINED.md",
-        formatTaskBreakdownMarkdown(
-          "Task Breakdown (Refined)",
-          coarseTasks,
-          undefined,
-          ["No valid task IDs in refined output; kept original tasks."],
-        ),
-      );
-      return { taskRefinementDone: true, totalCostUsd: costUsd };
-    }
-
-    const refinedMap = new Map(validRefined.map((t) => [t.id, t]));
-    const mergedTasks = coarseTasks.map((original) => {
-      const r = refinedMap.get(original.id);
-      if (!r) return original;
-      return {
-        ...original,
-        description: r.description || original.description,
-        files: r.files || original.files,
-        subSteps: r.subSteps || original.subSteps,
-        acceptanceCriteria: r.acceptanceCriteria || original.acceptanceCriteria,
-      };
-    });
-
-    const newBackend = mergedTasks.filter(
-      (t) => inferRole(t) === "backend",
-    ) as CodingTask[];
-    const newFrontend = mergedTasks.filter(
-      (t) => inferRole(t) === "frontend",
-    ) as CodingTask[];
-    const newTest = mergedTasks.filter(
-      (t) => inferRole(t) === "test",
-    ) as CodingTask[];
-
-    await writeTaskBreakdownMarkdown(
-      state.outputDir,
-      "TASK_BREAKDOWN_REFINED.md",
-      formatTaskBreakdownMarkdown("Task Breakdown (Refined)", mergedTasks, {
-        architect: mergedTasks.filter((t) => inferRole(t) === "architect"),
-        backend: newBackend,
-        frontend: newFrontend,
-        test: newTest,
-      }),
-    );
-
-    console.log(
-      `[Supervisor] refineTaskBreakdown: refined ${validRefined.length}/${coarseTasks.length} tasks (model=${response.model}, cost=$${costUsd.toFixed(4)})`,
-    );
-
-    return {
-      backendTasks: newBackend,
-      frontendTasks: newFrontend,
-      testTasks: newTest,
-      taskRefinementDone: true,
-      totalCostUsd: costUsd,
-    };
-  } catch (e) {
-    console.warn(
-      `[Supervisor] refineTaskBreakdown: LLM call failed: ${e instanceof Error ? e.message : String(e)}. Keeping original tasks.`,
-    );
-    await writeTaskBreakdownMarkdown(
-      state.outputDir,
-      "TASK_BREAKDOWN_REFINED.md",
-      formatTaskBreakdownMarkdown(
-        "Task Breakdown (Refined)",
-        coarseTasks,
-        undefined,
-        ["LLM call failed; kept original tasks."],
-      ),
-    );
-    return { taskRefinementDone: true };
-  }
-}
+/**
+ * When `true` (the default) a failed e2e run is re-executed once before any
+ * LLM fix attempt. The two runs are compared to classify every failing
+ * test as deterministic / flaky / infra, and only deterministic failures
+ * are sent to auto-repair. Set env `E2E_TRIAGE_ENABLED=0` to revert to the
+ * legacy "feed everything to the LLM" behaviour.
+ */
+const E2E_TRIAGE_ENABLED = (() => {
+  const raw = (process.env.E2E_TRIAGE_ENABLED ?? "1").trim().toLowerCase();
+  return raw !== "0" && raw !== "false" && raw !== "off";
+})();
 
 function parseFileBlocksFromContent(
   raw: string,
@@ -1784,6 +1679,13 @@ async function e2eVerifyAndFix(
           },
         );
         const genContent = genResponse.choices[0]?.message?.content ?? "";
+        recordSupervisorLlmUsage({
+          sessionId: state.sessionId,
+          stage: "e2e_generate_tests",
+          model: genResponse.model,
+          usage: genResponse.usage,
+          costUsd: estimateCost(genResponse.model, genResponse.usage),
+        });
         const genFileBlocks = parseFileBlocksFromContent(genContent);
         if (genFileBlocks.length > 0) {
           for (const file of genFileBlocks) {
@@ -1833,6 +1735,143 @@ async function e2eVerifyAndFix(
     };
   }
 
+  // ── Triage before auto-repair ────────────────────────────────────────────
+  // 1. Re-run the same command once, under the same conditions, so the
+  //    triage classifier can tell a real deterministic bug apart from a
+  //    flake (timing / mock race) or an infrastructure problem (port
+  //    clash, backend not up, DNS error).
+  // 2. Feed only the deterministic failures to the LLM. For flaky / infra
+  //    cases we write a report and exit the loop — rewriting code on a
+  //    flake or infra error is how we corrupt previously-correct files.
+  const emitter = getRepairEmitter(state.sessionId);
+  let deterministicTestNames: Set<string> | null = null;
+  let triageSummaryText = "";
+
+  if (E2E_TRIAGE_ENABLED) {
+    // Short-circuit for obvious infra — don't even pay the second run.
+    if (hasInfraSignal(output)) {
+      console.warn(
+        "[Supervisor] e2eVerify: infra signal detected in first run (ECONNREFUSED / EADDRINUSE / etc.) — skipping auto-repair.",
+      );
+      const triage = triageE2eFailures({
+        firstRunOutput: output,
+        firstRunExitCode: runResult.exitCode,
+      });
+      await writeTriageReport(state.outputDir, attempt, triage.report);
+      emitter({
+        stage: "e2e-triage",
+        event: "infra_detected",
+        details: {
+          attempt,
+          summary: triage.summary,
+          infraCount: triage.infra.length,
+        },
+      });
+      return {
+        // Bump past the limit so routeAfterE2eVerify exits the loop.
+        e2eVerifyAttempts: MAX_E2E_VERIFY_FIX_ATTEMPTS + 1,
+        e2eVerifyErrors: [
+          "E2E failed with infrastructure signal — not a code bug.",
+          triage.summary,
+          "See .ralph/e2e-triage.md for the full report.",
+          "",
+          failureSummary.slice(-2000),
+        ].join("\n\n"),
+      };
+    }
+
+    console.log(
+      "[Supervisor] e2eVerify: first run failed — executing retry pass for flake detection...",
+    );
+    const retryResult = await shellExec(plan.command, plan.cwd, {
+      timeout: 180_000,
+    });
+    const retryOutput =
+      `${retryResult.stdout}${retryResult.stderr}`.trim();
+
+    const triage = triageE2eFailures({
+      firstRunOutput: output,
+      firstRunExitCode: runResult.exitCode,
+      secondRunOutput: retryOutput,
+      secondRunExitCode: retryResult.exitCode,
+    });
+    triageSummaryText = triage.summary;
+    await writeTriageReport(state.outputDir, attempt, triage.report);
+
+    console.log(`[Supervisor] e2eVerify: ${triage.summary}`);
+
+    emitter({
+      stage: "e2e-triage",
+      event: "triage_complete",
+      details: {
+        attempt,
+        deterministic: triage.deterministic.length,
+        flaky: triage.flaky.length,
+        infra: triage.infra.length,
+        selfHealed: triage.selfHealed.length,
+        retryExitCode: retryResult.exitCode,
+      },
+    });
+
+    // Retry passed cleanly → treat as success; the original failure was a flake.
+    if (retryResult.exitCode === 0 && triage.deterministic.length === 0) {
+      console.log(
+        "[Supervisor] e2eVerify: retry run passed — original failure was a flake, no auto-repair needed.",
+      );
+      emitter({
+        stage: "e2e-triage",
+        event: "flake_self_healed",
+        details: { attempt, selfHealed: triage.selfHealed.length },
+      });
+      return {
+        e2eVerifyAttempts: attempt,
+        e2eVerifyErrors: "",
+      };
+    }
+
+    // Retry still fails but none of the failures are deterministic (all
+    // flake / infra) — auto-repair would chase noise. Exit the loop.
+    if (triage.deterministic.length === 0) {
+      console.warn(
+        `[Supervisor] e2eVerify: retry still failed but no deterministic failures (${triage.summary}) — skipping auto-repair.`,
+      );
+      emitter({
+        stage: "e2e-triage",
+        event: "no_deterministic_failures",
+        details: {
+          attempt,
+          flaky: triage.flaky.length,
+          infra: triage.infra.length,
+          selfHealed: triage.selfHealed.length,
+        },
+      });
+      return {
+        e2eVerifyAttempts: MAX_E2E_VERIFY_FIX_ATTEMPTS + 1,
+        e2eVerifyErrors: [
+          "E2E has failures but none are deterministic — auto-repair skipped.",
+          triage.summary,
+          "See .ralph/e2e-triage.md for the full report.",
+          "",
+          failureSummary.slice(-2000),
+        ].join("\n\n"),
+      };
+    }
+
+    deterministicTestNames = new Set(
+      triage.deterministic.map((r) => r.name),
+    );
+    emitter({
+      stage: "e2e-triage",
+      event: "repair_dispatch",
+      details: {
+        attempt,
+        deterministicCount: triage.deterministic.length,
+        skippedFlaky: triage.flaky.length,
+        skippedInfra: triage.infra.length,
+      },
+    });
+  }
+
   const e2eModelChain = resolveModelChain(
     MODEL_CONFIG.e2eGen ?? MODEL_CONFIG.codeFix ?? "gpt-4o",
     resolveModel,
@@ -1852,15 +1891,25 @@ async function e2eVerifyAndFix(
   // Read per-test error-context.md files from test-results — these contain
   // the page snapshot, exact failing line, and DOM structure the LLM needs
   // to understand WHY each test failed and what source code must change.
+  //
+  // When triage produced a `deterministicTestNames` set, we filter to only
+  // the matching contexts — the LLM is explicitly instructed below to fix
+  // ONLY those, so feeding it extra flaky/infra contexts would invite it
+  // to rewrite otherwise-correct code.
   const errorContextContents: string[] = [];
   const errorContextFiles = (await listFiles("frontend/test-results", state.outputDir))
     .filter((f) => f.endsWith("error-context.md"));
   for (const ecf of errorContextFiles) {
     const md = await fsRead(ecf, state.outputDir);
-    if (!md.startsWith("FILE_NOT_FOUND") && !md.startsWith("REJECTED")) {
-      const folderName = ecf.split("/").slice(-2, -1)[0] ?? ecf;
-      errorContextContents.push(`### ${folderName}\n${md.slice(0, 3000)}`);
+    if (md.startsWith("FILE_NOT_FOUND") || md.startsWith("REJECTED")) continue;
+    if (
+      deterministicTestNames &&
+      !errorContextMatchesAny(md, deterministicTestNames)
+    ) {
+      continue;
     }
+    const folderName = ecf.split("/").slice(-2, -1)[0] ?? ecf;
+    errorContextContents.push(`### ${folderName}\n${md.slice(0, 3000)}`);
   }
 
   // Statically analyse test files to extract waitForResponse URL patterns.
@@ -1971,6 +2020,18 @@ async function e2eVerifyAndFix(
         `Project root: ${state.outputDir}`,
         `E2E command: ${plan.command}`,
         `Attempt: ${attempt}`,
+        triageSummaryText ? `Triage: ${triageSummaryText}` : "",
+        deterministicTestNames && deterministicTestNames.size > 0
+          ? [
+              "",
+              "## Triage-filtered scope",
+              "The e2e command was executed twice. Only the tests listed below failed",
+              "deterministically on BOTH runs — fix ONLY these, do not speculate about",
+              "flaky or infrastructure-related failures (they are intentionally omitted",
+              "from this prompt):",
+              ...[...deterministicTestNames].map((n) => `- ${n}`),
+            ].join("\n")
+          : "",
         "",
         errorContextContents.length > 0
           ? `## Per-test failure details (page snapshots, exact failing lines, DOM state)\n${errorContextContents.join("\n\n---\n\n")}`
@@ -2010,6 +2071,13 @@ async function e2eVerifyAndFix(
       max_tokens: 12000,
     });
     const content = response.choices[0]?.message?.content ?? "";
+    recordSupervisorLlmUsage({
+      sessionId: state.sessionId,
+      stage: "e2e_source_repair",
+      model: response.model,
+      usage: response.usage,
+      costUsd: estimateCost(response.model, response.usage),
+    });
     const fileBlocks = parseFileBlocksFromContent(content);
     if (fileBlocks.length === 0) {
       console.warn(
@@ -2044,6 +2112,62 @@ async function e2eVerifyAndFix(
 function routeAfterIntegrationVerify(state: SupervisorState): string {
   if (state.integrationErrors) return "summary";
   return "e2e_verify";
+}
+
+/**
+ * Extract the most-uniquely-identifying segment of a Playwright test name.
+ * Tests are typically written as `<spec>:<line>:<col> › <suite> › <title>`
+ * or in error-context.md form `<spec> >> <suite> >> <title>`. The final
+ * segment is the test title, which uniquely identifies the test within a
+ * single run. We use it to match across the two formats.
+ */
+function lastTestNameSegment(name: string): string {
+  const parts = name.split(/\s*(?:›|>>)\s*/).map((p) => p.trim()).filter(Boolean);
+  const last = parts[parts.length - 1] ?? name;
+  return last.replace(/\s+/g, " ").trim();
+}
+
+function errorContextMatchesAny(
+  errorContextMd: string,
+  deterministicNames: Set<string>,
+): boolean {
+  // Find the `- Name: ...` line in the markdown header.
+  const m = /^-\s*Name:\s*(.+)$/m.exec(errorContextMd);
+  if (!m) return false;
+  const ctxTitle = lastTestNameSegment(m[1]);
+  for (const det of deterministicNames) {
+    const detTitle = lastTestNameSegment(det);
+    if (detTitle && ctxTitle === detTitle) return true;
+    // Fuzzy fallback: PRD ids like "E2E-002" must appear in both.
+    const prdId = (/\bE2E-\d+\b/i.exec(detTitle) ?? [])[0];
+    if (prdId && ctxTitle.includes(prdId)) return true;
+  }
+  return false;
+}
+
+async function writeTriageReport(
+  outputDir: string,
+  attempt: number,
+  report: string,
+): Promise<void> {
+  try {
+    const ralphDir = path.join(outputDir, ".ralph");
+    await fs.mkdir(ralphDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `e2e-triage-attempt-${attempt}-${timestamp}.md`;
+    await fs.writeFile(path.join(ralphDir, filename), report, "utf-8");
+    // Also write/overwrite the "latest" pointer for quick access.
+    await fs.writeFile(
+      path.join(ralphDir, "e2e-triage.md"),
+      report,
+      "utf-8",
+    );
+  } catch (err) {
+    console.warn(
+      `[Supervisor] writeTriageReport failed (ignored):`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 function routeAfterE2eVerify(state: SupervisorState): string {
@@ -2102,9 +2226,30 @@ async function generateApiContracts(state: SupervisorState) {
   const contextParts: string[] = [];
 
   if (state.projectContext) {
-    contextParts.push(
-      `## Project Context (PRD / TRD)\n${state.projectContext.slice(0, 8000)}`,
-    );
+    // Replace legacy `slice(0, 8000)` truncation with a relevance-aware
+    // section picker. We're looking for API contract material: endpoints,
+    // routes, request/response shapes, auth, data types.
+    const apiContractHint = {
+      keywords: [
+        "api",
+        "endpoint",
+        "route",
+        "request",
+        "response",
+        "schema",
+        "auth",
+        "token",
+        "controller",
+        "service",
+      ],
+    };
+    const trimmed = pickRelevantSections(state.projectContext, apiContractHint, {
+      budget: 12_000,
+      label: "api-contract-generation",
+      stage: "worker-context",
+      emitter: getRepairEmitter(state.sessionId),
+    });
+    contextParts.push(`## Project Context (PRD / TRD)\n${trimmed}`);
   }
 
   const typeFiles = state.fileRegistry
@@ -2161,6 +2306,13 @@ async function generateApiContracts(state: SupervisorState) {
 
     const raw = (response.choices[0]?.message?.content ?? "").trim();
     const costUsd = estimateCost(response.model, response.usage);
+    recordSupervisorLlmUsage({
+      sessionId: state.sessionId,
+      stage: "generate_api_contracts",
+      model: response.model,
+      usage: response.usage,
+      costUsd,
+    });
 
     let parsed: Array<{
       service: string;
@@ -2317,6 +2469,13 @@ Critical rules:
     });
     const content = response.choices[0]?.message?.content ?? "";
     const costUsd = estimateCost(response.model, response.usage);
+    recordSupervisorLlmUsage({
+      sessionId: state.sessionId,
+      stage: "bootstrap_shared_contracts",
+      model: response.model,
+      usage: response.usage,
+      costUsd,
+    });
     const files = parseFileOutput(content);
 
     const skOpts = scaffoldWriteOpts(state, true);
@@ -2357,143 +2516,11 @@ Critical rules:
   }
 }
 
-/**
- * Architect Phase 完成后，在 BE/FE 任务开始前，
- * 生成所有服务文件的接口骨架（类型定义 + 函数签名，无实现）。
- * 骨架文件让所有后续任务对接口有一致的预期，避免各自猜导出内容。
- */
-async function generateServiceSkeletons(
-  state: SupervisorState,
-): Promise<Partial<SupervisorState>> {
-  if (state.backendTasks.length === 0 && state.frontendTasks.length === 0) {
-    return {};
-  }
-
-  console.log(
-    "[Supervisor] generateServiceSkeletons: generating interface contracts...",
-  );
-
-  const allTasks = [...state.backendTasks, ...state.frontendTasks]
-    .map(
-      (t) => `- [${inferRole(t)}] ${t.title}: ${t.description.slice(0, 150)}`,
-    )
-    .join("\n");
-
-  const existingTypeFiles = state.fileRegistry
-    .filter(
-      (f) =>
-        f.role === "architect" &&
-        (f.path.includes("type") ||
-          f.path.includes("model") ||
-          f.path.includes("schema") ||
-          f.path.includes("interface")) &&
-        /\.(ts|tsx)$/.test(f.path),
-    )
-    .slice(0, 5);
-
-  const typeFileContents: string[] = [];
-  for (const tf of existingTypeFiles) {
-    const content = await fsRead(tf.path, state.outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND")) {
-      typeFileContents.push(
-        `### ${tf.path}\n\`\`\`typescript\n${content.slice(0, 1500)}\n\`\`\``,
-      );
-    }
-  }
-
-  const skeletonModelChain = resolveModelChain(
-    MODEL_CONFIG.codeFix ?? "gpt-4o",
-    resolveModel,
-  );
-  const messages: ChatMessage[] = [
-    {
-      role: "system",
-      content: `You are a Senior TypeScript Architect.
-Generate skeleton files — type definitions and function signatures ONLY, no implementations.
-Each function body should be: throw new Error("Not implemented");
-
-Rules:
-- Export every type, interface, enum, and function that other modules will import
-- Use consistent naming across all files
-- If a service function is used in a route, it MUST be exported from the service file
-- If a type is used in multiple files, define it ONCE in a shared types file and import it everywhere
-- Output files using \`\`\`file:<path> format
-- Output ONLY skeleton files, no explanatory text`,
-    },
-    {
-      role: "user",
-      content: [
-        "## All tasks that will be implemented",
-        allTasks,
-        "",
-        typeFileContents.length > 0
-          ? `## Existing type files from Architect\n${typeFileContents.join("\n\n")}`
-          : "",
-        "",
-        state.apiContracts.length > 0
-          ? `## API Contracts\n${state.apiContracts
-              .map((c) => `- ${c.method} ${c.endpoint} (${c.service})`)
-              .join("\n")}`
-          : "",
-        "",
-        "Generate skeleton files for:",
-        "1. All shared type definitions (types/, interfaces/)",
-        "2. All service files (lib/server/*/*.service.ts)",
-        "3. All API client files (lib/api/*.ts) for frontend consumption",
-        "4. Validation schemas if needed",
-        "",
-        "Each skeleton must export every identifier that will be imported by other files.",
-        "Output ONLY skeleton files using ```file:<path> format.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    },
-  ];
-
-  try {
-    const response = await chatCompletionWithFallback(
-      messages,
-      skeletonModelChain,
-      {
-        temperature: 0.1,
-        max_tokens: 16384,
-      },
-    );
-
-    const content = response.choices[0]?.message?.content ?? "";
-    const costUsd = estimateCost(response.model, response.usage);
-    const skeletonFiles = parseFileOutput(content);
-
-    const skOpts = scaffoldWriteOpts(state, false);
-    const newEntries: GeneratedFile[] = [];
-    for (const [fp, fc] of Object.entries(skeletonFiles)) {
-      await fsWrite(fp, fc, state.outputDir, skOpts);
-
-      const exports = extractExports(fc);
-      newEntries.push({
-        path: fp,
-        role: "architect",
-        summary: `Interface skeleton for: ${fp}`,
-        exports,
-      });
-    }
-
-    console.log(
-      `[Supervisor] generateServiceSkeletons: generated ${newEntries.length} skeleton file(s) (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
-    );
-
-    return {
-      fileRegistry: newEntries,
-      totalCostUsd: costUsd,
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn(
-      `[Supervisor] generateServiceSkeletons: error — ${msg}. Continuing without skeletons.`,
-    );
-    return {};
-  }
-}
+/* generateServiceSkeletons — REMOVED.
+ * Skeleton files (throw new Error("Not implemented")) caused more harm than
+ * good: controllers / routes / middleware were generated as stubs and often
+ * not replaced by workers. API contracts + task-breakdown + architect phase
+ * already provide enough cross-file context for workers. */
 
 function extractExports(source: string): string[] {
   const exports = new Set<string>();
@@ -2547,6 +2574,8 @@ function dispatchBackendAndTestWorkers(state: SupervisorState): Send[] {
         scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
         ralphConfig: state.ralphConfig,
+        sessionId: state.sessionId,
+        prdSpec: state.prdSpec,
       }),
     );
   });
@@ -2564,6 +2593,8 @@ function dispatchBackendAndTestWorkers(state: SupervisorState): Send[] {
         scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
         ralphConfig: state.ralphConfig,
+        sessionId: state.sessionId,
+        prdSpec: state.prdSpec,
       }),
     );
   }
@@ -2581,6 +2612,8 @@ function dispatchBackendAndTestWorkers(state: SupervisorState): Send[] {
         scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
         ralphConfig: state.ralphConfig,
+        sessionId: state.sessionId,
+        prdSpec: state.prdSpec,
       }),
     );
   }
@@ -2606,6 +2639,8 @@ function dispatchFrontendWorkers(state: SupervisorState): Send[] {
         scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
         ralphConfig: state.ralphConfig,
+        sessionId: state.sessionId,
+        prdSpec: state.prdSpec,
       }),
     ];
   }
@@ -2663,6 +2698,8 @@ function dispatchFrontendWorkers(state: SupervisorState): Send[] {
         scaffoldProtectedPaths: state.scaffoldProtectedPaths ?? [],
         currentTaskIndex: 0,
         ralphConfig: state.ralphConfig,
+        sessionId: state.sessionId,
+        prdSpec: state.prdSpec,
       }),
   );
 }
@@ -2764,6 +2801,13 @@ Rules:
     });
     const raw = (response.choices[0]?.message?.content ?? "").trim();
     const costUsd = estimateCost(response.model, response.usage);
+    recordSupervisorLlmUsage({
+      sessionId: state.sessionId,
+      stage: "extract_real_contracts",
+      model: response.model,
+      usage: response.usage,
+      costUsd,
+    });
 
     let parsed: Array<{
       service?: string;
@@ -3641,6 +3685,13 @@ async function phaseVerifyAndFix(
 
     const choice = resp.choices[0];
     totalCostUsd += estimateCost(resp.model, resp.usage);
+    recordSupervisorLlmUsage({
+      sessionId: state.sessionId,
+      stage: "phase_verify_fix",
+      model: resp.model,
+      usage: resp.usage,
+      costUsd: estimateCost(resp.model, resp.usage),
+    });
 
     // Append assistant message to conversation history
     messages.push({
@@ -4210,6 +4261,93 @@ async function installImportGapsAllProjects(outputDir: string): Promise<void> {
   }
 }
 
+interface DependencyConsistencyAudit {
+  remainingIssues: string[];
+  summary: string;
+}
+
+async function auditImportDependencyConsistency(
+  outputDir: string,
+): Promise<DependencyConsistencyAudit> {
+  const dirs = await findPackageJsonRelativeDirs(outputDir);
+  const nested = dirs.filter((d) => d !== ".");
+  const issues: string[] = [];
+
+  const rootMissing = await collectMissingImportPackages(outputDir, nested);
+  if (rootMissing.length > 0) {
+    issues.push(
+      `Root package imports are missing dependencies: ${rootMissing.join(", ")}`,
+    );
+  }
+
+  for (const rel of nested) {
+    const missing = await collectMissingImportPackagesForPrefix(outputDir, rel);
+    if (missing.length > 0) {
+      issues.push(
+        `"${rel}" imports are missing dependencies: ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  return {
+    remainingIssues: issues,
+    summary:
+      issues.length > 0
+        ? ["Dependency consistency audit still has unresolved items:", ...issues]
+            .join("\n")
+            .slice(0, 4000)
+        : "Dependency consistency audit: clean.",
+  };
+}
+
+async function pathExistsUnderOutput(
+  outputDir: string,
+  relPath: string,
+): Promise<boolean> {
+  try {
+    await fs.stat(path.join(outputDir, relPath));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function detectResidualImplementationConflicts(
+  outputDir: string,
+): Promise<string[]> {
+  const conflicts: string[] = [];
+  const candidatePairs = [
+    {
+      canonical: "frontend/src/contexts/AuthContext.tsx",
+      residual: "frontend/src/context/AuthContext.tsx",
+    },
+    {
+      canonical: "backend/src/middleware/",
+      residual: "backend/src/middlewares/",
+    },
+    {
+      canonical: "backend/src/db.ts",
+      residual: "backend/src/database/connection.ts",
+    },
+    {
+      canonical: "frontend/src/views/NotFoundPage.tsx",
+      residual: "frontend/src/views/NotFound.tsx",
+    },
+  ];
+
+  for (const pair of candidatePairs) {
+    const canonicalExists = await pathExistsUnderOutput(outputDir, pair.canonical);
+    const residualExists = await pathExistsUnderOutput(outputDir, pair.residual);
+    if (canonicalExists && residualExists) {
+      conflicts.push(
+        `Both "${pair.canonical}" and "${pair.residual}" exist. Keep one canonical implementation and remove or merge the residual copy.`,
+      );
+    }
+  }
+
+  return conflicts;
+}
+
 async function syncDeps(_state: SupervisorState) {
   console.log(
     "[Supervisor] sync_deps: skipping installs (npm install runs in integration verify).",
@@ -4570,6 +4708,21 @@ async function integrationVerifyAndFix(
   );
   await normalizeWorkspaceImports(state.outputDir);
   await installImportGapsAllProjects(state.outputDir);
+  const initialDependencyAudit = await auditImportDependencyConsistency(
+    state.outputDir,
+  );
+  const initialResidualConflicts =
+    await detectResidualImplementationConflicts(state.outputDir);
+  if (initialDependencyAudit.remainingIssues.length > 0) {
+    console.warn(
+      `${label}: dependency audit still has ${initialDependencyAudit.remainingIssues.length} unresolved item(s).`,
+    );
+  }
+  if (initialResidualConflicts.length > 0) {
+    console.warn(
+      `${label}: detected ${initialResidualConflicts.length} residual implementation conflict(s).`,
+    );
+  }
 
   const dbInfo = await detectDbDependencies(state.outputDir);
   const hasAnyOrmWithExternalDb =
@@ -4635,10 +4788,42 @@ async function integrationVerifyAndFix(
         ].join("\n")
       : "";
 
-  // ── PRD context (truncated to keep prompt manageable) ────────────────────
-  const prdBlock = state.projectContext
-    ? `\n## Product Requirements (PRD)\nUse this as the authoritative specification when reviewing feature completeness.\n\n${state.projectContext.slice(0, 12000)}`
+  // ── PRD context (relevance-trimmed to keep prompt manageable) ───────────
+  // Previously this was `slice(0, 12000)` which silently hid PRD features
+  // past the 12k mark from the integration-review agent. Replace with a
+  // section-level picker that tries to keep feature-review-critical content.
+  const integrationReviewHint = {
+    keywords: [
+      "feature",
+      "requirement",
+      "acceptance",
+      "criteria",
+      "page",
+      "component",
+      "endpoint",
+      "flow",
+      "scenario",
+    ],
+  };
+  const prdTrimmed = state.projectContext
+    ? pickRelevantSections(state.projectContext, integrationReviewHint, {
+        budget: 18_000,
+        label: "integration-review",
+        stage: "worker-context",
+        emitter: getRepairEmitter(state.sessionId),
+      })
     : "";
+  const prdBlock = prdTrimmed
+    ? `\n## Product Requirements (PRD)\nUse this as the authoritative specification when reviewing feature completeness.\n\n${prdTrimmed}`
+    : "";
+  const dependencyAuditBlock =
+    initialDependencyAudit.summary !== "Dependency consistency audit: clean."
+      ? `\n## Preflight dependency audit\n${initialDependencyAudit.summary}`
+      : "";
+  const residualConflictBlock =
+    initialResidualConflicts.length > 0
+      ? `\n## Residual implementation conflicts detected before final verify\n${initialResidualConflicts.map((line) => `- ${line}`).join("\n")}`
+      : "";
 
   const systemPrompt = [
     "You are a Senior Full-Stack Engineer performing the **Final Verification** of a fully generated codebase.",
@@ -4651,8 +4836,10 @@ async function integrationVerifyAndFix(
     "1. Review the PRD and identify missing pages, flows, handlers, middlewares, and end-to-end feature gaps.",
     "2. Frontend route closure:",
     "   - Scan `frontend/src/views` for actual page files.",
+    "   - **Also scan `frontend/src/pages`** — if any page-level `.tsx` files exist there, **move them** to `frontend/src/views` (flat, no subdirectories) and delete the `frontend/src/pages` directory. `src/pages` is a Next.js convention; M-tier Vite+React projects use `src/views`.",
+    "   - Ensure views are flat: if files are nested in subdirectories like `views/auth/LoginPage.tsx`, move them to `views/LoginPage.tsx` directly.",
     "   - Read `frontend/src/router.tsx`.",
-    "   - Import and register every real page that should be reachable unless it is clearly dead code.",
+    "   - Import and register every real page that should be reachable unless it is clearly dead code. Imports must use `./views/...` paths.",
     "3. Backend API module closure:",
     "   - Scan `backend/src/api/modules` for implemented module route files.",
     "   - Read `backend/src/api/modules/index.ts`.",
@@ -4670,8 +4857,15 @@ async function integrationVerifyAndFix(
     "   b. Read the relevant source files",
     "   c. Check: is the feature fully implemented? Are edge cases handled?",
     "   d. Check: will a real user be able to use this feature end-to-end?",
-    "3. Fix any missing or broken feature implementations",
-    "4. Specifically inspect every Protected Scaffold File listed below:",
+    "3. Backend cross-file consistency review (MANDATORY for every create/update/read flow backed by persistence):",
+    "   a. Read the request DTO/type, validation schema, controller/service payload, and ORM model together.",
+    "   b. Check that user-input fields vs system-generated fields are consistent across those files.",
+    "   c. If a model field is required (`allowNull: false`) but missing from both the create payload and model defaults, fix the inconsistency.",
+    "   d. If the model uses Sequelize timestamps (`timestamps: true` or timestamp aliases), ensure services/controllers are NOT forced to manually provide `createdAt` / `updatedAt` unless the project already uses that pattern consistently.",
+    "   e. Ensure system fields like `id`, `createdAt`, `updatedAt`, timestamp aliases, and lifecycle-generated fields are not mistakenly required in request DTOs/validation.",
+    "   f. When a controller catches an internal error, do not leave it as an unobservable black box in development; keep useful logging or structured error details so runtime failures remain diagnosable.",
+    "4. Fix any missing or broken feature implementations",
+    "5. Specifically inspect every Protected Scaffold File listed below:",
     "   - Check that business logic was correctly added (not left as stub/TODO)",
     "   - Check that routes, controllers, services, and configs are wired up correctly",
     "   - Fix any implementation errors — you ARE allowed to edit these files in this phase",
@@ -4690,6 +4884,16 @@ async function integrationVerifyAndFix(
     "7. Only after registration closure is complete and all three scoped validation gates pass may you call `report_done(status='pass', summary=...)`",
     "   OR `report_done(status='fail', summary=<unresolved issues>)` if critical features cannot be fixed",
     "",
+    "## Phase 2.25 — Delivery hardening",
+    "1. Resolve import/package mismatches so every runtime import is declared in the correct package.json.",
+    "2. Remove or merge residual duplicate implementations when the same responsibility exists in old/new canonical paths.",
+    "3. If you detect yourself rereading the same file or command output without making progress, stop looping and switch to the highest-signal failing gate first (frontend tsc, frontend build, backend tsc, or explicit PRD gap).",
+    "",
+    "## Phase 2.5 — Mock / Stub Cleanup",
+    "1. Search frontend source for mock API interceptor files or imports (e.g. `mockApi`, `mock-server`, `msw/handlers`, `__mocks__`). Delete any such files and remove their imports (e.g. `import './lib/mockApi'` in `App.tsx`).",
+    "2. Read `frontend/src/context/AuthContext.tsx` (or equivalent auth provider). If the provider is a no-op stub that always returns `{ isAuthenticated: false, user: null }`, replace it with a real implementation that reads `token`/`user` from `localStorage`, exposes `login()`/`logout()` functions, and sets `isAuthenticated` based on whether a token exists.",
+    "3. Search for any remaining `throw new Error('Not implemented')` stubs in backend controllers/services. If found, either implement them or remove the dead file.",
+    "",
     "## Hard rules",
     "- Do NOT switch HTTP frameworks (Express ↔ Fastify ↔ Koa) or frontend frameworks.",
     "- For split M-tier projects, keep routing in frontend/src/router.tsx and backend API modules under backend/src/api/modules.",
@@ -4698,6 +4902,7 @@ async function integrationVerifyAndFix(
     "- Do not stop after making pages/controllers/middlewares exist on disk; they must be wired into the actual router/module/app entrypoints.",
     "- Run verification ONLY inside `frontend/` and `backend/`. Do not use root-level `npx tsc` against the whole generated-code tree in this phase.",
     "- If you modify any file, treat previous validation as stale and re-run the full scoped validation sequence before finishing.",
+    "- Do NOT call `report_done(status='pass')` while dependency audit issues remain unresolved.",
     "- In this phase, scaffold-protected files do NOT block edits. You may overwrite protected scaffold files when registration or PRD completeness requires it.",
     "- Minimal targeted changes — do not rewrite working code.",
     "- Install missing npm packages: `pnpm add <pkg> --filter <workspace-name>`",
@@ -4710,6 +4915,8 @@ async function integrationVerifyAndFix(
     `Project directory: ${state.outputDir}`,
     `Package manager: ${pm}`,
     prdBlock,
+    dependencyAuditBlock,
+    residualConflictBlock,
     "",
     "Begin with PRD completeness review and shared registration closure first, then run scoped frontend/backend validation after the feature补写 is complete.",
   ]
@@ -4738,6 +4945,9 @@ async function integrationVerifyAndFix(
   let frontendTscOkAt: string | null = null;
   let frontendBuildOkAt: string | null = null;
   let backendTscOkAt: string | null = null;
+  let consecutiveNoMutationIterations = 0;
+  let lastStagnationGuidanceAt = 0;
+  const repeatedReadOnlyActionCounts = new Map<string, number>();
 
   function nowIso(): string {
     return new Date().toISOString();
@@ -4752,6 +4962,44 @@ async function integrationVerifyAndFix(
     frontendBuildOkAt = null;
     backendTscOkAt = null;
     console.log(`${label}: validation marked stale — ${reason}`);
+  }
+
+  function buildToolFingerprint(
+    name: string,
+    args: Record<string, unknown>,
+    command: string,
+  ): string | null {
+    switch (name) {
+      case "read_file":
+        return `read_file:${String(args.path ?? "").trim()}`;
+      case "list_files":
+        return `list_files:${String(args.dir ?? ".").trim()}`;
+      case "grep":
+        return `grep:${String(args.path ?? ".").trim()}:${String(args.pattern ?? "").trim()}`;
+      case "bash":
+        return `bash:${command.replace(/\s+/g, " ").trim().slice(0, 180)}`;
+      default:
+        return null;
+    }
+  }
+
+  function injectStagnationGuidance(
+    reason: string,
+    repeatedAction: string | null,
+  ): void {
+    messages.push({
+      role: "user",
+      content: [
+        "SYSTEM CORRECTION — IntegrationVerifyFix is stagnating.",
+        `Reason: ${reason}`,
+        repeatedAction ? `Repeated action: ${repeatedAction}` : "",
+        "Stop rereading the same files. Switch to the highest-signal unresolved gate, make a concrete code change, then re-run scoped validation.",
+        "If duplicate implementations exist, choose the canonical path and remove or merge the residual copy.",
+        "If dependency audit issues remain, fix package.json/import mismatches before doing more exploratory reads.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
   }
 
   function markScopedValidationSuccess(kind: ScopedValidationKind): void {
@@ -4934,6 +5182,13 @@ async function integrationVerifyAndFix(
 
     const choice = resp.choices[0];
     totalCostUsd += estimateCost(resp.model, resp.usage);
+    recordSupervisorLlmUsage({
+      sessionId: state.sessionId,
+      stage: "integration_verify_fix",
+      model: resp.model,
+      usage: resp.usage,
+      costUsd: estimateCost(resp.model, resp.usage),
+    });
 
     messages.push({
       role: "assistant",
@@ -4951,6 +5206,8 @@ async function integrationVerifyAndFix(
     }
 
     let doneSignaled = false;
+    let iterationMutated = false;
+    const iterationReadOnlyFingerprints: string[] = [];
     for (const tc of toolCalls) {
       let args: Record<string, unknown> = {};
       try {
@@ -5000,7 +5257,13 @@ async function integrationVerifyAndFix(
           args,
           state.outputDir,
         );
+        const fingerprint = buildToolFingerprint(
+          tc.function.name,
+          args,
+          command,
+        );
         if (tc.function.name === "write_file") {
+          iterationMutated = true;
           markValidationStale(`write_file:${String(args.path ?? "")}`);
         } else if (
           tc.function.name === "bash" &&
@@ -5010,8 +5273,17 @@ async function integrationVerifyAndFix(
           if (validationKind) {
             markScopedValidationSuccess(validationKind);
           } else if (isMutatingSupervisorBashCommand(command)) {
+            iterationMutated = true;
             markValidationStale(`mutating bash:${command.slice(0, 80)}`);
           }
+        }
+        if (
+          !iterationMutated &&
+          fingerprint &&
+          tc.function.name !== "report_done" &&
+          tc.function.name !== "write_file"
+        ) {
+          iterationReadOnlyFingerprints.push(fingerprint);
         }
         console.log(
           `${label}: tool=${tc.function.name} result_preview=${result.slice(0, 100).replace(/\n/g, " ")}`,
@@ -5025,6 +5297,60 @@ async function integrationVerifyAndFix(
       }
     }
 
+    if (iterationMutated) {
+      consecutiveNoMutationIterations = 0;
+      repeatedReadOnlyActionCounts.clear();
+    } else if (!doneSignaled) {
+      consecutiveNoMutationIterations += 1;
+      const uniqueFingerprints: string[] = [
+        ...new Set(iterationReadOnlyFingerprints),
+      ];
+      for (const fingerprint of uniqueFingerprints) {
+        repeatedReadOnlyActionCounts.set(
+          fingerprint,
+          (repeatedReadOnlyActionCounts.get(fingerprint) ?? 0) + 1,
+        );
+      }
+      const mostRepeatedEntry = [...repeatedReadOnlyActionCounts.entries()].sort(
+        (a, b) => b[1] - a[1],
+      )[0];
+      const repeatedAction =
+        mostRepeatedEntry && mostRepeatedEntry[1] >= 4
+          ? `${mostRepeatedEntry[0]} × ${mostRepeatedEntry[1]}`
+          : null;
+      if (
+        (consecutiveNoMutationIterations >= 8 || repeatedAction) &&
+        iterations - lastStagnationGuidanceAt >= 3
+      ) {
+        injectStagnationGuidance(
+          `No filesystem mutation for ${consecutiveNoMutationIterations} iteration(s).`,
+          repeatedAction,
+        );
+        lastStagnationGuidanceAt = iterations;
+        getRepairEmitter(state.sessionId)({
+          stage: "integration-gate",
+          event: "stagnation_warning",
+          details: {
+            iterationsWithoutMutation: consecutiveNoMutationIterations,
+            repeatedAction: repeatedAction ?? "none",
+          },
+        });
+      }
+      if (consecutiveNoMutationIterations >= 18) {
+        finalStatus = "fail";
+        finalSummary = [
+          "IntegrationVerifyFix stalled without making code changes.",
+          `No mutation for ${consecutiveNoMutationIterations} consecutive iteration(s).`,
+          repeatedAction ? `Most repeated action: ${repeatedAction}` : "",
+          "Aborting instead of spending more iterations rereading the same files.",
+        ]
+          .filter(Boolean)
+          .join("\n");
+        console.warn(`${label}: aborting due to stagnation.`);
+        break;
+      }
+    }
+
     if (doneSignaled) break;
   }
 
@@ -5034,6 +5360,9 @@ async function integrationVerifyAndFix(
   }
 
   const finalGateResult = await runFinalScopedValidationGates();
+  const finalDependencyAudit = await auditImportDependencyConsistency(
+    state.outputDir,
+  );
   if (!finalGateResult.pass) {
     finalStatus = "fail";
     finalSummary = [
@@ -5048,9 +5377,41 @@ async function integrationVerifyAndFix(
     finalSummary = [finalSummary, "Final scoped validation gates passed."]
       .filter(Boolean)
       .join("\n\n");
+  }
+
+  if (finalDependencyAudit.remainingIssues.length > 0) {
+    finalStatus = "fail";
+    finalSummary = [
+      finalSummary,
+      "Dependency consistency gate failed:",
+      finalDependencyAudit.summary,
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 4000);
   } else if (finalSummary.startsWith("No report_done received")) {
-    finalStatus = "pass";
-    finalSummary = "Final scoped validation gates passed.";
+    // P0-E: do NOT auto-pass when the integration loop never emitted report_done.
+    // Compile/build passing is not evidence that PRD features are implemented —
+    // let the downstream feature-checklist audit make the final call. Emit a
+    // repair event so the front-end can surface this honestly.
+    finalStatus = "fail";
+    finalSummary = [
+      finalSummary,
+      "Final scoped validation gates passed, but IntegrationVerifyFix never emitted report_done.",
+      "Treating as FAIL so downstream feature audit can arbitrate (compile ≠ feature-complete).",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 4000);
+    getRepairEmitter(state.sessionId)({
+      stage: "integration-gate",
+      event: "missing_report_done",
+      details: {
+        reason:
+          "IntegrationVerifyFix loop exhausted without report_done; compile/build gates alone cannot confirm feature completeness.",
+        iterations,
+      },
+    });
   }
 
   console.log(
@@ -5100,10 +5461,8 @@ export function createSupervisorGraph() {
     .addNode("scaffold_verify", scaffoldVerify)
     .addNode("scaffold_fix", scaffoldFix)
     .addNode("dispatch_gate", dispatchGate)
-    .addNode("refine_task_breakdown", refineTaskBreakdown)
     .addNode("dependency_baseline", dependencyBaseline)
     .addNode("generate_api_contracts", generateApiContracts)
-    .addNode("generate_service_skeletons", generateServiceSkeletons)
     .addNode("be_worker", parallelWorkerNode)
     .addNode("be_phase_verify", (s) =>
       phaseVerifyAndFix(s, { workerHintRoles: ["backend", "test"] }),
@@ -5127,12 +5486,10 @@ export function createSupervisorGraph() {
       scaffold_fix: "scaffold_fix",
     })
     .addEdge("scaffold_fix", "scaffold_verify")
-    .addEdge("dispatch_gate", "refine_task_breakdown")
-    .addEdge("refine_task_breakdown", "dependency_baseline")
+    .addEdge("dispatch_gate", "dependency_baseline")
     .addEdge("dependency_baseline", "generate_api_contracts")
-    .addEdge("generate_api_contracts", "generate_service_skeletons")
     .addConditionalEdges(
-      "generate_service_skeletons",
+      "generate_api_contracts",
       dispatchBackendAndTestWorkers,
     )
     .addEdge("be_worker", "be_phase_verify")

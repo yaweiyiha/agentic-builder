@@ -186,10 +186,17 @@ async function chatCompletionsOpenAICompatible(
     );
   }
 
+  const finishReason = json.choices?.[0]?.finish_reason ?? "stop";
   const content = json.choices?.[0]?.message?.content ?? "";
   const usage = json.usage ?? {};
   const pt = usage.prompt_tokens ?? 0;
   const ct = usage.completion_tokens ?? 0;
+
+  if (finishReason === "length") {
+    throw new Error(
+      `Codegen API model ${json.model ?? model} hit max_tokens limit (output truncated)`,
+    );
+  }
 
   return {
     id: json.id ?? "codegen",
@@ -201,7 +208,7 @@ async function chatCompletionsOpenAICompatible(
           content,
           tool_calls: json.choices?.[0]?.message?.tool_calls,
         },
-        finish_reason: json.choices?.[0]?.finish_reason ?? "stop",
+        finish_reason: finishReason,
       },
     ],
     usage: {
