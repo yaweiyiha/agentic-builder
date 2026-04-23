@@ -20,6 +20,7 @@ import {
 import {
   formatGeneratedCodeDotEnv,
   resolveBlueprintGeneratedDatabaseUrl,
+  upsertDatabaseUrlEnv,
 } from "@/lib/pipeline/generated-code-env";
 import type {
   KickoffWorkItem,
@@ -27,6 +28,10 @@ import type {
   RalphConfig,
 } from "@/lib/pipeline/types";
 import { stripTestingPhaseTasks } from "@/lib/pipeline/strip-testing-tasks";
+import {
+  readDesignReferencesFromOutput,
+  formatDesignReferencesPromptBlock,
+} from "@/lib/pipeline/design-references";
 import { DEFAULT_RALPH_CONFIG } from "@/lib/pipeline/types";
 import {
   buildFrontendDesignContextForCodegen,
@@ -262,6 +267,23 @@ interface SupervisorGateSnapshot {
   integrationErrors: string;
   runtimeVerifyErrors: string;
   e2eVerifyErrors: string;
+  /**
+   * Highest observed `scaffoldFixAttempts` across all phase-verify runs.
+   * Surfaced in the session report so the user can tell whether scaffold
+   * fix phases converged quickly or bumped the iteration ceiling.
+   */
+  scaffoldFixAttempts: number;
+  /** Same for `integrationFixAttempts` from integration verify/fix. */
+  integrationFixAttempts: number;
+  /**
+   * Tracks which gate actually ran — used by the report to render
+   * SKIPPED vs PASS/FAIL instead of treating "no error string" as a pass.
+   */
+  gatesExecuted: {
+    integrationVerify: boolean;
+    runtimeVerify: boolean;
+    e2eVerify: boolean;
+  };
 }
 
 function collectSupervisorGateStateFromChunk(
@@ -273,12 +295,27 @@ function collectSupervisorGateStateFromChunk(
     const rec = payload as Record<string, unknown>;
     if (typeof rec.integrationErrors === "string") {
       snapshot.integrationErrors = rec.integrationErrors;
+      snapshot.gatesExecuted.integrationVerify = true;
     }
     if (typeof rec.runtimeVerifyErrors === "string") {
       snapshot.runtimeVerifyErrors = rec.runtimeVerifyErrors;
+      snapshot.gatesExecuted.runtimeVerify = true;
     }
     if (typeof rec.e2eVerifyErrors === "string") {
       snapshot.e2eVerifyErrors = rec.e2eVerifyErrors;
+      snapshot.gatesExecuted.e2eVerify = true;
+    }
+    if (typeof rec.scaffoldFixAttempts === "number") {
+      snapshot.scaffoldFixAttempts = Math.max(
+        snapshot.scaffoldFixAttempts,
+        rec.scaffoldFixAttempts,
+      );
+    }
+    if (typeof rec.integrationFixAttempts === "number") {
+      snapshot.integrationFixAttempts = Math.max(
+        snapshot.integrationFixAttempts,
+        rec.integrationFixAttempts,
+      );
     }
   }
 }
@@ -445,15 +482,28 @@ export async function POST(request: NextRequest) {
   const resolvedDbUrl = resolveBlueprintGeneratedDatabaseUrl(databaseUrlBody);
   if (resolvedDbUrl) {
     try {
-      await fs.writeFile(
-        path.join(outputRoot, ".env"),
-        formatGeneratedCodeDotEnv(resolvedDbUrl),
-        "utf-8",
-      );
+      await fs.writeFile(path.join(outputRoot, ".env"), formatGeneratedCodeDotEnv(resolvedDbUrl), "utf-8");
       console.log("[CodingAPI] Wrote generated-code .env with DATABASE_URL.");
     } catch (e) {
       console.warn(
         `[CodingAPI] Failed to write .env: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+
+    const backendEnvPath = path.join(outputRoot, "backend", ".env");
+    try {
+      const existingBackendEnv = await fs.readFile(backendEnvPath, "utf-8").catch(
+        () => "",
+      );
+      const mergedBackendEnv = upsertDatabaseUrlEnv(
+        existingBackendEnv,
+        resolvedDbUrl,
+      );
+      await fs.writeFile(backendEnvPath, mergedBackendEnv, "utf-8");
+      console.log("[CodingAPI] Synced backend/.env DATABASE_URL.");
+    } catch (e) {
+      console.warn(
+        `[CodingAPI] Failed to sync backend/.env DATABASE_URL: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }
@@ -570,6 +620,18 @@ export async function POST(request: NextRequest) {
   if (implGuideDoc)
     baseContextParts.push(`## Implementation Guide\n\n${implGuideDoc}`);
 
+  const designReferenceEntries =
+    await readDesignReferencesFromOutput(outputRoot);
+  const designReferencesBlock = formatDesignReferencesPromptBlock(
+    designReferenceEntries,
+  );
+  if (designReferencesBlock) {
+    baseContextParts.push(designReferencesBlock);
+    console.log(
+      `[CodingAPI] Injected ${designReferenceEntries.length} design reference(s) into projectContext.`,
+    );
+  }
+
   const scaffoldContextBlock = [
     "## Scaffold specification",
     "",
@@ -668,6 +730,13 @@ export async function POST(request: NextRequest) {
         integrationErrors: "",
         runtimeVerifyErrors: "",
         e2eVerifyErrors: "",
+        scaffoldFixAttempts: 0,
+        integrationFixAttempts: 0,
+        gatesExecuted: {
+          integrationVerify: false,
+          runtimeVerify: false,
+          e2eVerify: false,
+        },
       };
       let reportTaskResults: AuditTaskSummary[] = [];
       let finalAuditResult: FeatureChecklistAuditResult | null = null;
@@ -884,6 +953,10 @@ export async function POST(request: NextRequest) {
             integrationErrors: collectedGateSnapshot.integrationErrors,
             runtimeVerifyErrors: collectedGateSnapshot.runtimeVerifyErrors,
             e2eVerifyErrors: collectedGateSnapshot.e2eVerifyErrors,
+            scaffoldFixAttempts: collectedGateSnapshot.scaffoldFixAttempts,
+            integrationFixAttempts:
+              collectedGateSnapshot.integrationFixAttempts,
+            gatesExecuted: collectedGateSnapshot.gatesExecuted,
             finalAudit: finalAuditResult,
             taskResults:
               reportTaskResults.length > 0

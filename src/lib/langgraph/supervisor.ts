@@ -24,7 +24,6 @@ import {
   buildVersionConstraints,
 } from "./agent-subgraph";
 import {
-  ensurePrismaDatasourceDatabaseUrl,
   formatGeneratedCodeDotEnv,
   resolveBlueprintGeneratedDatabaseUrl,
 } from "@/lib/pipeline/generated-code-env";
@@ -83,8 +82,7 @@ function getOpenRouterUsageCounts(usage: unknown): {
       }
     | undefined;
   const promptTokens = raw?.prompt_tokens ?? raw?.promptTokens ?? 0;
-  const completionTokens =
-    raw?.completion_tokens ?? raw?.completionTokens ?? 0;
+  const completionTokens = raw?.completion_tokens ?? raw?.completionTokens ?? 0;
   const totalTokens =
     raw?.total_tokens ?? raw?.totalTokens ?? promptTokens + completionTokens;
   return { promptTokens, completionTokens, totalTokens };
@@ -750,9 +748,58 @@ async function findPackageJsonRelativeDirs(
   return [...dirs].sort((a, b) => a.split("/").length - b.split("/").length);
 }
 
+type PackageManager = "pnpm" | "yarn" | "npm";
+
+async function readDeclaredPackageManager(
+  relDir: string,
+  outputDir: string,
+): Promise<PackageManager | null> {
+  const relPkg = relDir === "." ? "package.json" : `${relDir}/package.json`;
+  const raw = await fsRead(relPkg, outputDir);
+  if (raw.startsWith("FILE_NOT_FOUND") || raw.startsWith("REJECTED")) {
+    return null;
+  }
+  try {
+    const pkg = JSON.parse(raw) as { packageManager?: string };
+    const pm = (pkg.packageManager ?? "").toLowerCase();
+    if (pm.startsWith("pnpm@")) return "pnpm";
+    if (pm.startsWith("yarn@")) return "yarn";
+    if (pm.startsWith("npm@")) return "npm";
+  } catch {
+    // ignore malformed package.json
+  }
+  return null;
+}
+
+async function inferRepoPackageManager(
+  outputDir: string,
+): Promise<PackageManager | null> {
+  const dirs = await findPackageJsonRelativeDirs(outputDir);
+  const declared = new Set<PackageManager>();
+  for (const rel of dirs) {
+    const pm = await readDeclaredPackageManager(rel, outputDir);
+    if (pm) declared.add(pm);
+  }
+  return declared.size === 1 ? [...declared][0] : null;
+}
+
+async function resolvePackageManagerForDir(
+  relDir: string,
+  outputDir: string,
+  repoFallback: PackageManager | null,
+): Promise<PackageManager> {
+  const declared = await readDeclaredPackageManager(relDir, outputDir);
+  if (declared) return declared;
+  const cwd = relDir === "." ? outputDir : path.join(outputDir, relDir);
+  const detected = await detectPackageManager(cwd);
+  if (detected !== "npm") return detected;
+  return repoFallback ?? detected;
+}
+
 /** Run install at repo root (workspaces) or at each package root (no workspaces). */
 async function runNpmInstallAllRoots(outputDir: string): Promise<void> {
   const pm = await detectPackageManager(outputDir);
+  const repoFallbackPm = await inferRepoPackageManager(outputDir);
 
   // pnpm workspace: always install from root only
   if (pm === "pnpm") {
@@ -800,10 +847,11 @@ async function runNpmInstallAllRoots(outputDir: string): Promise<void> {
   }
   for (const rel of dirs) {
     const cwd = rel === "." ? outputDir : path.join(outputDir, rel);
+    const relPm = await resolvePackageManagerForDir(rel, outputDir, repoFallbackPm);
     console.log(
-      `[Supervisor] Integration verify: ${pm} install in "${rel === "." ? "." : rel}"`,
+      `[Supervisor] Integration verify: ${relPm} install in "${rel === "." ? "." : rel}"`,
     );
-    const r = await shellExec(buildInstallCommand(pm), cwd, {
+    const r = await shellExec(buildInstallCommand(relPm), cwd, {
       timeout: VERIFY_NPM_INSTALL_TIMEOUT_MS,
     });
     if (r.exitCode !== 0) {
@@ -957,11 +1005,18 @@ function collectDependencySuggestions(
       reason: "Runtime input validation near handlers/services.",
     });
   }
-  if (/prisma/.test(text)) {
-    api.push({ pkg: "@prisma/client", reason: "Prisma ORM runtime client." });
+  // Prisma is intentionally NOT suggested. This generator standardises on
+  // Sequelize for M-tier SQL workloads to avoid Prisma's binary footprint and
+  // migration-runner complexity in generated projects. If "prisma" appears in
+  // the task text (e.g. PRD copy-paste), we redirect to Sequelize instead.
+  if (/prisma|sequelize/.test(text)) {
     api.push({
-      pkg: "prisma",
-      reason: "Prisma CLI for schema management and migrations.",
+      pkg: "sequelize",
+      reason: "SQL ORM for Node.js (Sequelize is the standard for this tier).",
+    });
+    api.push({
+      pkg: "sequelize-cli",
+      reason: "Sequelize migrations / model scaffolding CLI.",
     });
   }
   if (/sqlite|better.sqlite/.test(text)) {
@@ -970,7 +1025,7 @@ function collectDependencySuggestions(
       reason: "SQLite embedded database driver.",
     });
   }
-  if (/postgres|postgresql/.test(text) && !/prisma/.test(text)) {
+  if (/postgres|postgresql/.test(text)) {
     api.push({ pkg: "pg", reason: "PostgreSQL client for Node.js." });
   }
   if (/mongoose|mongodb/.test(text)) {
@@ -1786,8 +1841,7 @@ async function e2eVerifyAndFix(
     const retryResult = await shellExec(plan.command, plan.cwd, {
       timeout: 180_000,
     });
-    const retryOutput =
-      `${retryResult.stdout}${retryResult.stderr}`.trim();
+    const retryOutput = `${retryResult.stdout}${retryResult.stderr}`.trim();
 
     const triage = triageE2eFailures({
       firstRunOutput: output,
@@ -1857,9 +1911,7 @@ async function e2eVerifyAndFix(
       };
     }
 
-    deterministicTestNames = new Set(
-      triage.deterministic.map((r) => r.name),
-    );
+    deterministicTestNames = new Set(triage.deterministic.map((r) => r.name));
     emitter({
       stage: "e2e-triage",
       event: "repair_dispatch",
@@ -1897,8 +1949,9 @@ async function e2eVerifyAndFix(
   // ONLY those, so feeding it extra flaky/infra contexts would invite it
   // to rewrite otherwise-correct code.
   const errorContextContents: string[] = [];
-  const errorContextFiles = (await listFiles("frontend/test-results", state.outputDir))
-    .filter((f) => f.endsWith("error-context.md"));
+  const errorContextFiles = (
+    await listFiles("frontend/test-results", state.outputDir)
+  ).filter((f) => f.endsWith("error-context.md"));
   for (const ecf of errorContextFiles) {
     const md = await fsRead(ecf, state.outputDir);
     if (md.startsWith("FILE_NOT_FOUND") || md.startsWith("REJECTED")) continue;
@@ -1919,20 +1972,37 @@ async function e2eVerifyAndFix(
   for (const tf of testFiles) {
     const c = await fsRead(tf, state.outputDir);
     if (c.startsWith("FILE_NOT_FOUND") || c.startsWith("REJECTED")) continue;
-    const wfrMatches = [...c.matchAll(/waitForResponse\s*\(\s*(?:response\s*=>\s*)?[^)]*?['"](\/[^'"]+)['"]/g)];
+    const wfrMatches = [
+      ...c.matchAll(
+        /waitForResponse\s*\(\s*(?:response\s*=>\s*)?[^)]*?['"](\/[^'"]+)['"]/g,
+      ),
+    ];
     for (const m of wfrMatches) {
-      waitForResponseConstraints.push(`- File ${tf}: waitForResponse expects a real HTTP request to a URL containing "${m[1]}"`);
+      waitForResponseConstraints.push(
+        `- File ${tf}: waitForResponse expects a real HTTP request to a URL containing "${m[1]}"`,
+      );
     }
     // Also catch arrow-function form: response => response.url().includes('/sessions')
-    const includesMatches = [...c.matchAll(/waitForResponse[^)]*?\.url\(\)\.includes\(['"](\/[^'"]+)['"]\)/g)];
+    const includesMatches = [
+      ...c.matchAll(
+        /waitForResponse[^)]*?\.url\(\)\.includes\(['"](\/[^'"]+)['"]\)/g,
+      ),
+    ];
     for (const m of includesMatches) {
       const url = m[1];
       if (!waitForResponseConstraints.some((l) => l.includes(url))) {
-        waitForResponseConstraints.push(`- File ${tf}: waitForResponse expects a real HTTP request to a URL containing "${url}"`);
+        waitForResponseConstraints.push(
+          `- File ${tf}: waitForResponse expects a real HTTP request to a URL containing "${url}"`,
+        );
       }
     }
     // Detect timer-completion tests: expect(modal).toBeVisible({ timeout: N }) after clicking Start
-    if (c.includes("toBeVisible") && c.includes("timeout") && c.includes("Start") && c.includes("modal")) {
+    if (
+      c.includes("toBeVisible") &&
+      c.includes("timeout") &&
+      c.includes("Start") &&
+      c.includes("modal")
+    ) {
       waitForResponseConstraints.push(
         `- File ${tf}: timer completion test — workDuration in defaultSettings MUST be ≤ 0.25 minutes (15 seconds) so the timer completes within the 30-second test timeout`,
       );
@@ -2122,7 +2192,10 @@ function routeAfterIntegrationVerify(state: SupervisorState): string {
  * single run. We use it to match across the two formats.
  */
 function lastTestNameSegment(name: string): string {
-  const parts = name.split(/\s*(?:›|>>)\s*/).map((p) => p.trim()).filter(Boolean);
+  const parts = name
+    .split(/\s*(?:›|>>)\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   const last = parts[parts.length - 1] ?? name;
   return last.replace(/\s+/g, " ").trim();
 }
@@ -2157,11 +2230,7 @@ async function writeTriageReport(
     const filename = `e2e-triage-attempt-${attempt}-${timestamp}.md`;
     await fs.writeFile(path.join(ralphDir, filename), report, "utf-8");
     // Also write/overwrite the "latest" pointer for quick access.
-    await fs.writeFile(
-      path.join(ralphDir, "e2e-triage.md"),
-      report,
-      "utf-8",
-    );
+    await fs.writeFile(path.join(ralphDir, "e2e-triage.md"), report, "utf-8");
   } catch (err) {
     console.warn(
       `[Supervisor] writeTriageReport failed (ignored):`,
@@ -2209,7 +2278,43 @@ Each element has this shape:
   "responseSchema": "string (TypeScript type literal for success response body)",
   "auth": "none|bearer|session",
   "description": "string (one sentence)"
-}`;
+}
+
+## MANDATORY: Nested resource endpoints for parent-child relationships
+
+When the PRD or supplied type/model definitions describe a one-to-many relationship
+between two resources (e.g. a Project "has" Tasks, a User "has" Comments, an Order
+"has" LineItems), you MUST emit BOTH sets of endpoints:
+
+  1. **Flat endpoints** on the child resource:
+       GET    /api/{children}              — list with filters
+       POST   /api/{children}              — create
+       GET    /api/{children}/:id          — get one
+       PATCH  /api/{children}/:id          — update
+       DELETE /api/{children}/:id          — delete
+
+  2. **Scoped-list endpoint** under the parent (THIS IS THE ONE MOST OFTEN MISSED):
+       GET    /api/{parents}/:id/{children}
+       Description: "List all {children} belonging to the {parent} identified by :id."
+       Support the same filtering/sorting/pagination query params the flat list accepts.
+       Example relationships and resulting scoped lists:
+         Project hasMany Tasks         → GET /api/projects/:id/tasks
+         User    hasMany Posts         → GET /api/users/:id/posts
+         Order   hasMany LineItems     → GET /api/orders/:id/line-items
+
+Rules:
+- The scoped-list endpoint is ADDITIONAL, not a replacement for the flat list.
+- Detect relationships from every signal available: PRD wording ("tasks belong to a project",
+  "user's posts"), TypeScript types/interfaces with a foreign-key field (e.g. \`projectId\`),
+  ORM model snippets (\`Project.hasMany(Task)\`, \`Task.belongsTo(Project)\`).
+- If the parent→child relationship exists but you are unsure about exact pluralisation,
+  still emit the endpoint — use the child resource's plural form consistent with its flat
+  endpoint (e.g. if flat is \`/api/tasks\`, scoped is \`/api/projects/:id/tasks\`).
+- Never silently drop a scoped endpoint because a flat one already exists.
+
+A separate post-generation gate will audit ORM models for hasMany/belongsTo relations
+and REJECT the contract if any scoped-list endpoint is missing. Get it right the first
+time to avoid a rework loop.`;
 
 async function generateApiContracts(state: SupervisorState) {
   if (state.backendTasks.length === 0) {
@@ -2243,12 +2348,16 @@ async function generateApiContracts(state: SupervisorState) {
         "service",
       ],
     };
-    const trimmed = pickRelevantSections(state.projectContext, apiContractHint, {
-      budget: 12_000,
-      label: "api-contract-generation",
-      stage: "worker-context",
-      emitter: getRepairEmitter(state.sessionId),
-    });
+    const trimmed = pickRelevantSections(
+      state.projectContext,
+      apiContractHint,
+      {
+        budget: 12_000,
+        label: "api-contract-generation",
+        stage: "worker-context",
+        emitter: getRepairEmitter(state.sessionId),
+      },
+    );
     contextParts.push(`## Project Context (PRD / TRD)\n${trimmed}`);
   }
 
@@ -2369,6 +2478,56 @@ async function generateApiContracts(state: SupervisorState) {
     console.log(
       `[Supervisor] generateApiContracts: generated ${contracts.length} contracts, written to API_CONTRACTS.json (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
     );
+
+    // ── Contract-vs-models completeness audit + auto-append ────────────────
+    // Run immediately after writing so the downstream worker phases generate
+    // against a complete contract instead of silently skipping endpoints the
+    // ORM relationships obviously require. Auto-append is safe-by-default: it
+    // only synthesises entries whose plural segments were already resolved by
+    // the audit, and never overwrites existing contract entries.
+    try {
+      const completeness = await auditContractCompleteness(state.outputDir);
+      if (completeness.missingScopedEndpoints.length > 0) {
+        console.warn(
+          `[Supervisor] generateApiContracts: contract completeness audit found ${completeness.missingScopedEndpoints.length} missing scoped endpoint(s): ${completeness.missingScopedEndpoints
+            .map((m) => m.expectedPath)
+            .join(", ")}`,
+        );
+      }
+      getRepairEmitter(state.sessionId)({
+        stage: "generate_api_contracts",
+        event: "contract_completeness_snapshot",
+        details: {
+          when: "post-generate",
+          inferredRelationshipCount: completeness.inferredRelationships.length,
+          missingScopedEndpoints: completeness.missingScopedEndpoints,
+        },
+      });
+      if (completeness.missingScopedEndpoints.length > 0) {
+        const appendResult = await autoAppendMissingScopedEndpoints(
+          state.outputDir,
+          completeness.missingScopedEndpoints,
+        );
+        if (appendResult.added.length > 0) {
+          console.log(
+            `[Supervisor] generateApiContracts: auto-appended ${appendResult.added.length} scoped endpoint(s) to API_CONTRACTS.json: ${appendResult.added.join(", ")}`,
+          );
+        }
+        getRepairEmitter(state.sessionId)({
+          stage: "generate_api_contracts",
+          event: "contract_completeness_autorepaired",
+          details: {
+            when: "post-generate",
+            added: appendResult.added,
+            skipped: appendResult.skipped,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn(
+        `[Supervisor] generateApiContracts: contract completeness audit skipped — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     return {
       apiContracts: contracts,
@@ -2795,10 +2954,14 @@ Rules:
   ];
 
   try {
-    const response = await chatCompletionWithFallback(messages, extractModelChain, {
-      temperature: 0.1,
-      max_tokens: 4096,
-    });
+    const response = await chatCompletionWithFallback(
+      messages,
+      extractModelChain,
+      {
+        temperature: 0.1,
+        max_tokens: 4096,
+      },
+    );
     const raw = (response.choices[0]?.message?.content ?? "").trim();
     const costUsd = estimateCost(response.model, response.usage);
     recordSupervisorLlmUsage({
@@ -2828,7 +2991,9 @@ Rules:
       parsed = JSON.parse(cleaned);
       if (!Array.isArray(parsed)) parsed = [];
     } catch {
-      console.warn("[Supervisor] extractRealContracts: failed to parse LLM output, falling back to regex.");
+      console.warn(
+        "[Supervisor] extractRealContracts: failed to parse LLM output, falling back to regex.",
+      );
     }
 
     // Regex fallback for any route the LLM missed
@@ -2836,7 +3001,8 @@ Rules:
     for (const file of beFiles.slice(0, 8)) {
       const content = await fsRead(file.path, state.outputDir);
       if (content.startsWith("FILE_NOT_FOUND")) continue;
-      const routePattern = /\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi;
+      const routePattern =
+        /\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi;
       let match;
       while ((match = routePattern.exec(content)) !== null) {
         const method = match[1].toUpperCase();
@@ -2844,7 +3010,12 @@ Rules:
         const alreadyCovered = parsed.some(
           (p) => p.method?.toUpperCase() === method && p.endpoint === endpoint,
         );
-        if (!alreadyCovered && !regexContracts.some((c) => c.method === method && c.endpoint === endpoint)) {
+        if (
+          !alreadyCovered &&
+          !regexContracts.some(
+            (c) => c.method === method && c.endpoint === endpoint,
+          )
+        ) {
           regexContracts.push({
             service: file.path.split("/").slice(-2, -1)[0] ?? "api",
             endpoint,
@@ -2861,13 +3032,19 @@ Rules:
       service: item.service ?? "api",
       endpoint: item.endpoint ?? "/",
       method: (item.method ?? "GET").toUpperCase(),
-      requestFields: item.requestFields !== "none" ? item.requestFields : undefined,
-      responseFields: item.responseFields !== "none" ? item.responseFields : undefined,
+      requestFields:
+        item.requestFields !== "none" ? item.requestFields : undefined,
+      responseFields:
+        item.responseFields !== "none" ? item.responseFields : undefined,
       authType: item.auth ?? "none",
       description: item.description,
       schema: [
-        item.requestFields && item.requestFields !== "none" ? `request: ${item.requestFields}` : "",
-        item.responseFields && item.responseFields !== "none" ? `response: ${item.responseFields}` : "",
+        item.requestFields && item.requestFields !== "none"
+          ? `request: ${item.requestFields}`
+          : "",
+        item.responseFields && item.responseFields !== "none"
+          ? `response: ${item.responseFields}`
+          : "",
       ]
         .filter(Boolean)
         .join(" | "),
@@ -2883,19 +3060,26 @@ Rules:
     return { apiContracts: allContracts, totalCostUsd: costUsd };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`[Supervisor] extractRealContracts: LLM error — ${msg}. Falling back to regex only.`);
+    console.warn(
+      `[Supervisor] extractRealContracts: LLM error — ${msg}. Falling back to regex only.`,
+    );
 
     // Pure regex fallback
     const fallbackContracts: ApiContract[] = [];
     for (const file of beFiles.slice(0, 8)) {
       const content = await fsRead(file.path, state.outputDir);
       if (content.startsWith("FILE_NOT_FOUND")) continue;
-      const routePattern = /\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi;
+      const routePattern =
+        /\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]/gi;
       let match;
       while ((match = routePattern.exec(content)) !== null) {
         const method = match[1].toUpperCase();
         const endpoint = match[2].startsWith("/") ? match[2] : `/${match[2]}`;
-        if (!fallbackContracts.some((c) => c.method === method && c.endpoint === endpoint)) {
+        if (
+          !fallbackContracts.some(
+            (c) => c.method === method && c.endpoint === endpoint,
+          )
+        ) {
           fallbackContracts.push({
             service: file.path.split("/").slice(-2, -1)[0] ?? "api",
             endpoint,
@@ -3190,10 +3374,84 @@ function buildSupervisorSearchMatcher(
   }
 }
 
-type ScopedValidationKind = "frontend_tsc" | "frontend_build" | "backend_tsc";
+type ScopedValidationKind =
+  | "frontend_tsc"
+  | "frontend_build"
+  | "backend_tsc"
+  | "backend_smoke";
 
 function isSuccessfulSupervisorToolResult(result: string): boolean {
   return /^exit_code:\s*0\b/m.test(result);
+}
+
+function stripSupervisorExitCodePrefix(result: string): string {
+  return result.replace(/^exit_code:\s*\d+\s*\n?/m, "").trim();
+}
+
+interface ScopedValidationIssueMetrics {
+  files: number;
+  errors: number;
+}
+
+function extractScopedValidationIssueMetrics(
+  kind: ScopedValidationKind,
+  result: string,
+): ScopedValidationIssueMetrics | null {
+  if (isSuccessfulSupervisorToolResult(result)) {
+    return { files: 0, errors: 0 };
+  }
+  const body = stripSupervisorExitCodePrefix(result);
+  if (!body) return null;
+  if (kind === "backend_smoke") {
+    return { files: 1, errors: 1 };
+  }
+
+  const filePathPattern =
+    /(^|\n)\s*((?:\.{0,2}\/)?(?:[A-Za-z0-9@_\-.]+\/)*[A-Za-z0-9@_\-.]+\.(?:[cm]?[jt]sx?|vue|svelte))(?:[:(]| - )/gm;
+  const files = new Set<string>();
+  let fileMatch: RegExpExecArray | null;
+  while ((fileMatch = filePathPattern.exec(body)) !== null) {
+    files.add(fileMatch[2]);
+  }
+
+  const tsMatches = body.match(/\berror TS\d+:/g);
+  const fileScopedErrors = body.match(/^\S+:\d+:\d+\s+-\s+error\b/gm);
+  const genericErrors = body.match(/^\s*(?:error|Error:)\b/gm);
+  const errors = Math.max(
+    tsMatches?.length ?? 0,
+    fileScopedErrors?.length ?? 0,
+    genericErrors?.length ?? 0,
+    1,
+  );
+
+  return {
+    files: Math.max(files.size, errors > 0 ? 1 : 0),
+    errors,
+  };
+}
+
+function isValidationIssueMetricsImproved(
+  current: ScopedValidationIssueMetrics,
+  previousBest: ScopedValidationIssueMetrics,
+): boolean {
+  return (
+    current.files < previousBest.files ||
+    (current.files === previousBest.files && current.errors < previousBest.errors)
+  );
+}
+
+function countRouteAuditIssues(audit: RouteRegistrationAudit): number {
+  return (
+    audit.unregisteredModules.length +
+    audit.unresolvedRegistrations.length +
+    audit.missingContractEndpoints.length
+  );
+}
+
+function countContractCompletenessIssues(
+  result: ContractCompletenessResult,
+): number {
+  return result.missingScopedEndpoints.length;
 }
 
 function isMutatingSupervisorBashCommand(command: string): boolean {
@@ -3234,6 +3492,14 @@ function detectScopedValidationKind(
   if (touchesBackend && /\b(tsc|npx tsc)\b/.test(normalized)) {
     return "backend_tsc";
   }
+  if (
+    touchesBackend &&
+    (normalized.includes("createapp export missing") ||
+      normalized.includes("backend_smoke_ok") ||
+      normalized.includes("tsx --eval"))
+  ) {
+    return "backend_smoke";
+  }
   return null;
 }
 
@@ -3241,7 +3507,8 @@ function isValidationLikeBashCommand(command: string): boolean {
   const normalized = command.replace(/\s+/g, " ").trim().toLowerCase();
   return (
     /\b(tsc|npx tsc)\b/.test(normalized) ||
-    /\b(pnpm|npm|yarn)\s+(run\s+)?build\b/.test(normalized)
+    /\b(pnpm|npm|yarn)\s+(run\s+)?build\b/.test(normalized) ||
+    normalized.includes("tsx --eval")
   );
 }
 
@@ -3421,6 +3688,204 @@ type PhaseVerifyAndFixOptions = {
 };
 
 /**
+ * Deterministic auto-fix for well-known convention violations.
+ *
+ * Runs before the LLM-driven phase so mechanical fixes don't burn LLM tokens
+ * and don't risk the LLM "creatively" inventing inconsistent fixes.
+ *
+ * Covers:
+ *  1. `@shared/...` import alias → `@project/shared/...` (Vite/tsconfig canonical).
+ *  2. Residual-only canonical/residual pairs (e.g. `backend/src/middlewares/` when
+ *     `backend/src/middleware/` is absent): rename residual → canonical on disk
+ *     and rewrite imports that reference the residual segment.
+ *
+ * When BOTH canonical and residual exist the merge decision is genuinely
+ * ambiguous (file contents may diverge) — we leave that to the LLM and surface
+ * the conflict as an `unfixable` note so the system prompt can call it out.
+ */
+async function autoApplyConventionFixes(outputDir: string): Promise<{
+  fixedFiles: string[];
+  notes: string[];
+  unfixable: string[];
+}> {
+  const fixedFiles = new Set<string>();
+  const notes: string[] = [];
+  const unfixable: string[] = [];
+
+  const allFiles = await listFiles(".", outputDir);
+  const sourceFiles = allFiles.filter(
+    (f) =>
+      /\.(ts|tsx|js|jsx|mts|cts)$/.test(f) &&
+      !f.includes("node_modules") &&
+      !f.startsWith("dist/") &&
+      !f.startsWith(".next/") &&
+      !f.startsWith("build/"),
+  );
+
+  // ── Rule 1: @shared/ import alias rewrite ───────────────────────────────
+  let sharedAliasHits = 0;
+  for (const rel of sourceFiles) {
+    const content = await fsRead(rel, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    if (!/@shared\//.test(content)) continue;
+    const rewritten = content
+      .replace(/(from\s+["'])@shared\//g, "$1@project/shared/")
+      .replace(/(import\s+["'])@shared\//g, "$1@project/shared/")
+      .replace(/(require\(\s*["'])@shared\//g, "$1@project/shared/");
+    if (rewritten !== content) {
+      await fsWrite(rel, rewritten, outputDir);
+      fixedFiles.add(rel);
+      sharedAliasHits += 1;
+    }
+  }
+  if (sharedAliasHits > 0) {
+    notes.push(
+      `Rewrote "@shared/..." → "@project/shared/..." imports in ${sharedAliasHits} file(s).`,
+    );
+  }
+
+  // ── Rule 2: canonical/residual relocation ──────────────────────────────
+  // Each pair: { canonical, residual, importSegmentBefore, importSegmentAfter }
+  // `importSegment*` are substrings we can safely swap inside import specifiers
+  // to keep references consistent after a rename. They are chosen narrow enough
+  // to avoid collateral rewrites.
+  const pairs: Array<{
+    canonical: string;
+    residual: string;
+    kind: "file" | "directory";
+    importSegmentBefore: string;
+    importSegmentAfter: string;
+  }> = [
+    {
+      canonical: "frontend/src/contexts/AuthContext.tsx",
+      residual: "frontend/src/context/AuthContext.tsx",
+      kind: "file",
+      importSegmentBefore: "/context/AuthContext",
+      importSegmentAfter: "/contexts/AuthContext",
+    },
+    {
+      canonical: "backend/src/middleware/",
+      residual: "backend/src/middlewares/",
+      kind: "directory",
+      importSegmentBefore: "/middlewares/",
+      importSegmentAfter: "/middleware/",
+    },
+    {
+      canonical: "backend/src/db.ts",
+      residual: "backend/src/database/connection.ts",
+      kind: "file",
+      importSegmentBefore: "/database/connection",
+      importSegmentAfter: "/db",
+    },
+    {
+      canonical: "backend/src/db.ts",
+      residual: "backend/src/config/database.ts",
+      kind: "file",
+      importSegmentBefore: "/config/database",
+      importSegmentAfter: "/db",
+    },
+    {
+      canonical: "frontend/src/views/NotFoundPage.tsx",
+      residual: "frontend/src/views/NotFound.tsx",
+      kind: "file",
+      importSegmentBefore: "/views/NotFound",
+      importSegmentAfter: "/views/NotFoundPage",
+    },
+  ];
+
+  for (const pair of pairs) {
+    const canonicalAbs = path.join(outputDir, pair.canonical);
+    const residualAbs = path.join(outputDir, pair.residual);
+    const canonicalExists = await pathExistsUnderOutput(
+      outputDir,
+      pair.canonical,
+    );
+    const residualExists = await pathExistsUnderOutput(
+      outputDir,
+      pair.residual,
+    );
+
+    if (!residualExists) continue;
+
+    if (canonicalExists) {
+      unfixable.push(
+        `Both "${pair.canonical}" and "${pair.residual}" exist — cannot auto-merge safely. Keep the canonical and delete or merge the residual.`,
+      );
+      continue;
+    }
+
+    // Only residual exists → relocate to canonical path + rewrite imports.
+    try {
+      await fs.mkdir(path.dirname(canonicalAbs), { recursive: true });
+      await fs.rename(residualAbs, canonicalAbs);
+      notes.push(
+        `Renamed residual ${pair.kind} "${pair.residual}" → canonical "${pair.canonical}".`,
+      );
+
+      // Rewrite imports that reference the residual segment.
+      let rewriteHits = 0;
+      for (const rel of sourceFiles) {
+        // The moved file itself may now live at the canonical path — still
+        // re-read by the original rel is fine (it has been moved, read will
+        // return FILE_NOT_FOUND).
+        const content = await fsRead(rel, outputDir);
+        if (
+          content.startsWith("FILE_NOT_FOUND") ||
+          content.startsWith("REJECTED")
+        ) {
+          continue;
+        }
+        if (!content.includes(pair.importSegmentBefore)) continue;
+
+        // Guard: only rewrite occurrences inside import/require string
+        // specifiers; a bare substring in a comment could also match but that
+        // is low risk and such rewrites are harmless.
+        const importSpecifierRe = new RegExp(
+          `((?:from|import|require\\(\\s*)\\s*["'][^"']*?)${escapeRegExp(
+            pair.importSegmentBefore,
+          )}`,
+          "g",
+        );
+        const rewritten = content.replace(
+          importSpecifierRe,
+          (_m, prefix) => `${prefix}${pair.importSegmentAfter}`,
+        );
+        if (rewritten !== content) {
+          await fsWrite(rel, rewritten, outputDir);
+          fixedFiles.add(rel);
+          rewriteHits += 1;
+        }
+      }
+      if (rewriteHits > 0) {
+        notes.push(
+          `  ↳ rewrote import paths in ${rewriteHits} file(s) to track the rename.`,
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      unfixable.push(
+        `Failed to rename "${pair.residual}" → "${pair.canonical}": ${msg}. LLM must relocate manually.`,
+      );
+    }
+  }
+
+  return {
+    fixedFiles: [...fixedFiles],
+    notes,
+    unfixable,
+  };
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Merged phase verify + fix as a single agentic loop.
  *
  * The LLM is given bash, read_file, write_file, list_files, and grep tools.
@@ -3513,6 +3978,49 @@ async function phaseVerifyAndFix(
   }
 
   const autoFixNotes: string[] = [];
+
+  // ── Deterministic convention auto-fix (runs before ESLint / ts-fix) ─────
+  // Mechanical fixes the LLM doesn't need to burn tokens on: @shared/ alias
+  // rewrite and residual-only canonical/residual relocations. Unfixable
+  // conflicts (both paths exist) are surfaced into the prompt below.
+  try {
+    const conv = await autoApplyConventionFixes(state.outputDir);
+    if (conv.fixedFiles.length > 0) {
+      console.log(
+        `${label}: pre-LLM convention auto-fix touched ${conv.fixedFiles.length} file(s).`,
+      );
+      for (const note of conv.notes) {
+        autoFixNotes.push(`convention: ${note}`);
+      }
+    }
+    for (const line of conv.unfixable) {
+      autoFixNotes.push(`convention (unfixable): ${line}`);
+    }
+    getRepairEmitter(state.sessionId)({
+      stage: "preflight-convention-fix",
+      event: "convention_autofix_applied",
+      details: {
+        phase: isBackendPhase
+          ? "backend"
+          : isFrontendPhase
+            ? "frontend"
+            : "root",
+        fixedFileCount: conv.fixedFiles.length,
+        fixedFiles: conv.fixedFiles.slice(0, 20),
+        notes: conv.notes,
+        unfixable: conv.unfixable,
+      },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    autoFixNotes.push(`convention auto-fix skipped due to error: ${msg}`);
+    getRepairEmitter(state.sessionId)({
+      stage: "preflight-convention-fix",
+      event: "convention_autofix_error",
+      details: { message: msg },
+    });
+  }
+
   let autoFixAllPassed = tsFixPlans.length > 0;
   for (const plan of tsFixPlans) {
     const autoFixCommand =
@@ -3558,10 +4066,9 @@ async function phaseVerifyAndFix(
     "",
     "## Workflow (follow in order)",
     `1. Run: \`${installCmd}\`  — install all dependencies`,
-    "2. Check if @prisma/client is used:",
-    "   - If prisma/schema.prisma exists → run `npx prisma generate`",
-    '   - Match Prisma major version: Prisma 5/6 expects `url = env("DATABASE_URL")` in datasource; Prisma 7+ may omit url — follow package.json.',
-    "     If @prisma/client cannot be resolved, ensure it is in package.json and re-run install.",
+    "2. ORM handling:",
+    "   - This generator standardises on Sequelize for SQL persistence. Do NOT introduce Prisma (`@prisma/client`, `prisma` CLI, or `prisma/schema.prisma`). If prior runs left Prisma artefacts behind, delete them and rewrite the persistence layer with Sequelize models in `backend/src/models/` and migrations in `backend/src/database/migrations/`.",
+    "   - If a legacy `prisma/schema.prisma` still exists from an older run, `npx prisma generate` may run automatically as a compatibility fallback — but the correct fix is to remove the Prisma schema and replace it with equivalent Sequelize definitions, not to keep it.",
     "3. Run: `npx tsc --noEmit --skipLibCheck --pretty false 2>&1`",
     "4. For each TypeScript error:",
     "   a. Read the file with the error",
@@ -4191,25 +4698,20 @@ async function collectMissingImportPackagesForPrefix(
 
 const VERIFY_IMPORT_INSTALL_TIMEOUT_MS = 120_000;
 
-/** Read the "name" field from a nested package's package.json (for pnpm --filter). */
-async function readWorkspacePackageName(
-  rel: string,
-  outputDir: string,
-): Promise<string | null> {
-  try {
-    const raw = await fsRead(`${rel}/package.json`, outputDir);
-    if (raw.startsWith("FILE_NOT_FOUND")) return null;
-    const pkg = JSON.parse(raw) as { name?: string };
-    return pkg.name ?? null;
-  } catch {
-    return null;
-  }
+interface ImportGapInstallRecord {
+  scope: string;
+  packages: string[];
+  exitCode: number;
 }
 
-async function installImportGapsAllProjects(outputDir: string): Promise<void> {
+async function installImportGapsAllProjects(
+  outputDir: string,
+): Promise<ImportGapInstallRecord[]> {
   await runNpmInstallAllRoots(outputDir);
 
+  const records: ImportGapInstallRecord[] = [];
   const pm = await detectPackageManager(outputDir);
+  const repoFallbackPm = await inferRepoPackageManager(outputDir);
   const dirs = await findPackageJsonRelativeDirs(outputDir);
   const nested = dirs.filter((d) => d !== ".");
 
@@ -4227,6 +4729,11 @@ async function installImportGapsAllProjects(outputDir: string): Promise<void> {
         `[Supervisor] Integration verify: root import-based add exit ${r.exitCode}: ${(r.stderr || r.stdout).slice(0, 300)}`,
       );
     }
+    records.push({
+      scope: "root",
+      packages: rootMissing,
+      exitCode: r.exitCode,
+    });
   }
 
   for (const rel of nested) {
@@ -4237,17 +4744,17 @@ async function installImportGapsAllProjects(outputDir: string): Promise<void> {
     );
 
     let r;
-    if (pm === "pnpm") {
+    const relPm = await resolvePackageManagerForDir(rel, outputDir, repoFallbackPm);
+    if (relPm === "pnpm") {
       // For pnpm workspaces, add packages via --filter from root
-      const pkgName = await readWorkspacePackageName(rel, outputDir);
-      const filter = pkgName ?? path.basename(rel);
-      const cmd = buildAddCommand("pnpm", missing, { filter });
-      r = await shellExec(cmd, outputDir, {
+      const cwd = path.join(outputDir, rel);
+      const cmd = buildAddCommand("pnpm", missing);
+      r = await shellExec(cmd, cwd, {
         timeout: VERIFY_IMPORT_INSTALL_TIMEOUT_MS,
       });
     } else {
       const cwd = path.join(outputDir, rel);
-      const cmd = buildAddCommand(pm, missing);
+      const cmd = buildAddCommand(relPm, missing);
       r = await shellExec(cmd, cwd, {
         timeout: VERIFY_IMPORT_INSTALL_TIMEOUT_MS,
       });
@@ -4258,7 +4765,9 @@ async function installImportGapsAllProjects(outputDir: string): Promise<void> {
         `[Supervisor] Integration verify: "${rel}" add exit ${r.exitCode}: ${(r.stderr || r.stdout).slice(0, 300)}`,
       );
     }
+    records.push({ scope: rel, packages: missing, exitCode: r.exitCode });
   }
+  return records;
 }
 
 interface DependencyConsistencyAudit {
@@ -4293,7 +4802,10 @@ async function auditImportDependencyConsistency(
     remainingIssues: issues,
     summary:
       issues.length > 0
-        ? ["Dependency consistency audit still has unresolved items:", ...issues]
+        ? [
+            "Dependency consistency audit still has unresolved items:",
+            ...issues,
+          ]
             .join("\n")
             .slice(0, 4000)
         : "Dependency consistency audit: clean.",
@@ -4330,14 +4842,24 @@ async function detectResidualImplementationConflicts(
       residual: "backend/src/database/connection.ts",
     },
     {
+      canonical: "backend/src/db.ts",
+      residual: "backend/src/config/database.ts",
+    },
+    {
       canonical: "frontend/src/views/NotFoundPage.tsx",
       residual: "frontend/src/views/NotFound.tsx",
     },
   ];
 
   for (const pair of candidatePairs) {
-    const canonicalExists = await pathExistsUnderOutput(outputDir, pair.canonical);
-    const residualExists = await pathExistsUnderOutput(outputDir, pair.residual);
+    const canonicalExists = await pathExistsUnderOutput(
+      outputDir,
+      pair.canonical,
+    );
+    const residualExists = await pathExistsUnderOutput(
+      outputDir,
+      pair.residual,
+    );
     if (canonicalExists && residualExists) {
       conflicts.push(
         `Both "${pair.canonical}" and "${pair.residual}" exist. Keep one canonical implementation and remove or merge the residual copy.`,
@@ -4348,6 +4870,1008 @@ async function detectResidualImplementationConflicts(
   return conflicts;
 }
 
+interface FrontendNormalizationResult {
+  changedFiles: string[];
+  notes: string[];
+}
+
+interface FrontendConvergenceCluster {
+  key: string;
+  title: string;
+  description: string;
+  files: string[];
+}
+
+async function normalizeFrontendHookSignatures(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+  const sourceRoots = ["frontend/src", "apps/web/src"];
+
+  for (const root of sourceRoots) {
+    let files: string[] = [];
+    try {
+      files = (await listFiles(root, outputDir)).filter((file) =>
+        /\.(ts|tsx)$/.test(file),
+      );
+    } catch {
+      continue;
+    }
+
+    for (const relPath of files) {
+      const content = await fsRead(relPath, outputDir);
+      if (
+        content.startsWith("FILE_NOT_FOUND") ||
+        content.startsWith("REJECTED")
+      ) {
+        continue;
+      }
+
+      let updated = content;
+      updated = updated.replace(
+        /useEffect\(\(\):\s*void\s*=>/g,
+        "useEffect(() =>",
+      );
+      updated = updated.replace(
+        /useLayoutEffect\(\(\):\s*void\s*=>/g,
+        "useLayoutEffect(() =>",
+      );
+
+      if (updated !== content) {
+        await fsWrite(relPath, updated, outputDir);
+        changedFiles.push(relPath);
+      }
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Frontend hook signature normalizer updated ${changedFiles.length} file(s): ${changedFiles.slice(0, 8).join(", ")}${changedFiles.length > 8 ? " ..." : ""}`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+async function normalizeFrontendJsxElementAnnotations(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+  const sourceRoots = ["frontend/src", "apps/web/src"];
+
+  for (const root of sourceRoots) {
+    let files: string[] = [];
+    try {
+      files = (await listFiles(root, outputDir)).filter((file) =>
+        /\.(ts|tsx)$/.test(file),
+      );
+    } catch {
+      continue;
+    }
+
+    for (const relPath of files) {
+      const content = await fsRead(relPath, outputDir);
+      if (
+        content.startsWith("FILE_NOT_FOUND") ||
+        content.startsWith("REJECTED")
+      ) {
+        continue;
+      }
+
+      const updated = content.replace(
+        /(?<!React\.)\bJSX\.Element\b/g,
+        "React.JSX.Element",
+      );
+
+      if (updated !== content) {
+        await fsWrite(relPath, updated, outputDir);
+        changedFiles.push(relPath);
+      }
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Frontend JSX return-type normalizer updated ${changedFiles.length} file(s): ${changedFiles.slice(0, 8).join(", ")}${changedFiles.length > 8 ? " ..." : ""}`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+async function normalizeFrontendReactComponentTemplates(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+  const sourceRoots = ["frontend/src", "apps/web/src"];
+
+  for (const root of sourceRoots) {
+    let files: string[] = [];
+    try {
+      files = (await listFiles(root, outputDir)).filter((file) =>
+        /\.tsx$/.test(file),
+      );
+    } catch {
+      continue;
+    }
+
+    for (const relPath of files) {
+      const content = await fsRead(relPath, outputDir);
+      if (
+        content.startsWith("FILE_NOT_FOUND") ||
+        content.startsWith("REJECTED")
+      ) {
+        continue;
+      }
+
+      let updated = content;
+      updated = updated.replace(/\)\s*:\s*React\.JSX\.Element\s*\{/g, ") {");
+      updated = updated.replace(/\)\s*:\s*JSX\.Element\s*\{/g, ") {");
+      updated = updated.replace(
+        /\)\s*:\s*React\.JSX\.Element\s*=>/g,
+        ") =>",
+      );
+      updated = updated.replace(/\)\s*:\s*JSX\.Element\s*=>/g, ") =>");
+
+      if (!updated.includes("React.")) {
+        updated = updated.replace(
+          /^import React,\s*\{([^}]*)\}\s*from\s*["']react["'];?\n?/m,
+          (_match, imports: string) =>
+            imports.trim().length > 0
+              ? `import {${imports}} from "react";\n`
+              : "",
+        );
+        updated = updated.replace(
+          /^import React from ["']react["'];?\n?/m,
+          "",
+        );
+      }
+
+      if (updated !== content) {
+        await fsWrite(relPath, updated, outputDir);
+        changedFiles.push(relPath);
+      }
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Frontend React component-template normalizer updated ${changedFiles.length} file(s): ${changedFiles.slice(0, 8).join(", ")}${changedFiles.length > 8 ? " ..." : ""}`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+async function normalizeFrontendAuthDtoAliases(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+  const candidatePaths = ["frontend/src/types/api.ts", "apps/web/src/types/api.ts"];
+
+  for (const relPath of candidatePaths) {
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+
+    if (
+      !content.includes("export type MeResponseDto = User;") &&
+      !content.includes("export type UpdateMeResponseDto = User;")
+    ) {
+      continue;
+    }
+
+    let updated = content;
+    const authUserDtoBlock = `export type AuthUserDto = Pick<User, "id" | "name" | "email" | "avatar" | "timezone"> &\n  Partial<Pick<User, "notificationPreferences" | "createdAt" | "updatedAt">>;\n\n`;
+    if (!updated.includes("export type AuthUserDto =")) {
+      if (updated.includes("export interface AuthResponseDto {")) {
+        updated = updated.replace(
+          "export interface AuthResponseDto {\n",
+          `${authUserDtoBlock}export interface AuthResponseDto {\n`,
+        );
+      } else {
+        updated = `${authUserDtoBlock}${updated}`;
+      }
+    }
+    updated = updated.replace(
+      /user:\s*Pick<User,\s*"id"\s*\|\s*"name"\s*\|\s*"email"\s*\|\s*"avatar"\s*\|\s*"timezone">;/g,
+      "user: AuthUserDto;",
+    );
+    updated = updated.replace(
+      "export type MeResponseDto = User;",
+      "export type MeResponseDto = AuthUserDto;",
+    );
+    updated = updated.replace(
+      "export type UpdateMeResponseDto = User;",
+      "export type UpdateMeResponseDto = AuthUserDto;",
+    );
+
+    if (updated !== content) {
+      await fsWrite(relPath, updated, outputDir);
+      changedFiles.push(relPath);
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Frontend auth DTO normalizer updated ${changedFiles.length} file(s): ${changedFiles.join(", ")}`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+async function normalizeFrontendUseFormHook(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+  const candidatePaths = [
+    "frontend/src/hooks/useForm.ts",
+    "apps/web/src/hooks/useForm.ts",
+  ];
+
+  for (const relPath of candidatePaths) {
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+
+    let updated = content;
+    updated = updated.replace(
+      "type FormValues = Record<string, string>;",
+      "type FormValues = Record<string, unknown>;",
+    );
+    updated = updated.replace(
+      "const maybeError: string | undefined = validator(values[key], values);",
+      'const maybeError: string | undefined = validator(String(values[key] ?? ""), values);',
+    );
+    updated = updated.replace(
+      "const message: string | undefined = validator(values[field], values);",
+      'const message: string | undefined = validator(String(values[field] ?? ""), values);',
+    );
+
+    if (updated !== content) {
+      await fsWrite(relPath, updated, outputDir);
+      changedFiles.push(relPath);
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Frontend form-hook normalizer updated ${changedFiles.length} file(s): ${changedFiles.join(", ")}`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+/**
+ * Frontend duplicate-apiClient convergence.
+ *
+ * The scaffold ships exactly one canonical client at
+ * `frontend/src/api/client.ts`. LLM-generated code repeatedly creates a
+ * second one at `frontend/src/utils/apiClient.ts` (or `utils/api.ts` /
+ * `lib/http.ts`), then half the feature files import from each — driving
+ * the "frontend shared API surface mismatch" cluster that stalls
+ * `integration_verify_fix` for many iterations.
+ *
+ * This normalizer:
+ *   1. Detects parallel client files in known anti-pattern locations.
+ *   2. Rewrites imports of those parallel clients to point at the
+ *      canonical `@/api/client` (or relative equivalent).
+ *   3. Deletes the parallel client file once no consumer references it.
+ */
+async function normalizeFrontendDuplicateApiClient(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+
+  const canonicalCandidates = [
+    "frontend/src/api/client.ts",
+    "apps/web/src/api/client.ts",
+  ];
+  let canonicalRoot: string | null = null;
+  for (const candidate of canonicalCandidates) {
+    const content = await fsRead(candidate, outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED") &&
+      /export\s+(?:const|function)\s+apiClient\b/.test(content)
+    ) {
+      canonicalRoot = candidate.startsWith("apps/web/")
+        ? "apps/web/src"
+        : "frontend/src";
+      break;
+    }
+  }
+  if (!canonicalRoot) {
+    return { changedFiles, notes };
+  }
+
+  const parallelRelPaths = [
+    `${canonicalRoot}/utils/apiClient.ts`,
+    `${canonicalRoot}/utils/api.ts`,
+    `${canonicalRoot}/utils/http.ts`,
+    `${canonicalRoot}/lib/http.ts`,
+    `${canonicalRoot}/lib/apiClient.ts`,
+    `${canonicalRoot}/services/http.ts`,
+    `${canonicalRoot}/services/apiClient.ts`,
+  ];
+  const parallels: string[] = [];
+  for (const relPath of parallelRelPaths) {
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    if (/export\s+(?:const|class|function|default)\s+\w*[Aa]pi\w*/.test(content)) {
+      parallels.push(relPath);
+    }
+  }
+  if (parallels.length === 0) {
+    return { changedFiles, notes };
+  }
+
+  // Rewrite imports across the entire frontend tree.
+  const sourceFiles = (await listFiles(canonicalRoot, outputDir)).filter(
+    (file) => /\.(ts|tsx)$/.test(file),
+  );
+
+  const importRewrites: Array<{ from: RegExp; to: string }> = [
+    // Examples we want to neutralise:
+    //   import { apiClient } from "../utils/apiClient";
+    //   import { ApiClient } from "@/utils/apiClient";
+    //   import apiClient from "../../utils/apiClient";
+    {
+      from: /from\s+["'](?:\.{1,2}\/)+utils\/apiClient["']/g,
+      to: 'from "../api/client"',
+    },
+    {
+      from: /from\s+["'](?:\.{1,2}\/)+utils\/api["']/g,
+      to: 'from "../api/client"',
+    },
+    {
+      from: /from\s+["']@\/utils\/apiClient["']/g,
+      to: 'from "@/api/client"',
+    },
+    {
+      from: /from\s+["']@\/utils\/api["']/g,
+      to: 'from "@/api/client"',
+    },
+    {
+      from: /from\s+["'](?:\.{1,2}\/)+lib\/http["']/g,
+      to: 'from "../api/client"',
+    },
+    {
+      from: /from\s+["']@\/lib\/http["']/g,
+      to: 'from "@/api/client"',
+    },
+    {
+      from: /from\s+["'](?:\.{1,2}\/)+services\/http["']/g,
+      to: 'from "../api/client"',
+    },
+  ];
+
+  for (const relPath of sourceFiles) {
+    if (parallels.includes(relPath)) continue;
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    let updated = content;
+    for (const rule of importRewrites) {
+      updated = updated.replace(rule.from, rule.to);
+    }
+    if (updated !== content) {
+      await fsWrite(relPath, updated, outputDir);
+      changedFiles.push(relPath);
+    }
+  }
+
+  // Replace each parallel client with a thin re-export so any stale import
+  // we did not rewrite still resolves to the canonical instance instead of
+  // diverging behaviour.
+  for (const parallel of parallels) {
+    const reexport = `// Auto-converged by AgenticBuilder preflight normalizer.\n// This file used to define a parallel HTTP client. The canonical client\n// lives at \`frontend/src/api/client.ts\` (re-exported via \`@/api/client\`).\nexport * from "../api/client";\n`;
+    await fsWrite(parallel, reexport, outputDir);
+    changedFiles.push(parallel);
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Frontend duplicate-apiClient normalizer collapsed ${parallels.length} parallel client(s) and rewrote ${changedFiles.length - parallels.length} consumer import(s).`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+interface BackendMiddlewareFolderResult {
+  /** Source files moved from `middleware/` to `middlewares/`. */
+  movedFiles: string[];
+  /** Source files dropped (because the canonical version already existed). */
+  droppedFiles: string[];
+  /** Files whose imports were rewritten. */
+  rewrittenImports: string[];
+  notes: string[];
+}
+
+/**
+ * Backend middleware-folder normalizer.
+ *
+ * Koa convention in the M-tier scaffold is `backend/src/middlewares` (plural).
+ * Workers occasionally emit `backend/src/middleware/*.ts` (singular) which
+ * leaves the project with two parallel directories — half the imports point
+ * to the canonical folder and half to the singular one, producing dozens of
+ * `Cannot find module` errors that the LLM then tries (and usually fails) to
+ * untangle by hand. This normalizer:
+ *
+ *   1. Moves every `backend/src/middleware/*.ts` file into
+ *      `backend/src/middlewares/` (preferring the canonical version when both
+ *      exist).
+ *   2. Rewrites every import of `.../middleware/<name>` (relative or alias)
+ *      across the backend source tree to `.../middlewares/<name>`.
+ *   3. Removes the now-empty singular folder so the audit cannot regress.
+ */
+async function normalizeBackendMiddlewareFolder(
+  outputDir: string,
+): Promise<BackendMiddlewareFolderResult> {
+  const result: BackendMiddlewareFolderResult = {
+    movedFiles: [],
+    droppedFiles: [],
+    rewrittenImports: [],
+    notes: [],
+  };
+
+  const singularRoot = "backend/src/middleware";
+  const pluralRoot = "backend/src/middlewares";
+
+  const singularDirAbs = path.join(outputDir, singularRoot);
+  let singularEntries: string[] = [];
+  try {
+    const stat = await fs.stat(singularDirAbs);
+    if (!stat.isDirectory()) return result;
+    singularEntries = (
+      await fs.readdir(singularDirAbs, { withFileTypes: true })
+    )
+      .filter((entry) => entry.isFile() && /\.(ts|tsx)$/.test(entry.name))
+      .map((entry) => entry.name);
+  } catch {
+    return result;
+  }
+
+  if (singularEntries.length === 0) {
+    try {
+      await fs.rmdir(singularDirAbs);
+    } catch {
+      // ignore — directory may not be empty for unrelated reasons.
+    }
+    return result;
+  }
+
+  await fs.mkdir(path.join(outputDir, pluralRoot), { recursive: true });
+
+  for (const fileName of singularEntries) {
+    const singularRel = `${singularRoot}/${fileName}`;
+    const pluralRel = `${pluralRoot}/${fileName}`;
+    const singularContent = await fsRead(singularRel, outputDir);
+    if (
+      singularContent.startsWith("FILE_NOT_FOUND") ||
+      singularContent.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+
+    const existingPlural = await fsRead(pluralRel, outputDir);
+    const pluralExists =
+      !existingPlural.startsWith("FILE_NOT_FOUND") &&
+      !existingPlural.startsWith("REJECTED");
+
+    if (pluralExists) {
+      result.droppedFiles.push(singularRel);
+    } else {
+      await fsWrite(pluralRel, singularContent, outputDir);
+      result.movedFiles.push(singularRel);
+    }
+
+    try {
+      await fs.unlink(path.join(outputDir, singularRel));
+    } catch {
+      // best-effort delete; downstream import rewrite still helps
+    }
+  }
+
+  // Rewrite imports across the backend source tree.
+  const backendFiles = (await listFiles("backend/src", outputDir)).filter(
+    (file) => /\.(ts|tsx)$/.test(file),
+  );
+  const rewriteRules: Array<{ from: RegExp; to: string }> = [
+    {
+      from: /(from\s+["'])((?:\.{1,2}\/)+)middleware\//g,
+      to: "$1$2middlewares/",
+    },
+    {
+      from: /(from\s+["'])@\/middleware\//g,
+      to: "$1@/middlewares/",
+    },
+    {
+      from: /(import\s*\(\s*["'])((?:\.{1,2}\/)+)middleware\//g,
+      to: "$1$2middlewares/",
+    },
+    {
+      from: /(import\s*\(\s*["'])@\/middleware\//g,
+      to: "$1@/middlewares/",
+    },
+  ];
+
+  for (const relPath of backendFiles) {
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    let updated = content;
+    for (const rule of rewriteRules) {
+      updated = updated.replace(rule.from, rule.to);
+    }
+    if (updated !== content) {
+      await fsWrite(relPath, updated, outputDir);
+      result.rewrittenImports.push(relPath);
+    }
+  }
+
+  // Try to remove the now-empty singular dir so subsequent audits do not
+  // re-flag a residual empty folder.
+  try {
+    const remaining = await fs.readdir(singularDirAbs);
+    if (remaining.length === 0) {
+      await fs.rmdir(singularDirAbs);
+    }
+  } catch {
+    // ignore
+  }
+
+  if (
+    result.movedFiles.length > 0 ||
+    result.droppedFiles.length > 0 ||
+    result.rewrittenImports.length > 0
+  ) {
+    result.notes.push(
+      `Backend middleware-folder normalizer moved ${result.movedFiles.length} file(s), dropped ${result.droppedFiles.length} duplicate(s), and rewrote imports in ${result.rewrittenImports.length} file(s).`,
+    );
+  }
+
+  return result;
+}
+
+interface FrontendApiClientUniquenessResult {
+  /** Canonical client path detected (or null when scaffold is missing). */
+  canonical: string | null;
+  /** Parallel apiClient files that survived the preflight normalizer. */
+  parallelClients: string[];
+  /** Human-readable findings for the LLM prompt / repair log. */
+  findings: string[];
+}
+
+/**
+ * Hard-fail audit: there must be exactly ONE HTTP client in the frontend
+ * after preflight runs. The preflight normalizer collapses duplicates by
+ * rewriting the parallel file to a re-export — this audit treats anything
+ * that *defines* a new fetch wrapper, axios instance, or class with the
+ * `Api` substring under `utils/`, `lib/`, or `services/` as a regression.
+ *
+ * Wired as a hard-fail at the final integration gate so coding sessions
+ * cannot ship two clients silently again.
+ */
+async function auditFrontendApiClientUniqueness(
+  outputDir: string,
+): Promise<FrontendApiClientUniquenessResult> {
+  const empty: FrontendApiClientUniquenessResult = {
+    canonical: null,
+    parallelClients: [],
+    findings: [],
+  };
+
+  const canonicalCandidates = [
+    "frontend/src/api/client.ts",
+    "apps/web/src/api/client.ts",
+  ];
+  let canonical: string | null = null;
+  for (const candidate of canonicalCandidates) {
+    const content = await fsRead(candidate, outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED") &&
+      /export\s+(?:const|function)\s+apiClient\b/.test(content)
+    ) {
+      canonical = candidate;
+      break;
+    }
+  }
+  if (!canonical) return empty;
+
+  const root = canonical.startsWith("apps/web/")
+    ? "apps/web/src"
+    : "frontend/src";
+  const suspectPaths = [
+    `${root}/utils/apiClient.ts`,
+    `${root}/utils/api.ts`,
+    `${root}/utils/http.ts`,
+    `${root}/lib/http.ts`,
+    `${root}/lib/apiClient.ts`,
+    `${root}/services/http.ts`,
+    `${root}/services/apiClient.ts`,
+  ];
+
+  const parallelClients: string[] = [];
+  for (const rel of suspectPaths) {
+    const content = await fsRead(rel, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    // After preflight, the parallel file should be a thin re-export. Anything
+    // that still declares its own `apiClient`/`ApiClient` class/const, or
+    // creates an axios/fetch instance, is a real divergence.
+    const reexportOnly =
+      /export\s+\*\s+from\s+["']\.\.\/api\/client["']/.test(content) &&
+      !/export\s+(?:const|class|function|default)\s+\w*[Aa]pi\w*/.test(
+        content.replace(
+          /export\s+\*\s+from\s+["']\.\.\/api\/client["'];?\s*\n?/g,
+          "",
+        ),
+      );
+    if (reexportOnly) continue;
+    if (
+      /export\s+(?:const|class|function|default)\s+\w*[Aa]pi\w*/.test(content) ||
+      /axios\.create\s*\(/.test(content) ||
+      /class\s+\w*[Aa]pi\w*Client\b/.test(content)
+    ) {
+      parallelClients.push(rel);
+    }
+  }
+
+  const findings: string[] = [];
+  if (parallelClients.length > 0) {
+    findings.push(
+      "## Frontend API client uniqueness violation",
+      `Canonical client: ${canonical}`,
+      "Parallel HTTP client(s) still defining their own \`apiClient\` / \`axios.create\` / \`ApiClient\` class:",
+      ...parallelClients.map((p) => `- ${p}`),
+      "Resolution: delete or convert these files to \`export * from \"../api/client\"\` and update every consumer to import from the canonical path.",
+    );
+  }
+
+  return {
+    canonical,
+    parallelClients,
+    findings,
+  };
+}
+
+/**
+ * Backend GET-with-validateBody normalizer.
+ *
+ * `validateBody` is a body-validation middleware; LLMs sometimes attach it
+ * to `apiRouter.get(...)` calls, which produces both a TypeScript noise
+ * (the controller signature is wrong) and a runtime semantics bug (a
+ * GET handler should not validate a JSON body). We strip the
+ * `validateBody(...)` argument so the route at least compiles and the
+ * route audit can re-evaluate; the LLM is still expected to pick a real
+ * handler name afterwards.
+ */
+async function normalizeBackendGetValidateBody(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+  const routesRoot = "backend/src/api/modules";
+  let files: string[];
+  try {
+    files = (await listFiles(routesRoot, outputDir)).filter((file) =>
+      file.endsWith(".routes.ts"),
+    );
+  } catch {
+    return { changedFiles, notes };
+  }
+
+  // Match `apiRouter.get( "<path>" , validateBody(<args>), <rest...> )` over
+  // multiple lines and remove the validateBody segment. Also catch sub-router
+  // form `router.get(...)` for completeness.
+  const getCallRe =
+    /\b((?:api)?[Rr]outer)\.get\s*\(\s*((?:[^()"'`]|"[^"]*"|'[^']*'|`[^`]*`|\([^()]*\))+)\)/g;
+  const validateBodyArgRe = /\bvalidateBody\s*\([^()]*\)\s*,\s*/g;
+
+  for (const rel of files) {
+    const content = await fsRead(rel, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    let mutated = false;
+    const updated = content.replace(getCallRe, (match, prefix, args) => {
+      if (!/\bvalidateBody\s*\(/.test(args)) return match;
+      const cleanedArgs = String(args).replace(validateBodyArgRe, "");
+      mutated = true;
+      return `${prefix}.get(${cleanedArgs})`;
+    });
+    if (mutated && updated !== content) {
+      await fsWrite(rel, updated, outputDir);
+      changedFiles.push(rel);
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Backend GET-route normalizer stripped \`validateBody(...)\` from ${changedFiles.length} file(s): ${changedFiles.slice(0, 6).join(", ")}${changedFiles.length > 6 ? " ..." : ""}`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+/**
+ * `Error(message, e)` → `Error(message, { cause: e })` rewrite.
+ *
+ * The two-arg `Error(message, cause)` signature is invalid TypeScript and
+ * fires `TS2554`/`TS2345` across multiple frontend files in every recent
+ * generation. The fix is mechanical: detect `throw new Error(<msg>, <ident>)`
+ * patterns where the second arg is a plain identifier (typical catch-binding)
+ * and convert it to the `{ cause: ident }` options form.
+ */
+async function normalizeFrontendErrorWithCause(
+  outputDir: string,
+): Promise<FrontendNormalizationResult> {
+  const changedFiles: string[] = [];
+  const notes: string[] = [];
+  const sourceRoots = ["frontend/src", "apps/web/src"];
+
+  const pattern =
+    /throw\s+new\s+Error\s*\(\s*([^,()]+?)\s*,\s*([A-Za-z_$][\w$]*)\s*\)/g;
+
+  for (const root of sourceRoots) {
+    let files: string[] = [];
+    try {
+      files = (await listFiles(root, outputDir)).filter((file) =>
+        /\.(ts|tsx)$/.test(file),
+      );
+    } catch {
+      continue;
+    }
+    for (const rel of files) {
+      const content = await fsRead(rel, outputDir);
+      if (
+        content.startsWith("FILE_NOT_FOUND") ||
+        content.startsWith("REJECTED")
+      ) {
+        continue;
+      }
+      const updated = content.replace(
+        pattern,
+        (_m, msg: string, ident: string) =>
+          `throw new Error(${msg.trim()}, { cause: ${ident} })`,
+      );
+      if (updated !== content) {
+        await fsWrite(rel, updated, outputDir);
+        changedFiles.push(rel);
+      }
+    }
+  }
+
+  if (changedFiles.length > 0) {
+    notes.push(
+      `Frontend Error(cause) normalizer rewrote ${changedFiles.length} file(s): ${changedFiles.slice(0, 8).join(", ")}${changedFiles.length > 8 ? " ..." : ""}`,
+    );
+  }
+
+  return { changedFiles, notes };
+}
+
+async function detectFrontendConvergenceClusters(
+  outputDir: string,
+): Promise<FrontendConvergenceCluster[]> {
+  const clusters: FrontendConvergenceCluster[] = [];
+  const sourceRoots = ["frontend/src", "apps/web/src"];
+  const frontendFiles = (
+    await Promise.all(
+      sourceRoots.map(async (root) => {
+        try {
+          return await listFiles(root, outputDir);
+        } catch {
+          return [];
+        }
+      }),
+    )
+  ).flat();
+
+  const hookSignatureFiles: string[] = [];
+  for (const relPath of frontendFiles.filter((file) =>
+    /\.(ts|tsx)$/.test(file),
+  )) {
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    if (
+      content.includes("useEffect((): void =>") ||
+      content.includes("useLayoutEffect((): void =>")
+    ) {
+      hookSignatureFiles.push(relPath);
+    }
+  }
+  if (hookSignatureFiles.length > 0) {
+    clusters.push({
+      key: "hook_signature",
+      title: "React hook callback signature mismatch",
+      description:
+        "Some React hook callbacks are annotated with explicit `: void` return types even though they return cleanup functions. Normalize the hook callback signature before fixing per-file logic.",
+      files: hookSignatureFiles.slice(0, 12),
+    });
+  }
+
+  const jsxAnnotationFiles: string[] = [];
+  for (const relPath of frontendFiles.filter((file) => /\.(ts|tsx)$/.test(file))) {
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    if (/(?<!React\.)\bJSX\.Element\b/.test(content)) {
+      jsxAnnotationFiles.push(relPath);
+    }
+  }
+  if (jsxAnnotationFiles.length > 0) {
+    clusters.push({
+      key: "jsx_namespace_annotation",
+      title: "React JSX namespace annotation mismatch",
+      description:
+        "Generated frontend files still use bare `JSX.Element` return types. Normalize this shared pattern across the cluster by preferring inferred return types or rewriting to `React.JSX.Element` consistently.",
+      files: jsxAnnotationFiles.slice(0, 12),
+    });
+  }
+
+  const reactTemplateResidualFiles: string[] = [];
+  for (const relPath of frontendFiles.filter((file) => /\.tsx$/.test(file))) {
+    const content = await fsRead(relPath, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    if (
+      /^import React from ["']react["'];?$/m.test(content) ||
+      /^import React,\s*\{[^}]+\}\s*from ["']react["'];?$/m.test(content) ||
+      /\)\s*:\s*React\.JSX\.Element\s*(\{|=>)/.test(content)
+    ) {
+      reactTemplateResidualFiles.push(relPath);
+    }
+  }
+  if (reactTemplateResidualFiles.length > 0) {
+    clusters.push({
+      key: "react_component_template_residuals",
+      title: "React component template residuals",
+      description:
+        "Some frontend files still carry template-style explicit component return types or default `React` imports that are no longer needed under the current JSX runtime. Normalize the shared template first, then fix any remaining leaf-file typing issues.",
+      files: reactTemplateResidualFiles.slice(0, 12),
+    });
+  }
+
+  const useFormCandidates = await Promise.all(
+    ["frontend/src/hooks/useForm.ts", "apps/web/src/hooks/useForm.ts"].map(
+      async (filePath) => ({
+        filePath,
+        content: await fsRead(filePath, outputDir),
+      }),
+    ),
+  );
+  const useFormCandidate = useFormCandidates.find(
+    (entry) =>
+      !entry.content.startsWith("FILE_NOT_FOUND") &&
+      !entry.content.startsWith("REJECTED"),
+  );
+  if (
+    useFormCandidate &&
+    useFormCandidate.content.includes(
+      "type FormValues = Record<string, string>;",
+    )
+  ) {
+    const formConsumerFiles: string[] = [];
+    for (const relPath of frontendFiles.filter((file) =>
+      /\.(ts|tsx)$/.test(file),
+    )) {
+      const content = await fsRead(relPath, outputDir);
+      if (
+        content.startsWith("FILE_NOT_FOUND") ||
+        content.startsWith("REJECTED")
+      ) {
+        continue;
+      }
+      if (/useForm<\w+>/.test(content)) {
+        formConsumerFiles.push(relPath);
+      }
+    }
+    clusters.push({
+      key: "form_hook_compatibility",
+      title: "Form hook generic incompatibility",
+      description:
+        "The shared `useForm` hook is narrower than the generated page form interfaces. Repair the hook abstraction first so page-level form interfaces no longer need index signatures.",
+      files: [useFormCandidate.filePath, ...formConsumerFiles.slice(0, 8)],
+    });
+  }
+
+  const modelsPath = useFormCandidate?.filePath.startsWith("apps/web/")
+    ? "apps/web/src/types/models.ts"
+    : "frontend/src/types/models.ts";
+  const projectMembersPath = useFormCandidate?.filePath.startsWith("apps/web/")
+    ? "apps/web/src/components/Projects/ProjectMembersList.tsx"
+    : "frontend/src/components/Projects/ProjectMembersList.tsx";
+  const apiTypesPath = useFormCandidate?.filePath.startsWith("apps/web/")
+    ? "apps/web/src/types/api.ts"
+    : "frontend/src/types/api.ts";
+  const modelsContent = await fsRead(modelsPath, outputDir);
+  const projectMembersContent = await fsRead(projectMembersPath, outputDir);
+  const apiTypesContent = await fsRead(apiTypesPath, outputDir);
+  if (
+    !apiTypesContent.startsWith("FILE_NOT_FOUND") &&
+    (/export type MeResponseDto = User;/.test(apiTypesContent) ||
+      /export type UpdateMeResponseDto = User;/.test(apiTypesContent))
+  ) {
+    clusters.push({
+      key: "auth_dto_alias_leakage",
+      title: "Auth DTO aliases leak model-only fields",
+      description:
+        "Frontend auth/session DTOs are aliased directly to `User`, which leaks persistence-model unions into UI and auth flows. Replace those aliases with a dedicated auth DTO shape and update all consuming types consistently.",
+      files: [apiTypesPath, modelsPath],
+    });
+  }
+  if (
+    !modelsContent.startsWith("FILE_NOT_FOUND") &&
+    !projectMembersContent.startsWith("FILE_NOT_FOUND") &&
+    modelsContent.includes("user?: ProjectMemberUserRef;") &&
+    /\.user\./.test(projectMembersContent)
+  ) {
+    clusters.push({
+      key: "dto_ui_consistency",
+      title: "DTO / UI optionality mismatch",
+      description:
+        "Frontend DTOs mark project member `user` as optional, but the consuming UI dereferences it as required. Decide whether the DTO should be required or the UI must guard against missing relations, then fix the cluster consistently.",
+      files: [modelsPath, apiTypesPath, projectMembersPath],
+    });
+  }
+
+  return clusters;
+}
+
 async function syncDeps(_state: SupervisorState) {
   console.log(
     "[Supervisor] sync_deps: skipping installs (npm install runs in integration verify).",
@@ -4356,6 +5880,16 @@ async function syncDeps(_state: SupervisorState) {
 }
 
 const MAX_INTEGRATION_VERIFY_FIX_ITERATIONS = 150;
+// Tightened thresholds: previous 8/18 burned ~100k tokens on read-only loops
+// before the abort fired. 3 iterations without mutation is enough to know the
+// LLM is reading in circles; 10 iterations is the hard stop.
+const BASE_INTEGRATION_STAGNATION_WARNING_ITERATIONS = 3;
+const BASE_INTEGRATION_STAGNATION_ABORT_ITERATIONS = 10;
+const MAX_INTEGRATION_PROGRESS_SCORE = 6;
+const INTEGRATION_STAGNATION_ABORT_BONUS_PER_PROGRESS = 2;
+const INTEGRATION_STAGNATION_WARNING_BONUS_PER_PROGRESS = 1;
+/** After N total stagnation warnings without progress, inject an escalated prompt. */
+const STAGNATION_ESCALATION_WARNING_COUNT = 2;
 
 // ─── DB dependency detection (Fix 3) ─────────────────────────────────────────
 
@@ -4481,15 +6015,6 @@ async function handlePrismaSetup(
   if (schemaRaw.charCodeAt(0) === 0xfeff) {
     schemaRaw = schemaRaw.slice(1);
     await fsWrite("prisma/schema.prisma", schemaRaw, outputDir);
-  }
-
-  const normalizedSchema = ensurePrismaDatasourceDatabaseUrl(schemaRaw);
-  if (normalizedSchema !== schemaRaw) {
-    schemaRaw = normalizedSchema;
-    await fsWrite("prisma/schema.prisma", schemaRaw, outputDir);
-    console.log(
-      '[Supervisor] DB check: ensured datasource url = env("DATABASE_URL") in schema.prisma',
-    );
   }
 
   console.log("[Supervisor] DB check: running npx prisma generate...");
@@ -4679,6 +6204,631 @@ async function normalizeWorkspaceImports(outputDir: string): Promise<void> {
   }
 }
 
+interface RouteRegistrationAudit {
+  /** Human-readable lines suitable for feeding into the system prompt. */
+  findings: string[];
+  /** Modules that have a `*.routes.ts` file but are never wired into index.ts. */
+  unregisteredModules: string[];
+  /** register*Routes imports in index.ts that don't resolve to a real module. */
+  unresolvedRegistrations: string[];
+  /** Endpoints declared in API_CONTRACTS.json but no matching route implementation found. */
+  missingContractEndpoints: Array<{ method: string; endpoint: string }>;
+  /**
+   * Endpoints implemented in routes.ts but not present in API_CONTRACTS.json.
+   * Warning only — not a hard failure (internal endpoints may legitimately
+   * live outside the public contract).
+   */
+  undeclaredEndpoints: Array<{ method: string; endpoint: string }>;
+}
+
+/**
+ * Audits backend API route wiring against three sources of truth:
+ *   1. Filesystem: what route files actually exist under backend/src/api/modules.
+ *   2. Router entry: what register*Routes functions index.ts imports AND calls.
+ *   3. Contract: API_CONTRACTS.json endpoints (method + path).
+ *
+ * Inconsistencies between these three are the #1 cause of "generated project
+ * starts but returns 404 on the paths the PRD promised". This audit is
+ * deliberately regex-based (not AST): the patterns below match the scaffold
+ * template conventions and fail loud when they don't — the LLM then has to
+ * close the gaps before integrationVerifyAndFix can pass.
+ *
+ * Returns an empty result (no findings) if the project has no backend or no
+ * api/modules tree, so frontend-only projects are a no-op.
+ */
+async function auditApiRouteRegistration(
+  outputDir: string,
+): Promise<RouteRegistrationAudit> {
+  const empty: RouteRegistrationAudit = {
+    findings: [],
+    unregisteredModules: [],
+    unresolvedRegistrations: [],
+    missingContractEndpoints: [],
+    undeclaredEndpoints: [],
+  };
+
+  const hasBackend = await pathExistsUnderOutput(
+    outputDir,
+    "backend/package.json",
+  );
+  if (!hasBackend) return empty;
+
+  const apiModulesDir = "backend/src/api/modules";
+  if (!(await pathExistsUnderOutput(outputDir, apiModulesDir))) return empty;
+
+  const moduleFiles = (await listFiles(apiModulesDir, outputDir)).filter((f) =>
+    f.endsWith(".routes.ts"),
+  );
+
+  // Implemented modules: map export name → { file, endpoints: [{method, path}] }
+  interface ModuleImpl {
+    file: string;
+    exportName: string | null;
+    mountPrefix: string | null;
+    endpoints: Array<{ method: string; endpoint: string }>;
+  }
+  const implemented: ModuleImpl[] = [];
+
+  const exportNameRe =
+    /export\s+(?:async\s+)?function\s+(register[A-Z]\w*Routes)\s*\(/;
+  // Match common Koa router variable names: `router`, `apiRouter`,
+  // `<feature>Router`, plus inline `new Router().<verb>()`. Generators
+  // alternate between mounting a sub-router (`router.get(...)` then
+  // `apiRouter.use("/foo", router.routes())`) and binding directly on
+  // the parent (`apiRouter.get("/foo", ...)`); both must be picked up.
+  const routerVerbRe =
+    /\b(?:router|apiRouter|[A-Za-z_$][\w$]*Router)\.(get|post|put|patch|delete|all|options|head)\s*\(\s*["'`]([^"'`]+)["'`]/g;
+  const inlineNewRouterRe =
+    /new\s+Router\s*\([^)]*\)\.(get|post|put|patch|delete|all|options|head)\s*\(\s*["'`]([^"'`]+)["'`]/g;
+  const mountPrefixRe =
+    /apiRouter\.use\s*\(\s*["'`]([^"'`]+)["'`]\s*,\s*(?:router|[A-Za-z_$][\w$]*Router)\.routes/;
+
+  for (const rel of moduleFiles) {
+    const content = await fsRead(rel, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    const exportMatch = content.match(exportNameRe);
+    const mountMatch = content.match(mountPrefixRe);
+    const endpoints: Array<{ method: string; endpoint: string }> = [];
+    const seen = new Set<string>();
+    const pushEndpoint = (method: string, endpoint: string): void => {
+      const key = `${method.toUpperCase()} ${endpoint}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      endpoints.push({ method: method.toUpperCase(), endpoint });
+    };
+    let vm: RegExpExecArray | null;
+    routerVerbRe.lastIndex = 0;
+    while ((vm = routerVerbRe.exec(content)) !== null) {
+      pushEndpoint(vm[1], vm[2]);
+    }
+    inlineNewRouterRe.lastIndex = 0;
+    while ((vm = inlineNewRouterRe.exec(content)) !== null) {
+      pushEndpoint(vm[1], vm[2]);
+    }
+    // If the file binds directly on `apiRouter` (no sub-router .use),
+    // do not prepend a mountPrefix later — endpoints already carry full
+    // paths relative to apiPrefix. Detect this by: any `apiRouter.<verb>`
+    // call exists.
+    const bindsDirectlyOnApiRouter =
+      /\bapiRouter\.(get|post|put|patch|delete|all|options|head)\s*\(/.test(
+        content,
+      );
+    implemented.push({
+      file: rel,
+      exportName: exportMatch ? exportMatch[1] : null,
+      mountPrefix: bindsDirectlyOnApiRouter ? null : mountMatch ? mountMatch[1] : null,
+      endpoints,
+    });
+  }
+
+  // Parse index.ts: which register*Routes are imported AND called.
+  const indexPath = `${apiModulesDir}/index.ts`;
+  const indexContent = await fsRead(indexPath, outputDir);
+  const indexExists =
+    !indexContent.startsWith("FILE_NOT_FOUND") &&
+    !indexContent.startsWith("REJECTED");
+
+  const registeredNames = new Set<string>();
+  const importedNames = new Set<string>();
+  const apiPrefixMatch = indexContent.match(
+    /new\s+Router\s*\(\s*\{[^}]*\bprefix\s*:\s*["'`]([^"'`]+)["'`]/,
+  );
+  const apiPrefix = apiPrefixMatch ? apiPrefixMatch[1] : "/api";
+
+  if (indexExists) {
+    const importLineRe =
+      /import\s*\{([^}]*)\}\s*from\s*["'][^"']*\/([\w-]+)\/\2\.routes["']/g;
+    let im: RegExpExecArray | null;
+    while ((im = importLineRe.exec(indexContent)) !== null) {
+      for (const n of im[1].split(",")) {
+        const name = n
+          .trim()
+          .split(/\s+as\s+/)[0]
+          .trim();
+        if (name) importedNames.add(name);
+      }
+    }
+    // Also accept flat-form imports like `from "./health/health.routes"`.
+    const flatImportRe =
+      /import\s*\{([^}]*)\}\s*from\s*["'][^"']*\.routes["']/g;
+    let fm: RegExpExecArray | null;
+    while ((fm = flatImportRe.exec(indexContent)) !== null) {
+      for (const n of fm[1].split(",")) {
+        const name = n
+          .trim()
+          .split(/\s+as\s+/)[0]
+          .trim();
+        if (name) importedNames.add(name);
+      }
+    }
+    // Called registrations: `registerFooRoutes(apiRouter)`
+    const callRe = /(register[A-Z]\w*Routes)\s*\(/g;
+    let cm: RegExpExecArray | null;
+    while ((cm = callRe.exec(indexContent)) !== null) {
+      registeredNames.add(cm[1]);
+    }
+  }
+
+  // Find modules with an exportName present but not called in index.ts.
+  const unregisteredModules: string[] = [];
+  for (const mod of implemented) {
+    if (!mod.exportName) continue;
+    if (!registeredNames.has(mod.exportName)) {
+      unregisteredModules.push(
+        `${mod.file}: exports "${mod.exportName}" but index.ts never calls it.`,
+      );
+    }
+  }
+
+  // Imports referencing a register*Routes that doesn't exist in any routes.ts.
+  const knownExports = new Set(
+    implemented.map((m) => m.exportName).filter((n): n is string => !!n),
+  );
+  const unresolvedRegistrations: string[] = [];
+  for (const name of importedNames) {
+    if (!knownExports.has(name)) {
+      unresolvedRegistrations.push(
+        `index.ts imports "${name}" but no routes.ts defines that export.`,
+      );
+    }
+  }
+
+  // Compare against API_CONTRACTS.json.
+  const missingContractEndpoints: Array<{ method: string; endpoint: string }> =
+    [];
+  const undeclaredEndpoints: Array<{ method: string; endpoint: string }> = [];
+
+  const contractRaw = await fsRead("API_CONTRACTS.json", outputDir);
+  const hasContract =
+    !contractRaw.startsWith("FILE_NOT_FOUND") &&
+    !contractRaw.startsWith("REJECTED");
+
+  if (hasContract) {
+    let contracts: Array<{ method?: string; endpoint?: string }> = [];
+    try {
+      const parsed = JSON.parse(contractRaw);
+      if (Array.isArray(parsed)) {
+        contracts = parsed as Array<{ method?: string; endpoint?: string }>;
+      }
+    } catch {
+      // Ignore malformed contracts — earlier phases should have rejected them.
+    }
+
+    // Normalise implemented endpoints: method + full path = apiPrefix + mount + route.
+    const implementedPaths = new Set<string>();
+    for (const mod of implemented) {
+      for (const ep of mod.endpoints) {
+        const fullPath = joinApiPath(
+          apiPrefix,
+          mod.mountPrefix ?? "",
+          ep.endpoint,
+        );
+        implementedPaths.add(`${ep.method} ${fullPath}`);
+      }
+    }
+
+    const contractKeys = new Set<string>();
+    for (const c of contracts) {
+      if (!c.method || !c.endpoint) continue;
+      const key = `${c.method.toUpperCase()} ${normaliseApiPath(c.endpoint)}`;
+      contractKeys.add(key);
+      if (!routeMatches(key, implementedPaths)) {
+        missingContractEndpoints.push({
+          method: c.method.toUpperCase(),
+          endpoint: c.endpoint,
+        });
+      }
+    }
+
+    for (const key of implementedPaths) {
+      if (!routeMatches(key, contractKeys)) {
+        const [method, endpoint] = key.split(" ");
+        undeclaredEndpoints.push({ method, endpoint });
+      }
+    }
+  }
+
+  const findings: string[] = [];
+  if (unregisteredModules.length > 0) {
+    findings.push("## Unregistered backend modules");
+    findings.push(...unregisteredModules.map((l) => `- ${l}`));
+  }
+  if (unresolvedRegistrations.length > 0) {
+    findings.push("## Dangling register*Routes imports in index.ts");
+    findings.push(...unresolvedRegistrations.map((l) => `- ${l}`));
+  }
+  if (missingContractEndpoints.length > 0) {
+    findings.push("## API_CONTRACTS endpoints with no matching implementation");
+    findings.push(
+      ...missingContractEndpoints.map((e) => `- ${e.method} ${e.endpoint}`),
+    );
+  }
+  if (undeclaredEndpoints.length > 0) {
+    findings.push(
+      "## Implemented endpoints not declared in API_CONTRACTS (verify intent)",
+    );
+    findings.push(
+      ...undeclaredEndpoints.map((e) => `- ${e.method} ${e.endpoint}`),
+    );
+  }
+
+  return {
+    findings,
+    unregisteredModules,
+    unresolvedRegistrations,
+    missingContractEndpoints,
+    undeclaredEndpoints,
+  };
+}
+
+function normaliseApiPath(p: string): string {
+  const withLeading = p.startsWith("/") ? p : `/${p}`;
+  return withLeading.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+}
+
+function joinApiPath(prefix: string, mount: string, route: string): string {
+  const parts = [prefix, mount, route]
+    .filter((s) => s && s.length > 0)
+    .map((s) => (s.startsWith("/") ? s : `/${s}`))
+    .join("");
+  return normaliseApiPath(parts);
+}
+
+/**
+ * Match a route key ("METHOD /api/foo/:id") against a set, treating path
+ * parameters (`:id`, `:userId`) as wildcards so that `/api/users/:id` in the
+ * contract matches `/api/users/:userId` in code (and vice versa).
+ */
+function routeMatches(key: string, candidates: Set<string>): boolean {
+  if (candidates.has(key)) return true;
+  const [method, path] = key.split(" ", 2);
+  if (!path) return false;
+  const pattern = new RegExp(
+    "^" + path.replace(/:\w+/g, ":[A-Za-z0-9_]+") + "$",
+  );
+  for (const candidate of candidates) {
+    const [cMethod, cPath] = candidate.split(" ", 2);
+    if (cMethod !== method || !cPath) continue;
+    if (pattern.test(cPath)) return true;
+    const reverse = new RegExp(
+      "^" + cPath.replace(/:\w+/g, ":[A-Za-z0-9_]+") + "$",
+    );
+    if (reverse.test(path)) return true;
+  }
+  return false;
+}
+
+interface ContractCompletenessResult {
+  /** Unique parent→child relationships extracted from Sequelize models. */
+  inferredRelationships: Array<{
+    parent: string;
+    child: string;
+    file: string;
+  }>;
+  /**
+   * Relationships where the scoped-list endpoint (GET /api/parents/:id/children)
+   * is absent from API_CONTRACTS.json. The #1 reason generated apps ship without
+   * project-detail pages, user-post pages, etc.
+   */
+  missingScopedEndpoints: Array<{
+    parent: string;
+    child: string;
+    expectedPath: string;
+    reason: string;
+  }>;
+  /**
+   * Human-readable findings lines ready to paste into an LLM system prompt or
+   * repair-log payload.
+   */
+  findings: string[];
+}
+
+/**
+ * Audits the API contract against Sequelize models to catch "the contract
+ * omits scoped endpoints the data model obviously requires" — e.g. Project
+ * hasMany Task but no `GET /api/projects/:id/tasks` in API_CONTRACTS.json.
+ *
+ * auditApiRouteRegistration only checks consistency between the contract and
+ * the implementation. When the contract itself under-specifies the domain,
+ * both ends look "consistent" and the bug ships. This audit derives the
+ * expected endpoint set from a stronger source of truth (the ORM models)
+ * and surfaces the delta.
+ *
+ * Regex-based on purpose — AST adds a Sequelize-typed dependency surface and
+ * the scaffold conventions are narrow enough that regex is precise.
+ */
+async function auditContractCompleteness(
+  outputDir: string,
+): Promise<ContractCompletenessResult> {
+  const empty: ContractCompletenessResult = {
+    inferredRelationships: [],
+    missingScopedEndpoints: [],
+    findings: [],
+  };
+
+  if (!(await pathExistsUnderOutput(outputDir, "backend/package.json"))) {
+    return empty;
+  }
+  const modelsDir = "backend/src/models";
+  if (!(await pathExistsUnderOutput(outputDir, modelsDir))) return empty;
+
+  const modelFiles = (await listFiles(modelsDir, outputDir)).filter(
+    (f) => /\.(ts|js)$/.test(f) && !f.includes("node_modules"),
+  );
+
+  // ── 1. Extract Sequelize hasMany / belongsTo relationships ───────────────
+  // hasMany: `Parent.hasMany(Child[, opts])` — parent "1" → child "many"
+  // belongsTo: `Child.belongsTo(Parent[, opts])` — same relationship, other side
+  const hasManyRe = /([A-Z][A-Za-z0-9_]*)\s*\.\s*hasMany\s*\(\s*([A-Z][A-Za-z0-9_]*)/g;
+  const belongsToRe =
+    /([A-Z][A-Za-z0-9_]*)\s*\.\s*belongsTo\s*\(\s*([A-Z][A-Za-z0-9_]*)/g;
+
+  const unique = new Map<
+    string,
+    { parent: string; child: string; file: string }
+  >();
+  for (const rel of modelFiles) {
+    const content = await fsRead(rel, outputDir);
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
+      continue;
+    }
+    let m: RegExpExecArray | null;
+    hasManyRe.lastIndex = 0;
+    while ((m = hasManyRe.exec(content)) !== null) {
+      const key = `${m[1]}->${m[2]}`;
+      if (!unique.has(key)) {
+        unique.set(key, { parent: m[1], child: m[2], file: rel });
+      }
+    }
+    belongsToRe.lastIndex = 0;
+    while ((m = belongsToRe.exec(content)) !== null) {
+      // m[1] = child, m[2] = parent
+      const key = `${m[2]}->${m[1]}`;
+      if (!unique.has(key)) {
+        unique.set(key, { parent: m[2], child: m[1], file: rel });
+      }
+    }
+  }
+
+  const relationships = [...unique.values()];
+  if (relationships.length === 0) {
+    return { ...empty, inferredRelationships: [] };
+  }
+
+  // ── 2. Load API_CONTRACTS.json ──────────────────────────────────────────
+  const contractRaw = await fsRead("API_CONTRACTS.json", outputDir);
+  if (
+    contractRaw.startsWith("FILE_NOT_FOUND") ||
+    contractRaw.startsWith("REJECTED")
+  ) {
+    return { ...empty, inferredRelationships: relationships };
+  }
+
+  let contracts: Array<{ method?: string; endpoint?: string }> = [];
+  try {
+    const parsed = JSON.parse(contractRaw);
+    if (Array.isArray(parsed)) {
+      contracts = parsed as Array<{ method?: string; endpoint?: string }>;
+    }
+  } catch {
+    return { ...empty, inferredRelationships: relationships };
+  }
+
+  const declaredSet = new Set<string>();
+  for (const c of contracts) {
+    if (typeof c.method !== "string" || typeof c.endpoint !== "string") {
+      continue;
+    }
+    declaredSet.add(`${c.method.toUpperCase()} ${normaliseApiPath(c.endpoint)}`);
+  }
+
+  /**
+   * Find the plural path segment the contract uses for a model, by looking at
+   * its flat list endpoint. If the contract declares `GET /api/tasks`, the
+   * child plural for model "Task" is "tasks". Falls back to lowercased name + "s"
+   * only when no flat endpoint exists at all (so we still give LLM a hint).
+   */
+  const flatSegmentFor = (modelName: string): string | null => {
+    const modelLower = modelName.toLowerCase();
+    for (const c of contracts) {
+      if (c.method?.toUpperCase() !== "GET") continue;
+      if (!c.endpoint) continue;
+      const ep = normaliseApiPath(c.endpoint);
+      const match = ep.match(/^\/api\/([^/]+)$/);
+      if (!match) continue;
+      const segment = match[1].toLowerCase();
+      // Accept segment if it starts with the model's lowercase name (projects,
+      // tasks, users, etc.) — tolerant of pluralisation variance.
+      if (
+        segment === modelLower ||
+        segment === `${modelLower}s` ||
+        segment === `${modelLower}es` ||
+        segment === modelLower.replace(/y$/, "ies") ||
+        segment.startsWith(modelLower)
+      ) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  // ── 3. For each relationship, check scoped endpoint is declared ─────────
+  const missing: ContractCompletenessResult["missingScopedEndpoints"] = [];
+
+  for (const rel of relationships) {
+    const parentSegment = flatSegmentFor(rel.parent);
+    const childSegment = flatSegmentFor(rel.child);
+
+    if (!parentSegment || !childSegment) {
+      missing.push({
+        parent: rel.parent,
+        child: rel.child,
+        expectedPath:
+          parentSegment && childSegment
+            ? `GET /api/${parentSegment}/:id/${childSegment}`
+            : `GET /api/{${rel.parent.toLowerCase()}s}/:id/{${rel.child.toLowerCase()}s}`,
+        reason: `Model relationship ${rel.parent}.hasMany(${rel.child}) found in ${rel.file}, but ${!parentSegment ? "parent" : "child"} has no flat /api list endpoint to derive the plural segment from — add the flat endpoint first, then the scoped one.`,
+      });
+      continue;
+    }
+
+    const expectedPattern = new RegExp(
+      `^/api/${parentSegment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/:\\w+/${childSegment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+    );
+    const hasScoped = [...declaredSet].some((key) => {
+      if (!key.startsWith("GET ")) return false;
+      return expectedPattern.test(key.slice(4));
+    });
+
+    if (!hasScoped) {
+      missing.push({
+        parent: rel.parent,
+        child: rel.child,
+        expectedPath: `GET /api/${parentSegment}/:id/${childSegment}`,
+        reason: `Model relationship ${rel.parent}.hasMany(${rel.child}) implies this endpoint but it is missing from API_CONTRACTS.json. Scoped lists are mandatory per contract rules.`,
+      });
+    }
+  }
+
+  const findings: string[] = [];
+  if (missing.length > 0) {
+    findings.push(
+      "## Contract completeness: missing scoped-list endpoints (inferred from ORM relationships)",
+    );
+    for (const m of missing) {
+      findings.push(`- ${m.expectedPath}`);
+      findings.push(`  reason: ${m.reason}`);
+    }
+  }
+
+  return {
+    inferredRelationships: relationships,
+    missingScopedEndpoints: missing,
+    findings,
+  };
+}
+
+/**
+ * Programmatically append stub contract entries for scoped-list endpoints
+ * that `auditContractCompleteness` flagged as missing.
+ *
+ * Feeding these into `API_CONTRACTS.json` BEFORE the backend worker phase
+ * means downstream codegen sees a complete contract and implements the
+ * missing endpoints naturally — instead of the LLM reading "you forgot X"
+ * during the late integration loop and potentially stalling on it.
+ *
+ * Idempotent: skips entries whose `METHOD /path` already exists, and skips
+ * entries whose `expectedPath` still contains `{...}` placeholders (meaning
+ * the audit couldn't resolve a plural segment and it's not safe to synthesize).
+ */
+async function autoAppendMissingScopedEndpoints(
+  outputDir: string,
+  missing: ContractCompletenessResult["missingScopedEndpoints"],
+): Promise<{ added: string[]; skipped: string[] }> {
+  const added: string[] = [];
+  const skipped: string[] = [];
+  if (missing.length === 0) return { added, skipped };
+
+  const contractPath = "API_CONTRACTS.json";
+  const raw = await fsRead(contractPath, outputDir);
+  if (raw.startsWith("FILE_NOT_FOUND") || raw.startsWith("REJECTED")) {
+    return { added, skipped: missing.map((m) => m.expectedPath) };
+  }
+
+  let parsed: Array<Record<string, unknown>>;
+  try {
+    const json = JSON.parse(raw);
+    if (!Array.isArray(json)) {
+      return { added, skipped: missing.map((m) => m.expectedPath) };
+    }
+    parsed = json as Array<Record<string, unknown>>;
+  } catch {
+    return { added, skipped: missing.map((m) => m.expectedPath) };
+  }
+
+  const existing = new Set<string>();
+  for (const c of parsed) {
+    if (typeof c.method === "string" && typeof c.endpoint === "string") {
+      existing.add(
+        `${c.method.toUpperCase()} ${normaliseApiPath(c.endpoint)}`,
+      );
+    }
+  }
+
+  for (const m of missing) {
+    const [methodRaw, pathRaw] = m.expectedPath.split(" ", 2);
+    if (!methodRaw || !pathRaw) {
+      skipped.push(m.expectedPath);
+      continue;
+    }
+    // Skip unresolved placeholder paths like "GET /api/{users}/:id/{tasks}".
+    if (pathRaw.includes("{") || pathRaw.includes("}")) {
+      skipped.push(`${m.expectedPath} (unresolved plural — fix flat endpoints first)`);
+      continue;
+    }
+    const method = methodRaw.toUpperCase();
+    const normPath = normaliseApiPath(pathRaw);
+    if (existing.has(`${method} ${normPath}`)) {
+      skipped.push(`${m.expectedPath} (already present)`);
+      continue;
+    }
+    const segMatch = normPath.match(/^\/api\/([^/]+)\/:\w+\/([^/]+)$/);
+    const parentSeg = segMatch?.[1] ?? m.parent.toLowerCase();
+    const childSeg = segMatch?.[2] ?? m.child.toLowerCase();
+    parsed.push({
+      service: parentSeg,
+      endpoint: normPath,
+      method,
+      requestSchema:
+        "params: { id: string }; query?: { limit?: number; offset?: number }",
+      responseSchema: `${m.child}Dto[]`,
+      auth: "bearer",
+      description: `List all ${childSeg} belonging to the ${m.parent.toLowerCase()} identified by :id.`,
+    });
+    existing.add(`${method} ${normPath}`);
+    added.push(`${method} ${normPath}`);
+  }
+
+  if (added.length === 0) return { added, skipped };
+
+  // Re-assign sequential ids so the contract file stays consistent with the
+  // pattern `API-NNN` that `generateApiContracts` establishes.
+  const withIds = parsed.map((item, i) => ({
+    ...item,
+    id: `API-${String(i + 1).padStart(3, "0")}`,
+  }));
+  await fsWrite(contractPath, JSON.stringify(withIds, null, 2), outputDir);
+  return { added, skipped };
+}
+
 /**
  * Merged integration verify + fix as a single agentic loop.
  *
@@ -4707,12 +6857,112 @@ async function integrationVerifyAndFix(
     `${label}: pre-flight — normalising workspace imports & installing deps...`,
   );
   await normalizeWorkspaceImports(state.outputDir);
-  await installImportGapsAllProjects(state.outputDir);
+  const importGapInstalls = await installImportGapsAllProjects(state.outputDir);
+  if (importGapInstalls.length > 0) {
+    const totalPackages = importGapInstalls.reduce(
+      (sum, r) => sum + r.packages.length,
+      0,
+    );
+    getRepairEmitter(state.sessionId)({
+      stage: "preflight-deps",
+      event: "import_gaps_installed",
+      details: {
+        totalPackages,
+        scopes: importGapInstalls.map((r) => ({
+          scope: r.scope,
+          packages: r.packages,
+          exitCode: r.exitCode,
+        })),
+      },
+    });
+  }
   const initialDependencyAudit = await auditImportDependencyConsistency(
     state.outputDir,
   );
-  const initialResidualConflicts =
-    await detectResidualImplementationConflicts(state.outputDir);
+  const initialResidualConflicts = await detectResidualImplementationConflicts(
+    state.outputDir,
+  );
+  const frontendHookNormalization = await normalizeFrontendHookSignatures(
+    state.outputDir,
+  );
+  const frontendJsxNormalization = await normalizeFrontendJsxElementAnnotations(
+    state.outputDir,
+  );
+  const frontendReactTemplateNormalization =
+    await normalizeFrontendReactComponentTemplates(state.outputDir);
+  const frontendAuthDtoNormalization = await normalizeFrontendAuthDtoAliases(
+    state.outputDir,
+  );
+  const frontendUseFormNormalization = await normalizeFrontendUseFormHook(
+    state.outputDir,
+  );
+  // Run *before* the cluster detector so the duplicate-client convergence
+  // is reflected in any subsequent audit. This is the highest-impact
+  // structural normalization for M-tier frontends — see analysis of
+  // `coding-session-report.md` for why the dual `apiClient` was the
+  // root cause of recent 18-iteration stagnation loops.
+  const frontendDuplicateClientNormalization =
+    await normalizeFrontendDuplicateApiClient(state.outputDir);
+  const frontendErrorCauseNormalization = await normalizeFrontendErrorWithCause(
+    state.outputDir,
+  );
+  const backendGetValidateBodyNormalization =
+    await normalizeBackendGetValidateBody(state.outputDir);
+  // Collapse `backend/src/middleware/*.ts` (singular, frequently emitted by
+  // workers) into the canonical `backend/src/middlewares/` directory and
+  // rewrite every consumer import. Without this normalizer the project ends
+  // up with dozens of `Cannot find module` errors that the agent loop
+  // typically cannot untangle by itself.
+  const backendMiddlewareFolderNormalization =
+    await normalizeBackendMiddlewareFolder(state.outputDir);
+  const frontendNormalizationNotes = [
+    ...frontendHookNormalization.notes,
+    ...frontendJsxNormalization.notes,
+    ...frontendReactTemplateNormalization.notes,
+    ...frontendAuthDtoNormalization.notes,
+    ...frontendUseFormNormalization.notes,
+    ...frontendDuplicateClientNormalization.notes,
+    ...frontendErrorCauseNormalization.notes,
+    ...backendGetValidateBodyNormalization.notes,
+    ...backendMiddlewareFolderNormalization.notes,
+  ];
+  const frontendConvergenceClusters = await detectFrontendConvergenceClusters(
+    state.outputDir,
+  );
+  const routeAudit = await auditApiRouteRegistration(state.outputDir);
+  const initialApiClientUniqueness = await auditFrontendApiClientUniqueness(
+    state.outputDir,
+  );
+  let contractCompleteness = await auditContractCompleteness(state.outputDir);
+  // Deterministic repair: append stub contract entries for missing scoped
+  // endpoints so the LLM prompt and downstream audits see a complete contract.
+  // Re-run the audit after appending so `contractCompleteness` reflects the
+  // post-repair state in the rest of this function.
+  if (contractCompleteness.missingScopedEndpoints.length > 0) {
+    const appendResult = await autoAppendMissingScopedEndpoints(
+      state.outputDir,
+      contractCompleteness.missingScopedEndpoints,
+    );
+    if (appendResult.added.length > 0) {
+      console.log(
+        `${label}: auto-appended ${appendResult.added.length} scoped endpoint(s) to API_CONTRACTS.json during preflight: ${appendResult.added.join(", ")}`,
+      );
+    }
+    if (appendResult.added.length > 0 || appendResult.skipped.length > 0) {
+      getRepairEmitter(state.sessionId)({
+        stage: "preflight-contract-completeness",
+        event: "contract_completeness_autorepaired",
+        details: {
+          when: "preflight",
+          added: appendResult.added,
+          skipped: appendResult.skipped,
+        },
+      });
+    }
+    if (appendResult.added.length > 0) {
+      contractCompleteness = await auditContractCompleteness(state.outputDir);
+    }
+  }
   if (initialDependencyAudit.remainingIssues.length > 0) {
     console.warn(
       `${label}: dependency audit still has ${initialDependencyAudit.remainingIssues.length} unresolved item(s).`,
@@ -4723,6 +6973,44 @@ async function integrationVerifyAndFix(
       `${label}: detected ${initialResidualConflicts.length} residual implementation conflict(s).`,
     );
   }
+  const routeAuditHardFail =
+    routeAudit.unregisteredModules.length > 0 ||
+    routeAudit.unresolvedRegistrations.length > 0 ||
+    routeAudit.missingContractEndpoints.length > 0;
+  if (routeAuditHardFail) {
+    console.warn(
+      `${label}: API route audit found ${routeAudit.unregisteredModules.length} unregistered module(s), ${routeAudit.unresolvedRegistrations.length} dangling import(s), ${routeAudit.missingContractEndpoints.length} missing contract endpoint(s).`,
+    );
+  }
+  if (contractCompleteness.missingScopedEndpoints.length > 0) {
+    console.warn(
+      `${label}: contract completeness audit found ${contractCompleteness.missingScopedEndpoints.length} missing scoped endpoint(s): ${contractCompleteness.missingScopedEndpoints
+        .map((m) => m.expectedPath)
+        .join(", ")}`,
+    );
+  }
+  getRepairEmitter(state.sessionId)({
+    stage: "preflight-route-audit",
+    event: "route_audit_snapshot",
+    details: {
+      when: "preflight",
+      hardFail: routeAuditHardFail,
+      unregisteredModules: routeAudit.unregisteredModules,
+      unresolvedRegistrations: routeAudit.unresolvedRegistrations,
+      missingContractEndpoints: routeAudit.missingContractEndpoints,
+      undeclaredEndpointCount: routeAudit.undeclaredEndpoints.length,
+    },
+  });
+  getRepairEmitter(state.sessionId)({
+    stage: "preflight-contract-completeness",
+    event: "contract_completeness_snapshot",
+    details: {
+      when: "preflight",
+      inferredRelationshipCount:
+        contractCompleteness.inferredRelationships.length,
+      missingScopedEndpoints: contractCompleteness.missingScopedEndpoints,
+    },
+  });
 
   const dbInfo = await detectDbDependencies(state.outputDir);
   const hasAnyOrmWithExternalDb =
@@ -4824,6 +7112,31 @@ async function integrationVerifyAndFix(
     initialResidualConflicts.length > 0
       ? `\n## Residual implementation conflicts detected before final verify\n${initialResidualConflicts.map((line) => `- ${line}`).join("\n")}`
       : "";
+  const frontendNormalizationBlock =
+    frontendNormalizationNotes.length > 0
+      ? `\n## Frontend preflight normalizations already applied\n${frontendNormalizationNotes.map((line) => `- ${line}`).join("\n")}`
+      : "";
+  const frontendClusterBlock =
+    frontendConvergenceClusters.length > 0
+      ? `\n## Frontend error clusters to resolve structurally\n${frontendConvergenceClusters
+          .map(
+            (cluster, index) =>
+              `${index + 1}. ${cluster.title}\n   - ${cluster.description}\n   - Files: ${cluster.files.join(", ")}`,
+          )
+          .join("\n")}`
+      : "";
+  const routeAuditBlock =
+    routeAudit.findings.length > 0
+      ? `\n## Backend route registration audit (MUST fix before report_done(pass))\n${routeAudit.findings.join("\n")}`
+      : "";
+  const contractCompletenessBlock =
+    contractCompleteness.findings.length > 0
+      ? `\n## Contract completeness audit (MUST fix before report_done(pass))\nThe ORM models imply scoped-list endpoints that API_CONTRACTS.json does not declare. Add the missing entries to API_CONTRACTS.json AND implement them in the corresponding routes.ts + controller.\n${contractCompleteness.findings.join("\n")}`
+      : "";
+  const apiClientUniquenessBlock =
+    initialApiClientUniqueness.parallelClients.length > 0
+      ? `\n## Frontend API client uniqueness audit (MUST fix before report_done(pass))\nA single canonical \`apiClient\` is required at \`${initialApiClientUniqueness.canonical}\`. The preflight normalizer left the following parallel client(s) intact because they still define their own implementation. Collapse them now.\n${initialApiClientUniqueness.findings.join("\n")}`
+      : "";
 
   const systemPrompt = [
     "You are a Senior Full-Stack Engineer performing the **Final Verification** of a fully generated codebase.",
@@ -4875,19 +7188,32 @@ async function integrationVerifyAndFix(
     `1. Frontend type-check: \`cd frontend && ${hasFrontend ? "npx tsc -p tsconfig.app.json --pretty false 2>&1" : "echo skip-frontend"}\``,
     `2. Frontend build: \`cd frontend && ${hasFrontend ? (pm === "yarn" ? "yarn run build 2>&1" : pm === "npm" ? "npm run build 2>&1" : "pnpm run build 2>&1") : "echo skip-frontend"}\``,
     `3. Backend type-check: \`cd backend && ${hasBackend ? "npx tsc --noEmit --pretty false 2>&1" : "echo skip-backend"}\``,
-    "4. For each TypeScript/build error:",
+    `4. Backend startup smoke: \`cd backend && ${hasBackend ? "npx tsx --eval \\\"(async () => { const { existsSync } = await import('node:fs'); const dbCandidates = ['./src/db.ts', './src/config/database.ts', './src/database/connection.ts']; const dbEntry = dbCandidates.find((candidate) => existsSync(candidate)); if (dbEntry) { await import(dbEntry); if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL missing after importing backend database entry; ensure dotenv is loaded in the startup/database chain'); } const mod = await import('./src/app.ts'); const createApp = mod.createApp ?? mod.default?.createApp ?? mod.default; if (typeof createApp !== 'function') throw new Error('createApp export missing'); const app = await createApp(); if (!app || typeof app.callback !== 'function') throw new Error('createApp did not return a Koa app'); console.log('backend_smoke_ok'); })().catch((error) => { console.error(error instanceof Error ? (error.stack ?? error.message) : String(error)); process.exit(1); });\\\" 2>&1" : "echo skip-backend"}\``,
+    "5. For each TypeScript/build/runtime smoke error:",
     "   a. Read the file with the error",
     "   b. Read any imported modules that are missing exports",
     "   c. Write the minimal fix",
-    "5. Any `write_file` or mutating install/generate command makes prior validation STALE.",
-    "6. After the LAST mutation, re-run all three scoped validation gates in full.",
-    "7. Only after registration closure is complete and all three scoped validation gates pass may you call `report_done(status='pass', summary=...)`",
+    "6. Any `write_file` or mutating install/generate command makes prior validation STALE.",
+    "7. After the LAST mutation, re-run all scoped validation gates in full, including backend startup smoke.",
+    "8. Only after registration closure is complete and all scoped validation gates pass may you call `report_done(status='pass', summary=...)`",
     "   OR `report_done(status='fail', summary=<unresolved issues>)` if critical features cannot be fixed",
     "",
     "## Phase 2.25 — Delivery hardening",
     "1. Resolve import/package mismatches so every runtime import is declared in the correct package.json.",
     "2. Remove or merge residual duplicate implementations when the same responsibility exists in old/new canonical paths.",
     "3. If you detect yourself rereading the same file or command output without making progress, stop looping and switch to the highest-signal failing gate first (frontend tsc, frontend build, backend tsc, or explicit PRD gap).",
+    "4. Treat repeated frontend TypeScript templates as cluster problems, not isolated file problems: fix the shared abstraction or repeated pattern first, then return to leaf files.",
+    "",
+    "## Phase 2.3 — Cluster priority order (READ BEFORE EDITING ANY LEAF FILE)",
+    "Apply fixes in this exact priority order. Do NOT jump ahead — fixing a leaf file before its parent cluster is the #1 cause of stagnation.",
+    "  P0. **Frontend shared API surface mismatch** — there must be exactly ONE HTTP client at `frontend/src/api/client.ts`. If you see a second client (e.g. `frontend/src/utils/apiClient.ts`, `frontend/src/lib/http.ts`) or feature files importing from two different clients, FIRST collapse to the canonical client and rewrite consumer imports. Only after that re-run frontend `tsc`.",
+    "  P0. **Backend route registration mismatch** — registrar export name vs `index.ts` import; mount-prefix mismatch; `apiRouter.<verb>` vs sub-router pattern. Fix the registrar/index pair before chasing per-endpoint TS errors.",
+    "  P1. **Backend Koa body / DTO typing** — rely on the scaffold-provided `koa.d.ts` augmentation; do NOT scatter `(ctx.request as any).body`. Validate with Joi, then cast to a typed DTO once.",
+    "  P1. **Backend JWT typing** — use `signJwt` / `verifyJwt` from `backend/src/utils/jwt.ts`. Do NOT call `jsonwebtoken` directly in feature code.",
+    "  P1. **Backend GET + validateBody** — strip `validateBody(...)` from any `apiRouter.get(...)` call; rebind to the correct `list*` / `get*` handler.",
+    "  P2. Frontend JSX namespace / hook signature / component template residuals (already covered by preflight; only fix leaks).",
+    "  P3. Per-file leaf TypeScript errors.",
+    "When the same error message recurs across ≥3 files, stop and treat it as a cluster (P0/P1) — not as isolated leaf bugs.",
     "",
     "## Phase 2.5 — Mock / Stub Cleanup",
     "1. Search frontend source for mock API interceptor files or imports (e.g. `mockApi`, `mock-server`, `msw/handlers`, `__mocks__`). Delete any such files and remove their imports (e.g. `import './lib/mockApi'` in `App.tsx`).",
@@ -4900,13 +7226,17 @@ async function integrationVerifyAndFix(
     "- Coding-stage tasks may leave shared registration files incomplete by design; IntegrationVerifyFix owns the final registration closure.",
     "- Registration closure is mandatory: treat missing registrations in `frontend/src/router.tsx`, `backend/src/api/modules/index.ts`, and `backend/src/app.ts` as top-priority integration defects.",
     "- Do not stop after making pages/controllers/middlewares exist on disk; they must be wired into the actual router/module/app entrypoints.",
+    "- When a shared module imports a named route registrar or app helper, verify the source file exports that exact symbol; import/export name mismatches are runtime blockers.",
     "- Run verification ONLY inside `frontend/` and `backend/`. Do not use root-level `npx tsc` against the whole generated-code tree in this phase.",
     "- If you modify any file, treat previous validation as stale and re-run the full scoped validation sequence before finishing.",
     "- Do NOT call `report_done(status='pass')` while dependency audit issues remain unresolved.",
+    "- Do NOT call `report_done(status='pass')` while the 'Backend route registration audit' block lists unregistered modules, dangling register*Routes imports, or API_CONTRACTS endpoints with no matching implementation. Fix each entry (register, implement, or remove) before finishing.",
+    "- Do NOT call `report_done(status='pass')` while the 'Contract completeness audit' block lists missing scoped-list endpoints. For every entry, (a) add the endpoint to API_CONTRACTS.json, (b) implement the handler in backend/src/api/modules/<parent>.routes.ts (or equivalent), (c) register it in backend/src/api/modules/index.ts, and (d) verify the frontend can reach it. Scoped endpoints are a functional requirement, not a style issue.",
     "- In this phase, scaffold-protected files do NOT block edits. You may overwrite protected scaffold files when registration or PRD completeness requires it.",
     "- Minimal targeted changes — do not rewrite working code.",
     "- Install missing npm packages: `pnpm add <pkg> --filter <workspace-name>`",
     "- If errors include [CONVENTION], they are policy violations and MUST be fixed.",
+    "- When frontend errors repeat across many files, prefer fixing the shared hook/type/template that generates the cluster instead of patching one leaf file at a time.",
     ...(versionConstraints ? ["", versionConstraints] : []),
     protectedFilesBlock,
   ].join("\n");
@@ -4917,6 +7247,11 @@ async function integrationVerifyAndFix(
     prdBlock,
     dependencyAuditBlock,
     residualConflictBlock,
+    frontendNormalizationBlock,
+    frontendClusterBlock,
+    routeAuditBlock,
+    contractCompletenessBlock,
+    apiClientUniquenessBlock,
     "",
     "Begin with PRD completeness review and shared registration closure first, then run scoped frontend/backend validation after the feature补写 is complete.",
   ]
@@ -4945,9 +7280,22 @@ async function integrationVerifyAndFix(
   let frontendTscOkAt: string | null = null;
   let frontendBuildOkAt: string | null = null;
   let backendTscOkAt: string | null = null;
+  let backendSmokeOkAt: string | null = null;
   let consecutiveNoMutationIterations = 0;
   let lastStagnationGuidanceAt = 0;
+  let stagnationWarningsWithoutProgress = 0;
   const repeatedReadOnlyActionCounts = new Map<string, number>();
+  let progressScore = 0;
+  let lastMeaningfulProgressIteration = 0;
+  let lastMeaningfulProgressReason = "initial integration review";
+  const bestValidationIssueMetrics: Partial<
+    Record<ScopedValidationKind, ScopedValidationIssueMetrics>
+  > = {};
+  let bestDependencyIssueCount = initialDependencyAudit.remainingIssues.length;
+  let bestRouteIssueCount = countRouteAuditIssues(routeAudit);
+  let bestContractCompletenessIssueCount = countContractCompletenessIssues(
+    contractCompleteness,
+  );
 
   function nowIso(): string {
     return new Date().toISOString();
@@ -4961,6 +7309,11 @@ async function integrationVerifyAndFix(
     frontendTscOkAt = null;
     frontendBuildOkAt = null;
     backendTscOkAt = null;
+    backendSmokeOkAt = null;
+    delete bestValidationIssueMetrics.frontend_tsc;
+    delete bestValidationIssueMetrics.frontend_build;
+    delete bestValidationIssueMetrics.backend_tsc;
+    delete bestValidationIssueMetrics.backend_smoke;
     console.log(`${label}: validation marked stale — ${reason}`);
   }
 
@@ -4986,7 +7339,29 @@ async function integrationVerifyAndFix(
   function injectStagnationGuidance(
     reason: string,
     repeatedAction: string | null,
+    escalated: boolean,
   ): void {
+    if (escalated) {
+      messages.push({
+        role: "user",
+        content: [
+          "SYSTEM CORRECTION — ESCALATED: IntegrationVerifyFix has stagnated across multiple warnings.",
+          `Reason: ${reason}`,
+          repeatedAction ? `Repeated action: ${repeatedAction}` : "",
+          "",
+          "You MUST pick exactly ONE of the following actions on the NEXT turn. Do not read another file first.",
+          "",
+          "  1. `write_file` with a concrete, minimal code change that addresses the highest-priority failing gate. Even a partial fix is better than more reading.",
+          "  2. `bash` command that makes progress (install a missing dep, run a scoped tsc, delete a residual duplicate file, etc.) — no read-only `ls`/`grep`.",
+          "  3. `report_done(status='fail', summary=<one sentence naming the specific file and line you cannot resolve>)`. This is acceptable when you honestly cannot fix something — it is NOT acceptable to keep reading.",
+          "",
+          "Do not emit a plan, do not summarise what you've read. Your next tool call must be one of the three above.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+      return;
+    }
     messages.push({
       role: "user",
       content: [
@@ -4994,29 +7369,130 @@ async function integrationVerifyAndFix(
         `Reason: ${reason}`,
         repeatedAction ? `Repeated action: ${repeatedAction}` : "",
         "Stop rereading the same files. Switch to the highest-signal unresolved gate, make a concrete code change, then re-run scoped validation.",
+        "Apply Phase 2.3 cluster priority order: P0 frontend shared API surface mismatch → P0 backend route registration → P1 backend Koa body / DTO typing → P1 backend JWT typing → P1 backend GET+validateBody → P2 JSX/template residuals → P3 leaf TS errors.",
+        "If you see two HTTP clients in the frontend, collapse them to `frontend/src/api/client.ts` and rewrite imports BEFORE running another `tsc`.",
         "If duplicate implementations exist, choose the canonical path and remove or merge the residual copy.",
         "If dependency audit issues remain, fix package.json/import mismatches before doing more exploratory reads.",
+        "If the blocker is a scaffold-protected file (e.g. `frontend/src/api/client.ts`), remember this phase permits overwriting protected scaffold files.",
       ]
         .filter(Boolean)
         .join("\n"),
     });
   }
 
-  function markScopedValidationSuccess(kind: ScopedValidationKind): void {
+  function recordMeaningfulProgress(reason: string, amount = 1): void {
+    progressScore = Math.min(
+      MAX_INTEGRATION_PROGRESS_SCORE,
+      progressScore + amount,
+    );
+    lastMeaningfulProgressIteration = iterations;
+    lastMeaningfulProgressReason = reason;
+    console.log(
+      `${label}: progress recorded — ${reason} (score=${progressScore}/${MAX_INTEGRATION_PROGRESS_SCORE})`,
+    );
+  }
+
+  function decayProgressScore(): void {
+    progressScore = Math.max(0, progressScore - 1);
+  }
+
+  function noteValidationIssueTrend(
+    kind: ScopedValidationKind,
+    result: string,
+  ): string | null {
+    const metrics = extractScopedValidationIssueMetrics(kind, result);
+    if (metrics === null) return null;
+    const previousBest = bestValidationIssueMetrics[kind];
+    if (!previousBest) {
+      bestValidationIssueMetrics[kind] = metrics;
+      return null;
+    }
+    if (!isValidationIssueMetricsImproved(metrics, previousBest)) {
+      return null;
+    }
+    bestValidationIssueMetrics[kind] = metrics;
+    return `validation_issue_metrics:${kind} files ${previousBest.files}->${metrics.files}, errors ${previousBest.errors}->${metrics.errors}`;
+  }
+
+  async function collectStructuralProgressReasons(): Promise<string[]> {
+    const reasons: string[] = [];
+
+    const dependencyAudit = await auditImportDependencyConsistency(
+      state.outputDir,
+    );
+    if (dependencyAudit.remainingIssues.length < bestDependencyIssueCount) {
+      reasons.push(
+        `dependency_audit ${bestDependencyIssueCount}->${dependencyAudit.remainingIssues.length}`,
+      );
+      bestDependencyIssueCount = dependencyAudit.remainingIssues.length;
+    }
+
+    const currentRouteAudit = await auditApiRouteRegistration(state.outputDir);
+    const routeIssueCount = countRouteAuditIssues(currentRouteAudit);
+    if (routeIssueCount < bestRouteIssueCount) {
+      reasons.push(`route_audit ${bestRouteIssueCount}->${routeIssueCount}`);
+      bestRouteIssueCount = routeIssueCount;
+    }
+
+    const currentContractCompleteness = await auditContractCompleteness(
+      state.outputDir,
+    );
+    const contractIssueCount = countContractCompletenessIssues(
+      currentContractCompleteness,
+    );
+    if (contractIssueCount < bestContractCompletenessIssueCount) {
+      reasons.push(
+        `contract_completeness ${bestContractCompletenessIssueCount}->${contractIssueCount}`,
+      );
+      bestContractCompletenessIssueCount = contractIssueCount;
+    }
+
+    return reasons;
+  }
+
+  function getDynamicStagnationThresholds(): {
+    warnAt: number;
+    abortAt: number;
+  } {
+    const abortAt =
+      BASE_INTEGRATION_STAGNATION_ABORT_ITERATIONS +
+      progressScore * INTEGRATION_STAGNATION_ABORT_BONUS_PER_PROGRESS;
+    const warnAt = Math.min(
+      abortAt - 4,
+      BASE_INTEGRATION_STAGNATION_WARNING_ITERATIONS +
+        progressScore * INTEGRATION_STAGNATION_WARNING_BONUS_PER_PROGRESS,
+    );
+    return { warnAt, abortAt };
+  }
+
+  function markScopedValidationSuccess(kind: ScopedValidationKind): boolean {
     const ts = nowIso();
+    const wasFrontendTscOk = !!frontendTscOkAt;
+    const wasFrontendBuildOk = !!frontendBuildOkAt;
+    const wasBackendTscOk = !!backendTscOkAt;
+    const wasBackendSmokeOk = !!backendSmokeOkAt;
+    bestValidationIssueMetrics[kind] = { files: 0, errors: 0 };
     if (kind === "frontend_tsc") frontendTscOkAt = ts;
     if (kind === "frontend_build") frontendBuildOkAt = ts;
     if (kind === "backend_tsc") backendTscOkAt = ts;
+    if (kind === "backend_smoke") backendSmokeOkAt = ts;
     const frontendReady =
       !hasFrontend || (!!frontendTscOkAt && !!frontendBuildOkAt);
-    const backendReady = !hasBackend || !!backendTscOkAt;
+    const backendReady =
+      !hasBackend || (!!backendTscOkAt && !!backendSmokeOkAt);
     if (frontendReady && backendReady) {
       validationStale = false;
       lastFullValidationAt = ts;
       console.log(
-        `${label}: scoped validations now fresh — frontend_tsc=${frontendTscOkAt ?? "skip"} frontend_build=${frontendBuildOkAt ?? "skip"} backend_tsc=${backendTscOkAt ?? "skip"}`,
+        `${label}: scoped validations now fresh — frontend_tsc=${frontendTscOkAt ?? "skip"} frontend_build=${frontendBuildOkAt ?? "skip"} backend_tsc=${backendTscOkAt ?? "skip"} backend_smoke=${backendSmokeOkAt ?? "skip"}`,
       );
     }
+    return (
+      (kind === "frontend_tsc" && !wasFrontendTscOk) ||
+      (kind === "frontend_build" && !wasFrontendBuildOk) ||
+      (kind === "backend_tsc" && !wasBackendTscOk) ||
+      (kind === "backend_smoke" && !wasBackendSmokeOk)
+    );
   }
 
   async function runFinalScopedValidationGates(): Promise<{
@@ -5079,6 +7555,12 @@ async function integrationVerifyAndFix(
         backendDir,
         "backend_tsc",
       );
+      await runCheck(
+        "backend_smoke",
+        `npx tsx --eval "(async () => { const { existsSync } = await import('node:fs'); const dbCandidates = ['./src/db.ts', './src/config/database.ts', './src/database/connection.ts']; const dbEntry = dbCandidates.find((candidate) => existsSync(candidate)); if (dbEntry) { await import(dbEntry); if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL missing after importing backend database entry; ensure dotenv is loaded in the startup/database chain'); } const mod = await import('./src/app.ts'); const createApp = mod.createApp ?? mod.default?.createApp ?? mod.default; if (typeof createApp !== 'function') throw new Error('createApp export missing'); const app = await createApp(); if (!app || typeof app.callback !== 'function') throw new Error('createApp did not return a Koa app'); console.log('backend_smoke_ok'); })().catch((error) => { console.error(error instanceof Error ? (error.stack ?? error.message) : String(error)); process.exit(1); });" 2>&1`,
+        backendDir,
+        "backend_smoke",
+      );
     } else {
       passes.push("backend gate: skipped (backend/package.json not found)");
     }
@@ -5090,7 +7572,7 @@ async function integrationVerifyAndFix(
     }
 
     console.log(
-      `${label}: final gates completed — pass=${pass} lastMutationAt=${lastMutationAt ?? "never"} lastFullValidationAt=${lastFullValidationAt ?? "never"} frontendTscOkAt=${frontendTscOkAt ?? "skip"} frontendBuildOkAt=${frontendBuildOkAt ?? "skip"} backendTscOkAt=${backendTscOkAt ?? "skip"}`,
+      `${label}: final gates completed — pass=${pass} lastMutationAt=${lastMutationAt ?? "never"} lastFullValidationAt=${lastFullValidationAt ?? "never"} frontendTscOkAt=${frontendTscOkAt ?? "skip"} frontendBuildOkAt=${frontendBuildOkAt ?? "skip"} backendTscOkAt=${backendTscOkAt ?? "skip"} backendSmokeOkAt=${backendSmokeOkAt ?? "skip"}`,
     );
 
     return {
@@ -5140,10 +7622,13 @@ async function integrationVerifyAndFix(
       `Validation state:\n` +
       `- stale: ${validationStale}\n` +
       `- last mutation: ${lastMutationAt ?? "never"} (${lastMutationReason})\n` +
+      `- progress score: ${progressScore}/${MAX_INTEGRATION_PROGRESS_SCORE}\n` +
+      `- last meaningful progress: iteration ${lastMeaningfulProgressIteration || 0} (${lastMeaningfulProgressReason})\n` +
       `- last full validation: ${lastFullValidationAt ?? "never"}\n` +
       `- frontend tsc ok at: ${frontendTscOkAt ?? "never"}\n` +
       `- frontend build ok at: ${frontendBuildOkAt ?? "never"}\n` +
       `- backend tsc ok at: ${backendTscOkAt ?? "never"}\n` +
+      `- backend smoke ok at: ${backendSmokeOkAt ?? "never"}\n` +
       `Previous actions summary:\n${actionLines.slice(-30).join("\n")}`;
 
     messages.splice(
@@ -5207,6 +7692,8 @@ async function integrationVerifyAndFix(
 
     let doneSignaled = false;
     let iterationMutated = false;
+    let iterationValidationProgress = false;
+    const iterationProgressReasons: string[] = [];
     const iterationReadOnlyFingerprints: string[] = [];
     for (const tc of toolCalls) {
       let args: Record<string, unknown> = {};
@@ -5271,7 +7758,22 @@ async function integrationVerifyAndFix(
         ) {
           const validationKind = detectScopedValidationKind(command);
           if (validationKind) {
-            markScopedValidationSuccess(validationKind);
+            if (markScopedValidationSuccess(validationKind)) {
+              iterationValidationProgress = true;
+              iterationProgressReasons.push(`scoped_validation:${validationKind}`);
+            }
+          } else if (isMutatingSupervisorBashCommand(command)) {
+            iterationMutated = true;
+            markValidationStale(`mutating bash:${command.slice(0, 80)}`);
+          }
+        } else if (tc.function.name === "bash") {
+          const validationKind = detectScopedValidationKind(command);
+          if (validationKind) {
+            const trendReason = noteValidationIssueTrend(validationKind, result);
+            if (trendReason) {
+              iterationValidationProgress = true;
+              iterationProgressReasons.push(trendReason);
+            }
           } else if (isMutatingSupervisorBashCommand(command)) {
             iterationMutated = true;
             markValidationStale(`mutating bash:${command.slice(0, 80)}`);
@@ -5297,11 +7799,34 @@ async function integrationVerifyAndFix(
       }
     }
 
+    if (iterationMutated && !doneSignaled) {
+      const structuralProgressReasons = await collectStructuralProgressReasons();
+      if (structuralProgressReasons.length > 0) {
+        iterationValidationProgress = true;
+        iterationProgressReasons.push(...structuralProgressReasons);
+      }
+    }
+
     if (iterationMutated) {
+      const mutationReason =
+        iterationProgressReasons.length > 0
+          ? `filesystem mutation (${lastMutationReason}); ${iterationProgressReasons.join(", ")}`
+          : `filesystem mutation (${lastMutationReason})`;
+      recordMeaningfulProgress(mutationReason, 2);
       consecutiveNoMutationIterations = 0;
+      stagnationWarningsWithoutProgress = 0;
+      repeatedReadOnlyActionCounts.clear();
+    } else if (iterationValidationProgress) {
+      recordMeaningfulProgress(
+        `validation progress (${iterationProgressReasons.join(", ")})`,
+        1,
+      );
+      consecutiveNoMutationIterations = 0;
+      stagnationWarningsWithoutProgress = 0;
       repeatedReadOnlyActionCounts.clear();
     } else if (!doneSignaled) {
       consecutiveNoMutationIterations += 1;
+      decayProgressScore();
       const uniqueFingerprints: string[] = [
         ...new Set(iterationReadOnlyFingerprints),
       ];
@@ -5311,20 +7836,26 @@ async function integrationVerifyAndFix(
           (repeatedReadOnlyActionCounts.get(fingerprint) ?? 0) + 1,
         );
       }
-      const mostRepeatedEntry = [...repeatedReadOnlyActionCounts.entries()].sort(
-        (a, b) => b[1] - a[1],
-      )[0];
+      const mostRepeatedEntry = [
+        ...repeatedReadOnlyActionCounts.entries(),
+      ].sort((a, b) => b[1] - a[1])[0];
       const repeatedAction =
-        mostRepeatedEntry && mostRepeatedEntry[1] >= 4
+        mostRepeatedEntry && mostRepeatedEntry[1] >= 3
           ? `${mostRepeatedEntry[0]} × ${mostRepeatedEntry[1]}`
           : null;
+      const { warnAt, abortAt } = getDynamicStagnationThresholds();
       if (
-        (consecutiveNoMutationIterations >= 8 || repeatedAction) &&
-        iterations - lastStagnationGuidanceAt >= 3
+        (consecutiveNoMutationIterations >= warnAt || repeatedAction) &&
+        iterations - lastStagnationGuidanceAt >= 2
       ) {
+        stagnationWarningsWithoutProgress += 1;
+        const escalated =
+          stagnationWarningsWithoutProgress >=
+          STAGNATION_ESCALATION_WARNING_COUNT;
         injectStagnationGuidance(
-          `No filesystem mutation for ${consecutiveNoMutationIterations} iteration(s).`,
+          `No filesystem mutation for ${consecutiveNoMutationIterations} iteration(s). Dynamic warn threshold=${warnAt}, abort threshold=${abortAt}. Warning #${stagnationWarningsWithoutProgress}.`,
           repeatedAction,
+          escalated,
         );
         lastStagnationGuidanceAt = iterations;
         getRepairEmitter(state.sessionId)({
@@ -5332,15 +7863,22 @@ async function integrationVerifyAndFix(
           event: "stagnation_warning",
           details: {
             iterationsWithoutMutation: consecutiveNoMutationIterations,
+            warnAt,
+            abortAt,
+            progressScore,
+            warningNumber: stagnationWarningsWithoutProgress,
+            escalated,
             repeatedAction: repeatedAction ?? "none",
           },
         });
       }
-      if (consecutiveNoMutationIterations >= 18) {
+      if (consecutiveNoMutationIterations >= abortAt) {
         finalStatus = "fail";
         finalSummary = [
           "IntegrationVerifyFix stalled without making code changes.",
           `No mutation for ${consecutiveNoMutationIterations} consecutive iteration(s).`,
+          `Dynamic stagnation threshold reached: abortAt=${abortAt}, progressScore=${progressScore}/${MAX_INTEGRATION_PROGRESS_SCORE}.`,
+          `Last meaningful progress: iteration ${lastMeaningfulProgressIteration || 0} (${lastMeaningfulProgressReason}).`,
           repeatedAction ? `Most repeated action: ${repeatedAction}` : "",
           "Aborting instead of spending more iterations rereading the same files.",
         ]
@@ -5363,6 +7901,13 @@ async function integrationVerifyAndFix(
   const finalDependencyAudit = await auditImportDependencyConsistency(
     state.outputDir,
   );
+  const finalRouteAudit = await auditApiRouteRegistration(state.outputDir);
+  const finalContractCompleteness = await auditContractCompleteness(
+    state.outputDir,
+  );
+  const finalApiClientUniqueness = await auditFrontendApiClientUniqueness(
+    state.outputDir,
+  );
   if (!finalGateResult.pass) {
     finalStatus = "fail";
     finalSummary = [
@@ -5377,6 +7922,109 @@ async function integrationVerifyAndFix(
     finalSummary = [finalSummary, "Final scoped validation gates passed."]
       .filter(Boolean)
       .join("\n\n");
+  }
+
+  const finalRouteAuditHardFail =
+    finalRouteAudit.unregisteredModules.length > 0 ||
+    finalRouteAudit.unresolvedRegistrations.length > 0 ||
+    finalRouteAudit.missingContractEndpoints.length > 0;
+  getRepairEmitter(state.sessionId)({
+    stage: "integration-gate",
+    event: "route_audit_snapshot",
+    details: {
+      when: "final",
+      hardFail: finalRouteAuditHardFail,
+      unregisteredModules: finalRouteAudit.unregisteredModules,
+      unresolvedRegistrations: finalRouteAudit.unresolvedRegistrations,
+      missingContractEndpoints: finalRouteAudit.missingContractEndpoints,
+      undeclaredEndpointCount: finalRouteAudit.undeclaredEndpoints.length,
+    },
+  });
+  if (finalRouteAuditHardFail) {
+    finalStatus = "fail";
+    finalSummary = [
+      finalSummary,
+      "Backend route registration gate failed:",
+      finalRouteAudit.findings.join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 4000);
+    getRepairEmitter(state.sessionId)({
+      stage: "integration-gate",
+      event: "route_registration_audit_failed",
+      details: {
+        unregisteredModules: finalRouteAudit.unregisteredModules,
+        unresolvedRegistrations: finalRouteAudit.unresolvedRegistrations,
+        missingContractEndpoints: finalRouteAudit.missingContractEndpoints,
+      },
+    });
+  }
+
+  const finalContractCompletenessHardFail =
+    finalContractCompleteness.missingScopedEndpoints.length > 0;
+  getRepairEmitter(state.sessionId)({
+    stage: "integration-gate",
+    event: "contract_completeness_snapshot",
+    details: {
+      when: "final",
+      hardFail: finalContractCompletenessHardFail,
+      inferredRelationshipCount:
+        finalContractCompleteness.inferredRelationships.length,
+      missingScopedEndpoints:
+        finalContractCompleteness.missingScopedEndpoints,
+    },
+  });
+  if (finalContractCompletenessHardFail) {
+    finalStatus = "fail";
+    finalSummary = [
+      finalSummary,
+      "Contract completeness gate failed:",
+      finalContractCompleteness.findings.join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 4000);
+    getRepairEmitter(state.sessionId)({
+      stage: "integration-gate",
+      event: "contract_completeness_failed",
+      details: {
+        missingScopedEndpoints:
+          finalContractCompleteness.missingScopedEndpoints,
+      },
+    });
+  }
+
+  const finalApiClientUniquenessHardFail =
+    finalApiClientUniqueness.parallelClients.length > 0;
+  getRepairEmitter(state.sessionId)({
+    stage: "integration-gate",
+    event: "frontend_api_client_uniqueness_snapshot",
+    details: {
+      when: "final",
+      hardFail: finalApiClientUniquenessHardFail,
+      canonical: finalApiClientUniqueness.canonical,
+      parallelClients: finalApiClientUniqueness.parallelClients,
+    },
+  });
+  if (finalApiClientUniquenessHardFail) {
+    finalStatus = "fail";
+    finalSummary = [
+      finalSummary,
+      "Frontend API client uniqueness gate failed:",
+      finalApiClientUniqueness.findings.join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 4000);
+    getRepairEmitter(state.sessionId)({
+      stage: "integration-gate",
+      event: "frontend_api_client_uniqueness_failed",
+      details: {
+        canonical: finalApiClientUniqueness.canonical,
+        parallelClients: finalApiClientUniqueness.parallelClients,
+      },
+    });
   }
 
   if (finalDependencyAudit.remainingIssues.length > 0) {

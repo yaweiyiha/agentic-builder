@@ -22,7 +22,12 @@ export type RepairStage =
   | "architect-triage"
   | "post-gen-audit"
   | "integration-gate"
-  | "e2e-triage";
+  | "e2e-triage"
+  | "preflight-convention-fix"
+  | "preflight-route-audit"
+  | "preflight-deps"
+  | "generate_api_contracts"
+  | "preflight-contract-completeness";
 
 export interface RepairEvent {
   timestamp: string;

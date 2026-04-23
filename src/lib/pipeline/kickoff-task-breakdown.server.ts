@@ -287,6 +287,12 @@ export async function buildTaskBreakdownFromDocuments(params: {
   tier?: ProjectTier;
   /** Optional user-selected guidance for improving a previously generated breakdown. */
   improvementNotes?: string[];
+  /**
+   * Pre-formatted markdown block describing user-uploaded design references.
+   * Produced by `formatDesignReferencesPromptBlock`. Empty string / undefined
+   * when no references were uploaded.
+   */
+  designReferencesBlock?: string;
 }): Promise<{
   tasks: KickoffWorkItem[];
   costUsd: number;
@@ -320,6 +326,7 @@ export async function buildTaskBreakdownFromDocuments(params: {
       designSpec: params.designSpec,
       prdSpecText,
       improvementNotes: params.improvementNotes,
+      designReferencesBlock: params.designReferencesBlock,
     },
     params.sessionId,
   );

@@ -24,17 +24,16 @@ export function formatGeneratedCodeDotEnv(databaseUrl: string): string {
   ].join("\n");
 }
 
-/**
- * Ensure PostgreSQL/Cockroach datasource includes `url = env("DATABASE_URL")` (Prisma 5/6).
- * No-op if a url line is already present.
- */
-export function ensurePrismaDatasourceDatabaseUrl(schemaContent: string): string {
-  if (/^\s*url\s*=\s*env\s*\(\s*["']DATABASE_URL["']\s*\)/m.test(schemaContent)) {
-    return schemaContent;
+/** Upsert DATABASE_URL into an existing .env payload while preserving other keys. */
+export function upsertDatabaseUrlEnv(
+  envContent: string,
+  databaseUrl: string,
+): string {
+  const serialized = `DATABASE_URL=${JSON.stringify(databaseUrl)}`;
+  if (!envContent.trim()) return `${serialized}\n`;
+  if (/^\s*DATABASE_URL\s*=.*$/m.test(envContent)) {
+    return envContent.replace(/^\s*DATABASE_URL\s*=.*$/m, serialized);
   }
-  return schemaContent.replace(
-    /^(\s*provider\s*=\s*"(postgresql|cockroachdb)"\s*)\r?\n(\s*)\}/m,
-    (_, provLine: string, indentBeforeClose: string) =>
-      `${provLine}\n  url = env("DATABASE_URL")\n${indentBeforeClose}}`,
-  );
+  const normalized = envContent.endsWith("\n") ? envContent : `${envContent}\n`;
+  return `${normalized}${serialized}\n`;
 }

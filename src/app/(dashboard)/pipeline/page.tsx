@@ -25,6 +25,8 @@ import {
   type PrepDocChatMsg,
 } from "@/components/PrepStyleChatPanel";
 import Loading from "@/components/Loading";
+import ImportPrdDialog from "@/components/ImportPrdDialog";
+import DesignReferencesDialog from "@/components/DesignReferencesDialog";
 import type { PipelineStepId, StepResult } from "@/lib/pipeline/types";
 import type { ProjectTier } from "@/lib/agents/project-classifier";
 import { DEBUG_SAMPLE_KICKOFF_TASKS } from "@/lib/pipeline/debug-sample-tasks";
@@ -67,6 +69,8 @@ const TOP_PHASES: { id: TopPhase; label: string }[] = [
   { id: "preview", label: "Preview" },
 ];
 
+const DEFAULT_CODE_OUTPUT_DIR = "generated-code";
+
 const PREP_STEP_IDS = new Set(PREP_STEPS.map((s) => s.id));
 
 function phaseForStep(stepId: PipelineStepId): TopPhase {
@@ -98,6 +102,28 @@ export default function PipelinePage() {
     setActiveTab,
     reset,
   } = usePipelineStore();
+
+  const importedPrd = usePipelineStore((s) => s.importedPrd);
+  const refreshImportedPrdStatus = usePipelineStore(
+    (s) => s.refreshImportedPrdStatus,
+  );
+  const clearImportedPrd = usePipelineStore((s) => s.clearImportedPrd);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const designReferences = usePipelineStore((s) => s.designReferences);
+  const refreshDesignReferences = usePipelineStore(
+    (s) => s.refreshDesignReferences,
+  );
+  const clearDesignReferences = usePipelineStore(
+    (s) => s.clearDesignReferences,
+  );
+  const [designReferencesDialogOpen, setDesignReferencesDialogOpen] =
+    useState(false);
+
+  useEffect(() => {
+    void refreshImportedPrdStatus();
+    void refreshDesignReferences();
+  }, [refreshImportedPrdStatus, refreshDesignReferences]);
 
   const [featureBrief, setFeatureBrief] = useState("");
   const [activeOverridePhase, setActiveOverridePhase] = useState<
@@ -287,6 +313,22 @@ export default function PipelinePage() {
     },
     [updateSteps],
   );
+
+  // When the PRD step is populated from an imported `.blueprint/PRD.md` file,
+  // skip the review gate automatically — the user has already hand-authored
+  // this PRD and does not need to re-approve it. Without this, the pipeline
+  // appears "stuck" on the PRD review step after an imported run.
+  useEffect(() => {
+    const prd = steps.prd;
+    if (!prd || prd.status !== "completed") return;
+    if (prdConfirmed) return;
+    if (isRunning || prdRefining) return;
+    const source = (prd.metadata as { source?: string } | undefined)?.source;
+    if (source !== "static-prd-file") return;
+    const content = prd.content;
+    if (!content || content.trim().length === 0) return;
+    handlePrdConfirm(content);
+  }, [steps.prd, prdConfirmed, isRunning, prdRefining, handlePrdConfirm]);
 
   const handlePrdRegenerate = useCallback(() => {
     setPrdConfirmed(false);
@@ -1064,6 +1106,66 @@ export default function PipelinePage() {
       {/* ─── Bottom Command Bar ─── */}
       {activePhase !== "coding" && activePhase !== "preview" && (
         <div className="flex flex-shrink-0 flex-col items-center gap-2.5 border-t border-zinc-200 px-6 pb-5 pt-3">
+          {importedPrd?.exists && (
+            <div className="flex w-full max-w-[760px] items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-[11.5px] text-emerald-800">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                <span className="truncate">
+                  Using imported PRD — PM generation will be skipped on the
+                  next run
+                  {importedPrd.updatedAt
+                    ? ` (updated ${new Date(importedPrd.updatedAt).toLocaleString()})`
+                    : ""}
+                  .
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImportDialogOpen(true)}
+                  className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+                >
+                  View / Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void clearImportedPrd()}
+                  className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+          {designReferences.length > 0 && (
+            <div className="flex w-full max-w-[760px] items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[11.5px] text-indigo-800">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                <span className="truncate">
+                  {designReferences.length} design reference
+                  {designReferences.length === 1 ? "" : "s"} attached — will be
+                  copied to <code className="font-mono">.design-references/</code>{" "}
+                  and injected into code-gen context.
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDesignReferencesDialogOpen(true)}
+                  className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-50"
+                >
+                  View / Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void clearDesignReferences()}
+                  className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-50"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
           <form
             onSubmit={handleCommandSubmit}
             className={`flex w-full max-w-[760px] gap-2.5 ${showPrdReview ? "items-end" : "items-center"}`}
@@ -1404,7 +1506,62 @@ export default function PipelinePage() {
           </form>
 
           {/* Debug shortcuts */}
-          <div className="flex items-center gap-4 text-[11px] text-zinc-400">
+          <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-400">
+            <button
+              type="button"
+              onClick={() => setImportDialogOpen(true)}
+              disabled={isRunning}
+              className={`flex items-center gap-1 transition-colors disabled:opacity-40 ${
+                importedPrd?.exists
+                  ? "text-emerald-600 hover:text-emerald-700"
+                  : "hover:text-zinc-600"
+              }`}
+              title="Import an existing PRD to skip the PM step"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="18" x2="12" y2="12" />
+                <polyline points="9 15 12 12 15 15" />
+              </svg>
+              {importedPrd?.exists ? "Imported PRD (active)" : "Import PRD"}
+            </button>
+            <span className="text-zinc-200">&middot;</span>
+            <button
+              type="button"
+              onClick={() => setDesignReferencesDialogOpen(true)}
+              disabled={isRunning}
+              className={`flex items-center gap-1 transition-colors disabled:opacity-40 ${
+                designReferences.length > 0
+                  ? "text-indigo-600 hover:text-indigo-700"
+                  : "hover:text-zinc-600"
+              }`}
+              title="Upload screenshots that coding agents will use as visual references"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              {designReferences.length > 0
+                ? `Design refs (${designReferences.length})`
+                : "Design refs"}
+            </button>
+            <span className="text-zinc-200">&middot;</span>
             <button
               type="button"
               onClick={handleLoadSnapshot}
@@ -1490,7 +1647,7 @@ export default function PipelinePage() {
               onClick={handleDebugE2eVerify}
               disabled={isRunning || codingStatus === "running"}
               className="flex items-center gap-1 text-purple-400 transition-colors hover:text-purple-600 disabled:opacity-40"
-              title="Skip coding — run E2E verify directly against existing generated-code"
+              title={`Skip coding — run E2E verify directly against ${codeOutputDir}`}
             >
               <svg
                 width="11"
@@ -1513,6 +1670,15 @@ export default function PipelinePage() {
           )}
         </div>
       )}
+
+      <ImportPrdDialog
+        isOpen={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+      />
+      <DesignReferencesDialog
+        isOpen={designReferencesDialogOpen}
+        onClose={() => setDesignReferencesDialogOpen(false)}
+      />
     </div>
   );
 }
@@ -1968,6 +2134,26 @@ function MetaBadge({
       <span className={valueClass ?? "text-zinc-500"}>{value}</span>
     </button>
   );
+}
+
+function OutputDirectoryField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const apply = () => {
+    onChange(draft);
+  };
 }
 
 /* ─── Running State ─── */

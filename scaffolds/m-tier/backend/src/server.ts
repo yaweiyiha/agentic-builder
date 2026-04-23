@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createApp } from './app';
 import { PORT } from './config/env';
 import { initDb } from './db';

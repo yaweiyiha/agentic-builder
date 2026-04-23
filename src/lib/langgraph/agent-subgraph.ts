@@ -209,6 +209,8 @@ Rules:
 - If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` aliases).
 - For Zod naming, use \`camelCaseSchema\` for runtime values and \`*Input\` / \`*Dto\` for inferred types.
 - If you create a brand new Vite project from scratch and choose to use the \`@\` alias, wire it consistently in both \`vite.config.ts\` and \`tsconfig.json\`.
+- In React/TSX files, do NOT annotate component return types as bare \`JSX.Element\`. Prefer inferred return types; if an explicit annotation is truly needed, use \`React.JSX.Element\`.
+- Do NOT alias API response DTOs directly to persistence/entity model types (for example \`type MeResponseDto = User\`). Define a dedicated DTO shape that exposes only the fields the API actually returns.
 ${FRONTEND_IMPORT_RULES}
 ${WORKER_READONLY_TOOLS_GUIDE}
 For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
@@ -241,6 +243,19 @@ Rules:
     ✅  (e: React.MouseEvent<HTMLButtonElement>) => ...
     ❌  (e) => ...   // implicit any — forbidden
 - ALWAYS type every function parameter and return value; never rely on implicit \`any\`.
+- In React/TSX files, do NOT write bare \`JSX.Element\` return types. Prefer inferred component return types; if an explicit annotation is required, use \`React.JSX.Element\`.
+- For auth/session API types, never alias DTOs directly to broad model/entity types like \`User\`. Define a narrow DTO shape (for example id/name/email/avatar/timezone plus explicitly optional auth-only fields) so frontend auth flows do not inherit unrelated model unions.
+
+## MANDATORY: Single canonical API client (M-tier)
+- The scaffold ships exactly ONE HTTP client at \`frontend/src/api/client.ts\` exporting \`apiClient\` with methods \`get / post / put / patch / delete\` and an options bag \`{ auth?, headers?, query?, signal? }\`.
+- Feature code MUST import from \`./client\`, \`../api/client\`, or \`@/api/client\`. NEVER create \`frontend/src/utils/apiClient.ts\`, \`frontend/src/utils/api.ts\`, \`frontend/src/lib/http.ts\`, \`frontend/src/services/http.ts\`, or any other parallel HTTP wrapper.
+- Pass query params via \`apiClient.get(path, { query: { foo: 1 } })\`. NEVER stringify queries into the path. NEVER add a second positional \`auth\` argument; auth is read from \`opts.auth\` (defaults to true).
+- Use \`apiClient.patch\` for partial updates. Never call \`.patch\` on an alternative client that lacks it.
+- When throwing wrapped errors, write \`throw new Error(message, { cause: e })\` — never \`throw new Error(message, e)\` (the second positional arg is invalid and will fail \`tsc\`).
+
+## MANDATORY: useEffect / useLayoutEffect typing
+- Do NOT annotate effect callbacks with \`(): void =>\`. The callback may return a cleanup function so the type must be inferred. Write \`useEffect(() => { ... })\`.
+
 - Only import from files that are listed in "Already generated files" or in this task's file hints.
   If a dependency file does not exist yet, create a minimal stub for it in this same response.
 
@@ -305,6 +320,31 @@ Rules:
   - Create DTOs / validation schemas MUST NOT require system-generated fields.
   - Before finalizing backend code, cross-check: the fields accepted by validation, the fields in the DTO/type, the fields passed into \`Model.create\` / \`Model.update\`, and the model's required/defaulted fields must agree.
 - Stick to the framework already in the project. Read \`package.json\`, \`app.ts\`, and route entry files in context first. If the project uses **Koa**, keep Koa. If it uses **Express**, keep Express. If it uses **Fastify**, keep Fastify. Do not switch frameworks.
+
+## MANDATORY: Koa request body access (M-tier)
+- The scaffold provides a global \`koa\` module augmentation at \`backend/src/types/koa.d.ts\` so \`ctx.request.body\` is typed as \`unknown\`. Read it directly: \`const body = ctx.request.body;\`. NEVER write \`(ctx.request as any).body\` and never duplicate the augmentation in feature files.
+- Validate the body with Joi (or another typed schema) before consuming it; do NOT keep \`unknown\` flowing into business logic.
+- When you need a typed Koa context, import \`AppKoaContext\` from \`backend/src/types/koa.ts\`. Do NOT redefine \`Context\` per file.
+
+## MANDATORY: Koa routing semantics
+- \`validateBody(schema)\` is for request bodies and MUST only appear on \`apiRouter.post / .put / .patch / .delete\` routes that actually receive a JSON body. NEVER attach \`validateBody\` to \`apiRouter.get\`.
+- Handler naming must match the HTTP verb: \`GET\` → \`list* / get* / fetch*\`; \`POST\` → \`create*\`; \`PUT / PATCH\` → \`update*\`; \`DELETE\` → \`remove* / delete*\`. Do NOT bind a \`createXxx\` handler to a \`GET\` route.
+- Each domain owns ONE registrar function (e.g. \`registerAuthRoutes\`). Do NOT split the same domain across multiple files that both register overlapping paths (e.g. \`/invitations\` declared in both \`workspaces.routes.ts\` and \`invitations.routes.ts\`).
+- Use the canonical signature \`export function registerXxxRoutes(apiRouter: Router): void\` and call \`apiRouter.<verb>(...)\` directly so the route audit can recognise the bindings.
+- Every endpoint declared in \`API_CONTRACTS.json\` for your domain MUST be implemented and registered (e.g. \`POST /api/auth/reset-password\`, \`PATCH /api/users/me\`). Do not silently skip contract entries.
+
+## MANDATORY: JWT (M-tier)
+- Import \`signJwt\` and \`verifyJwt\` from \`backend/src/utils/jwt.ts\` (canonical helper). Do NOT call \`jsonwebtoken\` directly in feature code, do NOT redeclare \`expiresIn\` typing, and do NOT recreate \`utils/jwt.ts\`.
+- Read \`JWT_SECRET\` only inside \`utils/jwt.ts\`; feature code relies on the helper to throw a meaningful error if the secret is missing.
+
+## MANDATORY: Sequelize model field declarations
+- Field declarations on model classes MUST use \`declare\`:
+    \`declare id: string;\`
+    \`declare email: string;\`
+  Without \`declare\`, public class fields shadow Sequelize accessors at runtime so \`instance.id\` is always \`undefined\`.
+
+## MANDATORY: Enum / literal narrowing
+- When narrowing user input to a string-literal union (e.g. project status), use \`parseEnumLiteral(value, ["active", "archived"])\` from \`backend/src/utils/narrow.ts\` instead of unchecked \`as\`-casts.
 - When the project uses Express, these typing rules are mandatory:
     - \`req.params\` is \`Record<string, string>\` — access as \`req.params.id\` (string, safe).
     - \`req.headers\` values are \`string | string[] | undefined\` — always narrow:
@@ -845,6 +885,28 @@ function normalizeTaskFileHints(taskFiles: unknown): string[] {
   return grouped;
 }
 
+function getTaskFilePlanBuckets(taskFiles: unknown): {
+  creates: string[];
+  modifies: string[];
+  reads: string[];
+} {
+  if (!taskFiles || typeof taskFiles !== "object" || Array.isArray(taskFiles)) {
+    return { creates: [], modifies: [], reads: [] };
+  }
+  const record = taskFiles as Record<string, unknown>;
+  const readBucket = (key: "creates" | "modifies" | "reads"): string[] =>
+    Array.isArray(record[key])
+      ? (record[key] as unknown[]).filter(
+          (f): f is string => typeof f === "string",
+        )
+      : [];
+  return {
+    creates: readBucket("creates"),
+    modifies: readBucket("modifies"),
+    reads: readBucket("reads"),
+  };
+}
+
 function formatTaskFileHints(taskFiles: unknown): string {
   if (!taskFiles) return "";
   if (Array.isArray(taskFiles)) {
@@ -877,6 +939,17 @@ function formatTaskFileHints(taskFiles: unknown): string {
   if (reads.length > 0)
     lines.push(`Reads:\n${reads.map((f) => `- ${f}`).join("\n")}`);
   return lines.length > 0 ? `\nTask file plan:\n${lines.join("\n")}` : "";
+}
+
+function getRemainingPlannedCreates(
+  task: CodingTask,
+  writtenFiles: string[],
+): string[] {
+  const { creates } = getTaskFilePlanBuckets(task.files);
+  const writtenSet = new Set(
+    writtenFiles.map((file) => file.replace(/\\/g, "/")),
+  );
+  return creates.filter((file) => !writtenSet.has(file.replace(/\\/g, "/")));
 }
 
 function scoreGeneratedFileForTask(
@@ -1210,6 +1283,24 @@ function parseCodegenRoundStatus(content: string): "done" | "continue" | null {
   return m[1].toUpperCase() === "DONE" ? "done" : "continue";
 }
 
+function parseTaskFilePlanFailureDetails(verifyErrors: string): {
+  missingCreates: string[];
+  unmodified: string[];
+} {
+  const parseList = (label: "missingCreates" | "unmodified"): string[] => {
+    const match = new RegExp(`${label}=\\[([^\\]]*)\\]`).exec(verifyErrors);
+    if (!match) return [];
+    return match[1]
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  };
+  return {
+    missingCreates: parseList("missingCreates"),
+    unmodified: parseList("unmodified"),
+  };
+}
+
 // ─── RALPH helpers ───
 
 /**
@@ -1494,9 +1585,19 @@ async function generateCode(state: WorkerState) {
         `[Worker:${state.workerLabel}] codegen round ${rounds}/${CODEGEN_MULTI_ROUND_MAX_ROUNDS}: wrote ${roundWrites} file(s), status=${roundStatus ?? "implicit_done"}, model=${response.model}`,
       );
 
+      const remainingCreates = getRemainingPlannedCreates(task, writtenFiles);
+      const forcedContinue =
+        CODEGEN_MULTI_ROUND_ENABLED &&
+        remainingCreates.length > 0 &&
+        rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS;
+      if (forcedContinue && roundStatus !== "continue") {
+        console.warn(
+          `[Worker:${state.workerLabel}] codegen round ${rounds}: file plan still missing ${remainingCreates.length} create(s); overriding ${roundStatus ?? "implicit_done"} -> continue.`,
+        );
+      }
       const shouldContinue =
         CODEGEN_MULTI_ROUND_ENABLED &&
-        roundStatus === "continue" &&
+        (roundStatus === "continue" || forcedContinue) &&
         rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS;
       if (!shouldContinue) break;
 
@@ -1512,6 +1613,9 @@ async function generateCode(state: WorkerState) {
           "Prefer files not yet generated in this task.",
           "If any previously generated file is incomplete, inconsistent, miswired, or needs correction, rewrite it in this round.",
           "Do not preserve an incorrect earlier version just to avoid rewriting.",
+          remainingCreates.length > 0
+            ? `You still MUST create these planned file(s) before finishing:\n${remainingCreates.map((file) => `- ${file}`).join("\n")}`
+            : "",
           "End with STATUS: CONTINUE or STATUS: DONE.",
           "",
           knownFiles ? `Already generated files:\n${knownFiles}` : "",
@@ -1974,7 +2078,20 @@ async function taskFix(state: WorkerState) {
     );
   }
 
-  const taskFiles = state.currentTaskGeneratedFiles;
+  const filePlanDetails = isFilePlanFix
+    ? parseTaskFilePlanFailureDetails(state.verifyErrors)
+    : { missingCreates: [], unmodified: [] };
+  const planBuckets = getTaskFilePlanBuckets(task.files);
+  const taskFiles = isFilePlanFix
+    ? [
+        ...new Set([
+          ...state.currentTaskGeneratedFiles,
+          ...filePlanDetails.unmodified,
+          ...planBuckets.modifies,
+          ...planBuckets.reads,
+        ]),
+      ]
+    : state.currentTaskGeneratedFiles;
   // For file-plan fixes, we explicitly handle the case of "no generated files
   // yet" — the fix is literally to produce them. Only short-circuit when we
   // have neither files nor a task plan to satisfy.
@@ -1988,6 +2105,11 @@ async function taskFix(state: WorkerState) {
   console.log(
     `[Worker:${state.workerLabel}] codeFix: task files in scope (${taskFiles.length}): ${taskFiles.slice(0, 12).join(", ")}${taskFiles.length > 12 ? " …" : ""}`,
   );
+  if (isFilePlanFix) {
+    console.log(
+      `[Worker:${state.workerLabel}] codeFix: missing creates (${filePlanDetails.missingCreates.length}): ${filePlanDetails.missingCreates.slice(0, 12).join(", ")}${filePlanDetails.missingCreates.length > 12 ? " …" : ""}`,
+    );
+  }
 
   const alreadyRead = new Set<string>();
   const fileContents: string[] = [];
@@ -2104,6 +2226,12 @@ async function taskFix(state: WorkerState) {
         `- id: ${task.id}`,
         `- title: ${task.title}`,
         task.description ? `- description: ${task.description}` : "",
+        filePlanDetails.missingCreates.length > 0
+          ? `- missingCreates:\n${filePlanDetails.missingCreates.map((file) => `  - ${file}`).join("\n")}`
+          : "",
+        filePlanDetails.unmodified.length > 0
+          ? `- unmodified:\n${filePlanDetails.unmodified.map((file) => `  - ${file}`).join("\n")}`
+          : "",
         formatTaskFileHints(task.files),
       ]
         .filter(Boolean)

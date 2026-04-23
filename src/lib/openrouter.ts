@@ -69,6 +69,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> =
     [GPT5_MODEL_ID]: { input: 2.5, output: 10 },
     "openai/gpt-5.3-codex": { input: 1.75, output: 14 },
     "openai/gpt-5-mini": { input: 0.3, output: 1.2 },
+    "qwen/qwen3.6-plus": { input: 0.325, output: 1.95 },
     "anthropic/claude-sonnet-4": { input: 3, output: 15 },
     "anthropic/claude-opus-4": { input: 15, output: 75 },
     "openai/gpt-4o": { input: 2.5, output: 10 },
@@ -83,8 +84,20 @@ export function resolveModel(alias: ModelAlias | string): string {
   return (MODELS as Record<string, string>)[alias] ?? alias;
 }
 
+export function resolvePricedModelId(model: string): string {
+  if (MODEL_PRICING[model]) return model;
+  if (model.includes(":free")) return model;
+
+  const normalized = model
+    .replace(/-\d{8}$/, "")
+    .replace(/-\d{4}-\d{2}-\d{2}$/, "")
+    .replace(/-\d{2}-\d{2}$/, "");
+
+  return MODEL_PRICING[normalized] ? normalized : model;
+}
+
 export function estimateCost(model: string, usage: OpenRouterUsage): number {
-  const pricing = MODEL_PRICING[model];
+  const pricing = MODEL_PRICING[resolvePricedModelId(model)];
   if (!pricing) return 0;
   return (
     (usage.prompt_tokens / 1_000_000) * pricing.input +

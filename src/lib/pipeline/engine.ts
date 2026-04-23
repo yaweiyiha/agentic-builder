@@ -45,6 +45,10 @@ import {
 import { runKickoffIntegrations } from "./kickoff-integrations";
 import { buildTaskBreakdownFromDocuments } from "./kickoff-task-breakdown.server";
 import {
+  copyDesignReferencesToOutput,
+  formatDesignReferencesPromptBlock,
+} from "./design-references";
+import {
   createRepairEmitter,
   createJsonlRepairSink,
   consoleRepairSink,
@@ -648,6 +652,32 @@ export class PipelineEngine {
         }
       }
 
+      // Mirror user-uploaded design references into the output tree so coding
+      // workers (and downstream tooling / manual inspection) can consult the
+      // files from inside the generated project. Safe no-op when no uploads.
+      let designReferenceEntries: Awaited<
+        ReturnType<typeof copyDesignReferencesToOutput>
+      > = [];
+      try {
+        designReferenceEntries = await copyDesignReferencesToOutput(
+          process.cwd(),
+          outputRoot,
+        );
+        if (designReferenceEntries.length > 0) {
+          console.log(
+            `[Engine] Copied ${designReferenceEntries.length} design reference(s) to <output>/.design-references/`,
+          );
+        }
+      } catch (e) {
+        console.warn(
+          "[Engine] Failed to copy design references (ignored):",
+          e instanceof Error ? e.message : e,
+        );
+      }
+      const designReferencesBlock = formatDesignReferencesPromptBlock(
+        designReferenceEntries,
+      );
+
       const {
         tasks: taskBreakdown,
         costUsd: tbCost,
@@ -666,6 +696,7 @@ export class PipelineEngine {
         prdSpec,
         sessionId: run.sessionId,
         tier,
+        designReferencesBlock: designReferencesBlock || undefined,
       });
 
       const { markdown: integrationMd, metadata: integrationMeta } =

@@ -44,5 +44,12 @@ import { sequelize } from "../db";
 // );
 
 export async function syncModels(): Promise<void> {
-  await sequelize.sync();
+  // Without `alter`, existing tables are never updated when models gain columns.
+  // Enable `alter` in non-production (or when DB_SYNC_ALTER=true) so local DBs
+  // stay aligned with the Sequelize models after codegen iterations.
+  const syncAlter =
+    process.env.DB_SYNC_ALTER === "true" ||
+    (process.env.NODE_ENV !== "production" &&
+      process.env.DB_SYNC_ALTER !== "false");
+  await sequelize.sync({ alter: syncAlter });
 }

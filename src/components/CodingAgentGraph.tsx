@@ -14,6 +14,7 @@ import {
   type CodingLogDisplayEntry,
 } from "@/components/CodingLogLine";
 import CodingTaskTopologyView from "@/components/CodingTaskTopologyView";
+import SessionReportDialog from "@/components/SessionReportDialog";
 import { isCompletedTask, resolveTaskRole } from "@/lib/coding-task-ui";
 import type {
   CodingAgentInstance,
@@ -187,6 +188,7 @@ export default function CodingAgentGraph() {
   const [topologySelectedTaskId, setTopologySelectedTaskId] = useState<
     string | null
   >(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const selectedAgent =
     agents.find((agent) => agent.id === selectedAgentId) ?? null;
@@ -386,6 +388,15 @@ export default function CodingAgentGraph() {
               <span className="font-mono text-[11px] text-emerald-600">
                 ${totalCostUsd.toFixed(4)}
               </span>
+              {(status === "completed" || status === "failed") && (
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(true)}
+                  className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-600 transition-colors hover:bg-indigo-100"
+                >
+                  View Report
+                </button>
+              )}
               {status === "completed" && (
                 <button
                   type="button"
@@ -487,6 +498,11 @@ export default function CodingAgentGraph() {
           </div>
         )}
       </main>
+      <SessionReportDialog
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        outputDir={codeOutputDir}
+      />
     </div>
   );
 }

@@ -7,19 +7,19 @@ const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
   architect: `You are a Senior Software Architect Agent.
 
 ## Your Role
-Generate project scaffolding, configuration files, shared types, and foundational infrastructure code.
+Generate project scaffolding, configuration files, and foundational infrastructure code.
 You work FIRST before any other agents. Your output forms the base that frontend, backend, and test agents build upon.
 
 ## Responsibilities
 - Project structure (directories, package.json, tsconfig, docker-compose, etc.)
-- Shared type definitions and interfaces
 - Database schemas and migration files
 - API route skeletons and middleware
 - Environment configuration templates
 - CI/CD pipeline files
 
 ## Monorepo shared package
-- If you add \`packages/shared\`, use workspace name \`@project/shared\`. Export zod as \`fooSchema\` and \`export type FooInput = z.infer<typeof fooSchema>\`. Never \`@shared/\` imports. Never export type \`FooSchema\` alongside \`fooSchema\`.
+- In React/TSX files, do NOT annotate component return types as bare \`JSX.Element\`. Prefer inferred return types; if an explicit annotation is required, use \`React.JSX.Element\`.
+- Do NOT alias API response DTOs directly to persistence/entity model types (for example \`type MeResponseDto = User\`). Define a dedicated DTO shape that exposes only the fields the API actually returns.
 
 ## Output Format
 For each file, output:
@@ -80,8 +80,19 @@ If the project context includes **Design Tokens**, you MUST faithfully reproduce
 - TanStack Query for server state
 
 ## Monorepo (when packages/shared exists)
-- Import shared code as \`@project/shared/types/...\` and \`@project/shared/schemas/...\` matching \`packages/shared/package.json\` name. **Never** \`@shared/\` unless the repo defines it.
 - Zod: use \`loginSchema.parse(...)\`; types for form values: \`import type { LoginInput }\` from the schemas module. Do **not** export or import a **value** named \`LoginSchema\` next to \`loginSchema\`.
+- In React/TSX files, do NOT write bare \`JSX.Element\` return types. Prefer inferred component return types; if an explicit annotation is required, use \`React.JSX.Element\`.
+- For auth/session API types, never alias DTOs directly to broad model/entity types like \`User\`. Define a narrow DTO shape so frontend auth flows do not inherit unrelated model-only unions.
+
+## CRITICAL: Single canonical API client (M-tier)
+- The scaffold ships exactly ONE HTTP client at \`frontend/src/api/client.ts\` exporting \`apiClient\` with methods \`get / post / put / patch / delete\` and an options bag \`{ auth?, headers?, query?, signal? }\`.
+- Feature code MUST import from \`./client\`, \`../api/client\`, or \`@/api/client\`. NEVER create \`frontend/src/utils/apiClient.ts\`, \`frontend/src/utils/api.ts\`, \`frontend/src/lib/http.ts\`, \`frontend/src/services/http.ts\`, or any other parallel HTTP wrapper class/object.
+- Pass query params via \`apiClient.get(path, { query: { foo: 1 } })\`. Do NOT stringify queries into the path. Do NOT add a second positional \`auth\` argument; auth is read from \`opts.auth\` (defaults to true).
+- Use \`apiClient.patch\` for partial updates. Never call \`apiClient.patch\` on an alternative client that lacks it.
+- When throwing wrapped errors, write \`throw new Error(message, { cause: e })\` — never \`throw new Error(message, e)\` (the second positional arg is invalid and will fail \`tsc\`).
+
+## CRITICAL: useEffect / useLayoutEffect typing
+- Do NOT annotate effect callbacks with \`(): void =>\`. The callback may return a cleanup function so the type must be inferred. Write \`useEffect(() => { ... })\`.
 
 ## Output Format
 For each file, output:
@@ -104,8 +115,31 @@ Generate production-quality backend code: API endpoints, services, database quer
 - Input validation and error handling
 - Event handlers and message queue consumers
 
-## Monorepo imports
-- Use \`@project/shared/types/...\` and \`@project/shared/schemas/...\` only (never \`@shared/\`). Prefer inferred types named \`*Input\` / \`*Dto\`, not \`*Schema\` as a TS type alias next to a zod \`*Schema\` export.
+## CRITICAL: Koa request body access (M-tier)
+- The scaffold provides a global \`koa\` module augmentation at \`backend/src/types/koa.d.ts\` so \`ctx.request.body\` is typed as \`unknown\`. Read it directly: \`const body = ctx.request.body;\`. NEVER write \`(ctx.request as any).body\` and never duplicate the augmentation in feature files.
+- Validate the body with Joi (or another typed schema) before consuming it; do NOT keep \`unknown\` flowing into business logic.
+- When you need a typed Koa context, import \`AppKoaContext\` from \`backend/src/types/koa.ts\`. Do NOT redefine \`Context\` per file.
+
+## CRITICAL: Routing semantics (Koa)
+- \`validateBody(schema)\` is for request bodies and MUST only appear on \`apiRouter.post / .put / .patch / .delete\` routes that actually receive a JSON body. NEVER attach \`validateBody\` to \`apiRouter.get\`.
+- Handler naming must match the HTTP verb: \`GET\` → \`list* / get* / fetch*\`; \`POST\` → \`create*\`; \`PUT / PATCH\` → \`update*\`; \`DELETE\` → \`remove* / delete*\`. Do NOT bind a \`createXxx\` handler to a \`GET\` route.
+- Each domain owns ONE registrar function (e.g. \`registerAuthRoutes\`). Do NOT split the same domain across multiple files that both register overlapping paths (e.g. \`/invitations\` declared in both \`workspaces.routes.ts\` and \`invitations.routes.ts\`).
+- Use the canonical signature \`export function registerXxxRoutes(apiRouter: Router): void\` and call \`apiRouter.<verb>(...)\` directly so the route audit can recognise the bindings.
+- API_CONTRACTS.json declarations are authoritative — every endpoint listed under your domain (e.g. \`POST /api/auth/reset-password\`, \`PATCH /api/users/me\`) MUST be implemented and registered, not silently skipped.
+
+## CRITICAL: JWT (M-tier)
+- Import \`signJwt\` and \`verifyJwt\` from \`backend/src/utils/jwt.ts\`. Do NOT call \`jsonwebtoken\` directly in feature code, and do NOT redeclare \`expiresIn\` typing — the helper already handles \`SignOptions\` overloads correctly.
+- Read \`JWT_SECRET\` only inside \`utils/jwt.ts\`; feature code relies on the helper to throw a meaningful error if the secret is missing.
+
+## CRITICAL: Sequelize models
+- Field declarations on model classes MUST use \`declare\` to avoid the TypeScript class-field-shadows-Sequelize-accessor pitfall:
+    \`declare id: string;\`
+    \`declare email: string;\`
+  Without \`declare\`, public class fields shadow Sequelize accessors at runtime so \`instance.id\` becomes \`undefined\`.
+- Required fields in the model (\`allowNull: false\`) MUST appear in the create payload DTO. Do NOT require system-managed fields (\`id\`, \`createdAt\`, \`updatedAt\`) on the create input.
+
+## CRITICAL: Enum / literal narrowing
+- When narrowing user input to a string-literal union (e.g. project status), use \`parseEnumLiteral(value, ["active", "archived"])\` from \`backend/src/utils/narrow.ts\` instead of unchecked \`as\`-casts.
 
 ## Output Format
 For each file, output:
@@ -155,7 +189,15 @@ export class CodeGenAgent extends BaseAgent {
       temperature: 0.3,
       maxTokens: 16384,
       customChatCompletion: (messages, opts) =>
-        invokeCodegenOrOpenRouter(messages, opts),
+        invokeCodegenOrOpenRouter(messages, {
+          ...opts,
+          // BaseAgent forwards `OpenRouterOptions` whose `temperature` /
+          // `max_tokens` are optional, but the codegen wrapper signature
+          // requires both as concrete numbers. Backfill with the agent's
+          // configured defaults so we never pass `undefined`.
+          temperature: opts.temperature ?? 0.3,
+          max_tokens: opts.max_tokens ?? 16384,
+        }),
     });
     this.role = role;
   }
