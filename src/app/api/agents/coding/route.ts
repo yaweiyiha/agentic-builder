@@ -21,6 +21,7 @@ import {
   formatGeneratedCodeDotEnv,
   resolveBlueprintGeneratedDatabaseUrl,
   upsertDatabaseUrlEnv,
+  upsertJwtEnvVars,
 } from "@/lib/pipeline/generated-code-env";
 import type {
   KickoffWorkItem,
@@ -489,23 +490,22 @@ export async function POST(request: NextRequest) {
         `[CodingAPI] Failed to write .env: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+  }
 
-    const backendEnvPath = path.join(outputRoot, "backend", ".env");
-    try {
-      const existingBackendEnv = await fs.readFile(backendEnvPath, "utf-8").catch(
-        () => "",
-      );
-      const mergedBackendEnv = upsertDatabaseUrlEnv(
-        existingBackendEnv,
-        resolvedDbUrl,
-      );
-      await fs.writeFile(backendEnvPath, mergedBackendEnv, "utf-8");
-      console.log("[CodingAPI] Synced backend/.env DATABASE_URL.");
-    } catch (e) {
-      console.warn(
-        `[CodingAPI] Failed to sync backend/.env DATABASE_URL: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
+  // Always ensure backend/.env has JWT_SECRET (and DATABASE_URL if available).
+  const backendEnvPath = path.join(outputRoot, "backend", ".env");
+  try {
+    const existingBackendEnv = await fs.readFile(backendEnvPath, "utf-8").catch(() => "");
+    const withDbUrl = resolvedDbUrl
+      ? upsertDatabaseUrlEnv(existingBackendEnv, resolvedDbUrl)
+      : existingBackendEnv;
+    const mergedBackendEnv = upsertJwtEnvVars(withDbUrl);
+    await fs.writeFile(backendEnvPath, mergedBackendEnv, "utf-8");
+    console.log("[CodingAPI] Synced backend/.env (DATABASE_URL + JWT vars).");
+  } catch (e) {
+    console.warn(
+      `[CodingAPI] Failed to sync backend/.env: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 
   const scaffoldProtectedPaths = await listScaffoldTemplateRelativePaths(tier);

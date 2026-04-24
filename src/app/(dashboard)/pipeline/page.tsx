@@ -1111,8 +1111,8 @@ export default function PipelinePage() {
               <div className="flex min-w-0 items-center gap-2">
                 <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
                 <span className="truncate">
-                  Using imported PRD — PM generation will be skipped on the
-                  next run
+                  Using imported PRD — PM generation will be skipped on the next
+                  run
                   {importedPrd.updatedAt
                     ? ` (updated ${new Date(importedPrd.updatedAt).toLocaleString()})`
                     : ""}
@@ -1144,8 +1144,9 @@ export default function PipelinePage() {
                 <span className="truncate">
                   {designReferences.length} design reference
                   {designReferences.length === 1 ? "" : "s"} attached — will be
-                  copied to <code className="font-mono">.design-references/</code>{" "}
-                  and injected into code-gen context.
+                  copied to{" "}
+                  <code className="font-mono">.design-references/</code> and
+                  injected into code-gen context.
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">

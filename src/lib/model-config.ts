@@ -52,6 +52,7 @@ export const MODEL_CONFIG = {
 
   /** Error-fix pass: cheaper models suffice for targeted tsc/build fixes. */
   codeFix: [
+    "claude-sonnet-4",
     "openai/gpt-5.3-codex",
     "qwen/qwen3.6-plus",
     "claude-sonnet",
@@ -63,6 +64,7 @@ export const MODEL_CONFIG = {
    * Needs strong tool-use / function-calling capability.
    */
   phaseVerifyFix: [
+    "claude-sonnet-4",
     "openai/gpt-5.3-codex",
     "qwen/qwen3.6-plus",
     "deepseek/deepseek-v3.2",

@@ -58,7 +58,7 @@ const MAX_OUTPUT_TOKENS = (() => {
 })();
 const MAX_TASK_GENERATION_RETRIES = 2;
 const MAX_WORKER_TOOL_ITERATIONS = 6;
-const MAX_WORKER_TOOL_OUTPUT_CHARS = 4000;
+const MAX_WORKER_TOOL_OUTPUT_CHARS = 12000;
 const WORKER_LLM_HEARTBEAT_MS = 10_000;
 const CODEGEN_MULTI_ROUND_ENABLED = (() => {
   const raw = (process.env.CODEGEN_MULTI_ROUND_ENABLED ?? "1")
@@ -201,180 +201,95 @@ const WORKER_READONLY_TOOLS: OpenRouterToolDefinition[] = [
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
   architect: `You are a Senior Software Architect Agent.
-Generate scaffolding/config/shared foundations for the assigned task.
+Generate scaffolding, config, and shared foundations for the assigned task.
 
-Rules:
-- Follow the scaffold and task scope; prefer extending existing files over creating duplicate structures.
-- Use valid JSON/TS syntax.
-- If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` aliases).
-- For Zod naming, use \`camelCaseSchema\` for runtime values and \`*Input\` / \`*Dto\` for inferred types.
-- If you create a brand new Vite project from scratch and choose to use the \`@\` alias, wire it consistently in both \`vite.config.ts\` and \`tsconfig.json\`.
-- In React/TSX files, do NOT annotate component return types as bare \`JSX.Element\`. Prefer inferred return types; if an explicit annotation is truly needed, use \`React.JSX.Element\`.
-- Do NOT alias API response DTOs directly to persistence/entity model types (for example \`type MeResponseDto = User\`). Define a dedicated DTO shape that exposes only the fields the API actually returns.
+**Project-specific conventions (read the Project Convention Card in context for exact paths):**
+- Prefer extending existing files over creating duplicate structures.
+- If the project uses the \`@\` alias, wire it in both \`vite.config.ts\` and \`tsconfig.json\`.
+- API response DTOs must be narrow shapes — never alias \`type MeResponseDto = User\`.
+- Shared packages: import by package name from context, never invent \`@shared/*\`.
+
 ${FRONTEND_IMPORT_RULES}
 ${WORKER_READONLY_TOOLS_GUIDE}
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
 
-When you have successfully generated all required files, end your response with exactly:
-${RALPH_COMPLETE_TOKEN}
-If you cannot complete the task, end with: <promise>TASK_FAILED: <reason></promise>`,
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
+
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 
   frontend: `You are a Senior Frontend Engineer Agent.
 Generate React + TypeScript + Tailwind code for the assigned task.
 
-Rules:
-- Keep routing/page structure consistent with existing project layout.
-- **Directory convention (MANDATORY for M-tier / Vite+React projects)**:
-  - Page-level view components MUST be placed under \`frontend/src/views/\` (e.g. \`frontend/src/views/LoginPage.tsx\`, \`frontend/src/views/DashboardPage.tsx\`).
-  - NEVER place pages under \`frontend/src/pages/\` — that path is for Next.js projects only. This project uses Vite + React Router.
-  - Use a **flat** structure inside \`views/\`: one file per page, do NOT nest into subdirectories like \`views/auth/LoginPage.tsx\`. Instead use \`views/LoginPage.tsx\`, \`views/RegisterPage.tsx\`, etc.
-  - Route registration lives in \`frontend/src/router.tsx\`; import page components from \`./views/...\`.
-- If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` or \`@repo/shared/*\`).
-- **Design compliance (MANDATORY)**: The merged **Project Context** includes \`## Design Specification\`, \`## Pencil design (implementation summary)\`, and often an English \`## Codegen handoff\` block (per-screen colors, typography, layout, route hints, PNG mapping). Treat these as the source of truth above generic templates; **Codegen handoff** is the structured counterpart to exported PNGs.
-  - Match page structure, section order, and component hierarchy from Design Specification.
-  - Apply colors, typography, spacing, and radii stated in the Pencil summary or Design Specification using Tailwind (use exact values, e.g. arbitrary colors \`bg-[#0a0a0a]\` when specified).
-  - If **Design assets on disk** lists files under \`public/design/\`, reference them in JSX (e.g. \`<img src="/design/..." />\` or imports) where they correspond to screens in the spec.
-  - Do not replace the design-driven layout with a minimal placeholder UI when the spec is present.
-- Keep edits scoped to this task.
-- ALWAYS type every event handler and callback parameter explicitly:
-    ✅  (e: React.ChangeEvent<HTMLInputElement>) => ...
-    ✅  (e: React.FormEvent<HTMLFormElement>) => ...
-    ✅  (e: React.MouseEvent<HTMLButtonElement>) => ...
-    ❌  (e) => ...   // implicit any — forbidden
-- ALWAYS type every function parameter and return value; never rely on implicit \`any\`.
-- In React/TSX files, do NOT write bare \`JSX.Element\` return types. Prefer inferred component return types; if an explicit annotation is required, use \`React.JSX.Element\`.
-- For auth/session API types, never alias DTOs directly to broad model/entity types like \`User\`. Define a narrow DTO shape (for example id/name/email/avatar/timezone plus explicitly optional auth-only fields) so frontend auth flows do not inherit unrelated model unions.
+**Project-specific conventions (always read the Project Convention Card in context first):**
+- Page views → \`frontend/src/views/\` (flat, e.g. \`LoginPage.tsx\`). NEVER use \`src/pages/\` — this is Vite+React Router, not Next.js.
+- Route registration → \`frontend/src/router.tsx\`, import from \`./views/...\`.
+- API client → ONE canonical file at \`frontend/src/api/client.ts\`. Never create a parallel HTTP wrapper.
+- **API paths: the client base URL already includes \`/api\`. Pass paths WITHOUT that prefix** — use \`"/users/me"\` not \`"/api/users/me"\`. Read the client file before coding if unsure.
+- Design spec: when "Design Specification", "Pencil design", or "Codegen handoff" is in context, treat it as source of truth. Match colors, layout, and component hierarchy exactly using Tailwind arbitrary values (\`bg-[#0a0a0a]\`).
 
-## MANDATORY: Single canonical API client (M-tier)
-- The scaffold ships exactly ONE HTTP client at \`frontend/src/api/client.ts\` exporting \`apiClient\` with methods \`get / post / put / patch / delete\` and an options bag \`{ auth?, headers?, query?, signal? }\`.
-- Feature code MUST import from \`./client\`, \`../api/client\`, or \`@/api/client\`. NEVER create \`frontend/src/utils/apiClient.ts\`, \`frontend/src/utils/api.ts\`, \`frontend/src/lib/http.ts\`, \`frontend/src/services/http.ts\`, or any other parallel HTTP wrapper.
-- Pass query params via \`apiClient.get(path, { query: { foo: 1 } })\`. NEVER stringify queries into the path. NEVER add a second positional \`auth\` argument; auth is read from \`opts.auth\` (defaults to true).
-- Use \`apiClient.patch\` for partial updates. Never call \`.patch\` on an alternative client that lacks it.
-- When throwing wrapped errors, write \`throw new Error(message, { cause: e })\` — never \`throw new Error(message, e)\` (the second positional arg is invalid and will fail \`tsc\`).
+**Data & API rules:**
+- Every list/table/grid that shows backend data MUST fetch via the API client. No hardcoded arrays, no mock data, no \`useState([{ id: 1, ... }])\` placeholder initialization.
+- Use \`useEffect\` + loading/error state for all data fetching. Read \`frontend/src/api/client.ts\` first to confirm method signatures.
+- All mutations (create/update/delete) must call the real endpoint, not patch local state only.
+- Wrap awaited calls driving loading state with a min-duration helper (~400 ms) so spinners stay visible long enough for E2E assertions.
 
-## MANDATORY: useEffect / useLayoutEffect typing
-- Do NOT annotate effect callbacks with \`(): void =>\`. The callback may return a cleanup function so the type must be inferred. Write \`useEffect(() => { ... })\`.
-
-- Only import from files that are listed in "Already generated files" or in this task's file hints.
-  If a dependency file does not exist yet, create a minimal stub for it in this same response.
-
-## MANDATORY: No Mock / Hardcoded Data — Real API Calls Only
-These rules are NON-NEGOTIABLE and override any other consideration:
-- ❌ FORBIDDEN: \`const mockData = [...]\`, \`const fakeItems = [...]\`, \`useState([{ id: 1, ... }])\` initialized with hardcoded objects, any inline array literal used as substitute for API data.
-- ❌ FORBIDDEN: \`// TODO: replace with real API\`, \`// temporary mock\`, placeholder data of any kind.
-- ❌ FORBIDDEN: Creating ANY mock/fake API interceptor file (e.g. \`mockApi.ts\`, \`mock-server.ts\`, \`msw/handlers.ts\`, \`__mocks__/*\`). NEVER import or create such files. NEVER add \`import "./lib/mockApi"\` or similar side-effect imports that intercept \`fetch\`/\`XMLHttpRequest\`.
-- ✅ REQUIRED: Every list, table, card grid, or detail view that displays data from the backend MUST use \`useEffect\` + the existing API client (\`frontend/src/api/client.ts\` or equivalent) to fetch from the real endpoint.
-- ✅ REQUIRED: Before coding, use the \`read_file\` tool to read \`frontend/src/api/client.ts\` and any relevant backend route files to know exactly which endpoints exist and what they return.
-- ✅ REQUIRED: Show a loading state while data is being fetched (e.g. \`isLoading\` flag) and an error state if the fetch fails. Render the real response data, not static arrays.
-- ✅ REQUIRED: All mutations (create, update, delete) MUST call the corresponding API endpoint via the API client, not update local state only.
-- If an endpoint is listed in the task description, use that exact path. If not listed, use the \`grep\` tool to find the backend route files and determine the correct endpoint path before coding.
-
-## MANDATORY: AuthContext / AuthProvider must be functional
-- If the task creates or modifies \`AuthContext\` or \`AuthProvider\`, it MUST implement real auth state management:
-  - Read \`token\` / \`user\` from \`localStorage\` on mount.
-  - Expose \`login(token, user)\`, \`logout()\` functions that update both state and \`localStorage\`.
-  - Set \`isAuthenticated\` based on whether a valid token exists.
-  - NEVER ship a no-op provider that always returns \`{ isAuthenticated: false, user: null }\`.
-
-## MANDATORY: Observable loading / disabled transitions
-Any transient UI state that the PRD or E2E test observes (loading spinner, disabled submit button, "Loading" / "Submitting" text, skeleton placeholder) MUST remain visible for **at least 300–500 ms** after the state enters. A local backend — or a Playwright \`route.fulfill\` mock — can resolve in under 50 ms, which is shorter than the poll interval of both human eyes and most E2E assertion frameworks. Without a minimum duration, assertions like \`expect(button).toBeDisabled()\` or \`expect(locator('text=Loading')).toBeVisible()\` will flake even though the feature works.
-
-- ✅ REQUIRED: Wrap awaited network calls that drive a loading state with a minimum-duration helper, e.g.
-  \`\`\`ts
-  const MIN_TRANSIENT_MS = 400;
-  const withMinDuration = <T,>(p: Promise<T>, ms: number) =>
-    Promise.all([p, new Promise(r => setTimeout(r, ms))]).then(([v]) => v as T);
-  await withMinDuration(apiClient.post("/records", payload), MIN_TRANSIENT_MS);
-  \`\`\`
-- ✅ REQUIRED: Keep \`isSubmitting\` / \`isLoading\` / \`disabled\` flags \`true\` for the full minimum window, even when the backend is fast.
-- ❌ FORBIDDEN: Relying on the backend latency alone to make a spinner visible. This is flaky in CI and fails against mocked responses.
+**Auth:**
+- If implementing \`AuthContext\`/\`AuthProvider\`: read token/user from localStorage on mount, expose \`login(token, user)\`/\`logout()\`, set \`isAuthenticated\` from token presence. Never ship a no-op stub.
 
 ${FRONTEND_IMPORT_RULES}
 ${WORKER_READONLY_TOOLS_GUIDE}
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
 
-When you have successfully generated all required files, end your response with exactly:
-${RALPH_COMPLETE_TOKEN}
-If you cannot complete the task, end with: <promise>TASK_FAILED: <reason></promise>`,
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
+
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 
   backend: `You are a Senior Backend Engineer Agent.
-Generate backend code (routes/services/domain logic) for the assigned task.
+Generate backend code (routes, services, domain logic) for the assigned task.
 
-Rules:
-- Keep exports/imports consistent with existing modules and contracts.
-- **Skeleton override rule**: If a file listed in this task already exists on disk with only placeholder stubs (e.g. \`throw new Error("Not implemented")\`), you MUST **replace the entire file** with a complete, working implementation. Read the existing file first, then output the full replacement via \`\`\`file:<path>\`. Do NOT leave any \`throw new Error("Not implemented")\` stubs in your output.
-- If the project includes a shared package, import it using the actual package name shown in context (never invent \`@shared/*\` or \`@repo/shared/*\`).
-- Use \`camelCaseSchema\` values and \`*Input\` / \`*Dto\` inferred types.
-- Backend code does NOT use Vite aliases. Use relative imports or backend-specific path aliases only if the project config explicitly defines them.
-- Keep edits scoped to this task.
-- **Sequelize / persistence consistency rule (MANDATORY)**:
-  - Treat \`id\`, \`createdAt\`, \`updatedAt\`, \`deletedAt\`, timestamps, slugs, and similar lifecycle/generated fields as **system fields** unless the PRD explicitly says the user submits them.
-  - For every create/update flow, keep these four layers consistent: request DTO/types, request validation schema, service/controller payload, and ORM model definition.
-  - If a model field is \`allowNull: false\`, then exactly one of the following must be true:
-    1. the create/update payload explicitly provides it;
-    2. the model defines a \`defaultValue\`;
-    3. the ORM/database lifecycle automatically fills it and the model configuration fully supports that behavior.
-  - If a model uses Sequelize \`timestamps: true\`, do NOT require services/controllers to manually pass \`createdAt\` / \`updatedAt\` unless the project already follows that convention consistently.
-  - Create DTOs / validation schemas MUST NOT require system-generated fields.
-  - Before finalizing backend code, cross-check: the fields accepted by validation, the fields in the DTO/type, the fields passed into \`Model.create\` / \`Model.update\`, and the model's required/defaulted fields must agree.
-- Stick to the framework already in the project. Read \`package.json\`, \`app.ts\`, and route entry files in context first. If the project uses **Koa**, keep Koa. If it uses **Express**, keep Express. If it uses **Fastify**, keep Fastify. Do not switch frameworks.
+**Project-specific conventions (always read the Project Convention Card in context first):**
+- Framework: read \`package.json\` + \`app.ts\` first and stick to whatever is already there (Koa/Express/Fastify).
+- Route registrar pattern: \`export function registerXxxRoutes(apiRouter: Router): void\` — call \`apiRouter.<verb>(...)\` directly so the route audit can detect bindings. ONE registrar per domain.
+- Middleware canonical path: \`backend/src/middlewares/\` (with the **s**). Do NOT create \`backend/src/middleware/\` (without).
+- Skeleton files: if a file already exists with \`throw new Error("Not implemented")\` stubs, read it and output a full replacement. Leave no stubs.
+- Shared packages: import by package name, never invent paths.
 
-## MANDATORY: Koa request body access (M-tier)
-- The scaffold provides a global \`koa\` module augmentation at \`backend/src/types/koa.d.ts\` so \`ctx.request.body\` is typed as \`unknown\`. Read it directly: \`const body = ctx.request.body;\`. NEVER write \`(ctx.request as any).body\` and never duplicate the augmentation in feature files.
-- Validate the body with Joi (or another typed schema) before consuming it; do NOT keep \`unknown\` flowing into business logic.
-- When you need a typed Koa context, import \`AppKoaContext\` from \`backend/src/types/koa.ts\`. Do NOT redefine \`Context\` per file.
+**Sequelize consistency (for every create/update flow):**
+- System fields (\`id\`, \`createdAt\`, \`updatedAt\`, slugs) must NOT appear in request DTOs or validation schemas unless the PRD says the user submits them.
+- Keep these four layers aligned: request DTO ↔ validation schema ↔ service payload ↔ ORM model required fields.
+- Model class field declarations MUST use \`declare\`: \`declare id: number;\` — otherwise Sequelize accessors are shadowed.
 
-## MANDATORY: Koa routing semantics
-- \`validateBody(schema)\` is for request bodies and MUST only appear on \`apiRouter.post / .put / .patch / .delete\` routes that actually receive a JSON body. NEVER attach \`validateBody\` to \`apiRouter.get\`.
-- Handler naming must match the HTTP verb: \`GET\` → \`list* / get* / fetch*\`; \`POST\` → \`create*\`; \`PUT / PATCH\` → \`update*\`; \`DELETE\` → \`remove* / delete*\`. Do NOT bind a \`createXxx\` handler to a \`GET\` route.
-- Each domain owns ONE registrar function (e.g. \`registerAuthRoutes\`). Do NOT split the same domain across multiple files that both register overlapping paths (e.g. \`/invitations\` declared in both \`workspaces.routes.ts\` and \`invitations.routes.ts\`).
-- Use the canonical signature \`export function registerXxxRoutes(apiRouter: Router): void\` and call \`apiRouter.<verb>(...)\` directly so the route audit can recognise the bindings.
-- Every endpoint declared in \`API_CONTRACTS.json\` for your domain MUST be implemented and registered (e.g. \`POST /api/auth/reset-password\`, \`PATCH /api/users/me\`). Do not silently skip contract entries.
+**M-tier specifics (Koa + Sequelize):**
+- Body access: \`const body = ctx.request.body;\` (the scaffold's \`koa.d.ts\` augments \`body\` as \`unknown\`). Never cast to \`any\`.
+- Validate body with Joi before consuming. Typed context: import \`AppKoaContext\` from \`backend/src/types/koa.ts\`.
+- \`validateBody(schema)\` only on POST/PUT/PATCH/DELETE — NEVER on GET routes.
+- JWT helpers: \`signJwt\` / \`verifyJwt\` from \`backend/src/utils/jwt.ts\`. Never call \`jsonwebtoken\` directly in feature code.
+- Every endpoint in \`API_CONTRACTS.json\` for this domain must be implemented and registered.
 
-## MANDATORY: JWT (M-tier)
-- Import \`signJwt\` and \`verifyJwt\` from \`backend/src/utils/jwt.ts\` (canonical helper). Do NOT call \`jsonwebtoken\` directly in feature code, do NOT redeclare \`expiresIn\` typing, and do NOT recreate \`utils/jwt.ts\`.
-- Read \`JWT_SECRET\` only inside \`utils/jwt.ts\`; feature code relies on the helper to throw a meaningful error if the secret is missing.
-
-## MANDATORY: Sequelize model field declarations
-- Field declarations on model classes MUST use \`declare\`:
-    \`declare id: string;\`
-    \`declare email: string;\`
-  Without \`declare\`, public class fields shadow Sequelize accessors at runtime so \`instance.id\` is always \`undefined\`.
-
-## MANDATORY: Enum / literal narrowing
-- When narrowing user input to a string-literal union (e.g. project status), use \`parseEnumLiteral(value, ["active", "archived"])\` from \`backend/src/utils/narrow.ts\` instead of unchecked \`as\`-casts.
-- When the project uses Express, these typing rules are mandatory:
-    - \`req.params\` is \`Record<string, string>\` — access as \`req.params.id\` (string, safe).
-    - \`req.headers\` values are \`string | string[] | undefined\` — always narrow:
-        const auth = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization;
-    - NEVER pass \`req.params.x\` or \`req.headers.x\` directly to a function expecting only \`string\` without narrowing.
-- Guard \`req.user\` before use — it is \`Express.User | undefined\`:
-    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-- ALWAYS type every function parameter explicitly; never use implicit \`any\`.
-- Only import types/interfaces that actually exist in the shared package context provided.
-  If a shared type is missing, define a local interface instead of importing a non-existent path.
 ${WORKER_READONLY_TOOLS_GUIDE}
 
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 
-When you have successfully generated all required files, end your response with exactly:
-${RALPH_COMPLETE_TOKEN}
-If you cannot complete the task, end with: <promise>TASK_FAILED: <reason></promise>`,
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 
   test: `You are a Senior QA / Test Engineer Agent.
 Generate comprehensive test suites: unit, integration, e2e.
 Frameworks: Vitest, @testing-library/react, Playwright, k6.
+
+Read the Project Convention Card in context for project-specific paths before writing any imports.
+
 ${FRONTEND_IMPORT_RULES}
 ${WORKER_READONLY_TOOLS_GUIDE}
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.
 
-When you have successfully generated all required files, end your response with exactly:
-${RALPH_COMPLETE_TOKEN}
-If you cannot complete the task, end with: <promise>TASK_FAILED: <reason></promise>`,
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
+
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 };
 
 // ─── Version constraint injection (prevent LLM from using deprecated APIs) ───
@@ -510,6 +425,85 @@ function buildSearchMatcher(pattern: string): (line: string) => boolean {
     const lowered = pattern.toLowerCase();
     return (line: string) => line.toLowerCase().includes(lowered);
   }
+}
+
+/**
+ * Dynamically scan the generated project and produce a concise "Project Convention Card"
+ * that tells every worker the key architectural facts they need before writing any code.
+ * This prevents systematic errors like double /api prefix, wrong directory names, etc.
+ */
+export async function buildProjectConventionCard(
+  outputDir: string,
+): Promise<string> {
+  const lines: string[] = ["## Project Convention Card (read before writing any code)"];
+
+  // ── Detect frontend API client base URL ──────────────────────────────────
+  const clientContent = await fsRead("frontend/src/api/client.ts", outputDir);
+  if (!clientContent.startsWith("FILE_NOT_FOUND") && !clientContent.startsWith("REJECTED")) {
+    const baseMatch =
+      clientContent.match(/VITE_API_BASE_URL[^|]*\|\|\s*["'`]([^"'`]+)["'`]/) ??
+      clientContent.match(/API_BASE\s*=\s*["'`]([^"'`]+)["'`]/) ??
+      clientContent.match(/baseURL.*?["'`]([^"'`]+)["'`]/);
+    const base = baseMatch ? baseMatch[1] : "/api";
+    lines.push(
+      `- **Frontend API client base URL**: \`${base}\` — pass paths WITHOUT this prefix.`,
+      `  ✅ \`apiClient.get("/users/me")\`  ❌ \`apiClient.get("${base}/users/me")\``,
+    );
+  }
+
+  // ── Detect package manager ────────────────────────────────────────────────
+  const pmLock = await fsRead("pnpm-lock.yaml", outputDir);
+  const pm = !pmLock.startsWith("FILE_NOT_FOUND") ? "pnpm" : "npm";
+  lines.push(`- **Package manager**: \`${pm}\``);
+
+  // ── Detect frontend framework / router convention ─────────────────────────
+  const frontendPkg = await fsRead("frontend/package.json", outputDir);
+  const hasVite =
+    !frontendPkg.startsWith("FILE_NOT_FOUND") && frontendPkg.includes('"vite"');
+  if (hasVite) {
+    lines.push(
+      "- **Frontend framework**: Vite + React + React Router (NOT Next.js)",
+      "- **Page views**: `frontend/src/views/` (flat, one file per page). NEVER use `src/pages/`.",
+      "- **Route registration**: `frontend/src/router.tsx`, import from `./views/...`",
+    );
+  }
+
+  // ── Detect middleware directory ───────────────────────────────────────────
+  const mwsFiles = await fsRead("backend/src/middlewares/auth.ts", outputDir);
+  const mwFiles  = await fsRead("backend/src/middleware/auth.ts",  outputDir);
+  const mwDir =
+    !mwsFiles.startsWith("FILE_NOT_FOUND") ? "backend/src/middlewares/" :
+    !mwFiles.startsWith("FILE_NOT_FOUND")  ? "backend/src/middleware/"  :
+    "backend/src/middlewares/";
+  lines.push(`- **Backend middleware directory**: \`${mwDir}\` (canonical — do not create a parallel directory)`);
+
+  // ── Detect backend framework ──────────────────────────────────────────────
+  const backendPkg = await fsRead("backend/package.json", outputDir);
+  if (!backendPkg.startsWith("FILE_NOT_FOUND")) {
+    const hasKoa  = backendPkg.includes('"koa"');
+    const hasExpress = backendPkg.includes('"express"');
+    const hasSequelize = backendPkg.includes('"sequelize"');
+    if (hasKoa)  lines.push("- **Backend framework**: Koa — use `ctx.request.body`, `AppKoaContext`, Joi validation");
+    if (hasExpress) lines.push("- **Backend framework**: Express — use `req.body`, `req.params`, `req.headers`");
+    if (hasSequelize) lines.push("- **ORM**: Sequelize — model field declarations MUST use `declare`. System fields (id, createdAt, updatedAt) must NOT be in request DTOs.");
+  }
+
+  // ── Route registrar convention ────────────────────────────────────────────
+  const indexContent = await fsRead("backend/src/api/modules/index.ts", outputDir);
+  if (!indexContent.startsWith("FILE_NOT_FOUND")) {
+    lines.push(
+      "- **Route registrar pattern**: `export function registerXxxRoutes(apiRouter: Router): void` — one registrar per domain, call `apiRouter.<verb>(...)` directly",
+      "- **Module index**: `backend/src/api/modules/index.ts` — every registrar must be imported and called here",
+    );
+  }
+
+  // ── JWT helper ────────────────────────────────────────────────────────────
+  const jwtHelper = await fsRead("backend/src/utils/jwt.ts", outputDir);
+  if (!jwtHelper.startsWith("FILE_NOT_FOUND")) {
+    lines.push("- **JWT**: use `signJwt`/`verifyJwt` from `backend/src/utils/jwt.ts`. Never call `jsonwebtoken` directly in feature code.");
+  }
+
+  return lines.join("\n");
 }
 
 async function executeWorkerReadonlyTool(
@@ -1421,6 +1415,16 @@ async function generateCode(state: WorkerState) {
     );
 
     const contextParts: string[] = [];
+
+    // Always inject the convention card first so every worker has a concise
+    // cheat-sheet of project-specific architectural facts before reading anything else.
+    try {
+      const conventionCard = await buildProjectConventionCard(state.outputDir);
+      if (conventionCard) contextParts.push(conventionCard);
+    } catch {
+      // Non-fatal — missing card just means workers rely on context files alone.
+    }
+
     if (state.projectContext) {
       contextParts.push(state.projectContext);
     }

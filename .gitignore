@@ -3,6 +3,7 @@
 # scaffold templates must stay source-only; local installs break copyScaffold
 scaffolds/**/node_modules
 generated-code
+generated-code 2
 generated-code/node_modules/
 generated-code/dist/
 generated-code/public/design/*.png
@@ -13,6 +14,8 @@ generated-code/public/design/*.png
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+
+*.zip
 
 # next.js
 /.next/

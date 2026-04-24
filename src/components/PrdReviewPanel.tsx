@@ -22,7 +22,7 @@ export default function PrdReviewPanel({
 }: PrdReviewPanelProps) {
   return (
     <div
-      className="mx-auto min-h-0 h-full w-full max-w-5xl overflow-y-auto px-2 py-2 sm:px-4 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-track]:bg-zinc-950 [&::-webkit-scrollbar]:w-2"
+      className="mx-auto min-h-0 h-full w-full max-w-5xl overflow-y-auto bg-zinc-950 px-4 py-6 sm:px-8 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-track]:bg-zinc-950 [&::-webkit-scrollbar]:w-2"
       role="article"
       aria-label="PRD content"
     >

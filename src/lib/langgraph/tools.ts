@@ -58,6 +58,9 @@ const ALLOWED_COMMANDS = [
   "find",
   "wc",
   "node -e",
+  // tsx: used for backend smoke test (npx tsx --eval)
+  "npx tsx",
+  "tsx",
   // RALPH: git operations for per-task commits
   "git init",
   "git add",

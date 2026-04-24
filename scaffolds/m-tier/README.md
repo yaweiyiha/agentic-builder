@@ -6,6 +6,7 @@
 
 - `frontend`：基于 `React + TypeScript + Vite + Ant Design React` 的前端应用
 - `backend`：基于 `Koa + TypeScript + Sequelize + PostgreSQL` 的后端 API 服务
+- `frontend`、`backend` 包管理器均使用 `pnpm`
 - `PRD.md`：产品需求文档，描述业务目标、页面与功能边界
 
 ---

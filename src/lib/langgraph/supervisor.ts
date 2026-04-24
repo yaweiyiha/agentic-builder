@@ -847,7 +847,11 @@ async function runNpmInstallAllRoots(outputDir: string): Promise<void> {
   }
   for (const rel of dirs) {
     const cwd = rel === "." ? outputDir : path.join(outputDir, rel);
-    const relPm = await resolvePackageManagerForDir(rel, outputDir, repoFallbackPm);
+    const relPm = await resolvePackageManagerForDir(
+      rel,
+      outputDir,
+      repoFallbackPm,
+    );
     console.log(
       `[Supervisor] Integration verify: ${relPm} install in "${rel === "." ? "." : rel}"`,
     );
@@ -1244,7 +1248,7 @@ Rules:
 
   const response = await chatCompletionWithFallback(messages, codeFixChain, {
     temperature: 0.2,
-    max_tokens: 16384,
+    max_tokens: 65536,
   });
 
   const content = response.choices[0]?.message?.content ?? "";
@@ -2387,7 +2391,7 @@ async function generateApiContracts(state: SupervisorState) {
   contextParts.push(`## Backend tasks to implement\n${taskList}`);
 
   const contractModelChain = resolveModelChain(
-    MODEL_CONFIG.codeFix ?? "gpt-4o",
+    MODEL_CONFIG.taskBreakdown ?? MODEL_CONFIG.codeFix ?? "gpt-4o",
     resolveModel,
   );
   const messages: ChatMessage[] = [
@@ -2409,7 +2413,7 @@ async function generateApiContracts(state: SupervisorState) {
       contractModelChain,
       {
         temperature: 0.1,
-        max_tokens: 4096,
+        max_tokens: 65536,
       },
     );
 
@@ -2624,7 +2628,7 @@ Critical rules:
   try {
     const response = await chatCompletionWithFallback(messages, chain, {
       temperature: 0.1,
-      max_tokens: 16384,
+      max_tokens: 65536,
     });
     const content = response.choices[0]?.message?.content ?? "";
     const costUsd = estimateCost(response.model, response.usage);
@@ -3436,7 +3440,8 @@ function isValidationIssueMetricsImproved(
 ): boolean {
   return (
     current.files < previousBest.files ||
-    (current.files === previousBest.files && current.errors < previousBest.errors)
+    (current.files === previousBest.files &&
+      current.errors < previousBest.errors)
   );
 }
 
@@ -4744,7 +4749,11 @@ async function installImportGapsAllProjects(
     );
 
     let r;
-    const relPm = await resolvePackageManagerForDir(rel, outputDir, repoFallbackPm);
+    const relPm = await resolvePackageManagerForDir(
+      rel,
+      outputDir,
+      repoFallbackPm,
+    );
     if (relPm === "pnpm") {
       // For pnpm workspaces, add packages via --filter from root
       const cwd = path.join(outputDir, rel);
@@ -5010,10 +5019,7 @@ async function normalizeFrontendReactComponentTemplates(
       let updated = content;
       updated = updated.replace(/\)\s*:\s*React\.JSX\.Element\s*\{/g, ") {");
       updated = updated.replace(/\)\s*:\s*JSX\.Element\s*\{/g, ") {");
-      updated = updated.replace(
-        /\)\s*:\s*React\.JSX\.Element\s*=>/g,
-        ") =>",
-      );
+      updated = updated.replace(/\)\s*:\s*React\.JSX\.Element\s*=>/g, ") =>");
       updated = updated.replace(/\)\s*:\s*JSX\.Element\s*=>/g, ") =>");
 
       if (!updated.includes("React.")) {
@@ -5024,10 +5030,7 @@ async function normalizeFrontendReactComponentTemplates(
               ? `import {${imports}} from "react";\n`
               : "",
         );
-        updated = updated.replace(
-          /^import React from ["']react["'];?\n?/m,
-          "",
-        );
+        updated = updated.replace(/^import React from ["']react["'];?\n?/m, "");
       }
 
       if (updated !== content) {
@@ -5051,7 +5054,10 @@ async function normalizeFrontendAuthDtoAliases(
 ): Promise<FrontendNormalizationResult> {
   const changedFiles: string[] = [];
   const notes: string[] = [];
-  const candidatePaths = ["frontend/src/types/api.ts", "apps/web/src/types/api.ts"];
+  const candidatePaths = [
+    "frontend/src/types/api.ts",
+    "apps/web/src/types/api.ts",
+  ];
 
   for (const relPath of candidatePaths) {
     const content = await fsRead(relPath, outputDir);
@@ -5219,7 +5225,9 @@ async function normalizeFrontendDuplicateApiClient(
     ) {
       continue;
     }
-    if (/export\s+(?:const|class|function|default)\s+\w*[Aa]pi\w*/.test(content)) {
+    if (
+      /export\s+(?:const|class|function|default)\s+\w*[Aa]pi\w*/.test(content)
+    ) {
       parallels.push(relPath);
     }
   }
@@ -5545,7 +5553,9 @@ async function auditFrontendApiClientUniqueness(
       );
     if (reexportOnly) continue;
     if (
-      /export\s+(?:const|class|function|default)\s+\w*[Aa]pi\w*/.test(content) ||
+      /export\s+(?:const|class|function|default)\s+\w*[Aa]pi\w*/.test(
+        content,
+      ) ||
       /axios\.create\s*\(/.test(content) ||
       /class\s+\w*[Aa]pi\w*Client\b/.test(content)
     ) {
@@ -5560,7 +5570,7 @@ async function auditFrontendApiClientUniqueness(
       `Canonical client: ${canonical}`,
       "Parallel HTTP client(s) still defining their own \`apiClient\` / \`axios.create\` / \`ApiClient\` class:",
       ...parallelClients.map((p) => `- ${p}`),
-      "Resolution: delete or convert these files to \`export * from \"../api/client\"\` and update every consumer to import from the canonical path.",
+      'Resolution: delete or convert these files to \`export * from "../api/client"\` and update every consumer to import from the canonical path.',
     );
   }
 
@@ -5737,7 +5747,9 @@ async function detectFrontendConvergenceClusters(
   }
 
   const jsxAnnotationFiles: string[] = [];
-  for (const relPath of frontendFiles.filter((file) => /\.(ts|tsx)$/.test(file))) {
+  for (const relPath of frontendFiles.filter((file) =>
+    /\.(ts|tsx)$/.test(file),
+  )) {
     const content = await fsRead(relPath, outputDir);
     if (
       content.startsWith("FILE_NOT_FOUND") ||
@@ -6204,6 +6216,88 @@ async function normalizeWorkspaceImports(outputDir: string): Promise<void> {
   }
 }
 
+/**
+ * Scans frontend/src/components/**\/*.tsx for exported component Props types and
+ * returns a compact "Component Interface Reference" block injected into the
+ * integration prompt. This lets the integration agent know the EXACT prop names
+ * each component expects, preventing TS2322 "Property X does not exist" regressions.
+ *
+ * Uses regex — good enough for the standard `type XxxProps = { ... }` /
+ * `interface XxxProps { ... }` patterns produced by the scaffold. Falls back to
+ * an empty string if the frontend directory doesn't exist.
+ */
+async function buildComponentInterfaceReference(
+  outputDir: string,
+): Promise<string> {
+  const componentsDir = path.join(outputDir, "frontend", "src", "components");
+  let tsxFiles: string[] = [];
+  try {
+    tsxFiles = await collectTsxFiles(componentsDir);
+  } catch {
+    return "";
+  }
+  if (tsxFiles.length === 0) return "";
+
+  const entries: string[] = [];
+
+  for (const filePath of tsxFiles) {
+    const raw = await fs.readFile(filePath, "utf-8").catch(() => "");
+    if (!raw) continue;
+
+    // Match both `type XxxProps = { ... }` and `interface XxxProps { ... }` (multiline)
+    const blockRe =
+      /(?:export\s+)?(?:type|interface)\s+(\w+Props)\s*(?:=\s*)?\{([\s\S]*?)\}/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = blockRe.exec(raw)) !== null) {
+      const propsName = match[1];
+      const body = match[2];
+
+      // Extract field names (required and optional)
+      const fieldRe = /^\s*(?:readonly\s+)?(\w+)(\?)?:/gm;
+      const fields: string[] = [];
+      let fieldMatch: RegExpExecArray | null;
+      while ((fieldMatch = fieldRe.exec(body)) !== null) {
+        const name = fieldMatch[1];
+        const optional = fieldMatch[2] === "?";
+        if (name !== "children") {
+          fields.push(optional ? `${name}?` : name);
+        }
+      }
+
+      if (fields.length === 0) continue;
+
+      // Derive component name from Props name (strip trailing "Props")
+      const componentName = propsName.replace(/Props$/, "");
+      const relPath = path.relative(path.join(outputDir, "frontend"), filePath);
+      entries.push(`- **${componentName}** (\`${relPath}\`): ${fields.join(", ")}`);
+    }
+  }
+
+  if (entries.length === 0) return "";
+
+  return [
+    "## Component Interface Reference (use EXACT prop names — TS2322 mismatches are P0 HARD FAIL)",
+    "Each line lists a component and its accepted prop names (? = optional).",
+    "Pass ONLY these names. Unknown props cause TypeScript errors that BLOCK report_done(pass).",
+    ...entries,
+  ].join("\n");
+}
+
+async function collectTsxFiles(dir: string): Promise<string[]> {
+  const results: string[] = [];
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...(await collectTsxFiles(full)));
+    } else if (entry.isFile() && entry.name.endsWith(".tsx")) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
 interface RouteRegistrationAudit {
   /** Human-readable lines suitable for feeding into the system prompt. */
   findings: string[];
@@ -6263,14 +6357,20 @@ async function auditApiRouteRegistration(
   // Implemented modules: map export name → { file, endpoints: [{method, path}] }
   interface ModuleImpl {
     file: string;
+    /** All register*Routes export names found in the file (a module may export aliases). */
+    exportNames: string[];
+    /** Primary export name used for backward-compat reporting. */
     exportName: string | null;
     mountPrefix: string | null;
     endpoints: Array<{ method: string; endpoint: string }>;
   }
   const implemented: ModuleImpl[] = [];
 
+  // Collect ALL register*Routes exports (not just the first one) so modules
+  // that export both a canonical name and a backward-compat alias don't get
+  // flagged as unregistered when the alias is what index.ts actually calls.
   const exportNameRe =
-    /export\s+(?:async\s+)?function\s+(register[A-Z]\w*Routes)\s*\(/;
+    /export\s+(?:async\s+)?function\s+(register[A-Z]\w*Routes)\s*\(/g;
   // Match common Koa router variable names: `router`, `apiRouter`,
   // `<feature>Router`, plus inline `new Router().<verb>()`. Generators
   // alternate between mounting a sub-router (`router.get(...)` then
@@ -6291,7 +6391,13 @@ async function auditApiRouteRegistration(
     ) {
       continue;
     }
-    const exportMatch = content.match(exportNameRe);
+    // Collect all register*Routes exports (reset lastIndex for global re-use).
+    exportNameRe.lastIndex = 0;
+    const exportNames: string[] = [];
+    let enm: RegExpExecArray | null;
+    while ((enm = exportNameRe.exec(content)) !== null) {
+      exportNames.push(enm[1]);
+    }
     const mountMatch = content.match(mountPrefixRe);
     const endpoints: Array<{ method: string; endpoint: string }> = [];
     const seen = new Set<string>();
@@ -6320,8 +6426,13 @@ async function auditApiRouteRegistration(
       );
     implemented.push({
       file: rel,
-      exportName: exportMatch ? exportMatch[1] : null,
-      mountPrefix: bindsDirectlyOnApiRouter ? null : mountMatch ? mountMatch[1] : null,
+      exportNames,
+      exportName: exportNames[0] ?? null,
+      mountPrefix: bindsDirectlyOnApiRouter
+        ? null
+        : mountMatch
+          ? mountMatch[1]
+          : null,
       endpoints,
     });
   }
@@ -6374,21 +6485,23 @@ async function auditApiRouteRegistration(
     }
   }
 
-  // Find modules with an exportName present but not called in index.ts.
+  // Find modules where NONE of their register*Routes exports are called in index.ts.
+  // A module that exports both a canonical name AND a backward-compat alias is
+  // considered registered if ANY of its exports is called.
   const unregisteredModules: string[] = [];
   for (const mod of implemented) {
-    if (!mod.exportName) continue;
-    if (!registeredNames.has(mod.exportName)) {
+    if (mod.exportNames.length === 0) continue;
+    const anyRegistered = mod.exportNames.some((n) => registeredNames.has(n));
+    if (!anyRegistered) {
+      const primary = mod.exportNames[0];
       unregisteredModules.push(
-        `${mod.file}: exports "${mod.exportName}" but index.ts never calls it.`,
+        `${mod.file}: exports "${primary}" but index.ts never calls it.`,
       );
     }
   }
 
   // Imports referencing a register*Routes that doesn't exist in any routes.ts.
-  const knownExports = new Set(
-    implemented.map((m) => m.exportName).filter((n): n is string => !!n),
-  );
+  const knownExports = new Set(implemented.flatMap((m) => m.exportNames));
   const unresolvedRegistrations: string[] = [];
   for (const name of importedNames) {
     if (!knownExports.has(name)) {
@@ -6532,8 +6645,8 @@ interface ContractCompletenessResult {
   }>;
   /**
    * Relationships where the scoped-list endpoint (GET /api/parents/:id/children)
-   * is absent from API_CONTRACTS.json. The #1 reason generated apps ship without
-   * project-detail pages, user-post pages, etc.
+   * is absent from API_CONTRACTS.json AND no acceptable alternative exists.
+   * Only HARD FAIL cases — warnings are separated into `warnOnlyEndpoints`.
    */
   missingScopedEndpoints: Array<{
     parent: string;
@@ -6542,10 +6655,23 @@ interface ContractCompletenessResult {
     reason: string;
   }>;
   /**
+   * Relationships that look "missing" at first glance but are likely served
+   * via a /me/... or flat filtered endpoint pattern. Reported as WARN only
+   * and do NOT block report_done(pass).
+   */
+  warnOnlyEndpoints: Array<{
+    parent: string;
+    child: string;
+    expectedPath: string;
+    reason: string;
+  }>;
+  /**
    * Human-readable findings lines ready to paste into an LLM system prompt or
-   * repair-log payload.
+   * repair-log payload. Includes both HARD and WARN items, each labelled.
    */
   findings: string[];
+  /** True when only warnOnly items remain — does not block report_done. */
+  warnOnly: boolean;
 }
 
 /**
@@ -6568,7 +6694,9 @@ async function auditContractCompleteness(
   const empty: ContractCompletenessResult = {
     inferredRelationships: [],
     missingScopedEndpoints: [],
+    warnOnlyEndpoints: [],
     findings: [],
+    warnOnly: true,
   };
 
   if (!(await pathExistsUnderOutput(outputDir, "backend/package.json"))) {
@@ -6584,7 +6712,8 @@ async function auditContractCompleteness(
   // ── 1. Extract Sequelize hasMany / belongsTo relationships ───────────────
   // hasMany: `Parent.hasMany(Child[, opts])` — parent "1" → child "many"
   // belongsTo: `Child.belongsTo(Parent[, opts])` — same relationship, other side
-  const hasManyRe = /([A-Z][A-Za-z0-9_]*)\s*\.\s*hasMany\s*\(\s*([A-Z][A-Za-z0-9_]*)/g;
+  const hasManyRe =
+    /([A-Z][A-Za-z0-9_]*)\s*\.\s*hasMany\s*\(\s*([A-Z][A-Za-z0-9_]*)/g;
   const belongsToRe =
     /([A-Z][A-Za-z0-9_]*)\s*\.\s*belongsTo\s*\(\s*([A-Z][A-Za-z0-9_]*)/g;
 
@@ -6647,7 +6776,9 @@ async function auditContractCompleteness(
     if (typeof c.method !== "string" || typeof c.endpoint !== "string") {
       continue;
     }
-    declaredSet.add(`${c.method.toUpperCase()} ${normaliseApiPath(c.endpoint)}`);
+    declaredSet.add(
+      `${c.method.toUpperCase()} ${normaliseApiPath(c.endpoint)}`,
+    );
   }
 
   /**
@@ -6681,21 +6812,21 @@ async function auditContractCompleteness(
   };
 
   // ── 3. For each relationship, check scoped endpoint is declared ─────────
-  const missing: ContractCompletenessResult["missingScopedEndpoints"] = [];
+  const hardMissing: ContractCompletenessResult["missingScopedEndpoints"] = [];
+  const warnOnly: ContractCompletenessResult["warnOnlyEndpoints"] = [];
 
   for (const rel of relationships) {
     const parentSegment = flatSegmentFor(rel.parent);
     const childSegment = flatSegmentFor(rel.child);
 
+    // When the parent has no flat list endpoint, the scoped endpoint is
+    // ambiguous — downgrade to WARN rather than blocking the build.
     if (!parentSegment || !childSegment) {
-      missing.push({
+      warnOnly.push({
         parent: rel.parent,
         child: rel.child,
-        expectedPath:
-          parentSegment && childSegment
-            ? `GET /api/${parentSegment}/:id/${childSegment}`
-            : `GET /api/{${rel.parent.toLowerCase()}s}/:id/{${rel.child.toLowerCase()}s}`,
-        reason: `Model relationship ${rel.parent}.hasMany(${rel.child}) found in ${rel.file}, but ${!parentSegment ? "parent" : "child"} has no flat /api list endpoint to derive the plural segment from — add the flat endpoint first, then the scoped one.`,
+        expectedPath: `GET /api/{${rel.parent.toLowerCase()}s}/:id/{${rel.child.toLowerCase()}s}`,
+        reason: `Model relationship ${rel.parent}.hasMany(${rel.child}) found in ${rel.file}, but ${!parentSegment ? "parent" : "child"} has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/${rel.child.toLowerCase()}s pattern.`,
       });
       continue;
     }
@@ -6708,31 +6839,78 @@ async function auditContractCompleteness(
       return expectedPattern.test(key.slice(4));
     });
 
-    if (!hasScoped) {
-      missing.push({
+    if (hasScoped) continue;
+
+    // Check for acceptable /me/<child> pattern (e.g. GET /api/users/me/interests).
+    // Apps frequently serve user-owned resources via /me/... instead of a full
+    // scoped path — both are valid designs; treat /me pattern as satisfying the
+    // completeness requirement.
+    const childLower = childSegment.toLowerCase();
+    const meAlternatives = [
+      `/api/users/me/${childLower}`,
+      `/api/${parentSegment}/me/${childLower}`,
+      `/api/me/${childLower}`,
+    ];
+    const hasMeAlternative = meAlternatives.some((alt) =>
+      [...declaredSet].some(
+        (key) => key.startsWith("GET ") && key.slice(4) === alt,
+      ),
+    );
+    if (hasMeAlternative) continue;
+
+    // Also accept if the child has a flat filtered endpoint (e.g. GET /api/alerts
+    // filtered by auth user satisfies User.hasMany(Alert)).
+    const hasChildFlat = [...declaredSet].some(
+      (key) =>
+        key.startsWith("GET ") &&
+        (key === `GET /api/${childLower}` ||
+          key === `GET /api/${childSegment}`),
+    );
+    if (hasChildFlat) {
+      // Flat child endpoint exists — likely filtered by auth. Downgrade to WARN.
+      warnOnly.push({
         parent: rel.parent,
         child: rel.child,
         expectedPath: `GET /api/${parentSegment}/:id/${childSegment}`,
-        reason: `Model relationship ${rel.parent}.hasMany(${rel.child}) implies this endpoint but it is missing from API_CONTRACTS.json. Scoped lists are mandatory per contract rules.`,
+        reason: `A flat GET /api/${childSegment} endpoint exists (auth-filtered pattern). If that endpoint already returns only the current user's ${rel.child} records, the scoped endpoint is redundant. Otherwise add it.`,
       });
+      continue;
     }
+
+    hardMissing.push({
+      parent: rel.parent,
+      child: rel.child,
+      expectedPath: `GET /api/${parentSegment}/:id/${childSegment}`,
+      reason: `Model relationship ${rel.parent}.hasMany(${rel.child}) implies this scoped-list endpoint, which is missing from API_CONTRACTS.json with no /me/... alternative.`,
+    });
   }
 
   const findings: string[] = [];
-  if (missing.length > 0) {
+  if (hardMissing.length > 0) {
     findings.push(
-      "## Contract completeness: missing scoped-list endpoints (inferred from ORM relationships)",
+      "## Contract completeness: missing scoped-list endpoints [HARD FAIL — implement these]",
     );
-    for (const m of missing) {
+    for (const m of hardMissing) {
       findings.push(`- ${m.expectedPath}`);
       findings.push(`  reason: ${m.reason}`);
+    }
+  }
+  if (warnOnly.length > 0) {
+    findings.push(
+      "## Contract completeness: advisory endpoints [WARN only — review but do not block]",
+    );
+    for (const w of warnOnly) {
+      findings.push(`- ${w.expectedPath} (advisory)`);
+      findings.push(`  note: ${w.reason}`);
     }
   }
 
   return {
     inferredRelationships: relationships,
-    missingScopedEndpoints: missing,
+    missingScopedEndpoints: hardMissing,
+    warnOnlyEndpoints: warnOnly,
     findings,
+    warnOnly: hardMissing.length === 0,
   };
 }
 
@@ -6777,9 +6955,7 @@ async function autoAppendMissingScopedEndpoints(
   const existing = new Set<string>();
   for (const c of parsed) {
     if (typeof c.method === "string" && typeof c.endpoint === "string") {
-      existing.add(
-        `${c.method.toUpperCase()} ${normaliseApiPath(c.endpoint)}`,
-      );
+      existing.add(`${c.method.toUpperCase()} ${normaliseApiPath(c.endpoint)}`);
     }
   }
 
@@ -6791,7 +6967,9 @@ async function autoAppendMissingScopedEndpoints(
     }
     // Skip unresolved placeholder paths like "GET /api/{users}/:id/{tasks}".
     if (pathRaw.includes("{") || pathRaw.includes("}")) {
-      skipped.push(`${m.expectedPath} (unresolved plural — fix flat endpoints first)`);
+      skipped.push(
+        `${m.expectedPath} (unresolved plural — fix flat endpoints first)`,
+      );
       continue;
     }
     const method = methodRaw.toUpperCase();
@@ -6934,8 +7112,8 @@ async function integrationVerifyAndFix(
     state.outputDir,
   );
   let contractCompleteness = await auditContractCompleteness(state.outputDir);
-  // Deterministic repair: append stub contract entries for missing scoped
-  // endpoints so the LLM prompt and downstream audits see a complete contract.
+  // Deterministic repair: append stub contract entries ONLY for HARD FAIL
+  // missing scoped endpoints (not WARN-only items which may have /me/ alternatives).
   // Re-run the audit after appending so `contractCompleteness` reflects the
   // post-repair state in the rest of this function.
   if (contractCompleteness.missingScopedEndpoints.length > 0) {
@@ -7129,10 +7307,28 @@ async function integrationVerifyAndFix(
     routeAudit.findings.length > 0
       ? `\n## Backend route registration audit (MUST fix before report_done(pass))\n${routeAudit.findings.join("\n")}`
       : "";
-  const contractCompletenessBlock =
-    contractCompleteness.findings.length > 0
-      ? `\n## Contract completeness audit (MUST fix before report_done(pass))\nThe ORM models imply scoped-list endpoints that API_CONTRACTS.json does not declare. Add the missing entries to API_CONTRACTS.json AND implement them in the corresponding routes.ts + controller.\n${contractCompleteness.findings.join("\n")}`
-      : "";
+  const contractCompletenessBlock = (() => {
+    if (contractCompleteness.findings.length === 0) return "";
+    // Split HARD vs WARN sections from findings (WARN items contain "(advisory)").
+    const hardLines = contractCompleteness.findings.filter(
+      (l) => !l.includes("(advisory)") && !l.includes("[WARN only"),
+    );
+    const warnLines = contractCompleteness.findings.filter(
+      (l) => l.includes("(advisory)") || l.includes("[WARN only"),
+    );
+    const parts: string[] = [];
+    if (hardLines.length > 1) {
+      parts.push(
+        `\n## Contract completeness audit (HARD FAIL — fix these before report_done(pass))\nImplement each missing scoped-list endpoint: add to API_CONTRACTS.json, implement the handler, and register it in index.ts.\n${hardLines.join("\n")}`,
+      );
+    }
+    if (warnLines.length > 1) {
+      parts.push(
+        `\n## Contract completeness advisory (WARN — review but does NOT block report_done)\nThese ORM relationships have alternative implementations (/me/... pattern or auth-filtered flat endpoints) that satisfy the requirement. Review only if a feature is visibly broken.\n${warnLines.join("\n")}`,
+      );
+    }
+    return parts.join("\n");
+  })();
   const apiClientUniquenessBlock =
     initialApiClientUniqueness.parallelClients.length > 0
       ? `\n## Frontend API client uniqueness audit (MUST fix before report_done(pass))\nA single canonical \`apiClient\` is required at \`${initialApiClientUniqueness.canonical}\`. The preflight normalizer left the following parallel client(s) intact because they still define their own implementation. Collapse them now.\n${initialApiClientUniqueness.findings.join("\n")}`
@@ -7201,13 +7397,13 @@ async function integrationVerifyAndFix(
     "## Phase 2.25 — Delivery hardening",
     "1. Resolve import/package mismatches so every runtime import is declared in the correct package.json.",
     "2. Remove or merge residual duplicate implementations when the same responsibility exists in old/new canonical paths.",
-    "3. If you detect yourself rereading the same file or command output without making progress, stop looping and switch to the highest-signal failing gate first (frontend tsc, frontend build, backend tsc, or explicit PRD gap).",
+    "3. **Stagnation guard**: If you detect yourself rereading the same file or running the same command without making a `write_file` change for 3+ iterations, STOP. Either: (a) make the minimal targeted fix right now, or (b) if all remaining issues are WARN-only, call report_done(pass) with an explanation. Looping without mutations wastes budget and never converges.",
     "4. Treat repeated frontend TypeScript templates as cluster problems, not isolated file problems: fix the shared abstraction or repeated pattern first, then return to leaf files.",
     "",
     "## Phase 2.3 — Cluster priority order (READ BEFORE EDITING ANY LEAF FILE)",
     "Apply fixes in this exact priority order. Do NOT jump ahead — fixing a leaf file before its parent cluster is the #1 cause of stagnation.",
     "  P0. **Frontend shared API surface mismatch** — there must be exactly ONE HTTP client at `frontend/src/api/client.ts`. If you see a second client (e.g. `frontend/src/utils/apiClient.ts`, `frontend/src/lib/http.ts`) or feature files importing from two different clients, FIRST collapse to the canonical client and rewrite consumer imports. Only after that re-run frontend `tsc`.",
-    "  P0. **Backend route registration mismatch** — registrar export name vs `index.ts` import; mount-prefix mismatch; `apiRouter.<verb>` vs sub-router pattern. Fix the registrar/index pair before chasing per-endpoint TS errors.",
+    "  P0. **Backend route registration mismatch** — registrar export name vs `index.ts` import; mount-prefix mismatch; `apiRouter.<verb>` vs sub-router pattern. Fix the registrar/index pair before chasing per-endpoint TS errors. For each dangling import entry: read the actual routes.ts, align the export name with the import (fix either side), never leave a gap between import and export.",
     "  P1. **Backend Koa body / DTO typing** — rely on the scaffold-provided `koa.d.ts` augmentation; do NOT scatter `(ctx.request as any).body`. Validate with Joi, then cast to a typed DTO once.",
     "  P1. **Backend JWT typing** — use `signJwt` / `verifyJwt` from `backend/src/utils/jwt.ts`. Do NOT call `jsonwebtoken` directly in feature code.",
     "  P1. **Backend GET + validateBody** — strip `validateBody(...)` from any `apiRouter.get(...)` call; rebind to the correct `list*` / `get*` handler.",
@@ -7227,11 +7423,17 @@ async function integrationVerifyAndFix(
     "- Registration closure is mandatory: treat missing registrations in `frontend/src/router.tsx`, `backend/src/api/modules/index.ts`, and `backend/src/app.ts` as top-priority integration defects.",
     "- Do not stop after making pages/controllers/middlewares exist on disk; they must be wired into the actual router/module/app entrypoints.",
     "- When a shared module imports a named route registrar or app helper, verify the source file exports that exact symbol; import/export name mismatches are runtime blockers.",
+    "- **Dangling import protocol** — when the route audit reports `index.ts imports \"registerXRoutes\" but no routes.ts defines that export`, follow this exact 3-step procedure:",
+    "    1. Read the actual routes.ts file for that module (e.g. `backend/src/api/modules/users/users.routes.ts`) to find its real export name.",
+    "    2. Choose ONE of: (a) rename the `export function register*Routes` in routes.ts to match what index.ts expects, OR (b) fix the import line in index.ts to match the actual export name in routes.ts.",
+    "    3. Never add a new import to index.ts for a registrar function unless you simultaneously verify OR create that exact export name in the corresponding routes.ts.",
+    "- **Component prop contract (P0 HARD FAIL)**: TypeScript error TS2322 of the form \"Property 'X' does not exist on type '...ComponentProps'. Did you mean 'Y'?\" is a P0 HARD FAIL. Read the component's Props type definition (see 'Component Interface Reference' block in the user message), use the CORRECT field name shown there, and DO NOT pass undeclared props. These errors block report_done(pass) exactly like dangling route imports.",
+    "- **Stale validation rule (ENFORCED)**: After ANY write_file or mutating bash command ALL 4 scoped validation results become stale. You MUST re-run the FULL 4-command validation sequence (frontend_tsc → frontend_build → backend_tsc → backend_smoke) before calling report_done(pass). Calling report_done(pass) with stale validation will be REJECTED by the system.",
     "- Run verification ONLY inside `frontend/` and `backend/`. Do not use root-level `npx tsc` against the whole generated-code tree in this phase.",
-    "- If you modify any file, treat previous validation as stale and re-run the full scoped validation sequence before finishing.",
     "- Do NOT call `report_done(status='pass')` while dependency audit issues remain unresolved.",
     "- Do NOT call `report_done(status='pass')` while the 'Backend route registration audit' block lists unregistered modules, dangling register*Routes imports, or API_CONTRACTS endpoints with no matching implementation. Fix each entry (register, implement, or remove) before finishing.",
-    "- Do NOT call `report_done(status='pass')` while the 'Contract completeness audit' block lists missing scoped-list endpoints. For every entry, (a) add the endpoint to API_CONTRACTS.json, (b) implement the handler in backend/src/api/modules/<parent>.routes.ts (or equivalent), (c) register it in backend/src/api/modules/index.ts, and (d) verify the frontend can reach it. Scoped endpoints are a functional requirement, not a style issue.",
+    "- The 'Contract completeness audit' section has two kinds of findings: **HARD FAIL** items (section header says 'HARD FAIL') block report_done(pass) — implement those. **WARN** items (header says 'WARN only') are advisory; they do NOT block report_done(pass). Common WARN patterns: /me/... alternative endpoints, auth-filtered flat endpoints. If only WARN items remain, you MAY call report_done(pass).",
+    "- **Audit false-positive exit**: If a route audit or contract-completeness finding is demonstrably incorrect (e.g., the route IS registered but the audit used a wrong export name, or the scoped endpoint IS present under a /me/... path), document the discrepancy in your report_done summary and call report_done(pass). Do NOT loop indefinitely trying to fix a false positive.",
     "- In this phase, scaffold-protected files do NOT block edits. You may overwrite protected scaffold files when registration or PRD completeness requires it.",
     "- Minimal targeted changes — do not rewrite working code.",
     "- Install missing npm packages: `pnpm add <pkg> --filter <workspace-name>`",
@@ -7240,6 +7442,10 @@ async function integrationVerifyAndFix(
     ...(versionConstraints ? ["", versionConstraints] : []),
     protectedFilesBlock,
   ].join("\n");
+
+  const componentInterfaceBlock = await buildComponentInterfaceReference(
+    state.outputDir,
+  ).catch(() => "");
 
   const openingUserContent = [
     `Project directory: ${state.outputDir}`,
@@ -7252,6 +7458,7 @@ async function integrationVerifyAndFix(
     routeAuditBlock,
     contractCompletenessBlock,
     apiClientUniquenessBlock,
+    componentInterfaceBlock,
     "",
     "Begin with PRD completeness review and shared registration closure first, then run scoped frontend/backend validation after the feature补写 is complete.",
   ]
@@ -7293,9 +7500,8 @@ async function integrationVerifyAndFix(
   > = {};
   let bestDependencyIssueCount = initialDependencyAudit.remainingIssues.length;
   let bestRouteIssueCount = countRouteAuditIssues(routeAudit);
-  let bestContractCompletenessIssueCount = countContractCompletenessIssues(
-    contractCompleteness,
-  );
+  let bestContractCompletenessIssueCount =
+    countContractCompletenessIssues(contractCompleteness);
 
   function nowIso(): string {
     return new Date().toISOString();
@@ -7704,7 +7910,37 @@ async function integrationVerifyAndFix(
       }
 
       if (tc.function.name === "report_done") {
-        finalStatus = (args.status as "pass" | "fail") ?? "fail";
+        const reportedStatus = (args.status as "pass" | "fail") ?? "fail";
+
+        // Guard: reject report_done(pass) when validation results are stale.
+        // The agent MUST re-run all 4 scoped validation commands after any write_file
+        // before it is allowed to claim a passing integration.
+        if (reportedStatus === "pass" && validationStale) {
+          const buildCmd =
+            pm === "yarn" ? "yarn run build" : pm === "npm" ? "npm run build" : "pnpm run build";
+          const rejectionMsg = [
+            "REJECTED: report_done(pass) is not allowed — validation results are STALE.",
+            `Last filesystem mutation: ${lastMutationAt ?? "unknown"} (${lastMutationReason ?? "unknown"})`,
+            "You MUST re-run the FULL 4-command validation sequence after your last write_file:",
+            `  1. cd frontend && npx tsc -p tsconfig.app.json --pretty false 2>&1`,
+            `  2. cd frontend && ${buildCmd} 2>&1`,
+            `  3. cd backend && npx tsc --noEmit --pretty false 2>&1`,
+            `  4. cd backend && npx tsx --eval "(async()=>{const m=await import('./src/app.ts');const f=m.createApp??m.default?.createApp??m.default;if(typeof f!=='function')throw new Error('createApp missing');const a=await f();if(!a||typeof a.callback!=='function')throw new Error('not a Koa app');console.log('backend_smoke_ok');})()" 2>&1`,
+            "All 4 must succeed (exit 0) before you may call report_done(pass).",
+          ].join("\n");
+          console.log(
+            `${label}: REJECTED report_done(pass) — stale validation (lastMutation=${lastMutationAt ?? "never"})`,
+          );
+          messages.push({
+            role: "tool",
+            content: rejectionMsg,
+            tool_call_id: tc.id,
+            name: "report_done",
+          });
+          continue;
+        }
+
+        finalStatus = reportedStatus;
         finalSummary = String(args.summary ?? "");
         doneSignaled = true;
         console.log(
@@ -7760,7 +7996,9 @@ async function integrationVerifyAndFix(
           if (validationKind) {
             if (markScopedValidationSuccess(validationKind)) {
               iterationValidationProgress = true;
-              iterationProgressReasons.push(`scoped_validation:${validationKind}`);
+              iterationProgressReasons.push(
+                `scoped_validation:${validationKind}`,
+              );
             }
           } else if (isMutatingSupervisorBashCommand(command)) {
             iterationMutated = true;
@@ -7769,7 +8007,10 @@ async function integrationVerifyAndFix(
         } else if (tc.function.name === "bash") {
           const validationKind = detectScopedValidationKind(command);
           if (validationKind) {
-            const trendReason = noteValidationIssueTrend(validationKind, result);
+            const trendReason = noteValidationIssueTrend(
+              validationKind,
+              result,
+            );
             if (trendReason) {
               iterationValidationProgress = true;
               iterationProgressReasons.push(trendReason);
@@ -7800,7 +8041,8 @@ async function integrationVerifyAndFix(
     }
 
     if (iterationMutated && !doneSignaled) {
-      const structuralProgressReasons = await collectStructuralProgressReasons();
+      const structuralProgressReasons =
+        await collectStructuralProgressReasons();
       if (structuralProgressReasons.length > 0) {
         iterationValidationProgress = true;
         iterationProgressReasons.push(...structuralProgressReasons);
@@ -7969,10 +8211,11 @@ async function integrationVerifyAndFix(
     details: {
       when: "final",
       hardFail: finalContractCompletenessHardFail,
+      warnOnly: finalContractCompleteness.warnOnly,
       inferredRelationshipCount:
         finalContractCompleteness.inferredRelationships.length,
-      missingScopedEndpoints:
-        finalContractCompleteness.missingScopedEndpoints,
+      missingScopedEndpoints: finalContractCompleteness.missingScopedEndpoints,
+      warnOnlyEndpoints: finalContractCompleteness.warnOnlyEndpoints,
     },
   });
   if (finalContractCompletenessHardFail) {
