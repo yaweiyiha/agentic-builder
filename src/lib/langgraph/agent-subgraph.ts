@@ -503,6 +503,15 @@ export async function buildProjectConventionCard(
     lines.push("- **JWT**: use `signJwt`/`verifyJwt` from `backend/src/utils/jwt.ts`. Never call `jsonwebtoken` directly in feature code.");
   }
 
+  // ── Playwright webServer & health route (E2E infra contract) ──────────────
+  const playwrightCfg = await fsRead("frontend/playwright.config.ts", outputDir);
+  if (!playwrightCfg.startsWith("FILE_NOT_FOUND") && !backendPkg.startsWith("FILE_NOT_FOUND")) {
+    lines.push(
+      "- **Playwright `webServer` (CRITICAL)**: `frontend/playwright.config.ts` MUST keep `webServer` as an ARRAY that starts BOTH the backend (`cd ../backend && pnpm dev`, health probe `http://localhost:4000/api/health`) AND the frontend (`pnpm dev` on :5173). Collapsing it to a single object causes every API-driven e2e test to fail with ECONNREFUSED — the supervisor will auto-rewrite it back. Do NOT remove the backend entry.",
+      "- **Backend `/api/health`**: `backend/src/api/modules/health/health.routes.ts` exposes `GET /health` and is registered in `backend/src/api/modules/index.ts` via `registerHealthRoutes(apiRouter)`. Do NOT delete this route — the Playwright `webServer` health probe depends on it.",
+    );
+  }
+
   return lines.join("\n");
 }
 

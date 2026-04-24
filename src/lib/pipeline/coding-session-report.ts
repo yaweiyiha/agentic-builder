@@ -1111,6 +1111,87 @@ function aggregateModelPerformance(input: {
   );
 }
 
+/**
+ * E2E telemetry parsed from the gate's plain-text output. The supervisor
+ * doesn't expose a structured object, so we sniff the well-known patterns
+ * Playwright + e2e-triage emit (`X failed`, `X passed`, `triage: A deterministic, B flaky, C infra`).
+ * All counts default to 0 when the corresponding line is absent.
+ */
+interface E2eTelemetry {
+  failed: number;
+  passed: number;
+  total: number;
+  /** True when triage classified the failure as pure infra and zero deterministic. */
+  pureInfra: boolean;
+  deterministic: number;
+  flaky: number;
+  infra: number;
+}
+
+function parseE2eTelemetry(errorBlob: string | undefined): E2eTelemetry {
+  const out: E2eTelemetry = {
+    failed: 0,
+    passed: 0,
+    total: 0,
+    pureInfra: false,
+    deterministic: 0,
+    flaky: 0,
+    infra: 0,
+  };
+  if (!errorBlob) return out;
+  // Playwright lines are wrapped in ANSI; strip them before matching.
+  const plain = errorBlob.replace(/\x1b\[[0-9;]*m/g, "");
+
+  const failedMatch = plain.match(/(\d+)\s+failed/i);
+  if (failedMatch) out.failed = parseInt(failedMatch[1], 10);
+  const passedMatch = plain.match(/(\d+)\s+passed/i);
+  if (passedMatch) out.passed = parseInt(passedMatch[1], 10);
+  out.total = out.failed + out.passed;
+
+  const triageMatch = plain.match(
+    /triage:\s*(\d+)\s*deterministic,\s*(\d+)\s*flaky,\s*(\d+)\s*infra/i,
+  );
+  if (triageMatch) {
+    out.deterministic = parseInt(triageMatch[1], 10);
+    out.flaky = parseInt(triageMatch[2], 10);
+    out.infra = parseInt(triageMatch[3], 10);
+    out.pureInfra =
+      out.deterministic === 0 && out.flaky === 0 && out.infra > 0;
+  }
+  return out;
+}
+
+interface ScoreLine {
+  /** Negative for penalty, positive for bonus. */
+  delta: number;
+  /** Short label used in the readable formula; e.g. "fail status". */
+  label: string;
+  /** Long-form reason printed in the bullet list. */
+  reason: string;
+}
+
+/**
+ * Coding session score calculator (v2).
+ *
+ * Design goals (vs v1):
+ *  1. **No double-jeopardy on fail status.** The 20-point fail penalty already
+ *     reflects "something went wrong"; we no longer also subtract a flat 20
+ *     for the *specific* gate that triggered it. Instead the gate penalty is
+ *     proportional to how broken the gate actually is (e2e pass-rate, gate
+ *     count, etc.), so a run that passes 5/6 e2e specs scores far higher than
+ *     one that fails all 6.
+ *  2. **E2E penalty scales with pass-rate.** -25 * (failed/total).
+ *  3. **Pure-infra e2e failure is forgiven.** If e2e-triage flagged the
+ *     failure as 0 deterministic / 0 flaky / N infra, the e2e penalty is
+ *     halved (the code is fine, the runtime/host wasn't).
+ *  4. **Completion bonus.** When all coding tasks completed and every quality
+ *     gate that was attempted produced no blocking output, +5. Encourages the
+ *     "almost everything works" outcome instead of treating it identically to
+ *     "everything broke".
+ *  5. **Self-explanatory formula.** Returns a one-line breakdown like
+ *     `100 − 20(fail) − 16(e2e:5/6 failed × 0.5 infra) − 4(trunc) = 60` so the
+ *     reader doesn't have to reverse-engineer the report.
+ */
 function scoreCodingSession(input: {
   status: "pass" | "fail" | "aborted";
   integrationErrors?: string;
@@ -1120,55 +1201,161 @@ function scoreCodingSession(input: {
   taskResults: AuditTaskSummary[];
   repairSummary: RepairEventSummary;
 }): ScoreBreakdown {
-  let score = 100;
-  const reasons: string[] = [];
-  if (input.status !== "pass") {
-    score -= input.status === "aborted" ? 30 : 20;
-    reasons.push(`Run status is ${input.status}.`);
+  const lines: ScoreLine[] = [];
+
+  const isFail = input.status !== "pass";
+  if (isFail) {
+    const delta = input.status === "aborted" ? -30 : -20;
+    lines.push({
+      delta,
+      label: input.status === "aborted" ? "aborted" : "fail",
+      reason: `Run status is ${input.status}.`,
+    });
   }
-  if (input.integrationErrors?.trim()) {
-    score -= 20;
-    reasons.push("Integration verification still has blocking errors.");
+
+  const integrationFailed = !!input.integrationErrors?.trim();
+  const runtimeFailed = !!input.runtimeVerifyErrors?.trim();
+  const e2eErrors = input.e2eVerifyErrors?.trim();
+  const e2eTel = parseE2eTelemetry(e2eErrors);
+
+  // Gate penalties — when run status is fail we already paid 20 above, so
+  // skipping a flat per-gate penalty avoids double-counting. We still scale
+  // by *how badly* each gate failed so partial successes get credit.
+  if (integrationFailed) {
+    // Integration is binary (no useful sub-metric in the blob), so apply a
+    // smaller flat penalty: half of the legacy -20.
+    const delta = isFail ? -10 : -20;
+    lines.push({
+      delta,
+      label: "integration",
+      reason: "Integration verification still has blocking errors.",
+    });
   }
-  if (input.runtimeVerifyErrors?.trim()) {
-    score -= 15;
-    reasons.push("Runtime verification still has blocking errors.");
+  if (runtimeFailed) {
+    const delta = isFail ? -8 : -15;
+    lines.push({
+      delta,
+      label: "runtime",
+      reason: "Runtime verification still has blocking errors.",
+    });
   }
-  if (input.e2eVerifyErrors?.trim()) {
-    score -= 20;
-    reasons.push("E2E verification still has blocking errors.");
+  if (e2eErrors) {
+    const e2eMaxPenalty = isFail ? 20 : 25;
+    const passRatio =
+      e2eTel.total > 0 ? e2eTel.failed / e2eTel.total : 1;
+    let delta = -Math.round(e2eMaxPenalty * passRatio);
+    let detail =
+      e2eTel.total > 0
+        ? `e2e:${e2eTel.failed}/${e2eTel.total} failed`
+        : "e2e:blocking errors";
+    if (e2eTel.pureInfra) {
+      delta = Math.round(delta / 2);
+      detail += " ×0.5 infra";
+    }
+    if (delta === 0 && e2eTel.total > 0) {
+      // Edge case: 0 failed but errors string non-empty — no penalty.
+    } else {
+      lines.push({
+        delta,
+        label: detail,
+        reason:
+          e2eTel.total > 0
+            ? `E2E gate: ${e2eTel.failed} failed / ${e2eTel.passed} passed${
+                e2eTel.pureInfra
+                  ? " (triage flagged infra-only — penalty halved)"
+                  : ""
+              }.`
+            : "E2E verification still has blocking errors.",
+      });
+    }
   }
+
   if (input.uncoveredCount > 0) {
-    const penalty = Math.min(25, input.uncoveredCount);
-    score -= penalty;
-    reasons.push(`${input.uncoveredCount} PRD requirement id(s) remain uncovered.`);
+    const delta = -Math.min(25, input.uncoveredCount);
+    lines.push({
+      delta,
+      label: `uncovered:${input.uncoveredCount}`,
+      reason: `${input.uncoveredCount} PRD requirement id(s) remain uncovered.`,
+    });
   }
-  const failedTasks = input.taskResults.filter((task) => task.status === "failed").length;
+
+  const failedTasks = input.taskResults.filter(
+    (task) => task.status === "failed",
+  ).length;
   if (failedTasks > 0) {
-    score -= Math.min(15, failedTasks * 5);
-    reasons.push(`${failedTasks} coding task(s) failed.`);
+    lines.push({
+      delta: -Math.min(15, failedTasks * 5),
+      label: `tasks-failed:${failedTasks}`,
+      reason: `${failedTasks} coding task(s) failed.`,
+    });
   }
-  const unknownTasks = input.taskResults.filter((task) => task.status === "unknown").length;
+
+  const unknownTasks = input.taskResults.filter(
+    (task) => task.status === "unknown",
+  ).length;
   if (unknownTasks > 0) {
-    score -= Math.min(10, unknownTasks * 2);
-    reasons.push(`${unknownTasks} coding task(s) never produced a final status.`);
+    lines.push({
+      delta: -Math.min(10, unknownTasks * 2),
+      label: `tasks-unknown:${unknownTasks}`,
+      reason: `${unknownTasks} coding task(s) never produced a final status.`,
+    });
   }
+
   const truncationSignals = input.repairSummary.byEvent.doc_truncated ?? 0;
   if (truncationSignals > 0) {
-    score -= Math.min(8, truncationSignals * 2);
-    reasons.push(`Context truncation happened ${truncationSignals} time(s).`);
+    lines.push({
+      delta: -Math.min(8, truncationSignals * 2),
+      label: `trunc:${truncationSignals}`,
+      reason: `Context truncation happened ${truncationSignals} time(s).`,
+    });
   }
+
   const planUnfulfilledSignals =
     input.repairSummary.byEvent.task_plan_unfulfilled ?? 0;
   if (planUnfulfilledSignals > 0) {
-    score -= Math.min(8, planUnfulfilledSignals * 2);
-    reasons.push(
-      `Task plan/file-plan mismatches happened ${planUnfulfilledSignals} time(s).`,
-    );
+    lines.push({
+      delta: -Math.min(8, planUnfulfilledSignals * 2),
+      label: `plan-unfulfilled:${planUnfulfilledSignals}`,
+      reason: `Task plan/file-plan mismatches happened ${planUnfulfilledSignals} time(s).`,
+    });
   }
 
-  score = clampScore(score);
+  // Completion bonus — applied last, after all penalties are determined.
+  const totalTasks = input.taskResults.length;
+  const completedTasks = input.taskResults.filter(
+    (task) => task.status === "completed",
+  ).length;
+  const allTasksDone = totalTasks > 0 && completedTasks === totalTasks;
+  const noBlockingGates =
+    !integrationFailed &&
+    !runtimeFailed &&
+    (e2eTel.total === 0 || e2eTel.failed === 0 || e2eTel.pureInfra);
+  if (allTasksDone && noBlockingGates && input.uncoveredCount === 0) {
+    lines.push({
+      delta: +5,
+      label: "all-tasks-done",
+      reason: `Bonus: all ${totalTasks} coding task(s) completed and no code-bug gate failed.`,
+    });
+  }
+
+  let runningTotal = 100;
+  for (const ln of lines) runningTotal += ln.delta;
+  const score = clampScore(runningTotal);
   const grade = scoreToGrade(score);
+
+  // Build a one-line readable formula. e.g.
+  //   "100 − 20(fail) − 16(e2e:5/6 failed ×0.5 infra) − 4(trunc:2) = 60"
+  const formulaParts: string[] = ["100"];
+  for (const ln of lines) {
+    const sign = ln.delta < 0 ? "−" : "+";
+    formulaParts.push(`${sign} ${Math.abs(ln.delta)}(${ln.label})`);
+  }
+  formulaParts.push(`= ${score}`);
+  const formula = formulaParts.join(" ");
+
+  const reasons: string[] = [`Score formula: ${formula}`];
+  for (const ln of lines) reasons.push(ln.reason);
+
   return { score, grade, reasons };
 }
 

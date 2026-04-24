@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import ResourceRequirementsPanel from "@/components/ResourceRequirementsPanel";
 import { parseKickoffTaskBreakdownFromMetadata } from "@/lib/pipeline/kickoff-task-breakdown";
 import { useCodingStore } from "@/store/coding-store";
 import { usePipelineStore } from "@/store/pipeline-store";
@@ -481,6 +482,17 @@ export default function KickoffStepPanel({
                 </p>
               </div>
             )}
+            <ResourceRequirementsPanel
+              prdContent={steps.prd?.content ?? ""}
+              trdContent={steps.trd?.content}
+              sysdesignContent={steps.sysdesign?.content}
+              implguideContent={steps.implguide?.content}
+              runId={
+                typeof result.metadata?.runId === "string"
+                  ? result.metadata.runId
+                  : undefined
+              }
+            />
             <PushGeneratedCodeSection codeOutputDir={codeOutputDir} />
           </motion.div>
         )}

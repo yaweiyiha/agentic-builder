@@ -23,6 +23,11 @@ import {
   upsertDatabaseUrlEnv,
   upsertJwtEnvVars,
 } from "@/lib/pipeline/generated-code-env";
+import {
+  readResourceRequirements,
+  upsertResourceEnvVars,
+  type ResourceRequirement,
+} from "@/lib/pipeline/resource-requirements";
 import type {
   KickoffWorkItem,
   CodingTask,
@@ -350,6 +355,59 @@ function summarizeBlockingGateErrors(snapshot: SupervisorGateSnapshot): string[]
   return failures;
 }
 
+/**
+ * Build a markdown block describing user-provided third-party credentials so
+ * coding agents know exactly which env vars are wired up and what each is for.
+ * Filled vs. unfilled values are surfaced separately so workers don't pretend
+ * a missing key exists. The actual secret values are NEVER shown to the LLM —
+ * only the env var names + descriptions.
+ */
+function formatResourceRequirementsPromptBlock(
+  items: ResourceRequirement[],
+): string {
+  if (items.length === 0) return "";
+  const filled = items.filter((r) => (r.value ?? "").trim().length > 0);
+  const unfilled = items.filter((r) => !(r.value ?? "").trim());
+
+  const lines: string[] = [];
+  lines.push("## External resources & credentials (env vars)");
+  lines.push("");
+  lines.push(
+    "The user provided the following third-party credentials at kickoff. " +
+      "Use these EXACT env var names when reading from `process.env` or `import.meta.env`. " +
+      "Do NOT invent alternative names. Secret values themselves are never exposed here — they live in `backend/.env` / `frontend/.env`.",
+  );
+  lines.push("");
+
+  if (filled.length > 0) {
+    lines.push("### Configured (values present in .env, ready to use)");
+    lines.push("");
+    for (const r of filled) {
+      const reqMark = r.required ? " — required" : " — optional";
+      lines.push(`- **\`${r.envKey}\`** (${r.category}${reqMark}): ${r.description}`);
+    }
+    lines.push("");
+  }
+
+  if (unfilled.length > 0) {
+    lines.push("### Declared but NOT yet configured (treat the corresponding feature as disabled / stubbed)");
+    lines.push("");
+    for (const r of unfilled) {
+      const reqMark = r.required ? " — required" : " — optional";
+      lines.push(`- \`${r.envKey}\` (${r.category}${reqMark}): ${r.description}`);
+    }
+    lines.push("");
+    lines.push(
+      "For unfilled keys: write code that reads the env var defensively " +
+        "(check `process.env.X` for truthy value before calling the integration); " +
+        "if absent, log a clear warning and gracefully degrade. Do NOT hardcode placeholder values.",
+    );
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
@@ -492,6 +550,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Read user-provided resource requirements (API keys, OAuth secrets, etc.)
+  // collected during the kickoff phase. These are merged into backend/.env so
+  // generated code has the credentials it needs at runtime.
+  const resourceRequirements = await readResourceRequirements(process.cwd());
+  const filledResources = resourceRequirements.filter(
+    (r) => (r.value ?? "").trim().length > 0,
+  );
+  const frontendResources = filledResources.filter((r) =>
+    /^(VITE_|NEXT_PUBLIC_)/.test(r.envKey),
+  );
+  const backendResources = filledResources.filter(
+    (r) => !/^(VITE_|NEXT_PUBLIC_)/.test(r.envKey),
+  );
+
   // Always ensure backend/.env has JWT_SECRET (and DATABASE_URL if available).
   const backendEnvPath = path.join(outputRoot, "backend", ".env");
   try {
@@ -499,13 +571,38 @@ export async function POST(request: NextRequest) {
     const withDbUrl = resolvedDbUrl
       ? upsertDatabaseUrlEnv(existingBackendEnv, resolvedDbUrl)
       : existingBackendEnv;
-    const mergedBackendEnv = upsertJwtEnvVars(withDbUrl);
-    await fs.writeFile(backendEnvPath, mergedBackendEnv, "utf-8");
-    console.log("[CodingAPI] Synced backend/.env (DATABASE_URL + JWT vars).");
+    const withJwt = upsertJwtEnvVars(withDbUrl);
+    const withResources = upsertResourceEnvVars(withJwt, backendResources);
+    await fs.writeFile(backendEnvPath, withResources, "utf-8");
+    console.log(
+      `[CodingAPI] Synced backend/.env (DATABASE_URL + JWT vars + ${backendResources.length} user resource(s)).`,
+    );
   } catch (e) {
     console.warn(
       `[CodingAPI] Failed to sync backend/.env: ${e instanceof Error ? e.message : String(e)}`,
     );
+  }
+
+  // Frontend env vars (VITE_* / NEXT_PUBLIC_*) need to land in frontend/.env.
+  if (frontendResources.length > 0) {
+    const frontendEnvPath = path.join(outputRoot, "frontend", ".env");
+    try {
+      const existingFrontendEnv = await fs
+        .readFile(frontendEnvPath, "utf-8")
+        .catch(() => "");
+      const merged = upsertResourceEnvVars(
+        existingFrontendEnv,
+        frontendResources,
+      );
+      await fs.writeFile(frontendEnvPath, merged, "utf-8");
+      console.log(
+        `[CodingAPI] Synced frontend/.env with ${frontendResources.length} user resource(s).`,
+      );
+    } catch (e) {
+      console.warn(
+        `[CodingAPI] Failed to sync frontend/.env: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   const scaffoldProtectedPaths = await listScaffoldTemplateRelativePaths(tier);
@@ -629,6 +726,16 @@ export async function POST(request: NextRequest) {
     baseContextParts.push(designReferencesBlock);
     console.log(
       `[CodingAPI] Injected ${designReferenceEntries.length} design reference(s) into projectContext.`,
+    );
+  }
+
+  const resourcesContextBlock = formatResourceRequirementsPromptBlock(
+    resourceRequirements,
+  );
+  if (resourcesContextBlock) {
+    baseContextParts.push(resourcesContextBlock);
+    console.log(
+      `[CodingAPI] Injected ${resourceRequirements.length} resource requirement(s) into projectContext (${filledResources.length} configured).`,
     );
   }
 

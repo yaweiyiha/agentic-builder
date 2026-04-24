@@ -1591,6 +1591,170 @@ function summarizeE2eTaskContext(tasks: CodingTask[]): string {
     .join("\n");
 }
 
+/**
+ * The canonical `webServer` block — must start BOTH the backend (on :4000,
+ * health-probed at /api/health) and the frontend (on :5173). The Vite dev
+ * server proxies `/api/*` to the backend, so the backend MUST be running
+ * before any API-driven Playwright test executes.
+ */
+const PLAYWRIGHT_CONFIG_CANONICAL = `import { defineConfig, devices } from "@playwright/test";
+
+// Auto-repaired by supervisor: the previous \`webServer\` field collapsed to a
+// single object (frontend-only), which left the backend offline and caused
+// every API-driven e2e test to fail with ECONNREFUSED through the Vite proxy.
+//
+// DO NOT collapse the array back to a single object. The supervisor will
+// rewrite it again on the next run. If you need extra services, append to
+// the array; do not remove the backend entry.
+export default defineConfig({
+  testDir: "./e2e",
+  timeout: 30_000,
+  expect: { timeout: 10_000 },
+  fullyParallel: false,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  reporter: "line",
+  use: {
+    baseURL: "http://localhost:5173",
+    trace: "on-first-retry",
+  },
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+  webServer: [
+    {
+      command: "cd ../backend && pnpm dev",
+      url: "http://localhost:4000/api/health",
+      reuseExistingServer: true,
+      timeout: 120_000,
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+    {
+      command: "pnpm dev",
+      url: "http://localhost:5173",
+      reuseExistingServer: true,
+      timeout: 60_000,
+    },
+  ],
+});
+`;
+
+/**
+ * Audit (and auto-repair) the frontend `playwright.config.ts` so its
+ * `webServer` field always starts BOTH the backend and the frontend in
+ * m-tier projects. The single most common cause of last-mile e2e `infra`
+ * failures is a worker collapsing the `webServer` array back to a single
+ * object, which leaves the backend offline and every API-touching test
+ * fails with ECONNREFUSED through the Vite proxy.
+ */
+async function ensurePlaywrightConfigStartsBackend(
+  outputDir: string,
+): Promise<
+  | { action: "no-config" }
+  | { action: "frontend-only-project" }
+  | { action: "ok" }
+  | { action: "rewritten"; reason: string }
+  | { action: "failed"; reason: string }
+> {
+  const cfgRel = "frontend/playwright.config.ts";
+  const cfgRaw = await fsRead(cfgRel, outputDir);
+  if (cfgRaw.startsWith("FILE_NOT_FOUND") || cfgRaw.startsWith("REJECTED")) {
+    return { action: "no-config" };
+  }
+
+  // Only enforce on m-tier (frontend + backend) projects. A frontend-only
+  // project legitimately has a single `webServer` entry.
+  const backendPkgRaw = await fsRead("backend/package.json", outputDir);
+  if (
+    backendPkgRaw.startsWith("FILE_NOT_FOUND") ||
+    backendPkgRaw.startsWith("REJECTED")
+  ) {
+    return { action: "frontend-only-project" };
+  }
+
+  // Detect a backend-launching webServer entry. Accepts any of:
+  //   - localhost:4000 (health probe URL)
+  //   - "cd ../backend ..." (canonical command)
+  //   - "pnpm -C ../backend ..." / "pnpm --dir ../backend ..." (alternates)
+  //   - "../backend && pnpm dev" (other shells)
+  // Must appear inside the `webServer` array.
+  const webServerMatch = cfgRaw.match(/webServer\s*:\s*\[[\s\S]*?\]/);
+  const startsBackend =
+    !!webServerMatch &&
+    /(localhost:4000|cd\s+\.\.\/backend|pnpm\s+(?:-C|--dir)\s+\.\.\/backend|\.\.\/backend\s*&&\s*pnpm)/.test(
+      webServerMatch[0],
+    );
+  if (startsBackend) return { action: "ok" };
+
+  // Need to rewrite. Force-overwrite via raw fs.writeFile so the protected
+  // path / scaffold-merge logic does not interfere.
+  const cfgAbs = path.resolve(path.join(outputDir, cfgRel));
+  try {
+    await fs.mkdir(path.dirname(cfgAbs), { recursive: true });
+    await fs.writeFile(cfgAbs, PLAYWRIGHT_CONFIG_CANONICAL, "utf-8");
+  } catch (err) {
+    return {
+      action: "failed",
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+  return {
+    action: "rewritten",
+    reason: webServerMatch
+      ? "webServer field did not start the backend on :4000"
+      : "no webServer field found",
+  };
+}
+
+/**
+ * Verify the backend has a registered `/api/health` route. The Playwright
+ * `webServer` health probe relies on it; if the worker deleted the health
+ * module or forgot to re-register it, the probe will hang for 120s and the
+ * whole e2e gate becomes unrecoverable.
+ *
+ * Returns `null` if the route looks registered, or a string describing the
+ * problem (which the supervisor will surface as an audit warning).
+ */
+async function auditBackendHealthRoute(
+  outputDir: string,
+): Promise<string | null> {
+  const backendPkgRaw = await fsRead("backend/package.json", outputDir);
+  if (
+    backendPkgRaw.startsWith("FILE_NOT_FOUND") ||
+    backendPkgRaw.startsWith("REJECTED")
+  ) {
+    return null;
+  }
+  const apiIndex = await fsRead(
+    "backend/src/api/modules/index.ts",
+    outputDir,
+  );
+  if (apiIndex.startsWith("FILE_NOT_FOUND") || apiIndex.startsWith("REJECTED")) {
+    return "backend/src/api/modules/index.ts is missing — the e2e webServer health probe at /api/health will fail.";
+  }
+  if (!/registerHealthRoutes\s*\(/.test(apiIndex)) {
+    return "backend/src/api/modules/index.ts no longer calls registerHealthRoutes(...) — the /api/health probe used by the Playwright webServer will fail.";
+  }
+  const healthRoutes = await fsRead(
+    "backend/src/api/modules/health/health.routes.ts",
+    outputDir,
+  );
+  if (
+    healthRoutes.startsWith("FILE_NOT_FOUND") ||
+    healthRoutes.startsWith("REJECTED")
+  ) {
+    return "backend/src/api/modules/health/health.routes.ts is missing — the /api/health probe used by the Playwright webServer will fail.";
+  }
+  if (!/router\.get\(\s*['"`]\/health['"`]/.test(healthRoutes)) {
+    return "backend/src/api/modules/health/health.routes.ts no longer exposes GET /health — the /api/health probe used by the Playwright webServer will fail.";
+  }
+  return null;
+}
+
 async function detectE2eCommand(
   outputDir: string,
 ): Promise<{ command: string; cwd: string; label: string } | null> {
@@ -1642,6 +1806,35 @@ async function e2eVerifyAndFix(
   console.log(
     `[Supervisor] e2eVerify: attempt ${attempt}/${MAX_E2E_VERIFY_FIX_ATTEMPTS + 1}...`,
   );
+
+  // Audit + auto-repair the Playwright `webServer` config BEFORE running.
+  // The previous round's flagship failure mode was a frontend-only
+  // `webServer` (missing the backend), causing every API-driven test to
+  // fail with ECONNREFUSED and the run to be classified as `infra`.
+  try {
+    const cfgAudit = await ensurePlaywrightConfigStartsBackend(state.outputDir);
+    if (cfgAudit.action === "rewritten") {
+      console.warn(
+        `[Supervisor] e2eVerify: rewrote frontend/playwright.config.ts — ${cfgAudit.reason}.`,
+      );
+    } else if (cfgAudit.action === "failed") {
+      console.error(
+        `[Supervisor] e2eVerify: failed to repair playwright.config.ts — ${cfgAudit.reason}`,
+      );
+    } else if (cfgAudit.action === "ok") {
+      console.log(
+        "[Supervisor] e2eVerify: playwright.config.ts already starts backend + frontend.",
+      );
+    }
+    const healthAudit = await auditBackendHealthRoute(state.outputDir);
+    if (healthAudit) {
+      console.warn(`[Supervisor] e2eVerify: ${healthAudit}`);
+    }
+  } catch (err) {
+    console.warn(
+      `[Supervisor] e2eVerify: pre-run config audit threw: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   const e2eSpecDoc = await fsRead("PRD_E2E_SPEC.md", state.outputDir);
   const e2eCoverageDoc = await fsRead("E2E_COVERAGE.md", state.outputDir);
@@ -2060,6 +2253,8 @@ async function e2eVerifyAndFix(
         "",
         "## Rules",
         "- NEVER modify any file that matches *.spec.ts, *.spec.tsx, *.test.ts, *.test.tsx.",
+        "- NEVER modify `frontend/playwright.config.ts`'s `webServer` field. It MUST stay an ARRAY that starts BOTH the backend (`cd ../backend && pnpm dev`, health probe `http://localhost:4000/api/health`) AND the frontend (`pnpm dev`). Collapsing it into a single object is the #1 cause of `infra: ECONNREFUSED` failures and the supervisor will rewrite it back.",
+        "- NEVER delete `backend/src/api/modules/health/health.routes.ts` or remove the `registerHealthRoutes(...)` call in `backend/src/api/modules/index.ts`. The Playwright `webServer` health probe at `/api/health` depends on it.",
         "- Treat every locator, URL, button label, and aria-label in the test files as the ground truth for what the UI must render.",
         "- When a test expects a button named 'Go Home', the source component MUST render a button with that exact accessible name.",
         "- When a test navigates to /dashboard or /settings, those routes MUST exist and render the correct page.",
