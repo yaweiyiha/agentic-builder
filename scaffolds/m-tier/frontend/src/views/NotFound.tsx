@@ -20,10 +20,10 @@ export const NotFound: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button
             type="primary"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/")}
             className="sm:w-auto"
           >
-            Go to Dashboard
+            Go Home
           </Button>
           <Button
             type="link"

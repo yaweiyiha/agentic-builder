@@ -22,8 +22,10 @@ declare module "koa" {
   }
 
   interface DefaultState {
-    /** User payload populated by `authMiddleware` after JWT verification. */
+    /** Normalized user identity (currently from Privy access token verification). */
     user?: { id: string; email?: string; [key: string]: unknown };
+    /** Raw verified Privy token claims for the request (when present). */
+    privy?: unknown;
   }
 }
 

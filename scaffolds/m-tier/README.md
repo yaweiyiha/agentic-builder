@@ -121,18 +121,55 @@ views/
 
 ---
 
-## 5. 后端架构说明
+## 5. 鉴权系统（Privy OAuth）
 
-### 5.1 技术栈
+本脚手架已内置一套前后端贯通的鉴权系统，基于 Privy：
+
+- 前端：使用 `@privy-io/react-auth` 发起 OAuth 登录（当前内置 Google / X），获取并维护 access token。
+- 后端：使用 `@privy-io/node` 在中间件层验证 access token，并为业务路由提供统一的用户上下文（`ctx.state.user`）。
+
+前端如何使用：
+
+1. 已集成鉴权系统，组件内可直接使用 `usePrivy` 获取登录状态、用户信息、退出登录函数。
+
+示例代码：
+
+```ts
+import { usePrivy } from "@privy-io/react-auth";
+
+const { ready, authenticated, user, logout } = usePrivy();
+```
+
+2. 发起登录时，请使用通用的登录弹窗 `frontend/src/components/auth/LoginModal.tsx` 。
+3. `frontend/src/context/AuthContext.tsx` 会把 token 写入 `localStorage.token`，`frontend/src/api/client.ts` 会自动以 `Authorization: Bearer <token>` 发送到后端。
+
+后端如何使用：
+
+1. `backend/src/app.ts` 已挂载 `privyAuthMiddleware`，会解析 Bearer/cookie token 并验证。
+2. 业务路由中可通过 `ctx.state.user` 判断登录态。
+
+```ts
+if (!ctx.state.user || !ctx.state.privy) {
+  // 未登录
+  // ctx.throw(401, "Not authenticated");
+}
+```
+
+3. 后端已提供 `/api/auth/me` 接口，用于返回用户的个人信息。
+
+---
+
+## 6. 后端架构说明
+
+### 6.1 技术栈
 
 - Node.js
 - Koa
 - TypeScript
 - Sequelize
 - PostgreSQL
-- JWT 鉴权
 
-### 5.2 后端目录结构
+### 6.2 后端目录结构
 
 ```text
 backend/
@@ -151,7 +188,7 @@ backend/
 └── pnpm-lock.yaml
 ```
 
-### 5.3 后端分层职责
+### 6.3 后端分层职责
 
 #### `src/server.js`
 
@@ -170,7 +207,6 @@ backend/
 - 创建 Koa 实例
 - 注册错误处理中间件
 - 注册请求解析中间件
-- 注册 JWT 中间件
 - 挂载 API 路由
 
 它是“应用结构入口”，不直接写某个具体业务接口。
@@ -180,7 +216,6 @@ backend/
 用于管理环境变量与运行配置，例如：
 
 - `PORT`
-- `JWT_SECRET`
 - 后续可能增加的数据库、邮件、对象存储、第三方服务配置
 
 #### `src/middlewares`
@@ -209,14 +244,14 @@ backend/
 
 ---
 
-## 6. 编码规范
+## 7. 编码规范
 
 - !!非常重要!!： 导入类型定义时，必须使用 import type 关键字，不能仅使用 import。
 - 优先使用 Tailwind CSS 进行样式开发。
 
 ---
 
-## 7. 当前前后端职责边界
+## 8. 当前前后端职责边界
 
 ### 前端负责
 
@@ -236,9 +271,9 @@ backend/
 
 ---
 
-## 8. 开发与运行
+## 9. 开发与运行
 
-### 8.1 前端
+### 9.1 前端
 
 ```bash
 cd frontend
@@ -248,7 +283,7 @@ pnpm dev
 
 默认启动后可通过 Vite 本地开发服务访问页面。
 
-### 8.2 后端
+### 9.2 后端
 
 ```bash
 cd backend
@@ -262,13 +297,13 @@ pnpm dev
 http://localhost:4000
 ```
 
-### 8.3 数据库
+### 9.3 数据库
 
 当前数据库连接通过环境变量或默认连接串配置，仓库根目录 `.env`
 
 ---
 
-## 9. 目录规范总结
+## 10. 目录规范总结
 
 可以统一遵循以下规则：
 
