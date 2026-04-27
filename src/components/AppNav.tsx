@@ -1,72 +1,175 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useProjects } from "@/hooks/useProjects";
 
-function SparklesIcon({ className }: { className?: string }) {
+function FolderIcon() {
   return (
-    <svg
-      className={className}
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-      <path d="M5 3v4" />
-      <path d="M19 17v4" />
-      <path d="M3 5h4" />
-      <path d="M17 19h4" />
+    <svg width="21" height="16" viewBox="0 0 24 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
 
+function ChevronDownIcon() {
+  return (
+    <svg width="6" height="4" viewBox="0 0 6 4" fill="none" aria-hidden>
+      <path d="M0.5 0.5L3 3L5.5 0.5" stroke="#94a3b8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg width="15" height="12" viewBox="0 0 18 22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v5h5" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <path d="M5 1v8M1 5h8" />
+    </svg>
+  );
+}
+
+function LogoMark() {
+  return (
+    <svg width="10.5" height="11.667" viewBox="0 0 12 14" fill="white" aria-hidden>
+      <path d="M6 0L12 3.5V10.5L6 14L0 10.5V3.5L6 0Z" />
+    </svg>
+  );
+}
+
+// ── Mock project data (replace with real store / API) ─────────────────────────
+// PROJECTS constant removed — now loaded from /api/projects via useProjects()
+
 export default function AppNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  const { projects, loading, addLocalProject } = useProjects();
+
+  function handleNewProject() {
+    const project = addLocalProject("New Project");
+    router.push(`/project/${project.slug}`);
+  }
+
+  const dragStyle: React.CSSProperties & { WebkitAppRegion?: string } = { WebkitAppRegion: "drag" };
+  const noDragStyle: React.CSSProperties & { WebkitAppRegion?: string } = { WebkitAppRegion: "no-drag" };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-6 lg:px-14">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-[var(--foreground)] transition-opacity hover:opacity-80"
-        >
-          <SparklesIcon className="shrink-0 text-[var(--accent)]" />
-          <span className="text-[17px] font-semibold tracking-tight">
-            Agentic Builder
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-7">
-          <Link
-            href="/pipeline"
-            className={`text-sm font-medium transition-colors ${
-              pathname === "/pipeline"
-                ? "text-[var(--foreground)]"
-                : "text-[var(--muted-secondary)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Pipeline
-          </Link>
-          <span
-            className="cursor-default text-sm font-medium text-[var(--muted-secondary)]"
-            title="Coming soon"
-          >
-            Docs
-          </span>
-          <Link
-            href="/pipeline"
-            className="inline-flex items-center rounded-[10px] bg-[var(--accent)] px-[18px] py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
-          >
-            Launch Pipeline
-          </Link>
+    <aside
+      className="fixed left-0 top-0 h-screen w-[240px] bg-[#f8fafc] border-r border-[#e2e8f0] flex flex-col justify-between z-50 pr-px py-4"
+      style={dragStyle}
+    >
+      {/* Logo & Brand */}
+      <div className="px-6 pb-8" style={noDragStyle}>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-black rounded-[2px] flex items-center justify-center shrink-0">
+            <LogoMark />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[18px] font-bold tracking-[-0.45px] text-[#0f172a] leading-7">
+              Agentic Builder
+            </span>
+            <span className="text-[10px] uppercase text-[#64748b] leading-[15px] font-space-grotesk">
+              V1.0.4
+            </span>
+          </div>
         </div>
       </div>
-    </header>
+
+      {/* Navigation */}
+      <nav className="flex-1 min-h-0 px-4 overflow-y-auto" style={noDragStyle}>
+        <div className="flex flex-col gap-1">
+          {/* Projects header row */}
+          <button
+            onClick={() => setProjectsOpen((v) => !v)}
+            className="flex items-center justify-between px-3 py-2 rounded-sm hover:bg-[#f1f5f9] transition-colors w-full"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-[#475569]">
+                <FolderIcon />
+              </span>
+              <span className="text-[14px] tracking-[-0.35px] text-[#475569]">Projects</span>
+            </div>
+            <span className={`transition-transform duration-150 ${projectsOpen ? "rotate-0" : "-rotate-90"}`}>
+              <ChevronDownIcon />
+            </span>
+          </button>
+
+          {/* Project list */}
+          {projectsOpen && (
+            <div className="flex flex-col gap-0.5 ml-1">
+              {loading && (
+                <span className="px-3 py-2 text-[12px] text-[#94a3b8]">Loading…</span>
+              )}
+              {!loading && projects.length === 0 && (
+                <span className="px-3 py-2 text-[12px] text-[#94a3b8]">No projects yet</span>
+              )}
+              {projects.map((project) => {
+                const href = `/project/${project.slug}`;
+                const isActive = pathname?.startsWith(href);
+                return (
+                  <div
+                    key={project.slug}
+                    className={`border-l-2 pl-[2px] w-[191px] ${
+                      isActive ? "border-[#4f46e5]" : "border-transparent"
+                    }`}
+                  >
+                    <div className={isActive ? "bg-[rgba(226,232,240,0.5)] rounded-sm" : ""}>
+                      <Link
+                        href={href}
+                        className="flex items-center gap-3 px-3 py-2 hover:bg-[rgba(226,232,240,0.4)] rounded-sm transition-colors"
+                      >
+                        <span className={isActive ? "text-[#4f46e5]" : "text-[#64748b]"}>
+                          <FileIcon />
+                        </span>
+                        <span
+                          className={`text-[14px] tracking-[-0.35px] truncate ${
+                            isActive ? "text-[#4f46e5]" : "text-[#475569]"
+                          }`}
+                        >
+                          {project.name}
+                        </span>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </nav>
+
+      {/* Bottom: New Project + User Profile */}
+      <div className="flex flex-col gap-6 px-4" style={noDragStyle}>
+        <button
+          onClick={handleNewProject}
+          className="flex items-center justify-center gap-2 w-full py-2 bg-[#4f46e5] text-white text-[14px] font-bold rounded-[2px] hover:bg-[#4338ca] transition-colors"
+        >
+          <PlusIcon />
+          <span>New Project</span>
+        </button>
+
+        <div className="border-t border-[#e2e8f0] flex items-center gap-3 pt-[17px] pb-2 px-3">
+          <div className="w-8 h-8 rounded-[12px] bg-[#e2e8f0] shrink-0 overflow-hidden">
+            <div className="w-full h-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-white text-[13px] font-bold">
+              A
+            </div>
+          </div>
+          <div className="flex flex-col overflow-hidden">
+            <span className="text-[12px] font-bold text-[#0f172a] leading-4 truncate">Alex Chen</span>
+            <span className="text-[10px] text-[#64748b] leading-[15px] truncate">Senior Architect</span>
+          </div>
+        </div>
+      </div>
+    </aside>
   );
 }
