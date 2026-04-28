@@ -8,6 +8,12 @@ export interface ChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: OpenRouterToolCall[];
+  /**
+   * DeepSeek V4 Pro thinking mode: the model returns this field in its response
+   * and requires it to be passed back verbatim in subsequent turns.
+   * Other providers ignore this field.
+   */
+  reasoning_content?: string;
 }
 
 /** A message whose content may be a mix of text and image parts (for vision models). */
@@ -75,6 +81,13 @@ export interface OpenRouterOptions {
   reasoning?: OpenRouterReasoningOptions;
   /** Provider-specific thinking config (e.g. GPT-5 gateway). */
   thinking?: OpenRouterThinkingOptions | false;
+  /**
+   * Per-call request timeout in milliseconds.
+   * Overrides the global OPENROUTER_CHAT_TIMEOUT_MS env var.
+   * On timeout the call throws a ModelTimeoutError which chatCompletionWithFallback
+   * treats as a soft failure — it falls through to the next model in the chain.
+   */
+  timeoutMs?: number;
 }
 
 export interface OpenRouterUsage {

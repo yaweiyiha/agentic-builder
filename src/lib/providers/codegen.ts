@@ -1,3 +1,12 @@
+/**
+ * Codegen provider routing layer.
+ *
+ * Priority order:
+ *   1. DEEPSEEK_API_KEY set  → DeepSeek V4 Pro direct (providers/deepseek-v4.ts), up to 3 attempts
+ *                               on exhaustion falls through to OpenRouter chain
+ *   2. CODEGEN_API_KEY set   → custom OpenAI-compatible endpoint (providers/codegen.ts)
+ *   3. otherwise             → OpenRouter model chain via MODEL_CONFIG[variant]
+ */
 import { chatCompletionWithFallback, resolveModel } from "@/lib/openrouter";
 import type {
   ChatMessage,
@@ -7,6 +16,12 @@ import type {
   OpenRouterOptions,
 } from "@/lib/llm-types";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
+import {
+  isDeepSeekV4Provider,
+  chatCompletionsDeepSeekV4,
+  DEEPSEEK_V4_DEFAULT_BASE,
+  DEEPSEEK_V4_DEFAULT_MODEL,
+} from "./deepseek-v4";
 
 const DEFAULT_CODEGEN_BASE = "https://api.gptsapi.net/v1";
 const DEFAULT_CODEGEN_MODEL = "claude-opus-4-6";
@@ -14,6 +29,16 @@ const DEFAULT_CODEGEN_MODEL = "claude-opus-4-6";
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 3_000;
 const FETCH_TIMEOUT_MS = 300_000;
+
+/**
+ * Per-model timeout for OpenRouter codegen/codefix calls.
+ * If a model in the fallback chain doesn't respond within this window it is
+ * skipped and the next model is tried immediately.
+ * Override via CODEGEN_PER_MODEL_TIMEOUT_MS env var (milliseconds).
+ */
+const CODEGEN_PER_MODEL_TIMEOUT_MS = Number(
+  process.env.CODEGEN_PER_MODEL_TIMEOUT_MS ?? "120000",
+);
 
 type ReasoningEffort = "low" | "medium" | "high";
 type ThinkingVerbosity = "low" | "medium" | "high";
@@ -68,7 +93,7 @@ function buildCodegenReasoningOptions(
   return out;
 }
 
-/** When set, coding agents use this OpenAI-compatible API instead of OpenRouter. */
+/** When CODEGEN_API_KEY is set, use this custom OpenAI-compatible endpoint. */
 export function isCodegenCustomProvider(): boolean {
   return Boolean(process.env.CODEGEN_API_KEY?.trim());
 }
@@ -222,8 +247,11 @@ async function chatCompletionsOpenAICompatible(
 export type CodegenOpenRouterVariant = "codeGen" | "codeFix";
 
 /**
- * Custom Claude (OpenAI-compatible) when `CODEGEN_API_KEY` is set; else OpenRouter.
- * `openRouterVariant` selects MODEL_CONFIG when falling back to OpenRouter (ignored for custom API).
+ * Provider priority for codegen:
+ *   1. DEEPSEEK_API_KEY set  → DeepSeek V4 Pro direct (up to 3 attempts)
+ *                               if all 3 fail → fall through to OpenRouter chain
+ *   2. CODEGEN_API_KEY set   → custom OpenAI-compatible endpoint (no fallback)
+ *   3. otherwise             → OpenRouter model chain (MODEL_CONFIG[variant])
  */
 export async function invokeCodegenOrOpenRouter(
   messages: ChatMessage[],
@@ -238,6 +266,26 @@ export async function invokeCodegenOrOpenRouter(
   const key = options.openRouterVariant ?? "codeGen";
   const reasoningOptions = buildCodegenReasoningOptions(key);
 
+  // ── Priority 1: DeepSeek V4 Pro direct API ──────────────────────────────
+  if (isDeepSeekV4Provider()) {
+    const dsModel =
+      process.env.DEEPSEEK_V4_MODEL?.trim() || DEEPSEEK_V4_DEFAULT_MODEL;
+    const dsBase =
+      process.env.DEEPSEEK_V4_BASE_URL?.trim() || DEEPSEEK_V4_DEFAULT_BASE;
+    console.log(
+      `[LLM] provider=deepseek-v4-direct  model=${dsModel}  base=${dsBase}`,
+    );
+    try {
+      return await chatCompletionsDeepSeekV4(messages, options);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[LLM] DeepSeek V4 exhausted all attempts (${msg.slice(0, 200)}). Falling back to OpenRouter chain.`,
+      );
+    }
+  }
+
+  // ── Priority 2: custom OpenAI-compatible endpoint ────────────────────────
   if (isCodegenCustomProvider()) {
     const customModel =
       process.env.CODEGEN_MODEL?.trim() || DEFAULT_CODEGEN_MODEL;
@@ -253,6 +301,8 @@ export async function invokeCodegenOrOpenRouter(
     }
     return chatCompletionsOpenAICompatible(messages, options);
   }
+
+  // ── Priority 3: OpenRouter model chain ───────────────────────────────────
   const configValue = MODEL_CONFIG[key] ?? "gpt-4o";
   const chain = resolveModelChain(configValue, resolveModel);
   console.log(
@@ -261,6 +311,7 @@ export async function invokeCodegenOrOpenRouter(
   return chatCompletionWithFallback(messages, chain, {
     temperature: options.temperature,
     max_tokens: options.max_tokens,
+    timeoutMs: CODEGEN_PER_MODEL_TIMEOUT_MS,
     ...reasoningOptions,
   });
 }

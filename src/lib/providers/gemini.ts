@@ -2,7 +2,7 @@ import type {
   ChatMessage,
   OpenRouterOptions,
   OpenRouterResponse,
-} from "./llm-types";
+} from "@/lib/llm-types";
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const DEFAULT_GEMINI_BASE_URL =
