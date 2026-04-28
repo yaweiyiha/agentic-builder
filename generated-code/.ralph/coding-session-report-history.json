@@ -1,5 +1,23 @@
 [
+
   {
+    "sessionId": "a5c1d064-9745-45b0-8224-f983d0bb8371",
+    "startedAt": "2026-04-27T03:59:41.395Z",
+    "endedAt": "2026-04-27T06:35:46.637Z",
+    "status": "fail",
+    "score": 29,
+    "grade": "F",
+    "durationMs": 9360342,
+    "totalCalls": 202,
+    "totalTokens": 2024492,
+    "totalCostUsd": 1.83242775,
+    "primaryModel": "deepseek/deepseek-v4-pro",
+    "primaryModelScore": 99.8,
+    "primaryModelGrade": "A",
+    "archiveJsonFile": "coding-session-report.2026-04-27T06-35-46-637Z.a5c1d064-9745-45b0-8224-f983d0bb8371.json",
+    "archiveMdFile": "coding-session-report.2026-04-27T06-35-46-637Z.a5c1d064-9745-45b0-8224-f983d0bb8371.md"
+  },
+{
     "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
     "startedAt": "2026-04-24T00:27:02.443Z",
     "endedAt": "2026-04-24T00:41:23.684Z",
