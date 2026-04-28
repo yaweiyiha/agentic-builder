@@ -431,11 +431,15 @@ function MetaBadge({ step }: { step: { model?: string; costUsd?: number; duratio
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function IntentSubStage() {
-  const isRunning      = usePipelineStore((s) => s.isRunning);
-  const startPipeline  = usePipelineStore((s) => s.startPipeline);
-  const featureBrief   = usePipelineStore((s) => s.featureBrief);
-  const goToSubStage   = useStageStore((s) => s.goToSubStage);
-  const setProjectName = useStageStore((s) => s.setProjectName);
+  const isRunning             = usePipelineStore((s) => s.isRunning);
+  const startPipeline         = usePipelineStore((s) => s.startPipeline);
+  const featureBrief          = usePipelineStore((s) => s.featureBrief);
+  const goToSubStage          = useStageStore((s) => s.goToSubStage);
+  const setProjectName        = useStageStore((s) => s.setProjectName);
+  const isStageHydrated       = useStageStore((s) => s.isStageHydrated);
+  const intentMessages        = useStageStore((s) => s.intentMessages);
+  const intentEnrichedBrief   = useStageStore((s) => s.intentEnrichedBrief);
+  const setIntentConversation = useStageStore((s) => s.setIntentConversation);
 
   const [inputValue, setInputValue]         = useState("");
   const [messages, setMessages]             = useState<ConvMsg[]>([]);
@@ -460,52 +464,82 @@ export default function IntentSubStage() {
   // isRunning reflects the main pipeline which hasn't started yet.
   const isAgentActive = isRechecking;
 
-  // Auto-start: if a brief was set in the initial stage, immediately begin intent analysis.
+  // Initialize: wait for DB hydration, then restore conversation or auto-start.
   useEffect(() => {
-    console.log("[intent] mounted — featureBrief:", featureBrief.slice(0, 60), "isRunning:", isRunning);
-    if (featureBrief.trim() && !autoStartedRef.current) {
-      autoStartedRef.current = true;
-      console.log("[intent] auto-starting with featureBrief from store");
-      enrichedBriefRef.current = featureBrief.trim();
-      qaHistoryRef.current = [];
-      setMessages([
-        { role: "user", text: featureBrief.trim(), id: `user-auto-${Date.now()}` } satisfies UserConvMsg,
-      ]);
-      setIsRechecking(true);
-      callRecheckStream(featureBrief.trim(), [])
-        .then((result) => {
-          console.log("[intent] auto-start result:", result ? "ok" : "null");
-          if (!result) {
-            setMessages((prev) => [...prev, {
-              role: "ai",
-              content: "Error analyzing brief.",
-              intentForm: { summary: "Error analyzing brief. Please try again.", questions: [] },
-              id: `ai-err-auto-${Date.now()}`,
-            } satisfies AiConvMsg]);
-            return;
-          }
-          if (result.project_name?.trim()) setProjectName(result.project_name.trim());
-          if (result.all_clear || result.questions.length === 0) setIntentAllClear(true);
+    if (!isStageHydrated) return; // wait for page.tsx loadFromServer to complete
+    if (autoStartedRef.current) return;
+    autoStartedRef.current = true;
+
+    // 1. Restore conversation from store (populated by loadFromServer from DB)
+    if (intentMessages.length > 0) {
+      const msgs = intentMessages as ConvMsg[];
+      enrichedBriefRef.current = intentEnrichedBrief || featureBrief.trim();
+      setMessages(msgs);
+      // Restore derived state from the last AI message
+      const lastAiMsg = [...msgs].reverse().find((m) => m.role === "ai") as AiConvMsg | undefined;
+      if (lastAiMsg?.intentForm) {
+        if (lastAiMsg.intentForm.all_clear || lastAiMsg.intentForm.questions.length === 0) {
+          setIntentAllClear(true);
+        }
+        if (lastAiMsg.intentForm.project_name?.trim()) {
+          setProjectName(lastAiMsg.intentForm.project_name.trim());
+        }
+      }
+      console.log("[intent] restored conversation from DB, messages:", msgs.length);
+      return;
+    }
+
+    // 2. Auto-start if featureBrief exists
+    if (!featureBrief.trim()) return;
+
+    console.log("[intent] auto-starting with featureBrief from store");
+    enrichedBriefRef.current = featureBrief.trim();
+    qaHistoryRef.current = [];
+    setMessages([
+      { role: "user", text: featureBrief.trim(), id: `user-auto-${Date.now()}` } satisfies UserConvMsg,
+    ]);
+    setIsRechecking(true);
+    callRecheckStream(featureBrief.trim(), [])
+      .then((result) => {
+        console.log("[intent] auto-start result:", result ? "ok" : "null");
+        if (!result) {
           setMessages((prev) => [...prev, {
             role: "ai",
-            content: JSON.stringify(result),
-            intentForm: result,
-            id: `ai-auto-${Date.now()}`,
-          } satisfies AiConvMsg]);
-        })
-        .catch((err) => {
-          console.error("[intent] auto-start error:", err);
-          setMessages((prev) => [...prev, {
-            role: "ai",
-            content: `Error: ${err instanceof Error ? err.message : "Unknown error"}.`,
-            intentForm: { summary: "Network error — please try again.", questions: [] },
+            content: "Error analyzing brief.",
+            intentForm: { summary: "Error analyzing brief. Please try again.", questions: [] },
             id: `ai-err-auto-${Date.now()}`,
           } satisfies AiConvMsg]);
-        })
-        .finally(() => setIsRechecking(false));
+          return;
+        }
+        if (result.project_name?.trim()) setProjectName(result.project_name.trim());
+        if (result.all_clear || result.questions.length === 0) setIntentAllClear(true);
+        setMessages((prev) => [...prev, {
+          role: "ai",
+          content: JSON.stringify(result),
+          intentForm: result,
+          id: `ai-auto-${Date.now()}`,
+        } satisfies AiConvMsg]);
+      })
+      .catch((err) => {
+        console.error("[intent] auto-start error:", err);
+        setMessages((prev) => [...prev, {
+          role: "ai",
+          content: `Error: ${err instanceof Error ? err.message : "Unknown error"}.`,
+          intentForm: { summary: "Network error — please try again.", questions: [] },
+          id: `ai-err-auto-${Date.now()}`,
+        } satisfies AiConvMsg]);
+      })
+      .finally(() => setIsRechecking(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStageHydrated]);
+
+  // Sync conversation to store (→ DB) whenever messages or enrichedBrief change.
+  useEffect(() => {
+    if (messages.length > 0) {
+      setIntentConversation(messages as unknown[], enrichedBriefRef.current);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [messages]);
 
   // ── Shared SSE streaming helper ────────────────────────────────────────
   // Consumes pipeline-style SSE events from /api/agents/intent-recheck.
@@ -842,10 +876,10 @@ export default function IntentSubStage() {
           </button>
           <button
             onClick={handleStartGeneration}
-            disabled={!intentAllClear || isAgentActive}
+            disabled={isAgentActive}
             className="flex items-center gap-2 px-4 py-2 bg-[#4f46e5] text-white text-[16px] font-semibold rounded shrink-0 shadow-sm hover:bg-[#4338ca] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span>Start Generation</span>
+            <span>Next Step -&gt;</span>
             <ArrowRightIcon />
           </button>
         </div>

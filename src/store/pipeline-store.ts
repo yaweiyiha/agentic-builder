@@ -8,6 +8,36 @@ import type {
   StepResult,
 } from "@/lib/pipeline/types";
 
+// ── DB sync helpers ────────────────────────────────────────────────────────
+// Debounce timer for batching rapid state changes into one PUT call.
+let _syncTimer: ReturnType<typeof setTimeout> | null = null;
+let _currentProjectSlug = "";
+
+function scheduleSync(getState: () => PipelineState) {
+  if (!_currentProjectSlug) return;
+  if (_syncTimer) clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => {
+    _syncTimer = null;
+    const s = getState();
+    fetch(`/api/projects/${_currentProjectSlug}/state`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pipelineState: {
+          featureBrief:  s.featureBrief,
+          currentStep:   s.currentStep,
+          activeTab:     s.activeTab,
+          totalCostUsd:  s.totalCostUsd,
+          isRunning:     s.isRunning,
+          fastFromPrd:   s.fastFromPrd,
+          codeOutputDir: s.codeOutputDir,
+          stepsJson:     s.steps,
+        },
+      }),
+    }).catch((err) => console.error("[pipeline-store] sync error:", err));
+  }, 600);
+}
+
 const DEFAULT_CODE_OUTPUT_DIR = "generated-code";
 
 const EMPTY_STEPS: Record<PipelineStepId, StepResult | null> = {
@@ -118,6 +148,13 @@ interface PipelineState {
   deleteDesignReference: (id: string) => Promise<boolean>;
   clearDesignReferences: () => Promise<boolean>;
   reset: () => void;
+  /** Called by the project page on mount — sets the slug used for DB sync. */
+  setProjectSlugForSync: (slug: string) => void;
+  /**
+   * Load pipeline state from the DB and hydrate this store.
+   * Called once on page mount after setProjectSlugForSync.
+   */
+  loadFromServer: (slug: string) => Promise<void>;
 }
 
 export const usePipelineStore = create<PipelineState>()(
@@ -143,15 +180,14 @@ export const usePipelineStore = create<PipelineState>()(
 
       setCodeOutputDir: (value) => {
         const next = value.trim();
-        set({
-          codeOutputDir: next.length > 0 ? next : DEFAULT_CODE_OUTPUT_DIR,
-        });
+        set({ codeOutputDir: next.length > 0 ? next : DEFAULT_CODE_OUTPUT_DIR });
+        scheduleSync(get);
       },
-      setFastFromPrd: (value) => set({ fastFromPrd: value }),
+      setFastFromPrd: (value) => { set({ fastFromPrd: value }); scheduleSync(get); },
 
-      setPendingBrief: (brief) => set({ featureBrief: brief.trim() }),
+      setPendingBrief: (brief) => { set({ featureBrief: brief.trim() }); scheduleSync(get); },
 
-      setActiveTab: (tab) => set({ activeTab: tab }),
+      setActiveTab: (tab) => { set({ activeTab: tab }); scheduleSync(get); },
 
       updateSteps: (updates) => {
         const current = get().steps;
@@ -164,6 +200,7 @@ export const usePipelineStore = create<PipelineState>()(
           }
         }
         set({ steps: merged, totalCostUsd: get().totalCostUsd + addedCost });
+        scheduleSync(get);
       },
 
       runKickoff: () => {
@@ -246,6 +283,7 @@ export const usePipelineStore = create<PipelineState>()(
           featureBrief: brief,
           activeTab: "intent",
         });
+        scheduleSync(get);
 
         fetch("/api/agents/pipeline", {
           method: "POST",
@@ -642,6 +680,47 @@ export const usePipelineStore = create<PipelineState>()(
           streamingThinking: "",
         });
       },
+
+      setProjectSlugForSync: (slug: string) => {
+        _currentProjectSlug = slug;
+      },
+
+      loadFromServer: async (slug: string) => {
+        _currentProjectSlug = slug;
+        try {
+          const resp = await fetch(`/api/projects/${slug}/state`, { cache: "no-store" });
+          if (!resp.ok) return;
+          const data = (await resp.json()) as {
+            pipelineState?: {
+              featureBrief?:  string;
+              currentStep?:   string | null;
+              activeTab?:     string;
+              totalCostUsd?:  number;
+              isRunning?:     boolean;
+              fastFromPrd?:   boolean;
+              codeOutputDir?: string;
+              stepsJson?:     Record<string, unknown>;
+            } | null;
+          };
+          const ps = data.pipelineState;
+          if (!ps) return;
+          set({
+            featureBrief:  ps.featureBrief  ?? "",
+            currentStep:   (ps.currentStep  as PipelineStepId | null) ?? null,
+            activeTab:     (ps.activeTab    as PipelineStepId) ?? "intent",
+            totalCostUsd:  ps.totalCostUsd  ?? 0,
+            // Always restore as not-running on page load — the browser can't resume a lost SSE stream
+            isRunning:     false,
+            fastFromPrd:   ps.fastFromPrd   ?? true,
+            codeOutputDir: ps.codeOutputDir ?? "generated-code",
+            steps:         ps.stepsJson
+              ? ({ ...EMPTY_STEPS, ...(ps.stepsJson as Record<PipelineStepId, StepResult | null>) })
+              : { ...EMPTY_STEPS },
+          });
+        } catch (err) {
+          console.error("[pipeline-store] loadFromServer error:", err);
+        }
+      },
     }),
     {
       name: "agentic-pipeline-settings",
@@ -684,6 +763,7 @@ function handleEvent(
       isRunning: false,
       activeTab: nextTab,
     });
+    scheduleSync(get);
     return;
   }
 
@@ -725,6 +805,7 @@ function handleEvent(
     };
     const cost = get().totalCostUsd + (stepData.costUsd ?? 0);
     set({ steps, totalCostUsd: cost });
+    scheduleSync(get);
 
     // When the intent step completes, extract AI-generated project_name and
     // update the stage store so the sidebar immediately reflects the name.

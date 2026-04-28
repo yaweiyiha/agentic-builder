@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { useParams } from "next/navigation";
 import PipelineNav from "@/components/PipelineNav";
 import { useStageStore, type StageId } from "@/store/stage-store";
+import { usePipelineStore } from "@/store/pipeline-store";
 import PreparationStage from "./_stages/preparation";
 import KickoffStage     from "./_stages/kickoff";
 import CodingStage      from "./_stages/coding";
@@ -46,7 +49,28 @@ const STAGE_VIEWS: Record<StageId, React.ComponentType> = {
 // ─── Page (thin shell) ────────────────────────────────────────────────────────
 
 export default function ProjectPage() {
-  const activeStage = useStageStore((s) => s.activeStage);
+  const params      = useParams<{ projectId: string }>();
+  const projectId   = params.projectId;
+
+  const activeStage            = useStageStore((s) => s.activeStage);
+  const stageLoadFromServer    = useStageStore((s) => s.loadFromServer);
+  const pipelineLoadFromServer = usePipelineStore((s) => s.loadFromServer);
+  const setProjectSlugForSync  = usePipelineStore((s) => s.setProjectSlugForSync);
+
+  const hydratedRef = useRef(false);
+
+  // On mount: tell both stores which project we're on, then restore from DB.
+  useEffect(() => {
+    if (!projectId || hydratedRef.current) return;
+    hydratedRef.current = true;
+    setProjectSlugForSync(projectId);
+    // Load both stores in parallel; stageLoadFromServer also sets _stageProjectSlug.
+    Promise.all([
+      pipelineLoadFromServer(projectId),
+      stageLoadFromServer(projectId),
+    ]).catch((err) => console.error("[ProjectPage] hydration error:", err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   const StageView = STAGE_VIEWS[activeStage];
 

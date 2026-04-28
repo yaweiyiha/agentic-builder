@@ -3,7 +3,13 @@ import { getProjects, createProject } from "@/lib/project-store";
 
 /** GET /api/projects — list all projects */
 export async function GET() {
-  return NextResponse.json({ projects: getProjects() });
+  try {
+    const projects = await getProjects();
+    return NextResponse.json({ projects });
+  } catch (err) {
+    console.error("[api/projects] GET error:", err);
+    return NextResponse.json({ message: "Internal server error." }, { status: 500 });
+  }
 }
 
 /** POST /api/projects — create a new project */
@@ -18,9 +24,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const project = createProject(name);
+    const project = await createProject(name);
     return NextResponse.json({ project }, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("[api/projects] POST error:", err);
     return NextResponse.json(
       { message: "Internal server error." },
       { status: 500 },

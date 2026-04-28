@@ -55,22 +55,27 @@ export default function AppNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [projectsOpen, setProjectsOpen] = useState(true);
-  const { projects, loading, addLocalProject } = useProjects();
+  const { projects, loading, createProject } = useProjects();
   const resetStage = useStageStore((s) => s.resetStage);
-  const setProjectSlug = useStageStore((s) => s.setProjectSlug);
+  const setProjectSlugForSync = useStageStore((s) => s.setProjectSlugForSync);
   const setProjectName = useStageStore((s) => s.setProjectName);
-  const stageProjectSlug = useStageStore((s) => s.projectSlug);
+  const stageProjectId = useStageStore((s) => s.projectId);
   const stageProjectName = useStageStore((s) => s.projectName);
   const resetPipeline = usePipelineStore((s) => s.reset);
+  const pipelineSetProjectSlugForSync = usePipelineStore((s) => s.setProjectSlugForSync);
 
-  function handleNewProject() {
-    // Reset both stage and pipeline stores before creating a new project
+  async function handleNewProject() {
     resetStage();
     resetPipeline();
-    const project = addLocalProject("New Project");
-    setProjectSlug(project.slug);
-    setProjectName("New Project");
-    router.push(`/project/${project.slug}`);
+    try {
+      const project = await createProject("New Project");
+      setProjectSlugForSync(project.id);
+      pipelineSetProjectSlugForSync(project.id);
+      setProjectName("New Project");
+      router.push(`/project/${project.id}`);
+    } catch (err) {
+      console.error("[AppNav] Failed to create project:", err);
+    }
   }
 
   const dragStyle: React.CSSProperties & { WebkitAppRegion?: string } = { WebkitAppRegion: "drag" };
@@ -127,16 +132,16 @@ export default function AppNav() {
                 <span className="px-3 py-2 text-[12px] text-[#94a3b8]">No projects yet</span>
               )}
               {projects.map((project) => {
-                const href = `/project/${project.slug}`;
+                const href = `/project/${project.id}`;
                 const isActive = pathname?.startsWith(href);
                 // Use AI-generated name from stage store for the current active project
                 const displayName =
-                  isActive && stageProjectSlug === project.slug && stageProjectName
+                  isActive && stageProjectId === project.id && stageProjectName
                     ? stageProjectName
                     : project.name;
                 return (
                   <div
-                    key={project.slug}
+                    key={project.id}
                     className={`border-l-2 pl-[2px] w-[191px] ${
                       isActive ? "border-[#4f46e5]" : "border-transparent"
                     }`}
