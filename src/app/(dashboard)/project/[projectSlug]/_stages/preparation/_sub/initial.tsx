@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore, STAGE_ORDER, STAGE_META } from "@/store/stage-store";
+import ImportPrdDialog from "@/components/ImportPrdDialog";
+import DesignReferencesDialog from "@/components/DesignReferencesDialog";
 
 // ─── Decorative Stage Progress Bar (display-only) ────────────────────────────
 
@@ -84,6 +86,26 @@ function AttachIcon() {
   );
 }
 
+function DesignIcon() {
+  return (
+    <svg
+      width="9"
+      height="9"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#94a3b8"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  );
+}
+
 function BoltIcon() {
   return (
     <svg
@@ -125,6 +147,8 @@ function InfoIcon() {
 export default function InitialSubStage() {
   const [mode, setMode] = useState<"Quick" | "Advanced">("Quick");
   const [prompt, setPrompt] = useState("");
+  const [prdDialogOpen, setPrdDialogOpen] = useState(false);
+  const [designDialogOpen, setDesignDialogOpen] = useState(false);
 
   const setPendingBrief = usePipelineStore((s) => s.setPendingBrief);
   const setFastFromPrd  = usePipelineStore((s) => s.setFastFromPrd);
@@ -145,6 +169,7 @@ export default function InitialSubStage() {
   }
 
   return (
+    <>
     <div className="flex flex-col items-center flex-1 px-8 pt-8 pb-12 gap-10">
       <div className="flex flex-col items-center w-full max-w-[920px] gap-8">
         {/* Heading */}
@@ -196,8 +221,23 @@ export default function InitialSubStage() {
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <button className="p-1.5 rounded hover:bg-[#f1f5f9] transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setPrdDialogOpen(true)}
+                  title="Import PRD"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-[#f1f5f9] transition-colors text-[11px] font-medium text-[#64748b] hover:text-[#334155]"
+                >
                   <AttachIcon />
+                  <span>PRD</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDesignDialogOpen(true)}
+                  title="Upload design references"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-[#f1f5f9] transition-colors text-[11px] font-medium text-[#64748b] hover:text-[#334155]"
+                >
+                  <DesignIcon />
+                  <span>Design</span>
                 </button>
                 <button className="p-1.5 rounded hover:bg-[#f1f5f9] transition-colors">
                   <BoltIcon />
@@ -231,5 +271,15 @@ export default function InitialSubStage() {
         </div>
       </div>
     </div>
+
+      <ImportPrdDialog
+        isOpen={prdDialogOpen}
+        onClose={() => setPrdDialogOpen(false)}
+      />
+      <DesignReferencesDialog
+        isOpen={designDialogOpen}
+        onClose={() => setDesignDialogOpen(false)}
+      />
+    </>
   );
 }

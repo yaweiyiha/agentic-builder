@@ -1,6 +1,19 @@
 import { NextRequest } from "next/server";
+import fs from "fs/promises";
+import path from "path";
 import { streamChatCompletion, resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG } from "@/lib/model-config";
+
+async function readImportedPrd(): Promise<string | null> {
+  try {
+    const filePath = path.resolve(process.cwd(), ".blueprint", "PRD.md");
+    const content = await fs.readFile(filePath, "utf-8");
+    const trimmed = content.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/agents/intent-recheck
@@ -81,17 +94,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Read the imported PRD (e.g. uploaded PDF converted to text) if present.
+    const importedPrdContent = await readImportedPrd();
+
+    // Build the user-turn content: prepend the imported PRD so the LLM has full context.
+    const userTurnParts: string[] = [];
+    if (importedPrdContent) {
+      userTurnParts.push(
+        `Imported PRD document (user-provided — treat as the primary source of truth):\n\`\`\`\n${importedPrdContent}\n\`\`\`\n`,
+      );
+    }
+    userTurnParts.push(`Original project brief:\n${brief}`);
+    if (conversationHistory.length > 0) {
+      userTurnParts.push(
+        `\nClarification conversation so far:\n${conversationHistory
+          .map((m) => `[${m.role.toUpperCase()}]: ${m.content}`)
+          .join("\n\n")}`,
+      );
+    } else {
+      userTurnParts.push("(No answers yet — this is the initial check)");
+    }
+
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: INTENT_RECHECK_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Original project brief:\n${brief}\n\n` +
-          (conversationHistory.length > 0
-            ? `Clarification conversation so far:\n${conversationHistory
-                .map((m) => `[${m.role.toUpperCase()}]: ${m.content}`)
-                .join("\n\n")}`
-            : "(No answers yet — this is the initial check)"),
-      },
+      { role: "user", content: userTurnParts.join("\n\n") },
     ];
 
     const model = resolveModel(MODEL_CONFIG.intent);
@@ -124,7 +150,6 @@ export async function POST(request: NextRequest) {
             const { done, value } = await reader.read();
             if (done) break;
             lineBuffer += decoder.decode(value, { stream: true });
-            // Split on SSE double-newline boundaries
             const parts = lineBuffer.split("\n");
             lineBuffer = parts.pop() ?? "";
             for (const line of parts) {
@@ -136,26 +161,36 @@ export async function POST(request: NextRequest) {
                   choices?: { delta?: { content?: string } }[];
                 };
                 const token = parsed.choices?.[0]?.delta?.content ?? "";
-                if (token) {
-                  accumulated += token;
-                  // ── step_stream ──
-                  controller.enqueue(send({
-                    type: "step_stream",
-                    stepId: "intent",
-                    data: { chunk: token, chunkType: "content" },
-                  }));
-                }
+                if (token) accumulated += token;
               } catch {
                 // ignore malformed upstream SSE lines
               }
             }
           }
 
-          // ── step_complete — parse accumulated JSON ──
+          // ── step_complete — parse accumulated JSON and stream summary word-by-word ──
           const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             try {
-              const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+              const parsed = JSON.parse(jsonMatch[0]) as {
+                summary?: string;
+                project_name?: string;
+                all_clear?: boolean;
+                gathered?: string[];
+                questions?: unknown[];
+              };
+              // Stream the summary text word by word so the client shows a typing effect
+              if (parsed.summary) {
+                const words = parsed.summary.split(" ");
+                for (let i = 0; i < words.length; i++) {
+                  const chunk = (i === 0 ? "" : " ") + words[i];
+                  controller.enqueue(send({
+                    type: "step_stream",
+                    stepId: "intent",
+                    data: { chunk, chunkType: "content" },
+                  }));
+                }
+              }
               controller.enqueue(send({
                 type: "step_complete",
                 stepId: "intent",

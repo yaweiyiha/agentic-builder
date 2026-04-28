@@ -48,6 +48,17 @@ function AgentIcon() {
   );
 }
 
+function RobotIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 11h6M9 15h6" />
+      <circle cx="9" cy="7" r="1" fill="white" />
+      <circle cx="15" cy="7" r="1" fill="white" />
+    </svg>
+  );
+}
+
 function UserIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -128,11 +139,11 @@ function CheckGatheredIcon() {
 
 function UserMessage({ text }: { text: string }) {
   return (
-    <div className="flex gap-4 items-start justify-end">
-      <div className="bg-black text-white rounded-tl-2xl rounded-br-2xl rounded-bl-2xl px-4 py-4 max-w-[calc(100%-56px)] shadow-sm">
-        <p className="text-[16px] leading-6 whitespace-pre-wrap">{text}</p>
+    <div className="flex gap-3 items-start justify-end">
+      <div className="bg-linear-to-br from-[#07c160] to-[#05a042] text-white rounded-3xl rounded-tr-none px-5 py-3.5 shadow-md hover:shadow-lg transition-shadow">
+        <p className="text-[15px] leading-7 whitespace-pre-wrap font-medium">{text}</p>
       </div>
-      <div className="shrink-0 w-8 h-8 rounded-sm bg-[#131b2e] flex items-center justify-center">
+      <div className="shrink-0 w-7 h-7 rounded-lg bg-linear-to-br from-[#07c160] to-[#05a042] flex items-center justify-center flex-none">
         <UserIcon />
       </div>
     </div>
@@ -154,15 +165,20 @@ function TypingDots() {
 function IntentFormCard({
   form,
   onSubmit,
+  onTextQuestion,
   disabled,
   isRechecking,
 }: {
   form: IntentFormData;
   onSubmit: (questions: IntentQuestion[], answers: Record<string, string | string[]>) => void;
+  /** Called when current question is text-type so parent can route chat-bar input here */
+  onTextQuestion?: (ctx: { questions: IntentQuestion[]; answers: Record<string, string | string[]>; id: string } | null) => void;
   disabled?: boolean;
   isRechecking?: boolean;
 }) {
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  // Show one question at a time; advance after answering
+  const [currentIdx, setCurrentIdx] = useState(0);
 
   function toggleRadio(id: string, value: string) {
     setAnswers((a) => ({ ...a, [id]: value }));
@@ -175,12 +191,27 @@ function IntentFormCard({
     });
   }
 
-  const allAnswered = form.questions.every((q) => {
-    const a = answers[q.id];
-    if (q.type === "checkbox") return Array.isArray(a) && a.length > 0;
-    if (q.type === "text") return typeof a === "string" && a.trim().length > 0;
+  const currentQuestion = form.questions[currentIdx];
+  const isLastQuestion  = currentIdx === form.questions.length - 1;
+
+  // Notify parent whenever the current question changes (or on mount)
+  useEffect(() => {
+    if (currentQuestion?.type === "text") {
+      onTextQuestion?.({ questions: form.questions, answers, id: currentQuestion.id });
+    } else {
+      onTextQuestion?.(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIdx, currentQuestion?.id]);
+
+  function isCurrentAnswered() {
+    if (!currentQuestion) return true;
+    // text-type answers are collected via the bottom chat bar, always allow advancing
+    if (currentQuestion.type === "text") return true;
+    const a = answers[currentQuestion.id];
+    if (currentQuestion.type === "checkbox") return Array.isArray(a) && a.length > 0;
     return typeof a === "string" && a.length > 0;
-  });
+  }
 
   return (
     <div className="space-y-5">
@@ -199,7 +230,7 @@ function IntentFormCard({
       )}
 
       {/* Summary */}
-      <div className="prose prose-sm max-w-none text-[#0b1c30]">
+      <div className="prose prose-sm max-w-none text-[#1f2937] leading-relaxed">
         <MarkdownRenderer content={form.summary} />
       </div>
 
@@ -216,80 +247,77 @@ function IntentFormCard({
         </div>
       )}
 
-      {/* Questions */}
-      {form.questions.length > 0 && (
+      {/* One question at a time */}
+      {currentQuestion && (
         <div className="space-y-5 border-t border-[#f1f5f9] pt-4">
-          <p className="text-[12px] font-semibold text-[#94a3b8] uppercase tracking-wide">Please clarify</p>
-          {form.questions.map((q) => (
-            <div key={q.id} className="space-y-2.5">
-              <p className="text-[13px] font-semibold text-[#0b1c30] leading-5">{q.label}</p>
+          {/* Progress indicator */}
+          {form.questions.length > 1 && (
+            <p className="text-[11px] text-[#94a3b8]">
+              Question {currentIdx + 1} of {form.questions.length}
+            </p>
+          )}
 
-              {q.type === "radio" && q.options?.map((opt) => {
-                const selected = answers[q.id] === opt;
-                return (
-                  <label
-                    key={opt}
-                    onClick={() => !disabled && toggleRadio(q.id, opt)}
-                    className="flex items-center gap-2.5 cursor-pointer group"
-                  >
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      selected ? "border-[#712ae2] bg-[#712ae2]" : "border-[#cbd5e1] group-hover:border-[#a78bfa]"
-                    }`}>
-                      {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                    </div>
-                    <span className="text-[13px] text-[#374151] select-none">{opt}</span>
-                  </label>
-                );
-              })}
+          <div className="space-y-2.5">
+            <p className="text-[14px] font-semibold text-[#111827] leading-6">{currentQuestion.label}</p>
 
-              {q.type === "checkbox" && q.options?.map((opt) => {
-                const checked = ((answers[q.id] as string[]) ?? []).includes(opt);
-                return (
-                  <label
-                    key={opt}
-                    onClick={() => !disabled && toggleCheckbox(q.id, opt)}
-                    className="flex items-center gap-2.5 cursor-pointer group"
-                  >
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                      checked ? "border-[#712ae2] bg-[#712ae2]" : "border-[#cbd5e1] group-hover:border-[#a78bfa]"
-                    }`}>
-                      {checked && <CheckSmallIcon />}
-                    </div>
-                    <span className="text-[13px] text-[#374151] select-none">{opt}</span>
-                  </label>
-                );
-              })}
+            {currentQuestion.type === "radio" && currentQuestion.options?.map((opt) => {
+              const selected = answers[currentQuestion.id] === opt;
+              return (
+                <label key={opt} onClick={() => !disabled && toggleRadio(currentQuestion.id, opt)} className="flex items-center gap-2.5 cursor-pointer group">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${selected ? "border-[#712ae2] bg-[#712ae2]" : "border-[#cbd5e1] group-hover:border-[#a78bfa]"}`}>
+                    {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <span className="text-[13px] text-[#4b5563] select-none font-medium">{opt}</span>
+                </label>
+              );
+            })}
 
-              {q.type === "text" && (
-                <input
-                  type="text"
-                  disabled={disabled}
-                  value={(answers[q.id] as string) ?? ""}
-                  onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-                  className="w-full px-3 py-2 text-[13px] border border-[#e2e8f0] rounded-md bg-white text-[#0b1c30] outline-none focus:ring-2 focus:ring-[#712ae2]/20 focus:border-[#712ae2] disabled:opacity-50"
-                  placeholder="Type your answer…"
-                />
-              )}
-            </div>
-          ))}
+            {currentQuestion.type === "checkbox" && currentQuestion.options?.map((opt) => {
+              const checked = ((answers[currentQuestion.id] as string[]) ?? []).includes(opt);
+              return (
+                <label key={opt} onClick={() => !disabled && toggleCheckbox(currentQuestion.id, opt)} className="flex items-center gap-2.5 cursor-pointer group">
+                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${checked ? "border-[#712ae2] bg-[#712ae2]" : "border-[#cbd5e1] group-hover:border-[#a78bfa]"}`}>
+                    {checked && <CheckSmallIcon />}
+                  </div>
+                  <span className="text-[13px] text-[#4b5563] select-none font-medium">{opt}</span>
+                </label>
+              );
+            })}
 
-          <button
-            onClick={() => onSubmit(form.questions, answers)}
-            disabled={!allAnswered || disabled || isRechecking}
-            className="flex items-center gap-2 px-4 py-2 bg-[#712ae2] text-white text-[13px] font-semibold rounded-md hover:bg-[#5f22c7] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {isRechecking ? (
-              <>
-                <SpinnerIcon size={13} />
-                Checking…
-              </>
-            ) : (
-              <>
-                Confirm &amp; Check
-                <ArrowRightIcon />
-              </>
+            {currentQuestion.type === "text" && (
+              <p className="text-[12px] text-[#6b7280] italic font-medium">
+                ↓ Type your answer in the chat bar below and press Send
+              </p>
             )}
-          </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Next question button */}
+            {!isLastQuestion && (
+              <button
+                onClick={() => setCurrentIdx((i) => i + 1)}
+                disabled={!isCurrentAnswered() || disabled}
+                className="flex items-center gap-2 px-4 py-2 bg-[#f1f5f9] text-[#374151] text-[13px] font-semibold rounded-md hover:bg-[#e2e8f0] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+                <ArrowRightIcon />
+              </button>
+            )}
+            {/* Submit all answers */}
+            {isLastQuestion && (
+              <button
+                onClick={() => onSubmit(form.questions, answers)}
+                disabled={!isCurrentAnswered() || disabled || isRechecking}
+                className="flex items-center gap-2 px-4 py-2 bg-[#712ae2] text-white text-[13px] font-semibold rounded-md hover:bg-[#5f22c7] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isRechecking ? (
+                  <><SpinnerIcon size={13} />Checking…</>
+                ) : (
+                  <>Confirm &amp; Check<ArrowRightIcon /></>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -299,30 +327,33 @@ function IntentFormCard({
 function AIMessage({
   intentForm,
   onFormSubmit,
+  onTextQuestion,
   isRechecking,
   isLastMessage,
 }: {
   intentForm?: IntentFormData;
   onFormSubmit?: (questions: IntentQuestion[], answers: Record<string, string | string[]>) => void;
+  onTextQuestion?: (ctx: { questions: IntentQuestion[]; answers: Record<string, string | string[]>; id: string } | null) => void;
   isRechecking?: boolean;
   isLastMessage?: boolean;
 }) {
   return (
-    <div className="flex gap-4 items-start">
-      <div className={`shrink-0 w-8 h-8 rounded-sm bg-[#712ae2] flex items-center justify-center ${isRechecking && isLastMessage ? "animate-pulse" : ""}`}>
-        <AgentIcon />
+    <div className="flex gap-3 items-start">
+      <div className={`shrink-0 w-8 h-8 rounded-lg bg-linear-to-br from-[#712ae2] to-[#5f22c7] flex items-center justify-center flex-none text-white ${isRechecking && isLastMessage ? "animate-pulse" : ""}`}>
+        <RobotIcon />
       </div>
-      <div className="flex-1 min-w-0 bg-[#f8fafc] border border-[#e2e8f0] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl p-4 shadow-sm">
+      <div className="flex-1 min-w-0 bg-linear-to-br from-[#f1f5ff] to-[#ede9f6] border border-[#e9e5f5] rounded-3xl rounded-tl-none p-5 shadow-md hover:shadow-lg transition-shadow">
         {intentForm ? (
           <IntentFormCard
             form={intentForm}
             onSubmit={onFormSubmit ?? (() => {})}
+            onTextQuestion={isLastMessage ? onTextQuestion : undefined}
             disabled={isRechecking}
             isRechecking={isRechecking && isLastMessage}
           />
         ) : (
-          <div className="flex items-center gap-2 text-[#94a3b8] text-sm">
-            <SpinnerIcon size={13} />
+          <div className="flex items-center gap-2.5 text-[#6b7280] text-sm font-medium">
+            <SpinnerIcon size={14} />
             <span>Processing…</span>
           </div>
         )}
@@ -412,9 +443,18 @@ export default function IntentSubStage() {
   const [streamingText, setStreamingText]   = useState("");
   const [intentAllClear, setIntentAllClear] = useState(false);
 
-  const qaHistoryRef     = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
-  const enrichedBriefRef = useRef("");
-  const bottomRef        = useRef<HTMLDivElement>(null);
+  const qaHistoryRef           = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
+  const enrichedBriefRef        = useRef("");
+  const bottomRef               = useRef<HTMLDivElement>(null);
+  const inputRef                = useRef<HTMLInputElement>(null);
+  const autoStartedRef          = useRef(false); // prevent StrictMode double-fire
+
+  // Auto-scroll to bottom whenever messages update or streaming text changes
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, streamingText, isRechecking]);
+  // Set when the last AI message is waiting for a text-type answer via the chat bar
+  const pendingTextQuestionRef  = useRef<{ questions: IntentQuestion[]; answers: Record<string, string | string[]>; id: string } | null>(null);
 
   // Intent stage runs BEFORE the full pipeline — only block on isRechecking here.
   // isRunning reflects the main pipeline which hasn't started yet.
@@ -423,7 +463,8 @@ export default function IntentSubStage() {
   // Auto-start: if a brief was set in the initial stage, immediately begin intent analysis.
   useEffect(() => {
     console.log("[intent] mounted — featureBrief:", featureBrief.slice(0, 60), "isRunning:", isRunning);
-    if (featureBrief.trim() && messages.length === 0 && !isRechecking) {
+    if (featureBrief.trim() && !autoStartedRef.current) {
+      autoStartedRef.current = true;
       console.log("[intent] auto-starting with featureBrief from store");
       enrichedBriefRef.current = featureBrief.trim();
       qaHistoryRef.current = [];
@@ -616,19 +657,32 @@ export default function IntentSubStage() {
     goToSubStage("prd", "preparation");
   }
 
-  // ── Handle initial brief send: call recheck API to get first set of questions ──
+  // ── Handle initial brief send OR text-question answer ──
   async function handleSend() {
     const val = inputValue.trim();
     if (!val || isAgentActive) return;
     setInputValue("");
-    enrichedBriefRef.current = val;
-    qaHistoryRef.current = [];
-    setIntentAllClear(false);
+
+    // If we're waiting for a text-type answer, inject it and submit the form
+    const pending = pendingTextQuestionRef.current;
+    if (pending) {
+      pendingTextQuestionRef.current = null;
+      const filledAnswers = { ...pending.answers, [pending.id]: val };
+      // handleFormSubmit already appends the user message internally, so don't add it here
+      await handleFormSubmit(pending.questions, filledAnswers);
+      inputRef.current?.focus();
+      return;
+    }
 
     setMessages((prev) => [
       ...prev,
       { role: "user", text: val, id: `user-${Date.now()}` } satisfies UserConvMsg,
     ]);
+
+    // New brief — reset context
+    enrichedBriefRef.current = val;
+    qaHistoryRef.current = [];
+    setIntentAllClear(false);
 
     setIsRechecking(true);
     try {
@@ -646,6 +700,7 @@ export default function IntentSubStage() {
             id: `ai-err-${Date.now()}`,
           } satisfies AiConvMsg,
         ]);
+        inputRef.current?.focus();
         return;
       }
 
@@ -679,6 +734,7 @@ export default function IntentSubStage() {
       ]);
     } finally {
       setIsRechecking(false);
+      inputRef.current?.focus();
     }
   }
 
@@ -723,6 +779,7 @@ export default function IntentSubStage() {
               key={msg.id}
               intentForm={(msg as AiConvMsg).intentForm}
               onFormSubmit={handleFormSubmit}
+              onTextQuestion={(ctx) => { pendingTextQuestionRef.current = ctx; }}
               isRechecking={isRechecking}
               isLastMessage={idx === messages.length - 1}
             />
@@ -730,18 +787,18 @@ export default function IntentSubStage() {
         )}
 
         {isRechecking && (
-          <div className="flex gap-4 items-start">
-            <div className="shrink-0 w-8 h-8 rounded-sm bg-[#712ae2] flex items-center justify-center animate-pulse">
-              <AgentIcon />
+          <div className="flex gap-3 items-start">
+            <div className="shrink-0 w-8 h-8 rounded-lg bg-linear-to-br from-[#712ae2] to-[#5f22c7] flex items-center justify-center animate-pulse flex-none text-white">
+              <RobotIcon />
             </div>
-            <div className="flex-1 min-w-0 bg-[#f8fafc] border border-[#e2e8f0] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl p-4 shadow-sm">
+            <div className="flex-1 min-w-0 bg-linear-to-br from-[#f1f5ff] to-[#ede9f6] border border-[#e9e5f5] rounded-3xl rounded-tl-none p-5 shadow-md">
               {streamingText ? (
-                <div className="prose prose-sm max-w-none text-[#0b1c30]">
+                <div className="prose prose-sm max-w-none text-[#1f2937] leading-relaxed">
                   <MarkdownRenderer content={streamingText} />
                   <TypingDots />
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-[#94a3b8] text-sm">
+                <div className="flex items-center gap-2.5 text-[#6b7280] text-sm font-medium">
                   <SpinnerIcon size={13} />
                   <span>Analyzing your brief</span>
                   <TypingDots />
@@ -761,6 +818,7 @@ export default function IntentSubStage() {
             <AttachIcon />
           </button>
           <input
+            ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
