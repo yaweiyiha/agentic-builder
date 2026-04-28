@@ -20,7 +20,7 @@ import {
   type ChatMessage,
   chatCompletionWithFallback,
 } from "@/lib/openrouter";
-import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
+import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
@@ -55,7 +55,8 @@ const MAX_OUTPUT_TOKENS = (() => {
   if (!Number.isFinite(raw) || raw <= 0) {
     return DEFAULT_WORKER_CODEGEN_MAX_OUTPUT_TOKENS;
   }
-  return Math.min(Math.max(Math.floor(raw), 1024), 32768);
+  // Cap raised to 128K to support large-context models (e.g. DeepSeek V4 Pro).
+  return Math.min(Math.max(Math.floor(raw), 1024), 131_072);
 })();
 const MAX_TASK_GENERATION_RETRIES = 2;
 const MAX_WORKER_TOOL_ITERATIONS = 6;
@@ -646,10 +647,15 @@ async function runCodegenWorkerLoop(
       );
     }
 
+    const reasoningContent = choice?.message?.reasoning_content;
     messages.push({
       role: "assistant",
       content,
-      tool_calls: toolCalls,
+      // Omit tool_calls entirely when empty — DeepSeek V4 rejects [] with a 400.
+      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      // DeepSeek V4 thinking mode: echo reasoning_content back so the API
+      // doesn't reject the next turn with "must be passed back" error.
+      ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
     });
 
     if (toolCalls.length === 0) {

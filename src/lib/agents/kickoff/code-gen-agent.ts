@@ -1,7 +1,7 @@
 import { BaseAgent } from "../shared/base-agent";
 import type { CodingAgentRole } from "@/lib/pipeline/types";
 import { MODEL_CONFIG, primaryModel } from "@/lib/model-config";
-import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
+import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
   architect: `You are a Senior Software Architect Agent.

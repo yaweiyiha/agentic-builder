@@ -51,11 +51,16 @@ import type { CodingTask } from "@/lib/pipeline/types";
  * skeleton contracts, API contracts list, relevant files, etc.).
  *
  * Override at runtime via `WORKER_CONTEXT_BUDGET_CHARS` env var.
+ *
+ * Hard cap is 1,000,000 chars (~250K tokens). When using DeepSeek V4 Pro
+ * (1M token window) a budget of 400,000–800,000 chars is safe.
+ * When OpenRouter fallback models are in play (128K–200K windows) keep the
+ * budget at ≤200,000 chars to avoid exceeding their limits.
  */
 export const DEFAULT_WORKER_CONTEXT_BUDGET_CHARS = (() => {
   const raw = Number(process.env.WORKER_CONTEXT_BUDGET_CHARS ?? "");
   if (!Number.isFinite(raw) || raw <= 0) return 30_000;
-  return Math.max(6_000, Math.min(Math.floor(raw), 120_000));
+  return Math.max(6_000, Math.min(Math.floor(raw), 1_000_000));
 })();
 
 /**

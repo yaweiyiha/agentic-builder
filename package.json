@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@langchain/core": "^1.1.38",
-    "@langchain/langgraph": "^1.2.6",
+    "@langchain/langgraph": "^1.2.9",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "langfuse": "^3.38.6",
     "motion": "^12.38.0",
