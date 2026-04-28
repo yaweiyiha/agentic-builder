@@ -53,12 +53,16 @@ export default function AppNav() {
           >
             Pipeline
           </Link>
-          <span
-            className="cursor-default text-sm font-medium text-[var(--muted-secondary)]"
-            title="Coming soon"
+          <Link
+            href="/reports"
+            className={`text-sm font-medium transition-colors ${
+              pathname === "/reports"
+                ? "text-[var(--foreground)]"
+                : "text-[var(--muted-secondary)] hover:text-[var(--foreground)]"
+            }`}
           >
-            Docs
-          </span>
+            Reports
+          </Link>
           <Link
             href="/pipeline"
             className="inline-flex items-center rounded-[10px] bg-[var(--accent)] px-[18px] py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"

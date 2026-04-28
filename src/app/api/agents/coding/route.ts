@@ -1032,7 +1032,8 @@ export async function POST(request: NextRequest) {
             collectedGateSnapshot,
           );
           if (!finalAudit.passed) {
-            const remainingIds = finalAudit.uncovered.map((entry) => entry.id);
+            // Use hardUncovered to exclude IC-xx interaction specs (soft warnings).
+            const remainingIds = (finalAudit.hardUncovered ?? finalAudit.uncovered.filter((e) => !/^IC-\d+$/i.test(e.id))).map((entry) => entry.id);
             blockingFailures.push(
               [
                 `Feature audit gate failed: ${remainingIds.length} requirement id(s) still unresolved.`,
