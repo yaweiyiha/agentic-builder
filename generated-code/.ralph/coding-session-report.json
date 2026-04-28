@@ -1,0 +1,3420 @@
+{
+  "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+  "startedAt": "2026-04-24T00:27:02.443Z",
+  "endedAt": "2026-04-24T00:41:23.684Z",
+  "status": "fail",
+  "terminalSummary": "E2E verify gate failed.\nE2E failed with infrastructure signal — not a code bug.\n\ntriage: 0 deterministic, 0 flaky, 1 infra (0 self-healed on retry)\n\nSee .ralph/e2e-triage.md for the full report.\n\n\n\n──────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/test-failed-1.png\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    attachment #2: \u001b[1mvideo\u001b[2m (video/webm) \u001b[2m──────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/video.webm\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    Error Context: test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/error-context.md\u001b[22m\n\n\n\u001b[1A\u001b[2K\u001b[31m  5 failed\u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts:15:3 › E2E-001 — List page loads with columns and pagination › renders required columns and paginates article list \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:58:3 › E2E-002 — Search by title and filter by status › applies keyword search and status filters; status change resets to page 1 \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-004-create-article-as-draft.spec.ts:34:3 › E2E-004 — Create article as draft › creates article with status=draft, redirects to list, and shows Draft row \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-005-create-article-as-published.spec.ts:34:3 › E2E-005 — Create article as published › publishes article and shows Published status in list \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:38:3 › E2E-006 — Edit existing article with prefilled data and save update › opens row edit route, pre-fills form, saves update, and persists on list \u001b[39m\n\u001b[32m  1 passed\u001b[39m\u001b[2m (50.0s)\u001b[22m\n\u001b[41m\u001b[30m ELIFECYCLE \u001b[39m\u001b[49m \u001b[31mCommand failed with exit code 1.\u001b[39m",
+  "fatalError": "E2E verify gate failed.\nE2E failed with infrastructure signal — not a code bug.\n\ntriage: 0 deterministic, 0 flaky, 1 infra (0 self-healed on retry)\n\nSee .ralph/e2e-triage.md for the full report.\n\n\n\n──────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/test-failed-1.png\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    attachment #2: \u001b[1mvideo\u001b[2m (video/webm) \u001b[2m──────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/video.webm\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    Error Context: test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/error-context.md\u001b[22m\n\n\n\u001b[1A\u001b[2K\u001b[31m  5 failed\u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts:15:3 › E2E-001 — List page loads with columns and pagination › renders required columns and paginates article list \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:58:3 › E2E-002 — Search by title and filter by status › applies keyword search and status filters; status change resets to page 1 \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-004-create-article-as-draft.spec.ts:34:3 › E2E-004 — Create article as draft › creates article with status=draft, redirects to list, and shows Draft row \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-005-create-article-as-published.spec.ts:34:3 › E2E-005 — Create article as published › publishes article and shows Published status in list \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:38:3 › E2E-006 — Edit existing article with prefilled data and save update › opens row edit route, pre-fills form, saves update, and persists on list \u001b[39m\n\u001b[32m  1 passed\u001b[39m\u001b[2m (50.0s)\u001b[22m\n\u001b[41m\u001b[30m ELIFECYCLE \u001b[39m\u001b[49m \u001b[31mCommand failed with exit code 1.\u001b[39m",
+  "generatorGitSha": "f52425e",
+  "scaffoldFixAttempts": 45,
+  "integrationFixAttempts": 10,
+  "score": {
+    "score": 56,
+    "grade": "F",
+    "reasons": [
+      "Run status is fail.",
+      "E2E verification still has blocking errors.",
+      "Context truncation happened 2 time(s)."
+    ]
+  },
+  "gateErrors": {
+    "integrationErrors": "",
+    "runtimeVerifyErrors": "",
+    "e2eVerifyErrors": "E2E failed with infrastructure signal — not a code bug.\n\ntriage: 0 deterministic, 0 flaky, 1 infra (0 self-healed on retry)\n\nSee .ralph/e2e-triage.md for the full report.\n\n\n\n──────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/test-failed-1.png\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    attachment #2: \u001b[1mvideo\u001b[2m (video/webm) \u001b[2m──────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/video.webm\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    Error Context: test-results/e2e/generated-e2e-001-list-pag-af029--and-paginates-article-list-chromium/error-context.md\u001b[22m\n\n\n\u001b[1A\u001b[2K\u001b[31m  5 failed\u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts:15:3 › E2E-001 — List page loads with columns and pagination › renders required columns and paginates article list \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:58:3 › E2E-002 — Search by title and filter by status › applies keyword search and status filters; status change resets to page 1 \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-004-create-article-as-draft.spec.ts:34:3 › E2E-004 — Create article as draft › creates article with status=draft, redirects to list, and shows Draft row \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-005-create-article-as-published.spec.ts:34:3 › E2E-005 — Create article as published › publishes article and shows Published status in list \u001b[39m\n\u001b[31m    [chromium] › tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:38:3 › E2E-006 — Edit existing article with prefilled data and save update › opens row edit route, pre-fills form, saves update, and persists on list \u001b[39m\n\u001b[32m  1 passed\u001b[39m\u001b[2m (50.0s)\u001b[22m\n\u001b[41m\u001b[30m ELIFECYCLE \u001b[39m\u001b[49m \u001b[31mCommand failed with exit code 1.\u001b[39m"
+  },
+  "gateStates": {
+    "integrationVerify": "pass",
+    "runtimeVerify": "skipped",
+    "e2eVerify": "fail",
+    "featureAudit": "pass"
+  },
+  "taskResults": [
+    {
+      "id": "T-001",
+      "title": "Setup database models and migrations for Article entity",
+      "coversRequirementIds": [
+        "FR-API01",
+        "FR-API02",
+        "FR-API03",
+        "FR-API04",
+        "FR-API05",
+        "FR-API06"
+      ],
+      "generatedFiles": [
+        "backend/src/models/Article.ts",
+        "backend/src/models/index.ts",
+        "backend/src/database/migrations/001-create-articles.ts",
+        "docker-compose.yml",
+        "backend/src/db.ts",
+        ".env"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-002",
+      "title": "Define API contracts and frontend client setup",
+      "coversRequirementIds": [
+        "FR-API06",
+        "AC-16",
+        "AC-17",
+        "AC-18",
+        "AC-19",
+        "AC-20"
+      ],
+      "generatedFiles": [
+        "backend/src/types/api.ts",
+        "backend/src/utils/validation.ts",
+        "frontend/src/types/api.ts",
+        "frontend/src/api/articles.ts",
+        "frontend/src/api/client.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-003",
+      "title": "Implement articles API endpoints and controllers",
+      "coversRequirementIds": [
+        "FR-API01",
+        "FR-API02",
+        "FR-API03",
+        "FR-API04",
+        "FR-API05",
+        "FR-API06",
+        "AC-16",
+        "AC-17",
+        "AC-18",
+        "AC-19",
+        "AC-20"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/articles/articles.service.ts",
+        "backend/src/api/modules/articles/articles.controller.ts",
+        "backend/src/api/modules/articles/articles.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-004",
+      "title": "Create application shell and navigation layout",
+      "coversRequirementIds": [
+        "FR-AL04",
+        "AC-04",
+        "AC-05"
+      ],
+      "generatedFiles": [
+        "frontend/src/main.tsx",
+        "frontend/src/App.tsx",
+        "frontend/src/components/Header.tsx",
+        "frontend/src/components/Layout.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-005",
+      "title": "Implement Article List page with search and filtering",
+      "coversRequirementIds": [
+        "FR-AL01",
+        "FR-AL02",
+        "FR-AL03",
+        "FR-AL04",
+        "FR-AL05",
+        "FR-AL06",
+        "FR-AL07",
+        "US-01",
+        "US-02",
+        "US-03",
+        "US-06",
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/SearchFilter.tsx",
+        "frontend/src/components/ArticleTable.tsx",
+        "frontend/src/components/Pagination.tsx",
+        "frontend/src/components/DeleteConfirmModal.tsx",
+        "frontend/src/views/ArticleListPage.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/App.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-006",
+      "title": "Implement Article Editor page with form validation",
+      "coversRequirementIds": [
+        "FR-AE01",
+        "FR-AE02",
+        "FR-AE03",
+        "FR-AE04",
+        "FR-AE05",
+        "FR-AE06",
+        "FR-AE07",
+        "FR-AE08",
+        "US-04",
+        "US-05",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/ArticleForm.tsx",
+        "frontend/src/hooks/useUnsavedChanges.ts",
+        "frontend/src/components/UnsavedChangesModal.tsx",
+        "frontend/src/views/ArticleEditorPage.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-001",
+      "title": "Set up Playwright E2E harness",
+      "coversRequirementIds": [],
+      "generatedFiles": [
+        "frontend/playwright.config.ts",
+        "frontend/package.json",
+        "frontend/tests/e2e/utils.ts",
+        "frontend/tests/e2e/fixtures.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-002",
+      "title": "Implement PRD browser journeys",
+      "coversRequirementIds": [
+        "US-01",
+        "FR-AL01",
+        "FR-API01",
+        "AC-01",
+        "AC-16",
+        "PAGE-001",
+        "CMP-009",
+        "CMP-010",
+        "CMP-011",
+        "US-02",
+        "US-03",
+        "FR-AL02",
+        "FR-AL03",
+        "AC-02",
+        "AC-03",
+        "CMP-002",
+        "CMP-003",
+        "CMP-004",
+        "CMP-028",
+        "CMP-029",
+        "US-04",
+        "FR-AL04",
+        "FR-AE01",
+        "FR-AE03",
+        "AC-04",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "PAGE-002",
+        "CMP-001",
+        "CMP-014",
+        "CMP-017",
+        "CMP-018",
+        "CMP-019",
+        "CMP-020",
+        "FR-AE02",
+        "FR-AE04",
+        "FR-API03",
+        "FR-API06",
+        "AC-11",
+        "AC-18",
+        "CMP-015",
+        "CMP-016",
+        "FR-AE05",
+        "AC-12",
+        "US-05",
+        "FR-AL05",
+        "FR-AE06",
+        "FR-API02",
+        "FR-API04",
+        "AC-05",
+        "AC-13",
+        "AC-17",
+        "AC-19",
+        "CMP-005",
+        "CMP-021",
+        "US-06",
+        "FR-AL06",
+        "FR-API05",
+        "AC-06",
+        "AC-20",
+        "PAGE-003",
+        "CMP-006",
+        "CMP-007",
+        "CMP-008",
+        "CMP-024",
+        "CMP-025",
+        "FR-AL07",
+        "AC-07",
+        "CMP-012",
+        "FR-AE07",
+        "AC-14",
+        "PAGE-004",
+        "CMP-013",
+        "CMP-022",
+        "CMP-023",
+        "CMP-026",
+        "CMP-027",
+        "FR-AE08",
+        "AC-15"
+      ],
+      "generatedFiles": [
+        "frontend/tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts",
+        "frontend/tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts",
+        "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts",
+        "frontend/tests/e2e/generated/e2e-004-create-article-as-draft.spec.ts",
+        "frontend/tests/e2e/generated/e2e-005-create-article-as-published.spec.ts",
+        "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-REPAIR-FRONTEND",
+      "title": "Backfill uncovered features (frontend): IC-01, IC-02, IC-03, IC-04 …+19",
+      "coversRequirementIds": [
+        "IC-01",
+        "IC-02",
+        "IC-03",
+        "IC-04",
+        "IC-05",
+        "IC-06",
+        "IC-07",
+        "IC-08",
+        "IC-09",
+        "IC-10",
+        "IC-11",
+        "IC-12",
+        "IC-13",
+        "IC-14",
+        "IC-15",
+        "IC-16",
+        "IC-17",
+        "IC-18",
+        "IC-19",
+        "IC-20",
+        "IC-21",
+        "IC-22",
+        "IC-23"
+      ],
+      "generatedFiles": [
+        "frontend/src/views/ArticleListPage.tsx",
+        "frontend/src/views/ArticleEditorPage.tsx",
+        "frontend/src/components/SearchFilter.tsx",
+        "frontend/src/components/ArticleTable.tsx",
+        "frontend/src/components/ArticleForm.tsx",
+        "frontend/src/components/Pagination.tsx",
+        "frontend/src/api/articles.ts",
+        "frontend/src/views/NotFoundPage.tsx"
+      ],
+      "status": "completed"
+    }
+  ],
+  "fileRegistryCount": 120,
+  "llmUsageEvents": [
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.04995375,
+      "promptTokens": 17009,
+      "completionTokens": 1442,
+      "totalTokens": 18451,
+      "timestamp": "2026-04-24T00:27:17.055Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0450625,
+      "promptTokens": 17806,
+      "completionTokens": 993,
+      "totalTokens": 18799,
+      "timestamp": "2026-04-24T00:27:27.281Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0368585,
+      "promptTokens": 18558,
+      "completionTokens": 313,
+      "totalTokens": 18871,
+      "timestamp": "2026-04-24T00:27:31.399Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "generate_api_contracts",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 5711,
+      "completionTokens": 705,
+      "totalTokens": 6416,
+      "timestamp": "2026-04-24T00:27:39.029Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.048282500000000006,
+      "promptTokens": 16102,
+      "completionTokens": 1436,
+      "totalTokens": 17538,
+      "timestamp": "2026-04-24T00:27:54.339Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06253624999999999,
+      "promptTokens": 16159,
+      "completionTokens": 2447,
+      "totalTokens": 18606,
+      "timestamp": "2026-04-24T00:28:06.486Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.055252749999999996,
+      "promptTokens": 17181,
+      "completionTokens": 1799,
+      "totalTokens": 18980,
+      "timestamp": "2026-04-24T00:28:10.209Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.049042,
+      "promptTokens": 18072,
+      "completionTokens": 1244,
+      "totalTokens": 19316,
+      "timestamp": "2026-04-24T00:28:26.678Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.058273250000000006,
+      "promptTokens": 18707,
+      "completionTokens": 1824,
+      "totalTokens": 20531,
+      "timestamp": "2026-04-24T00:28:48.008Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08563099999999998,
+      "promptTokens": 17372,
+      "completionTokens": 3945,
+      "totalTokens": 21317,
+      "timestamp": "2026-04-24T00:28:48.368Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06499150000000001,
+      "promptTokens": 20402,
+      "completionTokens": 2092,
+      "totalTokens": 22494,
+      "timestamp": "2026-04-24T00:29:06.213Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.066276,
+      "promptTokens": 22296,
+      "completionTokens": 1947,
+      "totalTokens": 24243,
+      "timestamp": "2026-04-24T00:29:20.986Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07825299999999999,
+      "promptTokens": 16980,
+      "completionTokens": 3467,
+      "totalTokens": 20447,
+      "timestamp": "2026-04-24T00:29:26.163Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.043317749999999995,
+      "promptTokens": 19377,
+      "completionTokens": 672,
+      "totalTokens": 20049,
+      "timestamp": "2026-04-24T00:29:37.210Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 1779,
+      "completionTokens": 83,
+      "totalTokens": 1862,
+      "timestamp": "2026-04-24T00:29:45.291Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 1940,
+      "completionTokens": 69,
+      "totalTokens": 2009,
+      "timestamp": "2026-04-24T00:29:49.564Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 3347,
+      "completionTokens": 92,
+      "totalTokens": 3439,
+      "timestamp": "2026-04-24T00:30:02.682Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 3577,
+      "completionTokens": 62,
+      "totalTokens": 3639,
+      "timestamp": "2026-04-24T00:30:05.742Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 3768,
+      "completionTokens": 70,
+      "totalTokens": 3838,
+      "timestamp": "2026-04-24T00:30:08.284Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 4108,
+      "completionTokens": 82,
+      "totalTokens": 4190,
+      "timestamp": "2026-04-24T00:30:11.161Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 4221,
+      "completionTokens": 59,
+      "totalTokens": 4280,
+      "timestamp": "2026-04-24T00:30:13.762Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 4383,
+      "completionTokens": 108,
+      "totalTokens": 4491,
+      "timestamp": "2026-04-24T00:30:16.043Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 4510,
+      "completionTokens": 105,
+      "totalTokens": 4615,
+      "timestamp": "2026-04-24T00:30:18.494Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 4797,
+      "completionTokens": 90,
+      "totalTokens": 4887,
+      "timestamp": "2026-04-24T00:30:22.426Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 6171,
+      "completionTokens": 86,
+      "totalTokens": 6257,
+      "timestamp": "2026-04-24T00:30:24.996Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 6293,
+      "completionTokens": 71,
+      "totalTokens": 6364,
+      "timestamp": "2026-04-24T00:30:27.150Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 7582,
+      "completionTokens": 105,
+      "totalTokens": 7687,
+      "timestamp": "2026-04-24T00:30:29.533Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 7800,
+      "completionTokens": 74,
+      "totalTokens": 7874,
+      "timestamp": "2026-04-24T00:30:32.076Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 7981,
+      "completionTokens": 195,
+      "totalTokens": 8176,
+      "timestamp": "2026-04-24T00:30:35.813Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 9460,
+      "completionTokens": 103,
+      "totalTokens": 9563,
+      "timestamp": "2026-04-24T00:30:38.524Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 9616,
+      "completionTokens": 2123,
+      "totalTokens": 11739,
+      "timestamp": "2026-04-24T00:30:59.373Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 11767,
+      "completionTokens": 88,
+      "totalTokens": 11855,
+      "timestamp": "2026-04-24T00:31:02.200Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 11874,
+      "completionTokens": 96,
+      "totalTokens": 11970,
+      "timestamp": "2026-04-24T00:31:06.844Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 13308,
+      "completionTokens": 105,
+      "totalTokens": 13413,
+      "timestamp": "2026-04-24T00:31:12.769Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 13436,
+      "completionTokens": 63,
+      "totalTokens": 13499,
+      "timestamp": "2026-04-24T00:31:14.993Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 14627,
+      "completionTokens": 69,
+      "totalTokens": 14696,
+      "timestamp": "2026-04-24T00:31:17.692Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 14863,
+      "completionTokens": 104,
+      "totalTokens": 14967,
+      "timestamp": "2026-04-24T00:31:20.502Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15001,
+      "completionTokens": 111,
+      "totalTokens": 15112,
+      "timestamp": "2026-04-24T00:31:23.696Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15498,
+      "completionTokens": 99,
+      "totalTokens": 15597,
+      "timestamp": "2026-04-24T00:31:26.497Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15653,
+      "completionTokens": 74,
+      "totalTokens": 15727,
+      "timestamp": "2026-04-24T00:31:29.188Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 16538,
+      "completionTokens": 103,
+      "totalTokens": 16641,
+      "timestamp": "2026-04-24T00:31:32.366Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 16673,
+      "completionTokens": 74,
+      "totalTokens": 16747,
+      "timestamp": "2026-04-24T00:31:34.773Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 17522,
+      "completionTokens": 81,
+      "totalTokens": 17603,
+      "timestamp": "2026-04-24T00:31:37.134Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 17625,
+      "completionTokens": 83,
+      "totalTokens": 17708,
+      "timestamp": "2026-04-24T00:31:39.459Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 17740,
+      "completionTokens": 128,
+      "totalTokens": 17868,
+      "timestamp": "2026-04-24T00:31:43.806Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 17952,
+      "completionTokens": 111,
+      "totalTokens": 18063,
+      "timestamp": "2026-04-24T00:31:46.981Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 18149,
+      "completionTokens": 83,
+      "totalTokens": 18232,
+      "timestamp": "2026-04-24T00:31:49.733Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 18537,
+      "completionTokens": 150,
+      "totalTokens": 18687,
+      "timestamp": "2026-04-24T00:31:53.362Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 18706,
+      "completionTokens": 72,
+      "totalTokens": 18778,
+      "timestamp": "2026-04-24T00:31:57.407Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 18797,
+      "completionTokens": 134,
+      "totalTokens": 18931,
+      "timestamp": "2026-04-24T00:32:02.155Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 18950,
+      "completionTokens": 65,
+      "totalTokens": 19015,
+      "timestamp": "2026-04-24T00:32:04.878Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 19034,
+      "completionTokens": 147,
+      "totalTokens": 19181,
+      "timestamp": "2026-04-24T00:32:10.963Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "extract_real_contracts",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 6014,
+      "completionTokens": 673,
+      "totalTokens": 6687,
+      "timestamp": "2026-04-24T00:32:17.109Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06925275,
+      "promptTokens": 19533,
+      "completionTokens": 2505,
+      "totalTokens": 22038,
+      "timestamp": "2026-04-24T00:32:38.829Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.054026,
+      "promptTokens": 21072,
+      "completionTokens": 1225,
+      "totalTokens": 22297,
+      "timestamp": "2026-04-24T00:32:50.216Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06333074999999999,
+      "promptTokens": 20413,
+      "completionTokens": 1972,
+      "totalTokens": 22385,
+      "timestamp": "2026-04-24T00:33:05.405Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0555905,
+      "promptTokens": 22078,
+      "completionTokens": 1211,
+      "totalTokens": 23289,
+      "timestamp": "2026-04-24T00:33:14.337Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07320425,
+      "promptTokens": 23263,
+      "completionTokens": 2321,
+      "totalTokens": 25584,
+      "timestamp": "2026-04-24T00:33:35.785Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.062034000000000006,
+      "promptTokens": 24944,
+      "completionTokens": 1313,
+      "totalTokens": 26257,
+      "timestamp": "2026-04-24T00:33:47.492Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09249275000000001,
+      "promptTokens": 21053,
+      "completionTokens": 3975,
+      "totalTokens": 25028,
+      "timestamp": "2026-04-24T00:34:23.608Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07097824999999999,
+      "promptTokens": 23927,
+      "completionTokens": 2079,
+      "totalTokens": 26006,
+      "timestamp": "2026-04-24T00:34:40.347Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0559755,
+      "promptTokens": 25714,
+      "completionTokens": 784,
+      "totalTokens": 26498,
+      "timestamp": "2026-04-24T00:34:48.014Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 1621,
+      "completionTokens": 87,
+      "totalTokens": 1708,
+      "timestamp": "2026-04-24T00:34:52.684Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 1886,
+      "completionTokens": 45,
+      "totalTokens": 1931,
+      "timestamp": "2026-04-24T00:34:54.450Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 3784,
+      "completionTokens": 92,
+      "totalTokens": 3876,
+      "timestamp": "2026-04-24T00:34:56.420Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 4556,
+      "completionTokens": 57,
+      "totalTokens": 4613,
+      "timestamp": "2026-04-24T00:34:58.097Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 5092,
+      "completionTokens": 96,
+      "totalTokens": 5188,
+      "timestamp": "2026-04-24T00:35:00.302Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 5407,
+      "completionTokens": 82,
+      "totalTokens": 5489,
+      "timestamp": "2026-04-24T00:35:02.328Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 5532,
+      "completionTokens": 78,
+      "totalTokens": 5610,
+      "timestamp": "2026-04-24T00:35:04.396Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 5687,
+      "completionTokens": 89,
+      "totalTokens": 5776,
+      "timestamp": "2026-04-24T00:35:07.960Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 5829,
+      "completionTokens": 66,
+      "totalTokens": 5895,
+      "timestamp": "2026-04-24T00:35:11.062Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 5948,
+      "completionTokens": 87,
+      "totalTokens": 6035,
+      "timestamp": "2026-04-24T00:35:13.740Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 6054,
+      "completionTokens": 87,
+      "totalTokens": 6141,
+      "timestamp": "2026-04-24T00:35:17.863Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 6160,
+      "completionTokens": 96,
+      "totalTokens": 6256,
+      "timestamp": "2026-04-24T00:35:21.889Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 6626,
+      "completionTokens": 74,
+      "totalTokens": 6700,
+      "timestamp": "2026-04-24T00:35:24.776Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 7926,
+      "completionTokens": 81,
+      "totalTokens": 8007,
+      "timestamp": "2026-04-24T00:35:26.809Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 8035,
+      "completionTokens": 64,
+      "totalTokens": 8099,
+      "timestamp": "2026-04-24T00:35:29.235Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 8480,
+      "completionTokens": 84,
+      "totalTokens": 8564,
+      "timestamp": "2026-04-24T00:35:31.962Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 8583,
+      "completionTokens": 76,
+      "totalTokens": 8659,
+      "timestamp": "2026-04-24T00:35:34.818Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 9906,
+      "completionTokens": 79,
+      "totalTokens": 9985,
+      "timestamp": "2026-04-24T00:35:36.919Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 10015,
+      "completionTokens": 86,
+      "totalTokens": 10101,
+      "timestamp": "2026-04-24T00:35:39.078Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 10180,
+      "completionTokens": 85,
+      "totalTokens": 10265,
+      "timestamp": "2026-04-24T00:35:41.347Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 10801,
+      "completionTokens": 128,
+      "totalTokens": 10929,
+      "timestamp": "2026-04-24T00:35:44.580Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 10948,
+      "completionTokens": 77,
+      "totalTokens": 11025,
+      "timestamp": "2026-04-24T00:35:47.102Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 11044,
+      "completionTokens": 90,
+      "totalTokens": 11134,
+      "timestamp": "2026-04-24T00:35:49.932Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 11188,
+      "completionTokens": 76,
+      "totalTokens": 11264,
+      "timestamp": "2026-04-24T00:35:52.394Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 11605,
+      "completionTokens": 97,
+      "totalTokens": 11702,
+      "timestamp": "2026-04-24T00:35:56.888Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 13240,
+      "completionTokens": 74,
+      "totalTokens": 13314,
+      "timestamp": "2026-04-24T00:36:01.203Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 14754,
+      "completionTokens": 126,
+      "totalTokens": 14880,
+      "timestamp": "2026-04-24T00:36:06.607Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 14940,
+      "completionTokens": 60,
+      "totalTokens": 15000,
+      "timestamp": "2026-04-24T00:36:09.044Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15255,
+      "completionTokens": 98,
+      "totalTokens": 15353,
+      "timestamp": "2026-04-24T00:36:11.666Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15547,
+      "completionTokens": 102,
+      "totalTokens": 15649,
+      "timestamp": "2026-04-24T00:36:16.446Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 16019,
+      "completionTokens": 497,
+      "totalTokens": 16516,
+      "timestamp": "2026-04-24T00:36:21.986Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 16538,
+      "completionTokens": 88,
+      "totalTokens": 16626,
+      "timestamp": "2026-04-24T00:36:24.932Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 16705,
+      "completionTokens": 85,
+      "totalTokens": 16790,
+      "timestamp": "2026-04-24T00:36:27.779Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 17083,
+      "completionTokens": 63,
+      "totalTokens": 17146,
+      "timestamp": "2026-04-24T00:36:30.017Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 18393,
+      "completionTokens": 2881,
+      "totalTokens": 21274,
+      "timestamp": "2026-04-24T00:36:54.150Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 21300,
+      "completionTokens": 615,
+      "totalTokens": 21915,
+      "timestamp": "2026-04-24T00:37:08.016Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 21937,
+      "completionTokens": 92,
+      "totalTokens": 22029,
+      "timestamp": "2026-04-24T00:37:11.033Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 22048,
+      "completionTokens": 84,
+      "totalTokens": 22132,
+      "timestamp": "2026-04-24T00:37:16.137Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 22151,
+      "completionTokens": 91,
+      "totalTokens": 22242,
+      "timestamp": "2026-04-24T00:37:20.391Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 22261,
+      "completionTokens": 72,
+      "totalTokens": 22333,
+      "timestamp": "2026-04-24T00:37:23.256Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 22352,
+      "completionTokens": 122,
+      "totalTokens": 22474,
+      "timestamp": "2026-04-24T00:37:27.788Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 22493,
+      "completionTokens": 68,
+      "totalTokens": 22561,
+      "timestamp": "2026-04-24T00:37:30.633Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 23751,
+      "completionTokens": 119,
+      "totalTokens": 23870,
+      "timestamp": "2026-04-24T00:37:34.720Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 23889,
+      "completionTokens": 74,
+      "totalTokens": 23963,
+      "timestamp": "2026-04-24T00:37:40.102Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "phase_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 23982,
+      "completionTokens": 299,
+      "totalTokens": 24281,
+      "timestamp": "2026-04-24T00:37:48.162Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 10056,
+      "completionTokens": 337,
+      "totalTokens": 10393,
+      "timestamp": "2026-04-24T00:37:55.826Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 11944,
+      "completionTokens": 62,
+      "totalTokens": 12006,
+      "timestamp": "2026-04-24T00:37:57.822Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 12614,
+      "completionTokens": 88,
+      "totalTokens": 12702,
+      "timestamp": "2026-04-24T00:38:00.390Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 13024,
+      "completionTokens": 260,
+      "totalTokens": 13284,
+      "timestamp": "2026-04-24T00:38:04.496Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 14310,
+      "completionTokens": 89,
+      "totalTokens": 14399,
+      "timestamp": "2026-04-24T00:38:06.954Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15130,
+      "completionTokens": 123,
+      "totalTokens": 15253,
+      "timestamp": "2026-04-24T00:38:10.183Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15192,
+      "completionTokens": 60,
+      "totalTokens": 15252,
+      "timestamp": "2026-04-24T00:38:16.239Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15567,
+      "completionTokens": 68,
+      "totalTokens": 15635,
+      "timestamp": "2026-04-24T00:38:31.680Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15654,
+      "completionTokens": 319,
+      "totalTokens": 15973,
+      "timestamp": "2026-04-24T00:38:39.494Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "integration_verify_fix",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 15997,
+      "completionTokens": 119,
+      "totalTokens": 16116,
+      "timestamp": "2026-04-24T00:38:45.357Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09532075000000001,
+      "promptTokens": 19445,
+      "completionTokens": 4378,
+      "totalTokens": 23823,
+      "timestamp": "2026-04-24T00:40:33.014Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0672595,
+      "promptTokens": 22586,
+      "completionTokens": 1981,
+      "totalTokens": 24567,
+      "timestamp": "2026-04-24T00:40:51.705Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08815975000000001,
+      "promptTokens": 24081,
+      "completionTokens": 3287,
+      "totalTokens": 27368,
+      "timestamp": "2026-04-24T00:41:13.935Z"
+    },
+    {
+      "sessionId": "0524f962-5ea4-45f1-90ce-c47061eabbc2",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.062867,
+      "promptTokens": 27324,
+      "completionTokens": 1075,
+      "totalTokens": 28399,
+      "timestamp": "2026-04-24T00:41:23.610Z"
+    }
+  ],
+  "modelUsage": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 26,
+      "costUsd": 1.6542225,
+      "promptTokens": 531454,
+      "completionTokens": 51727,
+      "totalTokens": 583181,
+      "stages": [
+        "worker_codegen:Architect",
+        "worker_codegen:Test Engineer",
+        "worker_codegen:Backend Dev",
+        "worker_codegen:Frontend Dev",
+        "worker_codegen:Audit Backfill (frontend)"
+      ]
+    },
+    {
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "calls": 95,
+      "costUsd": 0,
+      "promptTokens": 1152327,
+      "completionTokens": 16289,
+      "totalTokens": 1168616,
+      "stages": [
+        "generate_api_contracts",
+        "phase_verify_fix",
+        "extract_real_contracts",
+        "integration_verify_fix"
+      ]
+    }
+  ],
+  "modelPerformance": [
+    {
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "calls": 95,
+      "promptTokens": 1152327,
+      "completionTokens": 16289,
+      "totalTokens": 1168616,
+      "costUsd": 0,
+      "stages": [
+        "generate_api_contracts",
+        "phase_verify_fix",
+        "extract_real_contracts",
+        "integration_verify_fix"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 26,
+      "promptTokens": 531454,
+      "completionTokens": 51727,
+      "totalTokens": 583181,
+      "costUsd": 1.6542225,
+      "stages": [
+        "worker_codegen"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    }
+  ],
+  "stageUsage": [
+    {
+      "stage": "architect-triage",
+      "startAt": "2026-04-24T00:27:02.481Z",
+      "endAt": "2026-04-24T00:27:02.481Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker_codegen",
+      "startAt": "2026-04-24T00:27:17.055Z",
+      "endAt": "2026-04-24T00:41:23.610Z",
+      "durationMs": 846555,
+      "llmCalls": 26,
+      "promptTokens": 531454,
+      "completionTokens": 51727,
+      "totalTokens": 583181,
+      "costUsd": 1.6542225,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [
+        "Architect",
+        "Test Engineer",
+        "Backend Dev",
+        "Frontend Dev",
+        "Audit Backfill (frontend)"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "task",
+      "startAt": "2026-04-24T00:27:31.425Z",
+      "endAt": "2026-04-24T00:41:23.628Z",
+      "durationMs": 832203,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 9,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-context",
+      "startAt": "2026-04-24T00:27:31.465Z",
+      "endAt": "2026-04-24T00:37:49.829Z",
+      "durationMs": 618364,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 88,
+      "grade": "B",
+      "reasons": [
+        "Context was truncated 2 time(s)."
+      ]
+    },
+    {
+      "stage": "generate_api_contracts",
+      "startAt": "2026-04-24T00:27:39.029Z",
+      "endAt": "2026-04-24T00:27:39.036Z",
+      "durationMs": 7,
+      "llmCalls": 1,
+      "promptTokens": 5711,
+      "completionTokens": 705,
+      "totalTokens": 6416,
+      "costUsd": 0,
+      "models": [
+        "anthropic/claude-4-sonnet-20250522"
+      ],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-convention-fix",
+      "startAt": "2026-04-24T00:29:37.307Z",
+      "endAt": "2026-04-24T00:34:48.188Z",
+      "durationMs": 310881,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "phase_verify_fix",
+      "startAt": "2026-04-24T00:29:45.291Z",
+      "endAt": "2026-04-24T00:37:48.162Z",
+      "durationMs": 482871,
+      "llmCalls": 83,
+      "promptTokens": 1001114,
+      "completionTokens": 13386,
+      "totalTokens": 1014500,
+      "costUsd": 0,
+      "models": [
+        "anthropic/claude-4-sonnet-20250522"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "extract_real_contracts",
+      "startAt": "2026-04-24T00:32:17.109Z",
+      "endAt": "2026-04-24T00:32:17.109Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 6014,
+      "completionTokens": 673,
+      "totalTokens": 6687,
+      "costUsd": 0,
+      "models": [
+        "anthropic/claude-4-sonnet-20250522"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-route-audit",
+      "startAt": "2026-04-24T00:37:49.825Z",
+      "endAt": "2026-04-24T00:37:49.825Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-contract-completeness",
+      "startAt": "2026-04-24T00:37:49.825Z",
+      "endAt": "2026-04-24T00:37:49.825Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "integration_verify_fix",
+      "startAt": "2026-04-24T00:37:55.826Z",
+      "endAt": "2026-04-24T00:38:45.357Z",
+      "durationMs": 49531,
+      "llmCalls": 10,
+      "promptTokens": 139488,
+      "completionTokens": 1525,
+      "totalTokens": 141013,
+      "costUsd": 0,
+      "models": [
+        "anthropic/claude-4-sonnet-20250522"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "integration-gate",
+      "startAt": "2026-04-24T00:38:00.391Z",
+      "endAt": "2026-04-24T00:38:53.515Z",
+      "durationMs": 53124,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 5,
+      "score": 80,
+      "grade": "B",
+      "reasons": [
+        "Stagnation warnings triggered 2 time(s)."
+      ]
+    },
+    {
+      "stage": "e2e-triage",
+      "startAt": "2026-04-24T00:39:51.350Z",
+      "endAt": "2026-04-24T00:39:51.350Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "post-gen-audit",
+      "startAt": "2026-04-24T00:39:51.360Z",
+      "endAt": "2026-04-24T00:41:23.682Z",
+      "durationMs": 92322,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 7,
+      "score": 77,
+      "grade": "C",
+      "reasons": [
+        "23 requirement id(s) remained unresolved after audit."
+      ]
+    }
+  ],
+  "repairSummary": {
+    "totalEvents": 30,
+    "byStage": {
+      "architect-triage": 1,
+      "task": 9,
+      "worker-context": 2,
+      "generate_api_contracts": 1,
+      "preflight-convention-fix": 2,
+      "preflight-route-audit": 1,
+      "preflight-contract-completeness": 1,
+      "integration-gate": 5,
+      "e2e-triage": 1,
+      "post-gen-audit": 7
+    },
+    "byEvent": {
+      "task_forced_to_llm": 1,
+      "snapshot_cleaned": 9,
+      "doc_truncated": 2,
+      "contract_completeness_snapshot": 3,
+      "convention_autofix_applied": 2,
+      "route_audit_snapshot": 2,
+      "stagnation_warning": 2,
+      "frontend_api_client_uniqueness_snapshot": 1,
+      "infra_detected": 1,
+      "audit_start": 2,
+      "uncovered_detected": 1,
+      "repair_dispatch_start": 1,
+      "repair_dispatch_role_done": 1,
+      "repair_dispatch_done": 1,
+      "audit_clean": 1
+    },
+    "entries": [
+      {
+        "stage": "architect-triage",
+        "event": "task_forced_to_llm",
+        "timestamp": "2026-04-24T00:27:02.481Z",
+        "details": {
+          "reason": "Task references 6 file(s) outside the scaffold's protected paths — real work must be generated.",
+          "title": "Setup database models and migrations for Article entity",
+          "phase": "Data Layer"
+        },
+        "taskId": "T-001"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:27:31.425Z",
+        "taskId": "T-001"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-24T00:27:31.465Z",
+        "details": {
+          "label": "api-contract-generation",
+          "keptSections": 18,
+          "droppedSections": 46,
+          "budgetChars": 12000,
+          "usedChars": 12006
+        }
+      },
+      {
+        "stage": "generate_api_contracts",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-24T00:27:39.036Z",
+        "details": {
+          "when": "post-generate",
+          "inferredRelationshipCount": 0,
+          "missingScopedEndpoints": []
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:28:10.231Z",
+        "taskId": "T-E2E-001"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:28:48.028Z",
+        "taskId": "T-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:29:21.009Z",
+        "taskId": "T-E2E-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:29:37.230Z",
+        "taskId": "T-003"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-24T00:29:37.307Z",
+        "details": {
+          "phase": "backend",
+          "fixedFileCount": 3,
+          "fixedFiles": [
+            "frontend/src/providers/AppProviders.tsx",
+            "backend/src/app.ts",
+            "frontend/src/router.tsx"
+          ],
+          "notes": [
+            "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+            "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+            "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename."
+          ],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:32:50.236Z",
+        "taskId": "T-004"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:33:47.515Z",
+        "taskId": "T-005"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:34:48.036Z",
+        "taskId": "T-006"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-24T00:34:48.188Z",
+        "details": {
+          "phase": "frontend",
+          "fixedFileCount": 0,
+          "fixedFiles": [],
+          "notes": [],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "preflight-route-audit",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-24T00:37:49.825Z",
+        "details": {
+          "when": "preflight",
+          "hardFail": false,
+          "unregisteredModules": [],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [],
+          "undeclaredEndpointCount": 1
+        }
+      },
+      {
+        "stage": "preflight-contract-completeness",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-24T00:37:49.825Z",
+        "details": {
+          "when": "preflight",
+          "inferredRelationshipCount": 0,
+          "missingScopedEndpoints": []
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-24T00:37:49.829Z",
+        "details": {
+          "label": "integration-review",
+          "keptSections": 16,
+          "droppedSections": 48,
+          "budgetChars": 18000,
+          "usedChars": 18010
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-24T00:38:00.391Z",
+        "details": {
+          "iterationsWithoutMutation": 3,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 1,
+          "escalated": false,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-24T00:38:06.975Z",
+        "details": {
+          "iterationsWithoutMutation": 5,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 2,
+          "escalated": true,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-24T00:38:53.515Z",
+        "details": {
+          "when": "final",
+          "hardFail": false,
+          "unregisteredModules": [],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [],
+          "undeclaredEndpointCount": 1
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-24T00:38:53.515Z",
+        "details": {
+          "when": "final",
+          "hardFail": false,
+          "warnOnly": true,
+          "inferredRelationshipCount": 0,
+          "missingScopedEndpoints": [],
+          "warnOnlyEndpoints": []
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "frontend_api_client_uniqueness_snapshot",
+        "timestamp": "2026-04-24T00:38:53.515Z",
+        "details": {
+          "when": "final",
+          "hardFail": false,
+          "canonical": "frontend/src/api/client.ts",
+          "parallelClients": []
+        }
+      },
+      {
+        "stage": "e2e-triage",
+        "event": "infra_detected",
+        "timestamp": "2026-04-24T00:39:51.350Z",
+        "details": {
+          "attempt": 1,
+          "summary": "triage: 0 deterministic, 0 flaky, 1 infra (0 self-healed on retry)",
+          "infraCount": 1
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_start",
+        "timestamp": "2026-04-24T00:39:51.360Z",
+        "details": {
+          "totalIds": 64
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "uncovered_detected",
+        "timestamp": "2026-04-24T00:39:51.406Z",
+        "details": {
+          "totalChecked": 64,
+          "implemented": 41,
+          "partial": 0,
+          "missing": 23
+        },
+        "missingIds": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23"
+        ],
+        "stillMissing": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23"
+        ]
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_start",
+        "timestamp": "2026-04-24T00:39:51.408Z",
+        "details": {
+          "frontend": 23,
+          "backend": 0
+        },
+        "missingIds": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23"
+        ]
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-24T00:41:23.628Z",
+        "taskId": "T-REPAIR-FRONTEND"
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_role_done",
+        "timestamp": "2026-04-24T00:41:23.634Z",
+        "details": {
+          "role": "frontend",
+          "filesWritten": 8,
+          "taskId": "T-REPAIR-FRONTEND"
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_done",
+        "timestamp": "2026-04-24T00:41:23.634Z",
+        "details": {
+          "totalFiles": 8,
+          "costUsd": 0.313607
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_start",
+        "timestamp": "2026-04-24T00:41:23.634Z",
+        "details": {
+          "totalIds": 64
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_clean",
+        "timestamp": "2026-04-24T00:41:23.682Z",
+        "details": {
+          "totalChecked": 64,
+          "implemented": 64,
+          "partial": 0,
+          "missing": 0
+        },
+        "missingIds": [],
+        "stillMissing": []
+      }
+    ]
+  },
+  "preflightLedger": {
+    "conventionAutofix": {
+      "invocations": 2,
+      "totalFixedFiles": 3,
+      "totalUnfixable": 0,
+      "notes": [
+        "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+        "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+        "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename."
+      ],
+      "unfixable": []
+    },
+    "routeAudit": {
+      "preflight": {
+        "when": "preflight",
+        "hardFail": false,
+        "unregisteredModules": [],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [],
+        "undeclaredEndpointCount": 1
+      },
+      "final": {
+        "when": "final",
+        "hardFail": false,
+        "unregisteredModules": [],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [],
+        "undeclaredEndpointCount": 1
+      }
+    },
+    "importGapInstalls": {
+      "totalPackages": 0,
+      "scopes": []
+    },
+    "contractCompleteness": {
+      "postGenerate": {
+        "when": "post-generate",
+        "inferredRelationshipCount": 0,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      },
+      "preflight": {
+        "when": "preflight",
+        "inferredRelationshipCount": 0,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      },
+      "final": {
+        "when": "final",
+        "inferredRelationshipCount": 0,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      }
+    }
+  },
+  "defectCategories": [
+    {
+      "key": "dependency-sync",
+      "label": "Dependency sync",
+      "state": "pass",
+      "evidence": [
+        "No missing-import installs were needed."
+      ]
+    },
+    {
+      "key": "directory-dedup",
+      "label": "Directory / implementation dedup",
+      "state": "pass",
+      "evidence": [
+        "Convention auto-fix rewrote 3 file(s) across 2 invocation(s)."
+      ]
+    },
+    {
+      "key": "env-alignment",
+      "label": "Env variable alignment",
+      "state": "pass",
+      "evidence": [
+        "No env alignment signal — generator injected DATABASE_URL defaults and no gate flagged env drift."
+      ]
+    },
+    {
+      "key": "contract-consistency",
+      "label": "API contract consistency",
+      "state": "pass",
+      "evidence": [
+        "Preflight: 0 unregistered module(s), 0 missing contract endpoint(s), 0 dangling registration import(s).",
+        "Final gate: 0 unregistered, 0 missing contract, 0 dangling."
+      ]
+    },
+    {
+      "key": "contract-completeness",
+      "label": "API contract completeness (ORM-derived)",
+      "state": "pass",
+      "evidence": [
+        "Post-generate: 0 ORM relationship(s), 0 scoped endpoint(s) missing.",
+        "Preflight: 0 relationship(s), 0 missing.",
+        "Final gate: 0 missing."
+      ]
+    },
+    {
+      "key": "build-verification",
+      "label": "Build & runtime verification",
+      "state": "pass",
+      "evidence": [
+        "Integration and runtime gates produced no blocking output."
+      ]
+    }
+  ],
+  "finalAudit": {
+    "passed": true,
+    "entries": [
+      {
+        "id": "AC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:254 (AC-01)",
+          "PRD_E2E_SPEC.json:27 (AC-01)",
+          "PRD_E2E_SPEC.md:8 (AC-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (AC-01)",
+          "frontend/tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts:6 (AC-01)"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:255 (AC-02)",
+          "PRD_E2E_SPEC.json:74 (AC-02)",
+          "PRD_E2E_SPEC.md:18 (AC-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (AC-02)",
+          "frontend/tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:6 (AC-02)"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:256 (AC-03)",
+          "PRD_E2E_SPEC.json:75 (AC-03)",
+          "PRD_E2E_SPEC.md:18 (AC-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (AC-03)",
+          "frontend/tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:6 (AC-03)"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:257 (AC-04)",
+          "PRD_E2E_SPEC.json:122 (AC-04)",
+          "PRD_E2E_SPEC.md:28 (AC-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:118 (AC-04)",
+          "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts:7 (AC-04)"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:258 (AC-05)",
+          "PRD_E2E_SPEC.json:255 (AC-05)",
+          "PRD_E2E_SPEC.md:56 (AC-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:118 (AC-05)",
+          "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:7 (AC-05)"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:259 (AC-06)",
+          "PRD_E2E_SPEC.json:302 (AC-06)",
+          "PRD_E2E_SPEC.md:66 (AC-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (AC-06)"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:260 (AC-07)",
+          "PRD_E2E_SPEC.json:348 (AC-07)",
+          "PRD_E2E_SPEC.md:76 (AC-07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (AC-07)"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:261 (AC-08)",
+          "PRD_E2E_SPEC.json:123 (AC-08)",
+          "PRD_E2E_SPEC.md:28 (AC-08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-08)",
+          "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts:7 (AC-08)"
+        ]
+      },
+      {
+        "id": "AC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:262 (AC-09)",
+          "PRD_E2E_SPEC.json:124 (AC-09)",
+          "PRD_E2E_SPEC.md:28 (AC-09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-09)",
+          "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts:7 (AC-09)"
+        ]
+      },
+      {
+        "id": "AC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:263 (AC-10)",
+          "PRD_E2E_SPEC.json:125 (AC-10)",
+          "PRD_E2E_SPEC.md:28 (AC-10)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-10)",
+          "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts:7 (AC-10)"
+        ]
+      },
+      {
+        "id": "AC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:264 (AC-11)",
+          "PRD_E2E_SPEC.json:169 (AC-11)",
+          "PRD_E2E_SPEC.md:37 (AC-11)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-11)",
+          "frontend/test-results/e2e/generated-e2e-004-create-a-518f4-to-list-and-shows-Draft-row-chromium/error-context.md:89 (AC-11)"
+        ]
+      },
+      {
+        "id": "AC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:265 (AC-12)",
+          "PRD_E2E_SPEC.json:215 (AC-12)",
+          "PRD_E2E_SPEC.md:47 (AC-12)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-12)",
+          "frontend/test-results/e2e/generated-e2e-005-create-a-c2466-ws-Published-status-in-list-chromium/error-context.md:89 (AC-12)"
+        ]
+      },
+      {
+        "id": "AC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:266 (AC-13)",
+          "PRD_E2E_SPEC.json:257 (AC-13)",
+          "PRD_E2E_SPEC.md:56 (AC-13)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-13)",
+          "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:7 (AC-13)"
+        ]
+      },
+      {
+        "id": "AC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:267 (AC-14)",
+          "PRD_E2E_SPEC.json:377 (AC-14)",
+          "PRD_E2E_SPEC.md:84 (AC-14)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-14)"
+        ]
+      },
+      {
+        "id": "AC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:268 (AC-15)",
+          "PRD_E2E_SPEC.json:422 (AC-15)",
+          "PRD_E2E_SPEC.md:94 (AC-15)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (AC-15)"
+        ]
+      },
+      {
+        "id": "AC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:269 (AC-16)",
+          "PRD_E2E_SPEC.json:28 (AC-16)",
+          "PRD_E2E_SPEC.md:8 (AC-16)",
+          "TASK_BREAKDOWN_ORIGINAL.md:62 (AC-16)",
+          "frontend/tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts:6 (AC-16)"
+        ]
+      },
+      {
+        "id": "AC-17",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:270 (AC-17)",
+          "PRD_E2E_SPEC.json:258 (AC-17)",
+          "PRD_E2E_SPEC.md:56 (AC-17)",
+          "TASK_BREAKDOWN_ORIGINAL.md:62 (AC-17)",
+          "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:7 (AC-17)"
+        ]
+      },
+      {
+        "id": "AC-18",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:271 (AC-18)",
+          "PRD_E2E_SPEC.json:170 (AC-18)",
+          "PRD_E2E_SPEC.md:37 (AC-18)",
+          "TASK_BREAKDOWN_ORIGINAL.md:62 (AC-18)",
+          "frontend/test-results/e2e/generated-e2e-004-create-a-518f4-to-list-and-shows-Draft-row-chromium/error-context.md:89 (AC-18)"
+        ]
+      },
+      {
+        "id": "AC-19",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:272 (AC-19)",
+          "PRD_E2E_SPEC.json:259 (AC-19)",
+          "PRD_E2E_SPEC.md:56 (AC-19)",
+          "TASK_BREAKDOWN_ORIGINAL.md:62 (AC-19)",
+          "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:7 (AC-19)"
+        ]
+      },
+      {
+        "id": "AC-20",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:273 (AC-20)",
+          "PRD_E2E_SPEC.json:303 (AC-20)",
+          "PRD_E2E_SPEC.md:66 (AC-20)",
+          "TASK_BREAKDOWN_ORIGINAL.md:62 (AC-20)"
+        ]
+      },
+      {
+        "id": "FR-AE01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:43 (FR-AE01)",
+          "PRD_E2E_SPEC.json:120 (FR-AE01)",
+          "PRD_E2E_SPEC.md:28 (FR-AE01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:155 (FR-AE01)",
+          "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts:6 (FR-AE01)"
+        ]
+      },
+      {
+        "id": "FR-AE02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:44 (FR-AE02)",
+          "PRD_E2E_SPEC.json:165 (FR-AE02)",
+          "PRD_E2E_SPEC.md:37 (FR-AE02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (FR-AE02)",
+          "frontend/test-results/e2e/generated-e2e-004-create-a-518f4-to-list-and-shows-Draft-row-chromium/error-context.md:88 (FR-AE02)"
+        ]
+      },
+      {
+        "id": "FR-AE03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:45 (FR-AE03)",
+          "PRD_E2E_SPEC.json:121 (FR-AE03)",
+          "PRD_E2E_SPEC.md:28 (FR-AE03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (FR-AE03)",
+          "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts:6 (FR-AE03)"
+        ]
+      },
+      {
+        "id": "FR-AE04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:46 (FR-AE04)",
+          "PRD_E2E_SPEC.json:166 (FR-AE04)",
+          "PRD_E2E_SPEC.md:37 (FR-AE04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (FR-AE04)",
+          "frontend/test-results/e2e/generated-e2e-004-create-a-518f4-to-list-and-shows-Draft-row-chromium/error-context.md:88 (FR-AE04)"
+        ]
+      },
+      {
+        "id": "FR-AE05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:47 (FR-AE05)",
+          "PRD_E2E_SPEC.json:213 (FR-AE05)",
+          "PRD_E2E_SPEC.md:47 (FR-AE05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (FR-AE05)",
+          "frontend/test-results/e2e/generated-e2e-005-create-a-c2466-ws-Published-status-in-list-chromium/error-context.md:88 (FR-AE05)"
+        ]
+      },
+      {
+        "id": "FR-AE06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:48 (FR-AE06)",
+          "PRD_E2E_SPEC.json:252 (FR-AE06)",
+          "PRD_E2E_SPEC.md:56 (FR-AE06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (FR-AE06)",
+          "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:6 (FR-AE06)"
+        ]
+      },
+      {
+        "id": "FR-AE07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:49 (FR-AE07)",
+          "PRD_E2E_SPEC.json:376 (FR-AE07)",
+          "PRD_E2E_SPEC.md:84 (FR-AE07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (FR-AE07)"
+        ]
+      },
+      {
+        "id": "FR-AE08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:50 (FR-AE08)",
+          "PRD_E2E_SPEC.json:420 (FR-AE08)",
+          "PRD_E2E_SPEC.md:94 (FR-AE08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:155 (FR-AE08)"
+        ]
+      },
+      {
+        "id": "FR-AL01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:34 (FR-AL01)",
+          "PRD_E2E_SPEC.json:25 (FR-AL01)",
+          "PRD_E2E_SPEC.md:8 (FR-AL01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:123 (FR-AL01)",
+          "frontend/tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts:6 (FR-AL01)"
+        ]
+      },
+      {
+        "id": "FR-AL02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:35 (FR-AL02)",
+          "PRD_E2E_SPEC.json:71 (FR-AL02)",
+          "PRD_E2E_SPEC.md:18 (FR-AL02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (FR-AL02)",
+          "frontend/tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:6 (FR-AL02)"
+        ]
+      },
+      {
+        "id": "FR-AL03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:36 (FR-AL03)",
+          "PRD_E2E_SPEC.json:72 (FR-AL03)",
+          "PRD_E2E_SPEC.md:18 (FR-AL03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (FR-AL03)",
+          "frontend/tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:6 (FR-AL03)"
+        ]
+      },
+      {
+        "id": "FR-AL04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:37 (FR-AL04)",
+          "PRD_E2E_SPEC.json:119 (FR-AL04)",
+          "PRD_E2E_SPEC.md:28 (FR-AL04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:118 (FR-AL04)",
+          "frontend/tests/e2e/generated/e2e-003-navigate-to-create-editor-and-validate-r.spec.ts:6 (FR-AL04)"
+        ]
+      },
+      {
+        "id": "FR-AL05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:38 (FR-AL05)",
+          "PRD_E2E_SPEC.json:250 (FR-AL05)",
+          "PRD_E2E_SPEC.md:56 (FR-AL05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (FR-AL05)",
+          "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:6 (FR-AL05)"
+        ]
+      },
+      {
+        "id": "FR-AL06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:39 (FR-AL06)",
+          "PRD_E2E_SPEC.json:300 (FR-AL06)",
+          "PRD_E2E_SPEC.md:66 (FR-AL06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (FR-AL06)"
+        ]
+      },
+      {
+        "id": "FR-AL07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:40 (FR-AL07)",
+          "PRD_E2E_SPEC.json:346 (FR-AL07)",
+          "PRD_E2E_SPEC.md:76 (FR-AL07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:123 (FR-AL07)"
+        ]
+      },
+      {
+        "id": "IC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:215 (IC-01)"
+        ]
+      },
+      {
+        "id": "IC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:216 (IC-02)"
+        ]
+      },
+      {
+        "id": "IC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:217 (IC-03)"
+        ]
+      },
+      {
+        "id": "IC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:218 (IC-04)"
+        ]
+      },
+      {
+        "id": "IC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:219 (IC-05)"
+        ]
+      },
+      {
+        "id": "IC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:220 (IC-06)"
+        ]
+      },
+      {
+        "id": "IC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:221 (IC-07)"
+        ]
+      },
+      {
+        "id": "IC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:222 (IC-08)"
+        ]
+      },
+      {
+        "id": "IC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:223 (IC-09)"
+        ]
+      },
+      {
+        "id": "IC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:224 (IC-10)"
+        ]
+      },
+      {
+        "id": "IC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:225 (IC-11)"
+        ]
+      },
+      {
+        "id": "IC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:226 (IC-12)"
+        ]
+      },
+      {
+        "id": "IC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:227 (IC-13)"
+        ]
+      },
+      {
+        "id": "IC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:228 (IC-14)"
+        ]
+      },
+      {
+        "id": "IC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:229 (IC-15)"
+        ]
+      },
+      {
+        "id": "IC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:230 (IC-16)"
+        ]
+      },
+      {
+        "id": "IC-17",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:231 (IC-17)"
+        ]
+      },
+      {
+        "id": "IC-18",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:232 (IC-18)"
+        ]
+      },
+      {
+        "id": "IC-19",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:233 (IC-19)"
+        ]
+      },
+      {
+        "id": "IC-20",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:234 (IC-20)"
+        ]
+      },
+      {
+        "id": "IC-21",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:235 (IC-21)"
+        ]
+      },
+      {
+        "id": "IC-22",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:236 (IC-22)"
+        ]
+      },
+      {
+        "id": "IC-23",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:237 (IC-23)"
+        ]
+      },
+      {
+        "id": "US-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:243 (US-01)",
+          "PRD_E2E_SPEC.json:24 (US-01)",
+          "PRD_E2E_SPEC.md:8 (US-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (US-01)",
+          "frontend/tests/e2e/generated/e2e-001-list-page-loads-with-columns-and-paginat.spec.ts:6 (US-01)"
+        ]
+      },
+      {
+        "id": "US-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:244 (US-02)",
+          "PRD_E2E_SPEC.json:69 (US-02)",
+          "PRD_E2E_SPEC.md:18 (US-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (US-02)",
+          "frontend/tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:6 (US-02)"
+        ]
+      },
+      {
+        "id": "US-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:245 (US-03)",
+          "PRD_E2E_SPEC.json:70 (US-03)",
+          "PRD_E2E_SPEC.md:18 (US-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (US-03)",
+          "frontend/tests/e2e/generated/e2e-002-search-by-title-and-filter-by-status.spec.ts:6 (US-03)"
+        ]
+      },
+      {
+        "id": "US-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:246 (US-04)",
+          "PRD_E2E_SPEC.json:118 (US-04)",
+          "PRD_E2E_SPEC.md:28 (US-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (US-04)",
+          "frontend/test-results/e2e/generated-e2e-004-create-a-518f4-to-list-and-shows-Draft-row-chromium/error-context.md:88 (US-04)"
+        ]
+      },
+      {
+        "id": "US-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:247 (US-05)",
+          "PRD_E2E_SPEC.json:249 (US-05)",
+          "PRD_E2E_SPEC.md:56 (US-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:182 (US-05)",
+          "frontend/tests/e2e/generated/e2e-006-edit-existing-article-with-prefilled-dat.spec.ts:6 (US-05)"
+        ]
+      },
+      {
+        "id": "US-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:248 (US-06)",
+          "PRD_E2E_SPEC.json:299 (US-06)",
+          "PRD_E2E_SPEC.md:66 (US-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (US-06)"
+        ]
+      }
+    ],
+    "uncovered": []
+  },
+  "suggestions": [
+    "Reduce context loss: improve section selection / budget allocation so critical PRD and implementation context is not truncated.",
+    "Improve end-to-end reliability: keep smoke/e2e scenarios aligned with PRD flows and feed deterministic failure context back into source repair.",
+    "Optimize model spend: reduce repeated high-cost iterations by improving preflight checks, duplicate-file cleanup, and stricter early gates."
+  ]
+}
