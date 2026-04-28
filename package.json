@@ -21,7 +21,8 @@
     "memory:recall": "tsx scripts/memory-cli.ts recall",
     "memory:stats": "tsx scripts/memory-cli.ts stats",
     "memory:trace": "tsx scripts/memory-cli.ts trace",
-    "memory:invalidate-classification": "tsx scripts/memory-cli.ts invalidate-classification"
+    "memory:invalidate-classification": "tsx scripts/memory-cli.ts invalidate-classification",
+    "memory:mine-patterns": "tsx scripts/memory-mine-patterns.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.1.38",
