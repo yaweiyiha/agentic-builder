@@ -89,10 +89,104 @@ export default function PrdSubStage() {
   const goToStage        = useStageStore((s) => s.goToStage);
 
   const [editInput, setEditInput] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const isThisRunning = isRunning && currentStep === "prd";
   const content = isThisRunning ? streamingContent : (step?.content ?? "");
   const isDone  = step?.status === "completed";
+
+  const handleDownloadPdf = () => {
+    if (!content || isPrinting) return;
+    setIsPrinting(true);
+
+    // Dynamically import marked to convert markdown → HTML
+    import("marked").then(({ marked }) => {
+      const htmlBody = marked.parse(content) as string;
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) { setIsPrinting(false); return; }
+
+      printWindow.document.write(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Product Requirements Document</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html { font-size: 16px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+      color: #1f2328;
+      background: #ffffff;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 56px;
+    }
+    h1 { font-size: 2em; font-weight: 600; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; margin: 1.5em 0 0.75em; }
+    h2 { font-size: 1.5em; font-weight: 600; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; margin: 1.5em 0 0.75em; }
+    h3 { font-size: 1.25em; font-weight: 600; margin: 1.5em 0 0.5em; }
+    h4 { font-size: 1em; font-weight: 600; margin: 1.25em 0 0.4em; }
+    h5 { font-size: 0.875em; font-weight: 600; margin: 1em 0 0.3em; }
+    h6 { font-size: 0.85em; font-weight: 600; color: #57606a; margin: 1em 0 0.3em; }
+    p { margin: 0 0 1em; }
+    ul, ol { padding-left: 1.5em; margin: 0 0 1em; }
+    li + li { margin-top: 0.25em; }
+    a { color: #0969da; text-decoration: underline; }
+    strong { font-weight: 600; }
+    em { font-style: italic; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.85em;
+      background: #f6f8fa;
+      border: 1px solid rgba(175,184,193,0.2);
+      border-radius: 6px;
+      padding: 0.2em 0.4em;
+    }
+    pre {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 0 0 1em;
+    }
+    pre code { background: none; border: none; padding: 0; font-size: 13px; }
+    blockquote {
+      border-left: 4px solid #d0d7de;
+      color: #57606a;
+      margin: 0 0 1em;
+      padding: 0 1em;
+    }
+    table { border-collapse: collapse; width: 100%; margin: 0 0 1em; font-size: 14px; }
+    th, td { border: 1px solid #d0d7de; padding: 8px 16px; text-align: left; }
+    thead { background: #f6f8fa; font-weight: 600; }
+    tbody tr:nth-child(even) { background: #f6f8fa; }
+    hr { border: none; border-top: 1px solid #d0d7de; margin: 1.5em 0; }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 20mm 18mm; }
+    }
+  </style>
+</head>
+<body>
+  <h1 style="margin-top:0">Product Requirements Document</h1>
+  ${htmlBody}
+</body>
+</html>`);
+      printWindow.document.close();
+
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.onafterprint = () => { printWindow.close(); setIsPrinting(false); };
+        // fallback: reset flag after 5s if onafterprint never fires
+        setTimeout(() => setIsPrinting(false), 5000);
+      };
+    }).catch(() => setIsPrinting(false));
+  };
 
   const handleTabChange = (tab: DocTab) => {
     if (tab !== "prd") {
@@ -238,9 +332,13 @@ export default function PrdSubStage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3 shrink-0">
-          <button className="flex items-center gap-2 border border-[#e2e8f0] text-[#334155] text-[14px] font-bold px-[17px] py-[9px] rounded-[4px] hover:bg-[#f8fafc] transition-colors">
-            <DownloadIcon />
-            Download PDF
+          <button
+            onClick={handleDownloadPdf}
+            disabled={!isDone || isPrinting}
+            className="flex items-center gap-2 border border-[#e2e8f0] text-[#334155] text-[14px] font-bold px-[17px] py-[9px] rounded-[4px] hover:bg-[#f8fafc] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isPrinting ? <SpinnerIcon /> : <DownloadIcon />}
+            {isPrinting ? "Preparing…" : "Download PDF"}
           </button>
           <button
             onClick={() => goToSubStage("trd", "preparation")}
