@@ -104,6 +104,16 @@ export async function GET(req: NextRequest) {
     // History is optional — missing/unreadable file is fine.
   }
 
+  // Load scorecard and leaderboard markdown in parallel — non-fatal if missing.
+  const [scorecardMarkdown, leaderboardMarkdown] = await Promise.all([
+    fs
+      .readFile(path.join(ralphDir, "model-scorecard.md"), "utf-8")
+      .catch(() => null),
+    fs
+      .readFile(path.join(ralphDir, "model-leaderboard.md"), "utf-8")
+      .catch(() => null),
+  ]);
+
   return new Response(
     JSON.stringify({
       markdown,
@@ -111,6 +121,8 @@ export async function GET(req: NextRequest) {
       sessionId: sessionId ?? null,
       outputDir: outputRoot,
       history,
+      scorecardMarkdown: scorecardMarkdown ?? null,
+      leaderboardMarkdown: leaderboardMarkdown ?? null,
     }),
     {
       status: 200,

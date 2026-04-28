@@ -2,16 +2,17 @@
 /node_modules
 # scaffold templates must stay source-only; local installs break copyScaffold
 scaffolds/**/node_modules
-generated-code/node_modules/
-generated-code/dist/
-generated-code/public/design/*.png
-
-# generated-code: keep huge/generated trees local; commit pipeline diagnostics only
+# generated-code: ignore bulk of output; allow pipeline/session dirs to be tracked
 generated-code/*
 !generated-code/.ralph/
 !generated-code/.ralph/**
 !generated-code/.agentic-snapshot/
 !generated-code/.agentic-snapshot/**
+generated-code 2
+generated-code/node_modules/
+generated-code/dist/
+generated-code/public/design/*.png
+example
 /.pnp
 .pnp.*
 .yarn/*
@@ -40,17 +41,6 @@ generated-code/*
 # pipeline snapshot (debug-only, may contain large doc content)
 .blueprint/pipeline-snapshot.json
 .blueprint/design-references/
-
-# memory system L1 — only per-developer / cache files. records/** holds
-# the committable knowledge (classifications, failure patterns, decisions,
-# scaffold-fitness, agent-tuning) and survives across machines via git.
-# See design doc §4.
-.memory/metrics.json
-.memory/metrics.json.tmp
-.memory/.lock-target
-.memory/.lock-target.lock
-.memory/trace.jsonl
-.memory/store.sqlite
 
 # misc
 *.pem

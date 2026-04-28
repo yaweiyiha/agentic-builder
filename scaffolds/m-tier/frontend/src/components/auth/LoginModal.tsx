@@ -1,126 +1,119 @@
-import React, { useMemo, useState } from "react";
-import { useLoginWithOAuth } from "@privy-io/react-auth";
-import { Alert, Button, Divider, Modal, Space, Typography } from "antd";
+import React, { useState } from "react";
+import { Alert, Button, Form, Input, Modal, Typography } from "antd";
 
 export type LoginModalProps = {
   open: boolean;
   onClose: () => void;
+  /** Called when the user submits credentials. Should throw on failure. */
+  onLogin: (email: string, password: string) => Promise<void>;
 };
 
-function toErrorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    return String((err as { message?: unknown }).message ?? "Login failed");
-  }
-  return String(err ?? "Login failed");
-}
-
-export const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({
+  open,
+  onClose,
+  onLogin,
+}) => {
+  const [form] = Form.useForm<{ email: string; password: string }>();
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { initOAuth, state, loading } = useLoginWithOAuth({
-    onError: (err) => {
-      setError(toErrorMessage(err));
-    },
-  });
-
-  const busy = loading || state.status === "loading";
-  const hint = useMemo(() => {
-    if (state.status === "loading") return "Redirecting to the provider...";
-    if (state.status === "done") return "Signed in";
-    return null;
-  }, [state.status]);
-
-  async function handleOAuth(provider: "google" | "twitter") {
+  async function handleSubmit(values: { email: string; password: string }) {
     setError(null);
+    setLoading(true);
     try {
-      // The SDK typically triggers a redirect; if it errors, keep the modal open
-      // and surface the error to the user.
-      await initOAuth({ provider });
+      await onLogin(values.email, values.password);
+      form.resetFields();
+      onClose();
     } catch (err) {
-      setError(toErrorMessage(err));
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
     }
+  }
+
+  function handleCancel() {
+    form.resetFields();
+    setError(null);
+    onClose();
   }
 
   return (
     <Modal
       title={null}
       open={open}
-      onCancel={onClose}
+      onCancel={handleCancel}
       footer={null}
       destroyOnClose
       centered
       width={420}
     >
       <div className="px-1">
-        <div className="text-center">
+        <div className="text-center mb-4">
           <Typography.Title level={4} style={{ marginBottom: 4 }}>
             Sign in
           </Typography.Title>
           <Typography.Text type="secondary">
-            Continue with a social account
+            Enter your email and password to continue
           </Typography.Text>
         </div>
 
-        <Divider style={{ margin: "16px 0" }} />
+        {error && (
+          <Alert type="error" showIcon message={error} className="mb-4" />
+        )}
 
-        <Space direction="vertical" size={10} style={{ width: "100%" }}>
-          {error ? <Alert type="error" showIcon message={error} /> : null}
-          {hint ? <Alert type="info" showIcon message={hint} /> : null}
-
-          <Button
-            block
-            size="large"
-            disabled={busy}
-            onClick={() => handleOAuth("google")}
-            icon={
-              <img
-                src="/icon/auth/google.svg"
-                alt="Google"
-                width={20}
-                height={20}
-              />
-            }
-            style={{
-              height: 44,
-              borderRadius: 12,
-              background: "#ffffff",
-              borderColor: "#d9d9d9",
-              color: "#111827",
-              fontWeight: 600,
-              justifyContent: "flex-start",
-              paddingInline: 14,
-            }}
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          requiredMark={false}
+          autoComplete="on"
+        >
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: "Please enter your email" },
+              { type: "email", message: "Please enter a valid email address" },
+            ]}
           >
-            Continue with Google
-          </Button>
+            <Input
+              size="large"
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </Form.Item>
 
-          <Button
-            block
-            size="large"
-            disabled={busy}
-            onClick={() => handleOAuth("twitter")}
-            icon={<img src="/icon/auth/x.svg" alt="X" width={20} height={20} />}
-            style={{
-              height: 44,
-              borderRadius: 12,
-              background: "#ffffff",
-              borderColor: "#d9d9d9",
-              color: "#111827",
-              fontWeight: 600,
-              justifyContent: "flex-start",
-              paddingInline: 14,
-            }}
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[{ required: true, message: "Please enter your password" }]}
           >
-            Continue with X
-          </Button>
+            <Input.Password
+              size="large"
+              placeholder="Password"
+              autoComplete="current-password"
+            />
+          </Form.Item>
 
-          <Typography.Text
-            type="secondary"
-            style={{ fontSize: 12, display: "block", textAlign: "center" }}
-          >
-            By continuing, you agree to our Terms of Service and Privacy Policy.
-          </Typography.Text>
-        </Space>
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              size="large"
+              loading={loading}
+            >
+              Sign in
+            </Button>
+          </Form.Item>
+        </Form>
+
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: 12, display: "block", textAlign: "center", marginTop: 12 }}
+        >
+          By continuing, you agree to our Terms of Service and Privacy Policy.
+        </Typography.Text>
       </div>
     </Modal>
   );

@@ -58,7 +58,8 @@ Return a single JSON array. Each element MUST have this exact shape:
 
 ## What to INCLUDE
 - Third-party API keys for any service the PRD names or implies (payments, email, AI, maps, analytics, storage, push notifications, SMS).
-- OAuth client credentials when the PRD mentions "Sign in with Google/GitHub/Apple/etc."
+- OAuth client credentials when the PRD mentions "Sign in with Google/GitHub/Apple/etc." (emit GOOGLE_CLIENT_ID + VITE_GOOGLE_CLIENT_ID, etc.)
+- Privy App ID (VITE_PRIVY_APP_ID) when the PRD mentions multiple social login providers, Web3/wallet login, or explicitly names Privy as the auth layer.
 - Webhook signing secrets when the PRD describes inbound webhooks (Stripe events, GitHub events, etc.). List them as separate entries.
 - Public client IDs that ship to the frontend MUST use the appropriate prefix:
   * For Vite frontends: \`VITE_*\` (e.g. VITE_STRIPE_PUBLISHABLE_KEY, VITE_GOOGLE_CLIENT_ID)

@@ -969,9 +969,9 @@ function aggregateStageUsage(input: {
     ).length;
     const unresolvedIds = Math.max(
       0,
-      ...repairEntries.map((entry) => entry.stillMissing?.length ?? 0),
+      ...repairEntries.map((entry) => (entry.stillMissing ?? []).filter((id) => !/^IC-\d+$/i.test(id)).length),
       input.finalAudit && stage === "post-gen-audit"
-        ? input.finalAudit.uncovered.length
+        ? (input.finalAudit.hardUncovered?.length ?? input.finalAudit.uncovered.filter((e) => !/^IC-\d+$/i.test(e.id)).length)
         : 0,
     );
 
@@ -1456,7 +1456,10 @@ function formatMarkdownReport(input: {
   const totalCostUsd = input.modelUsage.reduce((sum, entry) => sum + entry.costUsd, 0);
   const totalCalls = input.modelUsage.reduce((sum, entry) => sum + entry.calls, 0);
   const totalTokens = input.modelUsage.reduce((sum, entry) => sum + entry.totalTokens, 0);
-  const uncoveredIds = input.finalAudit?.uncovered.map((entry) => entry.id) ?? [];
+  // Use hardUncovered (excludes IC-xx soft interaction specs) for gate display.
+  const hardUncoveredIds = input.finalAudit?.hardUncovered?.map((entry) => entry.id) ?? input.finalAudit?.uncovered.filter((e) => !/^IC-\d+$/i.test(e.id)).map((entry) => entry.id) ?? [];
+  const softUncoveredIds = input.finalAudit?.uncovered.filter((e) => /^IC-\d+$/i.test(e.id)).map((e) => e.id) ?? [];
+  const uncoveredIds = hardUncoveredIds;
 
   const lines: string[] = [
     "# Coding Session Report",
@@ -1479,7 +1482,11 @@ function formatMarkdownReport(input: {
     "",
   ];
 
-  if (input.fatalError) {
+  // Only render Fatal Error if it carries distinct information from the summary.
+  if (
+    input.fatalError &&
+    input.fatalError.trim() !== input.terminalSummary.trim()
+  ) {
     lines.push("## Fatal Error", input.fatalError, "");
   }
 
@@ -1492,11 +1499,102 @@ function formatMarkdownReport(input: {
     "",
   );
 
+  // ── Scoring breakdown table ───────────────────────────────────────────
+  lines.push("## Scoring Breakdown");
+  lines.push("");
+  // First line of reasons is the formula; the rest are per-rule explanations.
+  const [formulaLine, ...ruleBullets] = input.score.reasons;
+  if (formulaLine) {
+    lines.push(`**Formula:** \`${formulaLine.replace(/^Score formula:\s*/, "")}\``);
+    lines.push("");
+  }
   lines.push(
-    "## Scoring Notes",
-    ...input.score.reasons.map((reason) => `- ${reason}`),
-    "",
+    "| Rule | Max deduction | Applied | Reason |",
+    "| --- | --- | --- | --- |",
   );
+  const SCORING_RULES: Array<{
+    label: string;
+    condition: string;
+    maxDelta: number;
+    bonus?: boolean;
+  }> = [
+    { label: "Run status fail",     condition: "status=fail",    maxDelta: 20 },
+    { label: "Run status aborted",  condition: "status=aborted", maxDelta: 30 },
+    { label: "Integration gate",    condition: "integration errors present", maxDelta: 10 },
+    { label: "Runtime gate",        condition: "runtime errors present",     maxDelta: 8  },
+    { label: "E2E gate",            condition: "e2e errors present (scales with fail ratio)", maxDelta: 20 },
+    { label: "Uncovered requirements", condition: "PRD requirement ids unresolved", maxDelta: 25 },
+    { label: "Failed tasks",        condition: "coding tasks status=failed", maxDelta: 15 },
+    { label: "Unknown tasks",       condition: "coding tasks status=unknown", maxDelta: 10 },
+    { label: "Context truncation",  condition: "doc_truncated events",       maxDelta: 8  },
+    { label: "Plan mismatches",     condition: "task_plan_unfulfilled events", maxDelta: 8 },
+    { label: "All tasks done bonus", condition: "all tasks complete + no blocking gates", maxDelta: 5, bonus: true },
+  ];
+  // Build a map of applied deltas from the formula line
+  const appliedMap = new Map<string, { delta: number; reason: string }>();
+  for (const rule of ruleBullets) {
+    // Match each rule bullet to a known label via keyword
+    const matchReason = rule.trim();
+    if (/fail/i.test(matchReason) && /status/i.test(matchReason)) {
+      appliedMap.set("Run status fail", { delta: -20, reason: matchReason });
+    } else if (/aborted/i.test(matchReason)) {
+      appliedMap.set("Run status aborted", { delta: -30, reason: matchReason });
+    } else if (/integration/i.test(matchReason)) {
+      appliedMap.set("Integration gate", { delta: -10, reason: matchReason });
+    } else if (/runtime/i.test(matchReason)) {
+      appliedMap.set("Runtime gate", { delta: -8, reason: matchReason });
+    } else if (/e2e/i.test(matchReason)) {
+      appliedMap.set("E2E gate", { delta: -20, reason: matchReason });
+    } else if (/uncovered|requirement/i.test(matchReason)) {
+      appliedMap.set("Uncovered requirements", { delta: 0, reason: matchReason });
+    } else if (/task.*fail|fail.*task/i.test(matchReason)) {
+      appliedMap.set("Failed tasks", { delta: 0, reason: matchReason });
+    } else if (/unknown.*task|task.*unknown/i.test(matchReason)) {
+      appliedMap.set("Unknown tasks", { delta: 0, reason: matchReason });
+    } else if (/truncat/i.test(matchReason)) {
+      appliedMap.set("Context truncation", { delta: 0, reason: matchReason });
+    } else if (/plan.*mismatch|unfulfill/i.test(matchReason)) {
+      appliedMap.set("Plan mismatches", { delta: 0, reason: matchReason });
+    } else if (/bonus/i.test(matchReason)) {
+      appliedMap.set("All tasks done bonus", { delta: 5, reason: matchReason });
+    }
+  }
+  // Extract actual deltas from the formula string
+  if (formulaLine) {
+    const formulaStr = formulaLine.replace(/^Score formula:\s*/, "");
+    // Parse tokens like "− 20(fail)" or "+ 5(all-tasks-done)"
+    const tokenRe = /([−+])\s*(\d+)\(([^)]+)\)/g;
+    let m: RegExpExecArray | null;
+    while ((m = tokenRe.exec(formulaStr)) !== null) {
+      const sign = m[1] === "−" ? -1 : 1;
+      const abs = parseInt(m[2], 10);
+      const tag = m[3].toLowerCase();
+      const delta = sign * abs;
+      if (tag.startsWith("fail")) appliedMap.set("Run status fail", { delta, reason: "" });
+      else if (tag.startsWith("abort")) appliedMap.set("Run status aborted", { delta, reason: "" });
+      else if (tag.startsWith("integration")) appliedMap.set("Integration gate", { delta, reason: "" });
+      else if (tag.startsWith("runtime")) appliedMap.set("Runtime gate", { delta, reason: "" });
+      else if (tag.startsWith("e2e")) appliedMap.set("E2E gate", { delta, reason: "" });
+      else if (tag.startsWith("uncovered")) appliedMap.set("Uncovered requirements", { delta, reason: "" });
+      else if (tag.startsWith("tasks-failed")) appliedMap.set("Failed tasks", { delta, reason: "" });
+      else if (tag.startsWith("tasks-unknown")) appliedMap.set("Unknown tasks", { delta, reason: "" });
+      else if (tag.startsWith("trunc")) appliedMap.set("Context truncation", { delta, reason: "" });
+      else if (tag.startsWith("plan")) appliedMap.set("Plan mismatches", { delta, reason: "" });
+      else if (tag.startsWith("all-tasks")) appliedMap.set("All tasks done bonus", { delta, reason: "" });
+    }
+  }
+  for (const rule of SCORING_RULES) {
+    const applied = appliedMap.get(rule.label);
+    const maxCell = rule.bonus ? `+${rule.maxDelta}` : `−${rule.maxDelta}`;
+    const appliedCell = applied
+      ? applied.delta > 0
+        ? `**+${applied.delta}** ✅`
+        : `**${applied.delta}** ❌`
+      : "0 (not triggered)";
+    const reasonCell = (applied?.reason || rule.condition).replace(/\|/g, "\\|");
+    lines.push(`| ${rule.label} | ${maxCell} | ${appliedCell} | ${reasonCell} |`);
+  }
+  lines.push("");
 
   lines.push("## Model Usage");
   if (input.modelUsage.length === 0) {
@@ -1583,12 +1681,24 @@ function formatMarkdownReport(input: {
   if (!input.finalAudit) {
     lines.push("- No final audit snapshot captured.", "");
   } else if (input.finalAudit.passed) {
-    lines.push("- All audited requirement ids are covered.", "");
+    lines.push("- All hard requirement ids are covered.", "");
+    if (softUncoveredIds.length > 0) {
+      lines.push(
+        `- Soft warnings (IC-xx interaction specs, do not block gate): ${softUncoveredIds.join(", ")}`,
+        "",
+      );
+    }
   } else {
     lines.push(
-      `- Uncovered ids (${uncoveredIds.length}): ${uncoveredIds.join(", ") || "(none listed)"}`,
+      `- Hard uncovered ids (${hardUncoveredIds.length}): ${hardUncoveredIds.join(", ") || "(none listed)"}`,
       "",
     );
+    if (softUncoveredIds.length > 0) {
+      lines.push(
+        `- Soft warnings (IC-xx interaction specs, do not block gate): ${softUncoveredIds.join(", ")}`,
+        "",
+      );
+    }
   }
 
   // ── Preflight Automation Ledger ────────────────────────────────────────
