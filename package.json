@@ -11,7 +11,20 @@
     "lint": "next lint",
     "electron:dev": "concurrently --kill-others --prefix \"[{time}]\" --timestamp-format \"yyyy-MM-dd HH:mm:ss\" \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:build": "npm run build && electron-builder",
-    "electron:pack": "npm run build && electron-builder --dir"
+    "electron:pack": "npm run build && electron-builder --dir",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "memory": "tsx scripts/memory-cli.ts",
+    "memory:list": "tsx scripts/memory-cli.ts list",
+    "memory:show": "tsx scripts/memory-cli.ts show",
+    "memory:search": "tsx scripts/memory-cli.ts search",
+    "memory:recall": "tsx scripts/memory-cli.ts recall",
+    "memory:stats": "tsx scripts/memory-cli.ts stats",
+    "memory:trace": "tsx scripts/memory-cli.ts trace",
+    "memory:invalidate-classification": "tsx scripts/memory-cli.ts invalidate-classification",
+    "memory:mine-patterns": "tsx scripts/memory-mine-patterns.ts",
+    "memory:approve": "tsx scripts/memory-cli.ts approve",
+    "memory:disapprove": "tsx scripts/memory-cli.ts disapprove"
   },
   "dependencies": {
     "@langchain/core": "^1.1.38",
@@ -32,6 +45,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.5.0",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "concurrently": "^9.2.1",
@@ -40,8 +54,11 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.1",
     "postcss": "^8.5.8",
+    "proper-lockfile": "^4.1.2",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2",
+    "vitest": "^4.1.5",
     "wait-on": "^9.0.4"
   }
 }

@@ -56,6 +56,7 @@ import {
   type AuditTaskSummary,
   type FeatureChecklistAuditResult,
 } from "@/lib/pipeline/self-heal";
+import { createMemorySelfHealSink } from "@/lib/memory/self-heal-sink";
 import { extractPrdRequirementIndex } from "@/lib/requirements/extract-prd-spec";
 import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
 import type { ApiContract, GeneratedFile } from "@/lib/langgraph/state";
@@ -884,6 +885,13 @@ export async function POST(request: NextRequest) {
         createJsonlRepairSink(outputRoot),
         consoleRepairSink,
         counterRepairSink,
+        // Memory L2 sink: persist meaningful repair events as self-heal-log
+        // records. Uses the request's runId as kickoffId so records link
+        // back to the project-card written by the pipeline/kickoff routes.
+        createMemorySelfHealSink({
+          outputDir: outputRoot,
+          kickoffSessionId: typeof runId === "string" && runId.length > 0 ? runId : sessionId,
+        }),
       ]);
       registerRepairEmitter(sessionId, repairEmitter);
       const collectedTaskResults = new Map<string, AuditTaskSummary>();

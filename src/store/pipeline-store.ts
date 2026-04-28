@@ -73,6 +73,13 @@ interface PipelineState {
   /** Non-null while an import/clear request is in flight. */
   importedPrdLoading: "idle" | "loading" | "saving" | "clearing";
   importedPrdError: string | null;
+  /**
+   * Stable client-generated id that links the pipeline run and the
+   * subsequent kickoff into one logical session for memory records.
+   * Created in `startPipeline`, cleared in `reset`. Sent to both
+   * `/api/agents/pipeline` and `/api/agents/kickoff` as `sessionId`.
+   */
+  kickoffSessionId: string | null;
   /** User-uploaded design references. Copied to `<outputRoot>/.design-references/` at kickoff. */
   designReferences: DesignReferenceSummary[];
   designReferencesLoading:
@@ -135,6 +142,7 @@ export const usePipelineStore = create<PipelineState>()(
       importedPrd: null,
       importedPrdLoading: "idle",
       importedPrdError: null,
+      kickoffSessionId: null,
       designReferences: [],
       designReferencesLoading: "idle",
       designReferencesError: null,
@@ -163,8 +171,17 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       runKickoff: () => {
-        const { codeOutputDir, steps, featureBrief } = get();
-        set({ isRunning: true, error: null, currentStep: "kickoff", activeTab: "kickoff" });
+        const { codeOutputDir, steps, featureBrief, kickoffSessionId } = get();
+        // Reuse the session id from startPipeline if present; otherwise mint
+        // a fresh one so this stand-alone kickoff still gets its own.
+        const sessionId = kickoffSessionId ?? newSessionId();
+        set({
+          isRunning: true,
+          error: null,
+          currentStep: "kickoff",
+          activeTab: "kickoff",
+          kickoffSessionId: sessionId,
+        });
 
         fetch("/api/agents/kickoff", {
           method: "POST",
@@ -178,6 +195,7 @@ export const usePipelineStore = create<PipelineState>()(
             implguide: steps.implguide?.content ?? "",
             design: steps.design?.content ?? "",
             pencil: steps.pencil?.content ?? "",
+            sessionId,
           }),
         })
           .then(async (resp) => {
@@ -233,6 +251,7 @@ export const usePipelineStore = create<PipelineState>()(
 
       startPipeline: (brief: string) => {
         const { codeOutputDir, fastFromPrd } = get();
+        const sessionId = newSessionId();
         set({
           isRunning: true,
           error: null,
@@ -241,6 +260,7 @@ export const usePipelineStore = create<PipelineState>()(
           totalCostUsd: 0,
           featureBrief: brief,
           activeTab: "intent",
+          kickoffSessionId: sessionId,
         });
 
         fetch("/api/agents/pipeline", {
@@ -251,6 +271,7 @@ export const usePipelineStore = create<PipelineState>()(
             codeOutputDir,
             fastFromPrd,
             pauseAfterPrd: !fastFromPrd,
+            sessionId,
           }),
         })
           .then(async (resp) => {
@@ -636,6 +657,7 @@ export const usePipelineStore = create<PipelineState>()(
           featureBrief: "",
           streamingContent: "",
           streamingThinking: "",
+          kickoffSessionId: null,
         });
       },
     }),
@@ -658,6 +680,14 @@ type SsePayload = {
   stepId?: PipelineStepId;
   data?: Partial<StepResult> & { chunk?: string; chunkType?: "thinking" | "content" };
 };
+
+/** Stable session id linking pipeline + kickoff for memory records. */
+function newSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "ses-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
 function handleEvent(
   payload: SsePayload,

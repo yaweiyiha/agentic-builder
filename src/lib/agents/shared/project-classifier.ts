@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   chatCompletion,
   resolveModel,
@@ -5,6 +7,9 @@ import {
   type ChatMessage,
 } from "@/lib/openrouter";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import { memoryCacheEnabled } from "@/lib/memory/env";
+import { getSystemMemory } from "@/lib/memory";
+import { getTraceLogger } from "@/lib/memory/trace";
 
 export type ProjectTier = "S" | "M" | "L";
 
@@ -50,11 +55,159 @@ const CLASSIFIER_PROMPT = `You are a project complexity classifier. Given a feat
 
 Output ONLY the JSON block. No other text.`;
 
+/**
+ * BUMP whenever CLASSIFIER_PROMPT changes (review checklist requirement).
+ * Cached results from older versions stay in the index but never re-hit.
+ * See MEMORY_SYSTEM_DESIGN.md §12.6.1 R3.
+ */
+export const CLASSIFIER_PROMPT_VERSION = "v1-2026-04-28";
+
+/** Conservative — trim + collapse internal whitespace. No lowercasing,
+ *  no punctuation stripping. See design doc §12.6.1 R2. */
+function normalizeBrief(brief: string): string {
+  return brief.trim().replace(/\s+/g, " ");
+}
+
+function classificationCacheKey(brief: string, model: string): string {
+  const payload = `${normalizeBrief(brief)}::${CLASSIFIER_PROMPT_VERSION}::${model}`;
+  return createHash("sha256").update(payload).digest("hex").slice(0, 16);
+}
+
+function classificationRecordId(key: string): string {
+  return `CL-${key}`;
+}
+
+interface CachedClassificationBody extends ProjectClassification {
+  briefHash: string;
+  promptVersion: string;
+  modelUsed: string;
+}
+
+async function tryClassificationCache(
+  briefHash: string,
+  model: string,
+): Promise<ProjectClassification | null> {
+  const store = getSystemMemory();
+  const id = classificationRecordId(briefHash);
+  const start = Date.now();
+  const hit = await store.get(id);
+  if (!hit) {
+    void getTraceLogger(process.cwd()).log({
+      op: "cache-miss",
+      layer: "L1",
+      details: { kind: "classification", briefHash, model },
+    });
+    return null;
+  }
+  let body: CachedClassificationBody;
+  try {
+    body = JSON.parse(hit.body) as CachedClassificationBody;
+  } catch {
+    // Corrupt body — drop it so next call rewrites cleanly.
+    await store.delete(id).catch(() => {});
+    return null;
+  }
+  if (body.promptVersion !== CLASSIFIER_PROMPT_VERSION) {
+    // Stale entry from a prior prompt version. Don't return it; let LLM
+    // re-classify and overwrite via idempotent save.
+    return null;
+  }
+  // Awaited (not fire-and-forget) so the lockfile is released before the
+  // process can exit on short-lived runs / between test cases.
+  await store.bumpHit(id);
+  void getTraceLogger(process.cwd()).log({
+    op: "cache-hit",
+    layer: "L1",
+    details: {
+      kind: "classification",
+      briefHash,
+      id,
+      lookupMs: Date.now() - start,
+    },
+  });
+  // Honest accounting: cache hit incurs no LLM cost; report 0 + lookup ms
+  // so engine totalCostUsd doesn't double-count.
+  return {
+    tier: body.tier,
+    type: body.type,
+    needsBackend: body.needsBackend,
+    needsDatabase: body.needsDatabase,
+    needsAuth: body.needsAuth,
+    needsMultipleServices: body.needsMultipleServices,
+    reasoning: body.reasoning,
+    costUsd: 0,
+    durationMs: Date.now() - start,
+  };
+}
+
+async function writeClassificationCache(
+  briefHash: string,
+  model: string,
+  result: ProjectClassification,
+): Promise<void> {
+  try {
+    const store = getSystemMemory();
+    const body: CachedClassificationBody = {
+      ...result,
+      briefHash,
+      promptVersion: CLASSIFIER_PROMPT_VERSION,
+      modelUsed: model,
+    };
+    await store.save({
+      id: classificationRecordId(briefHash),
+      layer: "L1",
+      kind: "classification",
+      title: `Classification · ${result.tier} · ${result.type}`,
+      body: JSON.stringify(body),
+      tags: [
+        "classifier",
+        `tier:${result.tier}`,
+        `type:${result.type}`,
+        `promptVersion:${CLASSIFIER_PROMPT_VERSION}`,
+      ],
+      source: "cache",
+      refs: {},
+    });
+  } catch (err) {
+    console.warn(
+      "[memory] writeClassificationCache failed:",
+      (err as Error).message,
+    );
+  }
+}
+
 export async function classifyProject(
   featureBrief: string,
 ): Promise<ProjectClassification> {
   const model = resolveModel(MODEL_CONFIG.intent);
+  const briefHash = classificationCacheKey(featureBrief, model);
 
+  if (memoryCacheEnabled()) {
+    const hit = await tryClassificationCache(briefHash, model);
+    if (hit) return hit;
+  }
+
+  const { classification, didFallback } = await runClassifierLLM(
+    featureBrief,
+    model,
+  );
+
+  if (memoryCacheEnabled() && !didFallback) {
+    // writeClassificationCache swallows errors internally (try/catch +
+    // console.warn), so awaiting it is safe for the caller. We do await so
+    // that subsequent classifyProject() calls in the same process see the
+    // cached entry, and so the cache reaches disk before short-lived runs
+    // exit. Disk write is < ~10ms; LLM call dominated.
+    await writeClassificationCache(briefHash, model, classification);
+  }
+
+  return classification;
+}
+
+async function runClassifierLLM(
+  featureBrief: string,
+  model: string,
+): Promise<{ classification: ProjectClassification; didFallback: boolean }> {
   const messages: ChatMessage[] = [
     { role: "system", content: CLASSIFIER_PROMPT },
     { role: "user", content: featureBrief },
@@ -73,7 +226,10 @@ export async function classifyProject(
 
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    return fallbackClassification(featureBrief, costUsd, durationMs);
+    return {
+      classification: fallbackClassification(featureBrief, costUsd, durationMs),
+      didFallback: true,
+    };
   }
 
   try {
@@ -83,18 +239,24 @@ export async function classifyProject(
     );
 
     return {
-      tier,
-      type: parsed.type ?? "app",
-      needsBackend: parsed.needsBackend ?? tier !== "S",
-      needsDatabase: parsed.needsDatabase ?? tier === "L",
-      needsAuth: parsed.needsAuth ?? tier === "L",
-      needsMultipleServices: parsed.needsMultipleServices ?? tier === "L",
-      reasoning: parsed.reasoning ?? "",
-      costUsd,
-      durationMs,
+      classification: {
+        tier,
+        type: parsed.type ?? "app",
+        needsBackend: parsed.needsBackend ?? tier !== "S",
+        needsDatabase: parsed.needsDatabase ?? tier === "L",
+        needsAuth: parsed.needsAuth ?? tier === "L",
+        needsMultipleServices: parsed.needsMultipleServices ?? tier === "L",
+        reasoning: parsed.reasoning ?? "",
+        costUsd,
+        durationMs,
+      },
+      didFallback: false,
     };
   } catch {
-    return fallbackClassification(featureBrief, costUsd, durationMs);
+    return {
+      classification: fallbackClassification(featureBrief, costUsd, durationMs),
+      didFallback: true,
+    };
   }
 }
 
