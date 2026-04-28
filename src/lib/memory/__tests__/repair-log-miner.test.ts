@@ -95,7 +95,7 @@ describe("minePatternsFromRepairLog — clustering", () => {
     expect(p!.sessions).toBe(2);
   });
 
-  it("body contains symptoms / pattern / frequency / status sections", () => {
+  it("real-failure body has Recommended action + How to avoid + reasons", () => {
     const events = [
       ev({
         event: "fix_attempted",
@@ -109,19 +109,65 @@ describe("minePatternsFromRepairLog — clustering", () => {
       }),
     ];
     const [p] = minePatternsFromRepairLog(events);
+    expect(p!.category).toBe("real-failure");
     expect(p!.body).toContain("## Symptoms");
-    expect(p!.body).toContain("## Pattern");
-    expect(p!.body).toContain("## Frequency");
-    expect(p!.body).toContain("## Status");
+    expect(p!.body).toContain("## How to avoid");
+    expect(p!.body).toContain("## Recommended action");
+    expect(p!.body).toContain("## Raw stats");
     expect(p!.body).toContain("missing dependency X");
-    expect(p!.body).toContain("Layer 3 shadow");
+    expect(p!.body).toContain("Edit");
+    expect(p!.tags).toContain("category:real-failure");
+  });
+
+  it("classifies success-metric when self-heal mostly succeeded", () => {
+    const events: RepairEvent[] = [];
+    for (let i = 0; i < 8; i++)
+      events.push(ev({ event: "repair_done", repairedIds: [`a${i}`], stillMissing: [] }));
+    for (let i = 0; i < 2; i++)
+      events.push(ev({ event: "repair_done", files: [`x${i}.ts`] }));
+    const [p] = minePatternsFromRepairLog(events);
+    expect(p!.category).toBe("success-metric");
+    expect(p!.body).toContain("recovery metric");
+    expect(p!.body).toContain("Disapprove");
+    expect(p!.tags).toContain("category:success-metric");
+  });
+
+  it("classifies broadcast for snapshot / dispatch_done / audit_clean events", () => {
+    const events: RepairEvent[] = [
+      ev({ event: "route_audit_snapshot", files: ["a.ts"] }),
+      ev({ event: "route_audit_snapshot", files: ["b.ts"] }),
+    ];
+    const [p] = minePatternsFromRepairLog(events);
+    expect(p!.category).toBe("broadcast");
+    expect(p!.body).toContain("status broadcast");
+    expect(p!.tags).toContain("category:broadcast");
+  });
+
+  it("classifies real-failure on gave_up + failure-keyword event names", () => {
+    const events: RepairEvent[] = [
+      ev({ event: "doc_truncated", files: ["a.ts"] }),
+      ev({ event: "doc_truncated", files: ["b.ts"] }),
+    ];
+    const [p] = minePatternsFromRepairLog(events);
+    expect(p!.category).toBe("real-failure");
+    expect(p!.body).toContain("How to avoid");
+  });
+
+  it("classifies ambiguous when no clear signal", () => {
+    const events: RepairEvent[] = [
+      ev({ event: "noop_event", files: ["a.ts"] }),
+      ev({ event: "noop_event", files: ["b.ts"] }),
+    ];
+    const [p] = minePatternsFromRepairLog(events);
+    expect(p!.category).toBe("ambiguous");
+    expect(p!.body).toContain("Review manually");
   });
 
   it("limit caps the patterns returned", () => {
     const events: RepairEvent[] = [];
     for (let i = 0; i < 5; i++) {
-      events.push(ev({ stage: `s${i}`, event: "e", repairedIds: ["a"] }));
-      events.push(ev({ stage: `s${i}`, event: "e", repairedIds: ["b"] }));
+      events.push(ev({ stage: `s${i}` as never, event: "e", repairedIds: ["a"] }));
+      events.push(ev({ stage: `s${i}` as never, event: "e", repairedIds: ["b"] }));
     }
     const all = minePatternsFromRepairLog(events);
     expect(all.length).toBe(5);

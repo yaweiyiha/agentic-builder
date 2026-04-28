@@ -64,6 +64,16 @@ export default function AppNav() {
             Reports
           </Link>
           <Link
+            href="/memory"
+            className={`text-sm font-medium transition-colors ${
+              pathname === "/memory"
+                ? "text-[var(--foreground)]"
+                : "text-[var(--muted-secondary)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Memory
+          </Link>
+          <Link
             href="/pipeline"
             className="inline-flex items-center rounded-[10px] bg-[var(--accent)] px-[18px] py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >

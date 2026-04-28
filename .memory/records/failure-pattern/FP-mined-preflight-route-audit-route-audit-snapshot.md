@@ -1,20 +1,17 @@
 ---
-{"id":"FP-mined-preflight-route-audit-route-audit-snapshot","layer":"L1","kind":"failure-pattern","title":"preflight-route-audit · route_audit_snapshot","tags":["mined","stage:preflight-route-audit","event:route_audit_snapshot"],"source":"distill","refs":{},"createdAt":1777358679442,"updatedAt":1777358679442,"schemaVersion":1}
+{"id":"FP-mined-preflight-route-audit-route-audit-snapshot","layer":"L1","kind":"failure-pattern","title":"preflight-route-audit · route_audit_snapshot","tags":["mined","stage:preflight-route-audit","event:route_audit_snapshot","category:broadcast"],"source":"distill","refs":{},"createdAt":1777369541223,"updatedAt":1777369541223,"schemaVersion":1}
 ---
 
 # preflight-route-audit — route_audit_snapshot
 
-## Symptoms
-No structured reasons captured. Self-heal stage `preflight-route-audit` triggered `route_audit_snapshot` repeatedly.
+## What this records
+Stage `preflight-route-audit` emitted `route_audit_snapshot` notifications **6** times. This is a **status broadcast** (snapshot, dispatch confirmation, audit-clean, autorepair completion), not a failure to learn from.
 
-## Pattern
-- Stage: `preflight-route-audit`
-- Event: `route_audit_snapshot`
+## Recommended action
+🔴 **Disapprove.** Status broadcasts don't represent avoidable failures.
 
-## Frequency
+## Raw stats
+- Stage: `preflight-route-audit` · Event: `route_audit_snapshot`
 - 6 occurrences across 0 session(s)
 - Outcomes: fixed=0, progress=0, gave_up=0, other=6
-
-## Status
-Mined automatically from repair-log. Default score = 0 (Layer 3 shadow). Approve via `npm run memory:approve <id>` or wait for outcome attribution to promote it.
 

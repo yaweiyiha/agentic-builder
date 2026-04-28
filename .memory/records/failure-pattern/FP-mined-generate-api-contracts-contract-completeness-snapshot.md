@@ -1,20 +1,17 @@
 ---
-{"id":"FP-mined-generate-api-contracts-contract-completeness-snapshot","layer":"L1","kind":"failure-pattern","title":"generate_api_contracts · contract_completeness_snapshot","tags":["mined","stage:generate_api_contracts","event:contract_completeness_snapshot"],"source":"distill","refs":{},"createdAt":1777358679444,"updatedAt":1777358679444,"schemaVersion":1}
+{"id":"FP-mined-generate-api-contracts-contract-completeness-snapshot","layer":"L1","kind":"failure-pattern","title":"generate_api_contracts · contract_completeness_snapshot","tags":["mined","stage:generate_api_contracts","event:contract_completeness_snapshot","category:broadcast"],"source":"distill","refs":{},"createdAt":1777369541220,"updatedAt":1777369541220,"schemaVersion":1}
 ---
 
 # generate_api_contracts — contract_completeness_snapshot
 
-## Symptoms
-No structured reasons captured. Self-heal stage `generate_api_contracts` triggered `contract_completeness_snapshot` repeatedly.
+## What this records
+Stage `generate_api_contracts` emitted `contract_completeness_snapshot` notifications **7** times. This is a **status broadcast** (snapshot, dispatch confirmation, audit-clean, autorepair completion), not a failure to learn from.
 
-## Pattern
-- Stage: `generate_api_contracts`
-- Event: `contract_completeness_snapshot`
+## Recommended action
+🔴 **Disapprove.** Status broadcasts don't represent avoidable failures.
 
-## Frequency
-- 6 occurrences across 0 session(s)
-- Outcomes: fixed=0, progress=0, gave_up=0, other=6
-
-## Status
-Mined automatically from repair-log. Default score = 0 (Layer 3 shadow). Approve via `npm run memory:approve <id>` or wait for outcome attribution to promote it.
+## Raw stats
+- Stage: `generate_api_contracts` · Event: `contract_completeness_snapshot`
+- 7 occurrences across 0 session(s)
+- Outcomes: fixed=0, progress=0, gave_up=0, other=7
 

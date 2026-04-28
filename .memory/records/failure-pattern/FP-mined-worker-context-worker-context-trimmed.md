@@ -1,20 +1,17 @@
 ---
-{"id":"FP-mined-worker-context-worker-context-trimmed","layer":"L1","kind":"failure-pattern","title":"worker-context · worker_context_trimmed","tags":["mined","stage:worker-context","event:worker_context_trimmed"],"source":"distill","refs":{},"createdAt":1777358679452,"updatedAt":1777358679452,"schemaVersion":1}
+{"id":"FP-mined-worker-context-worker-context-trimmed","layer":"L1","kind":"failure-pattern","title":"worker-context · worker_context_trimmed","tags":["mined","stage:worker-context","event:worker_context_trimmed","category:broadcast"],"source":"distill","refs":{},"createdAt":1777369541242,"updatedAt":1777369541242,"schemaVersion":1}
 ---
 
 # worker-context — worker_context_trimmed
 
-## Symptoms
-No structured reasons captured. Self-heal stage `worker-context` triggered `worker_context_trimmed` repeatedly.
+## What this records
+Stage `worker-context` emitted `worker_context_trimmed` notifications **3** times. This is a **status broadcast** (snapshot, dispatch confirmation, audit-clean, autorepair completion), not a failure to learn from.
 
-## Pattern
-- Stage: `worker-context`
-- Event: `worker_context_trimmed`
+## Recommended action
+🔴 **Disapprove.** Status broadcasts don't represent avoidable failures.
 
-## Frequency
+## Raw stats
+- Stage: `worker-context` · Event: `worker_context_trimmed`
 - 3 occurrences across 0 session(s)
 - Outcomes: fixed=0, progress=0, gave_up=0, other=3
-
-## Status
-Mined automatically from repair-log. Default score = 0 (Layer 3 shadow). Approve via `npm run memory:approve <id>` or wait for outcome attribution to promote it.
 

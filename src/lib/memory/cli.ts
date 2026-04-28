@@ -144,6 +144,58 @@ export async function cmdStats(args: ParsedArgs): Promise<void> {
   }
 }
 
+export async function cmdApprove(args: ParsedArgs): Promise<void> {
+  const id = args.positional[1];
+  if (!id) {
+    fail(
+      "usage: memory approve <id> [--score=0.5] [--project=<path>]\n" +
+        "  Adds the `manual:approved` tag and bumps score so the pattern\n" +
+        "  enters Layer 2 (active injection). See design doc §12.7.",
+    );
+  }
+  const score = numFlag(args.flags.score, 0.5);
+  if (score < -1 || score > 1) {
+    fail(`--score must be in [-1, 1]; got ${score}`);
+  }
+  const store = pickStore(args.flags);
+  const r = await store.get(id);
+  if (!r) {
+    console.error(`not found: ${id}`);
+    process.exitCode = 1;
+    return;
+  }
+  const tags = r.tags.includes("manual:approved")
+    ? r.tags
+    : [...r.tags, "manual:approved"];
+  await store.update(id, { tags, metrics: { score } });
+  console.log(`approved ${id}`);
+  console.log(`  title: ${r.title}`);
+  console.log(`  score: ${score}`);
+  console.log(`  tags:  ${tags.join(", ")}`);
+}
+
+export async function cmdDisapprove(args: ParsedArgs): Promise<void> {
+  const id = args.positional[1];
+  if (!id) {
+    fail(
+      "usage: memory disapprove <id> [--score=0] [--project=<path>]\n" +
+        "  Removes the `manual:approved` tag and resets score to 0\n" +
+        "  (back to Layer 3 shadow).",
+    );
+  }
+  const score = numFlag(args.flags.score, 0);
+  const store = pickStore(args.flags);
+  const r = await store.get(id);
+  if (!r) {
+    console.error(`not found: ${id}`);
+    process.exitCode = 1;
+    return;
+  }
+  const tags = r.tags.filter((t) => t !== "manual:approved");
+  await store.update(id, { tags, metrics: { score } });
+  console.log(`disapproved ${id}  (score=${score}, tag removed)`);
+}
+
 export async function cmdInvalidateClassification(
   args: ParsedArgs,
 ): Promise<void> {
@@ -228,6 +280,8 @@ const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
   recall: cmdRecall,
   stats: cmdStats,
   trace: cmdTrace,
+  approve: cmdApprove,
+  disapprove: cmdDisapprove,
   "invalidate-classification": cmdInvalidateClassification,
 };
 
@@ -236,7 +290,7 @@ export async function main(argv: string[]): Promise<void> {
   const cmd = args.positional[0];
   if (!cmd || !COMMANDS[cmd]) {
     console.error(
-      "usage: memory <list|show|search|recall|stats|trace|invalidate-classification> [args]",
+      "usage: memory <list|show|search|recall|stats|trace|approve|disapprove|invalidate-classification> [args]",
     );
     console.error("  --project=<path>   target an L2 store (else L1)");
     console.error("  --layer=L1|L2|both filter by layer (recall/search)");

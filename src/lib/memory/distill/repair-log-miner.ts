@@ -14,13 +14,29 @@
 
 import type { RepairEvent } from "@/lib/pipeline/self-heal/events";
 
+export type PatternCategory =
+  /** Self-heal succeeded most of the time — recovery metric, not a failure
+   *  to teach the LLM. Suggested action: Disapprove or Delete. */
+  | "success-metric"
+  /** Status snapshot / dispatch confirmation / audit-clean — pure
+   *  notification, no learning signal. Suggested action: Disapprove. */
+  | "broadcast"
+  /** Real recurring failure with either rich `details.reason` data or a
+   *  clear failure event name. Suggested action: Edit "How to avoid"
+   *  then Approve. */
+  | "real-failure"
+  /** Cannot classify automatically. Suggested action: Review manually. */
+  | "ambiguous";
+
 export interface MinedPattern {
   /** Deterministic id: FP-mined-<stage>-<event>. Re-mining is idempotent. */
   id: string;
   title: string;
-  /** Markdown body with Symptoms / Pattern / Frequency / Sample sections. */
+  /** Markdown body — template depends on category. */
   body: string;
   tags: string[];
+  /** Auto-classified pattern nature; surfaces as `category:*` tag. */
+  category: PatternCategory;
   /** Cluster size (number of events that contributed). */
   occurrences: number;
   /** Number of distinct sessions/runs the pattern appeared in. */
@@ -58,19 +74,20 @@ export function minePatternsFromRepairLog(
   for (const ev of events) {
     if (!isLearningSignal(ev)) continue;
     const key = `${ev.stage}::${ev.event}`;
-    const cluster =
-      clusters.get(key) ??
-      ({
+    let cluster = clusters.get(key);
+    if (!cluster) {
+      cluster = {
         stage: ev.stage,
         event: ev.event,
-        events: [],
-        fileExts: new Map(),
-        sessions: new Set(),
+        events: [] as RepairEvent[],
+        fileExts: new Map<string, number>(),
+        sessions: new Set<string>(),
         outcomes: { fixed: 0, progress: 0, gaveUp: 0, other: 0 },
-        reasons: new Map(),
-        taskTitles: new Set(),
-      } satisfies ClusterAccumulator);
-    clusters.set(key, cluster);
+        reasons: new Map<string, number>(),
+        taskTitles: new Set<string>(),
+      };
+      clusters.set(key, cluster);
+    }
 
     cluster.events.push(ev);
     bumpOutcome(cluster.outcomes, classify(ev));
@@ -150,12 +167,14 @@ function buildPattern(c: ClusterAccumulator): MinedPattern {
     ? truncate(reasonsRanked[0][0], 60)
     : c.event;
   const title = `${c.stage} · ${titleHint}`;
+  const category = classifyPatternNature(c, reasonsRanked.length);
 
-  const body = renderMarkdown(c, reasonsRanked, topExtensions);
+  const body = renderMarkdown(c, reasonsRanked, topExtensions, category);
   const tags = [
     "mined",
     `stage:${c.stage}`,
     `event:${c.event}`,
+    `category:${category}`,
     ...topExtensions.map((ext) => `ext:${ext}`),
   ];
   return {
@@ -163,6 +182,7 @@ function buildPattern(c: ClusterAccumulator): MinedPattern {
     title,
     body,
     tags,
+    category,
     occurrences: c.events.length,
     sessions: c.sessions.size,
     outcomes: { ...c.outcomes },
@@ -170,7 +190,117 @@ function buildPattern(c: ClusterAccumulator): MinedPattern {
   };
 }
 
+/**
+ * Classify a cluster into one of four categories based on its outcomes,
+ * event name, and richness of `details.reason` data. The category drives
+ * both the markdown template and the UI suggestion banner.
+ */
+export function classifyPatternNature(
+  c: ClusterAccumulator,
+  reasonsCount: number,
+): PatternCategory {
+  const total = c.events.length;
+  const { fixed, progress, gaveUp, other } = c.outcomes;
+  const eventName = c.event.toLowerCase();
+
+  // 1. Pure status broadcasts — no learning signal regardless of frequency
+  if (
+    /(_snapshot|audit_clean|dispatch_done|dispatch_role_done|autorepaired|installed|applied|trimmed)/.test(
+      eventName,
+    )
+  ) {
+    return "broadcast";
+  }
+
+  // 2. Recovery metric — self-heal succeeded most of the time
+  if (fixed > 0 && fixed / total >= 0.6 && gaveUp === 0) {
+    return "success-metric";
+  }
+
+  // 3. Real failure — clear failure-signal event name OR explicit gave_up
+  //    OR the cluster carries rich `details.reason` data we can teach from
+  if (
+    gaveUp > 0 ||
+    /(truncated|stagnation|unfulfilled|task_forced|fail|exhausted|abandon|gave_up|missing)/.test(
+      eventName,
+    ) ||
+    reasonsCount > 0
+  ) {
+    return "real-failure";
+  }
+
+  // (progress / other counts are surfaced in the body but don't drive
+  //  classification on their own.)
+  void progress;
+  void other;
+
+  // 4. Default — couldn't classify; let the human decide
+  return "ambiguous";
+}
+
 function renderMarkdown(
+  c: ClusterAccumulator,
+  reasonsRanked: Array<[string, number]>,
+  topExtensions: string[],
+  category: PatternCategory,
+): string {
+  switch (category) {
+    case "success-metric":
+      return renderSuccessMetric(c, topExtensions);
+    case "broadcast":
+      return renderBroadcast(c, topExtensions);
+    case "real-failure":
+      return renderRealFailure(c, reasonsRanked, topExtensions);
+    case "ambiguous":
+    default:
+      return renderAmbiguous(c, topExtensions);
+  }
+}
+
+function renderSuccessMetric(
+  c: ClusterAccumulator,
+  topExtensions: string[],
+): string {
+  const total = c.events.length;
+  const lines: string[] = [];
+  lines.push(`# ${c.stage} — ${c.event}`);
+  lines.push("");
+  lines.push("## What this records");
+  lines.push(
+    `Self-heal **successfully repaired** \`${c.stage}\` issues in **${c.outcomes.fixed} of ${total}** attempts. This is a **recovery metric**, not a failure pattern.`,
+  );
+  lines.push("");
+  lines.push("## Recommended action");
+  lines.push(
+    "🔴 **Disapprove or Delete.** Recovery metrics don't teach the LLM how to avoid anything — they describe the self-heal system working as designed. Injecting this would waste prompt budget without actionable advice.",
+  );
+  lines.push("");
+  appendStats(lines, c, topExtensions);
+  return lines.join("\n");
+}
+
+function renderBroadcast(
+  c: ClusterAccumulator,
+  topExtensions: string[],
+): string {
+  const lines: string[] = [];
+  lines.push(`# ${c.stage} — ${c.event}`);
+  lines.push("");
+  lines.push("## What this records");
+  lines.push(
+    `Stage \`${c.stage}\` emitted \`${c.event}\` notifications **${c.events.length}** times. This is a **status broadcast** (snapshot, dispatch confirmation, audit-clean, autorepair completion), not a failure to learn from.`,
+  );
+  lines.push("");
+  lines.push("## Recommended action");
+  lines.push(
+    "🔴 **Disapprove.** Status broadcasts don't represent avoidable failures.",
+  );
+  lines.push("");
+  appendStats(lines, c, topExtensions);
+  return lines.join("\n");
+}
+
+function renderRealFailure(
   c: ClusterAccumulator,
   reasonsRanked: Array<[string, number]>,
   topExtensions: string[],
@@ -178,30 +308,40 @@ function renderMarkdown(
   const lines: string[] = [];
   lines.push(`# ${c.stage} — ${c.event}`);
   lines.push("");
+  lines.push("## What this records");
+  const gaveUpNote =
+    c.outcomes.gaveUp > 0
+      ? ` **${c.outcomes.gaveUp}** ended in \`gave_up\` — these are real unrecovered failures worth preventing.`
+      : "";
+  lines.push(
+    `Stage \`${c.stage}\` triggered \`${c.event}\` **${c.events.length}** times across ${c.sessions.size} session(s).${gaveUpNote}`,
+  );
+  lines.push("");
   lines.push("## Symptoms");
   if (reasonsRanked.length > 0) {
-    lines.push("Recurring reasons observed in self-heal events:");
+    lines.push("Top reasons captured in past events:");
     lines.push("");
     for (const [reason, count] of reasonsRanked) {
       lines.push(`- (×${count}) ${reason}`);
     }
   } else {
     lines.push(
-      `No structured reasons captured. Self-heal stage \`${c.stage}\` triggered \`${c.event}\` repeatedly.`,
+      "_No structured reasons in raw events — please describe based on your project knowledge._",
     );
   }
   lines.push("");
-  lines.push("## Pattern");
-  lines.push(`- Stage: \`${c.stage}\``);
-  lines.push(`- Event: \`${c.event}\``);
-  if (topExtensions.length) {
-    lines.push(`- File types touched: ${topExtensions.map((e) => "`." + e + "`").join(", ")}`);
-  }
-  lines.push("");
-  lines.push("## Frequency");
-  lines.push(`- ${c.events.length} occurrences across ${c.sessions.size} session(s)`);
+  lines.push("## How to avoid (FILL IN)");
   lines.push(
-    `- Outcomes: fixed=${c.outcomes.fixed}, progress=${c.outcomes.progress}, gave_up=${c.outcomes.gaveUp}, other=${c.outcomes.other}`,
+    "> ⚠️ This section is the actual content the LLM will see. Write specific, actionable guidance:",
+  );
+  lines.push(">");
+  lines.push("> - Describe the trigger condition (e.g., \"when task references files outside scaffold protected paths\")");
+  lines.push("> - Give the prevention rule (e.g., \"check `scaffolds/<tier>/` before listing creates\")");
+  lines.push("> - Mention any task-type / stack signals that flag this pattern");
+  lines.push("");
+  lines.push("## Recommended action");
+  lines.push(
+    `🟢 **Edit "How to avoid" with project-specific guidance, then Approve.** ${c.events.length} occurrences indicate this is a real recurring problem.`,
   );
   lines.push("");
   if (c.taskTitles.size > 0) {
@@ -211,12 +351,57 @@ function renderMarkdown(
     }
     lines.push("");
   }
-  lines.push("## Status");
+  appendStats(lines, c, topExtensions);
+  return lines.join("\n");
+}
+
+function renderAmbiguous(
+  c: ClusterAccumulator,
+  topExtensions: string[],
+): string {
+  const lines: string[] = [];
+  lines.push(`# ${c.stage} — ${c.event}`);
+  lines.push("");
+  lines.push("## What this records");
   lines.push(
-    "Mined automatically from repair-log. Default score = 0 (Layer 3 shadow). Approve via `npm run memory:approve <id>` or wait for outcome attribution to promote it.",
+    `Stage \`${c.stage}\` emitted \`${c.event}\` **${c.events.length}** times. The cluster lacks clear classification signals (no rich reasons, no fix/give-up split, no obvious failure keyword in the event name).`,
   );
   lines.push("");
+  lines.push("## Recommended action");
+  lines.push(
+    "🟡 **Review manually based on your knowledge of this stage:**",
+  );
+  lines.push(
+    "- If it's a recovery / notification — **Disapprove**",
+  );
+  lines.push(
+    "- If it's a real failure the LLM could avoid — **Edit `How to avoid` (add the section), then Approve**",
+  );
+  lines.push(
+    "- Otherwise — **Disapprove** for now; revisit when richer event data accumulates",
+  );
+  lines.push("");
+  appendStats(lines, c, topExtensions);
   return lines.join("\n");
+}
+
+function appendStats(
+  lines: string[],
+  c: ClusterAccumulator,
+  topExtensions: string[],
+): void {
+  lines.push("## Raw stats");
+  lines.push(`- Stage: \`${c.stage}\` · Event: \`${c.event}\``);
+  lines.push(`- ${c.events.length} occurrences across ${c.sessions.size} session(s)`);
+  lines.push(
+    `- Outcomes: fixed=${c.outcomes.fixed}, progress=${c.outcomes.progress}, gave_up=${c.outcomes.gaveUp}, other=${c.outcomes.other}`,
+  );
+  if (topExtensions.length) {
+    lines.push(
+      `- File types touched: ${topExtensions.map((e) => "`." + e + "`").join(", ")}`,
+    );
+  }
+  lines.push("");
 }
 
 function slug(s: string): string {

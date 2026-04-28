@@ -49,3 +49,8 @@ example
 next-env.d.ts
 
 worklog-automation
+
+# memory runtime / locks (L1 records under .memory/records are tracked separately)
+.memory/.lock-target
+.memory/metrics.json
+.memory/trace.jsonl

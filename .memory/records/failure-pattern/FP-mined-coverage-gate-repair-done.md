@@ -1,20 +1,17 @@
 ---
-{"id":"FP-mined-coverage-gate-repair-done","layer":"L1","kind":"failure-pattern","title":"coverage-gate · repair_done","tags":["mined","stage:coverage-gate","event:repair_done"],"source":"distill","refs":{},"createdAt":1777358679435,"updatedAt":1777358679435,"schemaVersion":1}
+{"id":"FP-mined-coverage-gate-repair-done","layer":"L1","kind":"failure-pattern","title":"coverage-gate · repair_done","tags":["mined","stage:coverage-gate","event:repair_done","category:success-metric"],"source":"distill","refs":{},"createdAt":1777369541203,"updatedAt":1777369541203,"schemaVersion":1}
 ---
 
 # coverage-gate — repair_done
 
-## Symptoms
-No structured reasons captured. Self-heal stage `coverage-gate` triggered `repair_done` repeatedly.
+## What this records
+Self-heal **successfully repaired** `coverage-gate` issues in **12 of 15** attempts. This is a **recovery metric**, not a failure pattern.
 
-## Pattern
-- Stage: `coverage-gate`
-- Event: `repair_done`
+## Recommended action
+🔴 **Disapprove or Delete.** Recovery metrics don't teach the LLM how to avoid anything — they describe the self-heal system working as designed. Injecting this would waste prompt budget without actionable advice.
 
-## Frequency
-- 14 occurrences across 0 session(s)
-- Outcomes: fixed=11, progress=2, gave_up=0, other=1
-
-## Status
-Mined automatically from repair-log. Default score = 0 (Layer 3 shadow). Approve via `npm run memory:approve <id>` or wait for outcome attribution to promote it.
+## Raw stats
+- Stage: `coverage-gate` · Event: `repair_done`
+- 15 occurrences across 0 session(s)
+- Outcomes: fixed=12, progress=2, gave_up=0, other=1
 

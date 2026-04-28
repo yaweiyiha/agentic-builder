@@ -1,20 +1,17 @@
 ---
-{"id":"FP-mined-integration-gate-frontend-api-client-uniqueness-snapshot","layer":"L1","kind":"failure-pattern","title":"integration-gate · frontend_api_client_uniqueness_snapshot","tags":["mined","stage:integration-gate","event:frontend_api_client_uniqueness_snapshot"],"source":"distill","refs":{},"createdAt":1777358679450,"updatedAt":1777358679450,"schemaVersion":1}
+{"id":"FP-mined-integration-gate-frontend-api-client-uniqueness-snapshot","layer":"L1","kind":"failure-pattern","title":"integration-gate · frontend_api_client_uniqueness_snapshot","tags":["mined","stage:integration-gate","event:frontend_api_client_uniqueness_snapshot","category:broadcast"],"source":"distill","refs":{},"createdAt":1777369541236,"updatedAt":1777369541236,"schemaVersion":1}
 ---
 
 # integration-gate — frontend_api_client_uniqueness_snapshot
 
-## Symptoms
-No structured reasons captured. Self-heal stage `integration-gate` triggered `frontend_api_client_uniqueness_snapshot` repeatedly.
+## What this records
+Stage `integration-gate` emitted `frontend_api_client_uniqueness_snapshot` notifications **4** times. This is a **status broadcast** (snapshot, dispatch confirmation, audit-clean, autorepair completion), not a failure to learn from.
 
-## Pattern
-- Stage: `integration-gate`
-- Event: `frontend_api_client_uniqueness_snapshot`
+## Recommended action
+🔴 **Disapprove.** Status broadcasts don't represent avoidable failures.
 
-## Frequency
+## Raw stats
+- Stage: `integration-gate` · Event: `frontend_api_client_uniqueness_snapshot`
 - 4 occurrences across 0 session(s)
 - Outcomes: fixed=0, progress=0, gave_up=0, other=4
-
-## Status
-Mined automatically from repair-log. Default score = 0 (Layer 3 shadow). Approve via `npm run memory:approve <id>` or wait for outcome attribution to promote it.
 

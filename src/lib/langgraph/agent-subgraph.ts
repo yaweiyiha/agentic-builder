@@ -21,6 +21,7 @@ import {
   chatCompletionWithFallback,
 } from "@/lib/openrouter";
 import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
+import { recallAndPrepareInject } from "@/lib/memory/recall-context";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
@@ -1546,6 +1547,28 @@ async function generateCode(state: WorkerState) {
         role: "system",
         content: `## Project Context\n${contextParts.join("\n\n")}`,
       });
+    }
+
+    // Memory recall (Phase C-3): inject active failure-patterns matching
+    // the current task. Layer 2 only — Layer 3 (shadow) is trace-logged
+    // by recallAndPrepareInject but does NOT modify the prompt. The
+    // helper itself respects MEMORY_ENABLED / MEMORY_INJECT flags and
+    // never throws.
+    const memoryRecall = await recallAndPrepareInject({
+      agent: "worker_codegen",
+      role: state.role,
+      task: {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        files: Array.isArray(task.files) ? task.files : undefined,
+      },
+      projectRoot: state.outputDir,
+      kickoffId: state.sessionId,
+      layers: ["L1", "L2"],
+    });
+    if (memoryRecall.block) {
+      messages.push({ role: "system", content: memoryRecall.block });
     }
     const subStepsHint =
       task.subSteps && task.subSteps.length > 0
