@@ -1,5 +1,5 @@
 ---
-{"id":"FP-mined-coverage-gate-repair-done","layer":"L1","kind":"failure-pattern","title":"coverage-gate · repair_done","tags":["mined","stage:coverage-gate","event:repair_done","category:success-metric"],"source":"distill","refs":{},"createdAt":1777369541203,"updatedAt":1777369541203,"schemaVersion":1}
+{"id":"FP-mined-coverage-gate-repair-done","layer":"L1","kind":"failure-pattern","title":"coverage-gate · repair_done","tags":["mined","stage:coverage-gate","event:repair_done","category:success-metric"],"source":"distill","refs":{},"createdAt":1777369541203,"updatedAt":1777428490117,"schemaVersion":1}
 ---
 
 # coverage-gate — repair_done

@@ -5,6 +5,29 @@ import { create } from "zustand";
 import type { MemoryListItem, StatusFilter } from "@/app/api/memory/route";
 import type { MemoryRecord, MemoryKind } from "@/lib/memory/types";
 
+export interface AttributionRunResult {
+  ok: true;
+  applied: number;
+  attributions: Array<{
+    patternId: string;
+    oldScore: number;
+    newScore: number;
+    delta: number;
+    successes: number;
+    failures: number;
+    immune: boolean;
+  }>;
+  stats: {
+    taskHistoryConsidered: number;
+    taskHistorySkippedNotTerminal: number;
+    taskHistorySkippedAlreadyAttributed: number;
+    injectEventsConsidered: number;
+    patternsTouched: number;
+    newlyAttributedPairs: number;
+  };
+  projectRoot: string;
+}
+
 interface MemoryState {
   items: MemoryListItem[];
   total: number;
@@ -20,6 +43,10 @@ interface MemoryState {
   filterKind: MemoryKind | "all";
   search: string;
 
+  attributionRunning: boolean;
+  attributionResult: AttributionRunResult | null;
+  attributionError: string | null;
+
   fetchList: () => Promise<void>;
   setActive: (id: string | null) => void;
   fetchDetail: (id: string) => Promise<void>;
@@ -34,6 +61,13 @@ interface MemoryState {
     patch: { body?: string; tags?: string[]; score?: number },
   ) => Promise<boolean>;
   deleteRecord: (id: string) => Promise<boolean>;
+
+  runAttribution: (opts?: {
+    projectRoot?: string;
+    resetCursor?: boolean;
+    dryRun?: boolean;
+  }) => Promise<AttributionRunResult | null>;
+  dismissAttribution: () => void;
 }
 
 const SUPPORTED_KINDS_DEFAULT: MemoryKind[] = ["failure-pattern", "classification"];
@@ -52,6 +86,10 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   filterStatus: "all",
   filterKind: "all",
   search: "",
+
+  attributionRunning: false,
+  attributionResult: null,
+  attributionError: null,
 
   fetchList: async () => {
     set({ loading: true, error: null });
@@ -156,6 +194,43 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       return false;
     }
   },
+  runAttribution: async (opts = {}) => {
+    set({ attributionRunning: true, attributionError: null, attributionResult: null });
+    try {
+      const resp = await fetch("/api/memory/attribute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectRoot: opts.projectRoot,
+          resetCursor: opts.resetCursor === true,
+          dryRun: opts.dryRun === true,
+        }),
+      });
+      const data = (await resp.json()) as
+        | AttributionRunResult
+        | { error: string };
+      if (!resp.ok || "error" in data) {
+        const err = "error" in data ? data.error : `HTTP ${resp.status}`;
+        set({ attributionRunning: false, attributionError: err });
+        return null;
+      }
+      set({ attributionRunning: false, attributionResult: data });
+      // Refresh list so updated scores show up immediately.
+      if (!opts.dryRun) await get().fetchList();
+      return data;
+    } catch (err) {
+      set({
+        attributionRunning: false,
+        attributionError: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  },
+
+  dismissAttribution: () => {
+    set({ attributionResult: null, attributionError: null });
+  },
+
   deleteRecord: async (id) => {
     try {
       const resp = await fetch(`/api/memory/${encodeURIComponent(id)}`, {
