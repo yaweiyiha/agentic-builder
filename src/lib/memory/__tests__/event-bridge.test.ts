@@ -37,9 +37,10 @@ function ev(over: Partial<PipelineEvent>): PipelineEvent {
 }
 
 async function flush(): Promise<void> {
-  // Bridge writes are fire-and-forget (void recordX()). Wait a tick to let
-  // microtasks settle.
-  await new Promise((r) => setTimeout(r, 50));
+  // Bridge writes are fire-and-forget (void recordX()) — they queue
+  // through proper-lockfile. Wait long enough for the writes to land
+  // even when other tests are competing for fs I/O in the same run.
+  await new Promise((r) => setTimeout(r, 250));
 }
 
 describe("event-bridge", () => {

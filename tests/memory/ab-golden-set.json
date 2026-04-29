@@ -1,0 +1,48 @@
+{
+  "$schema": "ad-hoc",
+  "purpose": "A/B test briefs for Phase C-6 — verify MEMORY_INJECT=true reduces self-heal triggers vs MEMORY_INJECT=false on the same brief.",
+  "instructions": "See scripts/memory-ab-compare.ts header for full workflow. Pick a brief, run it twice into separate output dirs, then compare.",
+  "verdict_threshold": "On 5+ briefs averaged: self-heal triggers down ≥20% with no >5% cost regression.",
+  "briefs": [
+    {
+      "id": "BRIEF-1-clock",
+      "tier_hint": "S",
+      "feature_brief": "Build a single-page Pomodoro timer web app. Users can start / pause / reset a 25-minute focus timer and a 5-minute break timer. Display the remaining time in MM:SS format. Show a session counter that increments on each completed cycle. No backend, no auth, no database — all state in memory.",
+      "expected_self_heal_hot_spots": ["worker-context", "preflight-deps"]
+    },
+    {
+      "id": "BRIEF-2-todo-fullstack",
+      "tier_hint": "M",
+      "feature_brief": "Build a Todo app with a Node/Express backend and React frontend. Backend exposes REST endpoints for list/create/toggle/delete tasks (in-memory store, no DB). Frontend has a single page that lists tasks, supports adding via input, toggling done, and deleting. No auth, no persistence.",
+      "expected_self_heal_hot_spots": ["integration-gate", "worker-verify", "preflight-contract-completeness"]
+    },
+    {
+      "id": "BRIEF-3-blog-prisma",
+      "tier_hint": "M",
+      "feature_brief": "Build a personal blog with PostgreSQL via Prisma. Posts have title, slug, body (markdown), publishedAt. Admin can CRUD posts via a simple form (no auth in v1). Public homepage lists posts; clicking opens detail page. Use Next.js (App Router) + Prisma + Postgres in docker-compose.",
+      "expected_self_heal_hot_spots": ["architect-triage", "worker-codegen", "preflight-deps"]
+    },
+    {
+      "id": "BRIEF-4-task-manager",
+      "tier_hint": "M",
+      "feature_brief": "Task management web app. Users create tasks with title, description, status (todo/doing/done), priority (P0/P1/P2). Filter by status / priority. Assign tasks to fake users (no real auth). React frontend, Node backend, in-memory storage.",
+      "expected_self_heal_hot_spots": ["coverage-gate", "worker-verify"]
+    },
+    {
+      "id": "BRIEF-5-quiz-app",
+      "tier_hint": "S",
+      "feature_brief": "Build a JavaScript-fundamentals quiz with 10 multiple-choice questions hardcoded in the frontend. Show one question at a time, user picks an answer, advance to next. At the end show score / 10 with a Restart button.",
+      "expected_self_heal_hot_spots": ["worker-context", "preflight-route-audit"]
+    }
+  ],
+  "recipe": {
+    "preconditions": [
+      "Mining + approve done: at least 3-5 patterns at score >= 0.3 OR manual:approved.",
+      "Output dirs cleaned: pick fresh paths each run so .ralph/ doesn't carry over."
+    ],
+    "baseline_run": "MEMORY_ENABLED=true MEMORY_INJECT=false  npm run electron:dev  →  kickoff brief into  out-baseline-<briefId>/",
+    "treatment_run": "MEMORY_ENABLED=true MEMORY_INJECT=true  npm run electron:dev  →  kickoff same brief into  out-treatment-<briefId>/",
+    "compare": "npm run memory:ab-compare -- --baseline=out-baseline-<briefId> --treatment=out-treatment-<briefId>",
+    "attribution_after": "After treatment run, run `npm run memory:attribute -- --project=out-treatment-<briefId>` so success/failure outcomes feed back into pattern scores."
+  }
+}
