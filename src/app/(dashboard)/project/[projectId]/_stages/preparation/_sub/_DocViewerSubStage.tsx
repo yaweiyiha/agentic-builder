@@ -129,7 +129,7 @@ export default function DocViewerSubStage({
       {/* ── Content Canvas ── */}
       <ScrollArea className="flex-1">
         <div className="px-8 py-8">
-          <div className="max-w-4xl">
+          <div className="w-full">
             <div className="bg-white border border-[#e2e8f0] rounded-lg shadow-sm overflow-hidden">
 
               {/* Document Header */}
