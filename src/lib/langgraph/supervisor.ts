@@ -55,7 +55,13 @@ import type {
 } from "@/lib/pipeline/types";
 import { stripTestingPhaseTasks } from "@/lib/pipeline/strip-testing-tasks";
 import { triagePrebuiltArchitectTasks } from "./architect-triage";
-import { getRepairEmitter } from "@/lib/pipeline/self-heal";
+import {
+  getRepairEmitter,
+  runContractUsageCoverage,
+  runRuntimeIntegrationAudit,
+  formatRuntimeAuditBlock,
+} from "@/lib/pipeline/self-heal";
+import { readResourceRequirements } from "@/lib/pipeline/resource-requirements";
 import { recordCodingSessionLlmUsage } from "@/lib/pipeline/coding-session-report";
 import { pickRelevantSections } from "./doc-section-picker";
 import {
@@ -2379,7 +2385,23 @@ async function e2eVerifyAndFix(
 }
 
 function routeAfterIntegrationVerify(state: SupervisorState): string {
-  if (state.integrationErrors) return "summary";
+  // CODEGEN_HARDENING_PLAN.md §7.3 — "FAILED_BUT_CONTINUED" policy:
+  // Always proceed to e2e_verify even when integration failed. Skipping e2e
+  // because integration FAIL'd hides the highest-signal readiness data
+  // (whether the app actually starts and serves traffic). Session 52851b86
+  // SKIPPED runtime+e2e because of an over-generated contract that could
+  // never have implemented endpoints — but the produced code DID build and
+  // start. The report should reflect that, not collapse to a single
+  // "graph_error" header.
+  //
+  // The session's overall status will still be marked "fail" downstream
+  // (route.ts wraps the post-graph throw on any non-empty gate errors),
+  // but every gate gets to run and contribute its evidence first.
+  if (state.integrationErrors) {
+    console.log(
+      "[Supervisor] routeAfterIntegrationVerify: integration FAILED — proceeding to e2e_verify anyway (FAIL_CONTINUED policy).",
+    );
+  }
   return "e2e_verify";
 }
 
@@ -2476,44 +2498,72 @@ Each element has this shape:
   "requestSchema": "string (TypeScript type literal for request body/params, or 'none')",
   "responseSchema": "string (TypeScript type literal for success response body)",
   "auth": "none|bearer|session",
-  "description": "string (one sentence)"
+  "description": "string (one sentence)",
+  "prdJustification": "string (verbatim PRD line/section that justifies this endpoint)",
+  "audience": "user|admin"
 }
 
-## MANDATORY: Nested resource endpoints for parent-child relationships
+## CRITICAL: Contract scope rule (HARD RULE — read first)
 
-When the PRD or supplied type/model definitions describe a one-to-many relationship
-between two resources (e.g. a Project "has" Tasks, a User "has" Comments, an Order
-"has" LineItems), you MUST emit BOTH sets of endpoints:
+The PRD is the ONLY source of truth. An endpoint belongs in this contract ONLY if
+AT LEAST ONE of the following is true, and you can quote the PRD line that justifies it
+in the \`prdJustification\` field:
 
-  1. **Flat endpoints** on the child resource:
-       GET    /api/{children}              — list with filters
-       POST   /api/{children}              — create
-       GET    /api/{children}/:id          — get one
-       PATCH  /api/{children}/:id          — update
-       DELETE /api/{children}/:id          — delete
+  (a) A "User flow" / "User journey" step in the PRD describes a user action
+      that requires it (e.g. "user marks a story as read"
+      → PATCH /api/feed-items/:id/read).
+  (b) A "UX / Pages" section names a page or component that needs the data
+      (e.g. "Onboarding Style page" → POST /api/users/me/style-assessment).
+  (c) An "Admin / Integration features" section names an internal consumer
+      (admin dashboard, webhook, cron). Mark these with \`"audience": "admin"\`
+      so the usage audit knows to skip them.
 
-  2. **Scoped-list endpoint** under the parent (THIS IS THE ONE MOST OFTEN MISSED):
-       GET    /api/{parents}/:id/{children}
-       Description: "List all {children} belonging to the {parent} identified by :id."
-       Support the same filtering/sorting/pagination query params the flat list accepts.
-       Example relationships and resulting scoped lists:
-         Project hasMany Tasks         → GET /api/projects/:id/tasks
-         User    hasMany Posts         → GET /api/users/:id/posts
-         Order   hasMany LineItems     → GET /api/orders/:id/line-items
+DO NOT default-enumerate "GET /list, GET /:id, POST, PATCH, DELETE" for every
+ORM model. The ORM model existing is NOT evidence that a REST endpoint is required.
+Most apps need <5 endpoints per model; many models need 0 (they only feed inner
+joins or are populated by background jobs).
 
-Rules:
-- The scoped-list endpoint is ADDITIONAL, not a replacement for the flat list.
-- Detect relationships from every signal available: PRD wording ("tasks belong to a project",
-  "user's posts"), TypeScript types/interfaces with a foreign-key field (e.g. \`projectId\`),
-  ORM model snippets (\`Project.hasMany(Task)\`, \`Task.belongsTo(Project)\`).
-- If the parent→child relationship exists but you are unsure about exact pluralisation,
-  still emit the endpoint — use the child resource's plural form consistent with its flat
-  endpoint (e.g. if flat is \`/api/tasks\`, scoped is \`/api/projects/:id/tasks\`).
-- Never silently drop a scoped endpoint because a flat one already exists.
+For each endpoint you DO emit:
+  - \`prdJustification\` MUST be non-empty AND verbatim from the PRD context provided.
+    If you cannot quote the PRD, OMIT the endpoint.
+  - \`audience\` MUST be \`"user"\` (called by the consumer-facing frontend) or
+    \`"admin"\` (internal / admin UI / system).
 
-A separate post-generation gate will audit ORM models for hasMany/belongsTo relations
-and REJECT the contract if any scoped-list endpoint is missing. Get it right the first
-time to avoid a rework loop.`;
+When in doubt: OMIT. A missing endpoint is cheap to add later (the
+contract-usage-coverage audit + frontend-api-uniqueness audit will surface it).
+A surplus endpoint poisons the integration gate, makes the backend worker chase
+impossible repairs, and burns LLM budget — that is what we are explicitly
+preventing here.
+
+## Nested resource endpoints (relationship-driven, NOT default CRUD)
+
+When the PRD or supplied ORM model definitions describe a one-to-many relationship
+between two resources (e.g. Project hasMany Tasks, User hasMany Posts):
+
+  1. **Flat endpoints on the child resource** — emit ONLY the verbs the PRD
+     actually describes for that resource. NEVER default-enumerate all 5
+     CRUD verbs. Examples:
+       - PRD says "users create and view posts" → emit POST /api/posts and
+         GET /api/posts/:id only. Do NOT emit PATCH/DELETE unless PRD describes
+         "users edit their post" or "users delete their post".
+       - PRD says "feed items are populated by a background aggregator and the
+         user only reads them" → emit GET /api/feed-items only. No POST,
+         no PATCH, no DELETE.
+
+  2. **Scoped-list endpoint under the parent** (this one IS relationship-driven
+     and SHOULD be inferred when the PRD describes a parent-detail page that
+     lists children):
+       GET /api/{parents}/:id/{children}
+       Examples:
+         "Project detail page shows its tasks"   → GET /api/projects/:id/tasks
+         "User profile page shows their posts"   → GET /api/users/:id/posts
+       Do NOT emit the scoped-list endpoint when the PRD never describes a
+       parent-detail UI that lists the children.
+
+A separate post-generation gate will audit ORM models for hasMany/belongsTo
+relations and warn about missing scoped-list endpoints — but only when the
+parent-detail UI is actually described in the PRD. Speculative scoped lists
+(no PRD page) are AS BAD as speculative flat CRUD.`;
 
 async function generateApiContracts(state: SupervisorState) {
   if (state.backendTasks.length === 0) {
@@ -2630,6 +2680,8 @@ async function generateApiContracts(state: SupervisorState) {
       responseSchema?: string;
       auth?: string;
       description?: string;
+      prdJustification?: string;
+      audience?: string;
     }> = [];
 
     try {
@@ -2647,6 +2699,35 @@ async function generateApiContracts(state: SupervisorState) {
       return { totalCostUsd: costUsd };
     }
 
+    // ── v2 scope-rule telemetry ────────────────────────────────────────────
+    // CODEGEN_HARDENING_PLAN.md §7.1 requires every emitted endpoint to carry
+    // a non-empty `prdJustification` and an `audience` value. We log how the
+    // model is doing on these so the contract-usage-coverage audit (T1.2) can
+    // make decisions and so the report's retrofit suggestions can detect drift.
+    const normalisedAudience = (raw: string | undefined): "user" | "admin" => {
+      const v = (raw ?? "").trim().toLowerCase();
+      return v === "admin" ? "admin" : "user";
+    };
+    const missingJustification = parsed.filter(
+      (p) => !(p.prdJustification ?? "").trim(),
+    );
+    if (missingJustification.length > 0) {
+      console.warn(
+        `[Supervisor] generateApiContracts: ${missingJustification.length}/${parsed.length} endpoint(s) emitted with empty prdJustification — these are at risk of being pruned by the contract-usage-coverage audit.`,
+      );
+      getRepairEmitter(state.sessionId)({
+        stage: "generate_api_contracts",
+        event: "contract_scope_rule_violation",
+        details: {
+          totalEndpoints: parsed.length,
+          missingJustification: missingJustification.length,
+          sample: missingJustification
+            .slice(0, 5)
+            .map((p) => `${p.method} ${p.endpoint}`),
+        },
+      });
+    }
+
     const contracts: ApiContract[] = parsed.map((item) => ({
       service: item.service ?? "unknown",
       endpoint: item.endpoint ?? "/",
@@ -2662,12 +2743,16 @@ async function generateApiContracts(state: SupervisorState) {
         .filter(Boolean)
         .join(" | "),
       generatedBy: "api_contract_phase",
+      prdJustification: item.prdJustification ?? undefined,
+      audience: normalisedAudience(item.audience),
     }));
 
     const contractJson = JSON.stringify(
       parsed.map((item, i) => ({
         ...item,
         id: `API-${String(i + 1).padStart(3, "0")}`,
+        prdJustification: (item.prdJustification ?? "").trim(),
+        audience: normalisedAudience(item.audience),
       })),
       null,
       2,
@@ -2675,7 +2760,7 @@ async function generateApiContracts(state: SupervisorState) {
     await fsWrite("API_CONTRACTS.json", contractJson, state.outputDir);
 
     console.log(
-      `[Supervisor] generateApiContracts: generated ${contracts.length} contracts, written to API_CONTRACTS.json (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+      `[Supervisor] generateApiContracts: generated ${contracts.length} contracts (${contracts.length - missingJustification.length} with PRD justification), written to API_CONTRACTS.json (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
     );
 
     // ── Contract-vs-models completeness audit + auto-append ────────────────
@@ -2728,8 +2813,86 @@ async function generateApiContracts(state: SupervisorState) {
       );
     }
 
+    // ── Contract usage coverage (post-contract phase) ──────────────────────
+    // Prune endpoints with no PRD justification BEFORE downstream task
+    // breakdown / worker codegen sees them. This is the single most effective
+    // fix for the "speculative CRUD wedge" failure mode that produced
+    // session 52851b86's 45 missing-impl errors and the verify-fix stagnation.
+    // See CODEGEN_HARDENING_PLAN.md §7.1.
+    let prunedCount = 0;
+    try {
+      const coverage = await runContractUsageCoverage({
+        outputDir: state.outputDir,
+        emitter: getRepairEmitter(state.sessionId),
+        sessionId: state.sessionId,
+        phase: "post-contract",
+      });
+      prunedCount = coverage.pruned.length;
+      if (coverage.pruned.length > 0) {
+        console.log(
+          `[Supervisor] generateApiContracts: contract-usage-coverage pruned ${coverage.pruned.length} surplus endpoint(s) lacking PRD justification: ${coverage.pruned
+            .slice(0, 6)
+            .map((p) => `${p.method} ${p.endpoint}`)
+            .join(", ")}${coverage.pruned.length > 6 ? ", …" : ""}.`,
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[Supervisor] generateApiContracts: contract-usage-coverage skipped — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    // If we pruned, reload the (now-shrunk) contract from disk and rebuild
+    // the in-memory ApiContract[] so downstream nodes don't see ghost entries.
+    let finalContracts = contracts;
+    if (prunedCount > 0) {
+      try {
+        const reloaded = await fsRead("API_CONTRACTS.json", state.outputDir);
+        if (
+          !reloaded.startsWith("FILE_NOT_FOUND") &&
+          !reloaded.startsWith("REJECTED")
+        ) {
+          const reparsed = JSON.parse(reloaded) as Array<{
+            service?: string;
+            endpoint?: string;
+            method?: string;
+            requestSchema?: string;
+            responseSchema?: string;
+            auth?: string;
+            description?: string;
+            prdJustification?: string;
+            audience?: string;
+          }>;
+          if (Array.isArray(reparsed)) {
+            finalContracts = reparsed.map((item) => ({
+              service: item.service ?? "unknown",
+              endpoint: item.endpoint ?? "/",
+              method: (item.method ?? "GET").toUpperCase(),
+              requestFields: item.requestSchema ?? undefined,
+              responseFields: item.responseSchema ?? undefined,
+              authType: item.auth ?? "none",
+              description: item.description ?? undefined,
+              schema: [
+                item.requestSchema ? `request: ${item.requestSchema}` : "",
+                item.responseSchema ? `response: ${item.responseSchema}` : "",
+              ]
+                .filter(Boolean)
+                .join(" | "),
+              generatedBy: "api_contract_phase",
+              prdJustification: item.prdJustification ?? undefined,
+              audience: normalisedAudience(item.audience),
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `[Supervisor] generateApiContracts: failed to reload pruned contract — ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     return {
-      apiContracts: contracts,
+      apiContracts: finalContracts,
       totalCostUsd: costUsd,
     };
   } catch (e) {
@@ -7302,6 +7465,75 @@ async function integrationVerifyAndFix(
   const frontendConvergenceClusters = await detectFrontendConvergenceClusters(
     state.outputDir,
   );
+
+  // ── Contract usage coverage (pre-integration phase) ────────────────────
+  // Run BEFORE the route audit so any surplus contract entries get pruned
+  // first — this prevents the route audit from reporting them as "missing
+  // implementations" and wedging the verify-fix worker in a stagnation loop.
+  // The audit also produces `pendingRepairTasks` for the worker to consume
+  // as deterministic instructions (CODEGEN_HARDENING_PLAN.md §7.2).
+  let coverageResult: Awaited<ReturnType<typeof runContractUsageCoverage>> | null = null;
+  try {
+    coverageResult = await runContractUsageCoverage({
+      outputDir: state.outputDir,
+      emitter: getRepairEmitter(state.sessionId),
+      sessionId: state.sessionId,
+      phase: "pre-integration",
+    });
+    if (coverageResult.pruned.length > 0) {
+      console.log(
+        `${label}: contract-usage-coverage pruned ${coverageResult.pruned.length} surplus endpoint(s) before route audit: ${coverageResult.pruned
+          .slice(0, 4)
+          .map((p) => `${p.method} ${p.endpoint}`)
+          .join(", ")}${coverageResult.pruned.length > 4 ? ", …" : ""}.`,
+      );
+    }
+    if (coverageResult.pendingRepairTasks.length > 0) {
+      console.log(
+        `${label}: contract-usage-coverage queued ${coverageResult.pendingRepairTasks.length} deterministic repair task(s) for verify-fix worker.`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `${label}: contract-usage-coverage skipped — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // ── Runtime integration audit (CODEGEN_HARDENING_PLAN.md §4.2 / §4.3 /
+  //    §4.4 / §4.5 / §4.7) ────────────────────────────────────────────────
+  // Static grep-based audit catching the runtime pitfalls Phase 4 prompts
+  // warn against. Findings are persisted to
+  // `.blueprint/runtime-integration-audit.json` and surfaced in the
+  // verify-fix worker's opening user message via `runtimeAuditBlock`
+  // below. `appliedOptionalFeatures` is auto-loaded by the audit from
+  // `.blueprint/scaffold-applied.json`; `declaredEnvKeys` is read here
+  // because resource-requirements.json lives at process.cwd() (the host
+  // builder), not at the generated project root.
+  let runtimeAuditResult: Awaited<
+    ReturnType<typeof runRuntimeIntegrationAudit>
+  > | null = null;
+  try {
+    const declaredResources = await readResourceRequirements(process.cwd());
+    const declaredEnvKeys = declaredResources.map((r) => r.envKey);
+    runtimeAuditResult = await runRuntimeIntegrationAudit({
+      outputDir: state.outputDir,
+      declaredEnvKeys,
+      emitter: getRepairEmitter(state.sessionId),
+      sessionId: state.sessionId,
+    });
+    if (!runtimeAuditResult.clean) {
+      const errCount = runtimeAuditResult.bySeverity.error ?? 0;
+      const warnCount = runtimeAuditResult.bySeverity.warn ?? 0;
+      console.log(
+        `${label}: runtime-integration-audit found ${runtimeAuditResult.findings.length} finding(s) (${errCount} error, ${warnCount} warn) across ${Object.keys(runtimeAuditResult.byRule).length} rule(s).`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `${label}: runtime-integration-audit skipped — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const routeAudit = await auditApiRouteRegistration(state.outputDir);
   const initialApiClientUniqueness = await auditFrontendApiClientUniqueness(
     state.outputDir,
@@ -7535,7 +7767,39 @@ async function integrationVerifyAndFix(
     "  1. FIRST review PRD completeness and fill missing implementations so the product is actually usable.",
     "  2. THEN perform registration closure plus scoped compile/build verification until all final gates pass.",
     "",
-    "## Phase 0 — PRD Completeness & Routing/Module Registration",
+    "## Phase 0 — Contract usage coverage decisions (READ FIRST, ACT IMMEDIATELY)",
+    "Before any other work, check the user message for a `## Contract usage coverage` block.",
+    "That block contains a pre-classified list of contract / frontend-call mismatches. It is",
+    "AUTHORITATIVE — the classification was performed deterministically against API_CONTRACTS.json,",
+    "the actual frontend code, and the PRD. Do NOT re-derive these decisions; just execute them.",
+    "",
+    "The 4-quadrant decision tree (already applied for you):",
+    "  case (1) frontend-wiring-missing  → contract has it, frontend doesn't call it, PRD requires it.",
+    "                                       ACTION: write the frontend wiring (apiClient call + UI",
+    "                                       hookup). Do NOT modify API_CONTRACTS.json.",
+    "  case (2) contract-surplus          → already pruned from API_CONTRACTS.json by the audit.",
+    "                                       ACTION: none — the contract is now correct.",
+    "  case (3) contract-gap-add-and-impl → frontend already calls an endpoint not in contract,",
+    "                                       and PRD justifies it. ACTION: add the entry to",
+    "                                       API_CONTRACTS.json (infer schema from the call site)",
+    "                                       AND implement the backend route.",
+    "  case (4) frontend-rogue-call       → frontend calls an endpoint with no contract entry and",
+    "                                       no PRD justification. ACTION: remove the rogue call",
+    "                                       (or replace with the canonical contract endpoint).",
+    "",
+    "You ARE explicitly allowed to:",
+    "  - edit API_CONTRACTS.json (cases 2 already done; case 3 requires adding entries)",
+    "  - delete frontend API calls (case 4)",
+    "The PRD is the only source of truth. Contract is a derived artefact, NOT an immutable spec.",
+    "",
+    "Anti-pattern: defaulting to 'implement the missing endpoint' when the route audit later",
+    "reports it as missing-from-backend. If the contract entry corresponds to a case (1) repair",
+    "task above, the FRONTEND is what's missing — implementing a backend stub the frontend will",
+    "never call wastes budget. If the entry was a case (2) it was already pruned, so you'll never",
+    "see it again. If you DO see new missing-impl reports from the route audit not covered by the",
+    "above tasks, those are genuine backend gaps and you should implement them.",
+    "",
+    "## Phase 0.5 — PRD Completeness & Routing/Module Registration",
     "Before compile/build validation, inspect these integration points first:",
     "1. Review the PRD and identify missing pages, flows, handlers, middlewares, and end-to-end feature gaps.",
     "2. Frontend route closure:",
@@ -7642,10 +7906,105 @@ async function integrationVerifyAndFix(
     state.outputDir,
   ).catch(() => "");
 
+  // ── Coverage repair-task block ─────────────────────────────────────────
+  // Render the deterministic decisions from `runContractUsageCoverage` as a
+  // checklist the verify-fix worker should execute first. Empty string when
+  // the audit didn't produce actionable items (or wasn't run).
+  let coverageBlock = "";
+  if (coverageResult) {
+    const { totals, pruned, pendingRepairTasks } = coverageResult;
+    const noiseFree =
+      pruned.length === 0 && pendingRepairTasks.length === 0;
+    if (!noiseFree) {
+      const lines: string[] = ["", "## Contract usage coverage"];
+      lines.push(
+        `Totals: contractEntries=${totals.contractEntries}, frontendCalls=${totals.frontendCalls}, consistent=${totals.consistent}, surplus=${totals.surplus} (pruned), wiring-missing=${totals.frontendWiringMissing}, contract-gap=${totals.contractGap}, rogue=${totals.frontendRogue}, admin-skipped=${totals.adminSkipped}.`,
+      );
+      if (pruned.length > 0) {
+        lines.push("");
+        lines.push(
+          `**Already pruned from API_CONTRACTS.json (${pruned.length})** — these endpoints had no PRD justification and no frontend caller. Do NOT try to re-add them; they were correctly removed.`,
+        );
+        for (const p of pruned.slice(0, 12)) {
+          lines.push(`  - PRUNED: ${p.method} ${p.endpoint}`);
+        }
+        if (pruned.length > 12) {
+          lines.push(`  - … (+${pruned.length - 12} more, full list in .ralph/contract-usage-coverage.json)`);
+        }
+      }
+      if (pendingRepairTasks.length > 0) {
+        const wiring = pendingRepairTasks.filter(
+          (t) => t.case === "frontend-wiring-missing",
+        );
+        const gaps = pendingRepairTasks.filter(
+          (t) => t.case === "contract-gap-add-and-impl",
+        );
+        const rogue = pendingRepairTasks.filter(
+          (t) => t.case === "frontend-rogue-call",
+        );
+        if (wiring.length > 0) {
+          lines.push("");
+          lines.push(
+            `**Case (1) Frontend wiring missing — execute these (${wiring.length}):**`,
+          );
+          for (const t of wiring.slice(0, 10)) {
+            lines.push(`  - [frontend] ${t.method} ${t.endpoint} — ${t.directive}`);
+          }
+          if (wiring.length > 10) {
+            lines.push(`  - … (+${wiring.length - 10} more)`);
+          }
+        }
+        if (gaps.length > 0) {
+          lines.push("");
+          lines.push(
+            `**Case (3) Contract gap — add to API_CONTRACTS.json + implement backend (${gaps.length}):**`,
+          );
+          for (const t of gaps.slice(0, 10)) {
+            lines.push(
+              `  - [contract+backend] ${t.method} ${t.endpoint} (call site: ${t.sourcePath ?? "?"}) — ${t.directive}`,
+            );
+          }
+          if (gaps.length > 10) {
+            lines.push(`  - … (+${gaps.length - 10} more)`);
+          }
+        }
+        if (rogue.length > 0) {
+          lines.push("");
+          lines.push(
+            `**Case (4) Frontend rogue calls — remove or rewrite (${rogue.length}):**`,
+          );
+          for (const t of rogue.slice(0, 10)) {
+            lines.push(
+              `  - [frontend] ${t.method} ${t.endpoint} at ${t.sourcePath ?? "?"} — ${t.directive}`,
+            );
+          }
+          if (rogue.length > 10) {
+            lines.push(`  - … (+${rogue.length - 10} more)`);
+          }
+        }
+      }
+      lines.push("");
+      lines.push(
+        "These tasks are PRE-CLASSIFIED. Execute them in one batch pass before re-running the route audit. Full data: `.ralph/contract-usage-coverage.json`.",
+      );
+      coverageBlock = lines.join("\n");
+    }
+  }
+
+  // Render the runtime-integration-audit findings (CODEGEN_HARDENING_PLAN.md
+  // §4.2 / §4.3 / §4.4 / §4.5 / §4.7) — empty when the audit was clean or
+  // didn't run. Rendered immediately after `coverageBlock` so the worker
+  // sees both deterministic decision sets back-to-back.
+  const runtimeAuditBlock = runtimeAuditResult
+    ? formatRuntimeAuditBlock(runtimeAuditResult)
+    : "";
+
   const openingUserContent = [
     `Project directory: ${state.outputDir}`,
     `Package manager: ${pm}`,
     prdBlock,
+    coverageBlock,
+    runtimeAuditBlock,
     dependencyAuditBlock,
     residualConflictBlock,
     frontendNormalizationBlock,
@@ -7686,6 +8045,15 @@ async function integrationVerifyAndFix(
   let consecutiveNoMutationIterations = 0;
   let lastStagnationGuidanceAt = 0;
   let stagnationWarningsWithoutProgress = 0;
+  // CODEGEN_HARDENING_PLAN.md §7.4 — pre-abort fallback retry. When the
+  // stagnation abort would normally fire, the worker gets ONE batched
+  // "do classify-then-write" prompt and 2 extra iterations to actually
+  // mutate the workspace. If that still produces nothing, we abort for
+  // real. This recovers the common failure mode where the worker had the
+  // right intent but couldn't see the next concrete action.
+  let stagnationFallbackUsed = false;
+  let stagnationFallbackIterationsLeft = 0;
+  let stagnationFallbackPassedEmitted = false;
   const repeatedReadOnlyActionCounts = new Map<string, number>();
   let progressScore = 0;
   let lastMeaningfulProgressIteration = 0;
@@ -8253,6 +8621,27 @@ async function integrationVerifyAndFix(
       consecutiveNoMutationIterations = 0;
       stagnationWarningsWithoutProgress = 0;
       repeatedReadOnlyActionCounts.clear();
+      // CODEGEN_HARDENING_PLAN.md §7.4 — credit the fallback retry once
+      // the worker actually mutates after we injected the batched prompt.
+      // Emitting `stagnation_fallback_passed` lets the model-scoring
+      // system recognise "this was a pipeline rescue, not a model fault"
+      // and avoids spuriously down-weighting the model on the next run.
+      if (stagnationFallbackUsed && !stagnationFallbackPassedEmitted) {
+        stagnationFallbackPassedEmitted = true;
+        // Cancel remaining fallback budget — we're back on track.
+        stagnationFallbackIterationsLeft = 0;
+        getRepairEmitter(state.sessionId)({
+          stage: "integration-gate",
+          event: "stagnation_fallback_passed",
+          details: {
+            recoveredAtIteration: iterations,
+            mutationReason,
+          },
+        });
+        console.log(
+          `${label}: stagnation fallback recovered — worker mutated after batched prompt.`,
+        );
+      }
     } else if (iterationValidationProgress) {
       recordMeaningfulProgress(
         `validation progress (${iterationProgressReasons.join(", ")})`,
@@ -8310,6 +8699,97 @@ async function integrationVerifyAndFix(
         });
       }
       if (consecutiveNoMutationIterations >= abortAt) {
+        // ── Fallback retry (CODEGEN_HARDENING_PLAN.md §7.4) ──────────────
+        // Before truly aborting, give the worker ONE last shot with a
+        // batched classify-then-mutate prompt. The hypothesis: the worker
+        // was reading-only because it couldn't decide WHICH issue to fix
+        // first. The fallback removes that ambiguity by handing it a
+        // single, deterministic procedure. Worker gets 2 more iterations
+        // to actually mutate; if it still doesn't, the real abort fires.
+        if (!stagnationFallbackUsed) {
+          stagnationFallbackUsed = true;
+          stagnationFallbackIterationsLeft = 2;
+          consecutiveNoMutationIterations = 0;
+          stagnationWarningsWithoutProgress = 0;
+          repeatedReadOnlyActionCounts.clear();
+
+          messages.push({
+            role: "user",
+            content: [
+              "SYSTEM CORRECTION — STAGNATION ABORT WAS ABOUT TO FIRE. You get ONE last batched-mode chance to make progress.",
+              `Reason: no filesystem mutation for ${abortAt} iteration(s); progressScore=${progressScore}/${MAX_INTEGRATION_PROGRESS_SCORE}; last meaningful progress at iteration ${lastMeaningfulProgressIteration || 0} (${lastMeaningfulProgressReason}).`,
+              repeatedAction ? `Most repeated action: ${repeatedAction}.` : "",
+              "",
+              "## Switch to single-batch classification mode",
+              "Do EXACTLY this on your next 2 turns. Do NOT free-form explore.",
+              "",
+              "Turn N (this turn):",
+              "  1. read_file(`API_CONTRACTS.json`)            — ONCE.",
+              "  2. read_file(`.ralph/contract-usage-coverage.json`) if it exists — that file already classifies every contract entry vs frontend call vs PRD.",
+              "  3. grep(`apiClient\\.|api\\.(get|post|put|patch|delete)\\(`, `frontend/src`) — collect all call sites in ONE pass.",
+              "  4. grep(`PRD|Product Requirement|User flow|UX`, `PRD.md`) is OPTIONAL — the audit already did this for you.",
+              "  5. For every (contract entry, frontend call) pair:",
+              "       Apply the 4-quadrant decision tree from your system prompt (case 1: wire frontend; case 2: prune contract; case 3: add to contract + implement; case 4: remove rogue call).",
+              "  6. Output a SINGLE batch of write_file calls covering the highest-confidence decisions. Do NOT verify between writes.",
+              "",
+              "Turn N+1:",
+              "  1. Re-run the FULL scoped validation (frontend tsc → frontend build → backend tsc → backend smoke) once.",
+              "  2. Either call report_done(status='pass', summary=…) if everything passes, OR write the minimal additional fixes the validation flagged, OR call report_done(status='fail', summary=…) naming the specific unresolved file/line.",
+              "",
+              "Hard rules during this batched mode:",
+              "- DO NOT re-read API_CONTRACTS.json, frontend api files, or PRD.md again. You already have what you need.",
+              "- DO NOT explore alternate files; trust the classification.",
+              "- DO NOT call report_done(status='pass') without first running the validation in turn N+1.",
+              "- If you genuinely cannot derive a fix from the classification, call report_done(status='fail', summary='unable to classify <specific endpoint> — needs human review'). That is preferable to another stagnation cycle.",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          });
+
+          getRepairEmitter(state.sessionId)({
+            stage: "integration-gate",
+            event: "stagnation_fallback_injected",
+            details: {
+              triggeredAtIteration: iterations,
+              consecutiveNoMutationIterations: abortAt,
+              progressScore,
+              progressMax: MAX_INTEGRATION_PROGRESS_SCORE,
+              lastMeaningfulProgressIteration,
+              lastMeaningfulProgressReason,
+              repeatedAction: repeatedAction ?? "none",
+              budgetIterations: stagnationFallbackIterationsLeft,
+            },
+          });
+
+          console.warn(
+            `${label}: pre-abort stagnation fallback injected — granting ${stagnationFallbackIterationsLeft} more iteration(s).`,
+          );
+          // Continue the outer loop — give the worker its budget.
+          continue;
+        }
+
+        // Already used the fallback — drain its budget; only then abort.
+        if (stagnationFallbackIterationsLeft > 0) {
+          stagnationFallbackIterationsLeft -= 1;
+          if (stagnationFallbackIterationsLeft > 0) {
+            console.warn(
+              `${label}: stagnation persists during fallback (${stagnationFallbackIterationsLeft} iteration(s) of fallback budget left).`,
+            );
+            continue;
+          }
+        }
+
+        getRepairEmitter(state.sessionId)({
+          stage: "integration-gate",
+          event: "stagnation_fallback_exhausted",
+          details: {
+            triggeredAtIteration: iterations,
+            consecutiveNoMutationIterations: abortAt,
+            progressScore,
+            progressMax: MAX_INTEGRATION_PROGRESS_SCORE,
+          },
+        });
+
         finalStatus = "fail";
         finalSummary = [
           "IntegrationVerifyFix stalled without making code changes.",
@@ -8317,11 +8797,15 @@ async function integrationVerifyAndFix(
           `Dynamic stagnation threshold reached: abortAt=${abortAt}, progressScore=${progressScore}/${MAX_INTEGRATION_PROGRESS_SCORE}.`,
           `Last meaningful progress: iteration ${lastMeaningfulProgressIteration || 0} (${lastMeaningfulProgressReason}).`,
           repeatedAction ? `Most repeated action: ${repeatedAction}` : "",
-          "Aborting instead of spending more iterations rereading the same files.",
+          stagnationFallbackUsed
+            ? "Pre-abort batch-classify fallback was injected and exhausted; no recovery."
+            : "Aborting instead of spending more iterations rereading the same files.",
         ]
           .filter(Boolean)
           .join("\n");
-        console.warn(`${label}: aborting due to stagnation.`);
+        console.warn(
+          `${label}: aborting due to stagnation${stagnationFallbackUsed ? " (after fallback exhausted)" : ""}.`,
+        );
         break;
       }
     }

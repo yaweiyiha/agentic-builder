@@ -36,6 +36,44 @@ interface RepairEventEntry {
   taskId?: string;
 }
 
+/**
+ * Snapshot of `<outputDir>/.ralph/runtime-integration-audit.json` (produced
+ * by `runRuntimeIntegrationAudit` during integration preflight). Used as the
+ * "Runtime readiness" header signal — see CODEGEN_HARDENING_PLAN.md §6.2.
+ *
+ * `present=false` means the audit was never persisted (typically because
+ * integration verify aborted before preflight even ran). Treat that as a
+ * neutral "unknown", NOT a clean pass.
+ */
+interface RuntimeReadinessSummary {
+  present: boolean;
+  clean: boolean;
+  hasError: boolean;
+  findingsTotal: number;
+  errorCount: number;
+  warnCount: number;
+  byRule: Record<string, number>;
+  topFindings: Array<{
+    ruleId: string;
+    severity: string;
+    file: string;
+    line: number;
+  }>;
+  disabledRules: Array<{ ruleId: string; reason: string }>;
+}
+
+const EMPTY_RUNTIME_READINESS: RuntimeReadinessSummary = {
+  present: false,
+  clean: false,
+  hasError: false,
+  findingsTotal: 0,
+  errorCount: 0,
+  warnCount: 0,
+  byRule: {},
+  topFindings: [],
+  disabledRules: [],
+};
+
 export interface WriteCodingSessionReportInput {
   sessionId: string;
   outputDir: string;
@@ -102,6 +140,16 @@ interface CodingSessionReportHistoryEntry {
   primaryModelGrade: string;
   archiveJsonFile: string;
   archiveMdFile: string;
+  /**
+   * Runtime-integration-audit snapshot (CODEGEN_HARDENING_PLAN.md §6.2).
+   * `runtimeReadinessFindings = -1` means the audit didn't run / wasn't
+   * persisted (typically because integration verify aborted before
+   * preflight). `0` is a real "clean" pass.
+   */
+  runtimeReadinessFindings?: number;
+  runtimeReadinessErrors?: number;
+  runtimeReadinessWarnings?: number;
+  runtimeReadinessHasError?: boolean;
 }
 
 interface StageUsageSummary {
@@ -297,17 +345,45 @@ function formatHistoryMarkdown(
 
   lines.push("## Compare Table", "");
   lines.push(
-    "| Ended At | Status | Score | Duration | Calls | Tokens | Cost | Primary Model | Model Score | Report |",
+    "| Ended At | Status | Score | Runtime | Duration | Calls | Tokens | Cost | Primary Model | Model Score | Report |",
   );
   lines.push(
-    "| --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+    "| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
   );
+  const fmtRuntime = (entry: CodingSessionReportHistoryEntry): string => {
+    const f = entry.runtimeReadinessFindings;
+    if (f === undefined || f < 0) return "n/a";
+    if (f === 0) return "✅ 0";
+    return `${f} (${entry.runtimeReadinessErrors ?? 0}E/${entry.runtimeReadinessWarnings ?? 0}W)`;
+  };
   for (const entry of entries) {
     lines.push(
-      `| ${entry.endedAt} | ${entry.status.toUpperCase()} | ${entry.score}/100 (${entry.grade}) | ${formatDuration(entry.durationMs)} | ${entry.totalCalls} | ${entry.totalTokens} | $${entry.totalCostUsd.toFixed(4)} | ${entry.primaryModel} | ${entry.primaryModelScore}/100 (${entry.primaryModelGrade}) | [view](./report-history/${entry.archiveMdFile}) |`,
+      `| ${entry.endedAt} | ${entry.status.toUpperCase()} | ${entry.score}/100 (${entry.grade}) | ${fmtRuntime(entry)} | ${formatDuration(entry.durationMs)} | ${entry.totalCalls} | ${entry.totalTokens} | $${entry.totalCostUsd.toFixed(4)} | ${entry.primaryModel} | ${entry.primaryModelScore}/100 (${entry.primaryModelGrade}) | [view](./report-history/${entry.archiveMdFile}) |`,
     );
   }
   lines.push("");
+
+  // CODEGEN_HARDENING_PLAN.md §6.2 trigger: "若三次 run 仍然 ≥1 → 升级对应
+  // prompt". Surface a callout when the last 3 sessions all carry runtime
+  // findings — this is the operator's signal that the audit pattern has
+  // outgrown its prompt-level fix and needs to be promoted to L1 (scaffold)
+  // or L4 (auto-repair).
+  const last3WithRuntime = entries
+    .slice(-3)
+    .filter(
+      (e) =>
+        e.runtimeReadinessFindings !== undefined &&
+        e.runtimeReadinessFindings >= 0,
+    );
+  if (
+    last3WithRuntime.length === 3 &&
+    last3WithRuntime.every((e) => (e.runtimeReadinessFindings ?? 0) >= 1)
+  ) {
+    lines.push(
+      "> ⚠️ **Runtime readiness trend alert (§6.2)** — 3 consecutive sessions reported ≥1 runtime-integration-audit finding. The corresponding rule(s) should be promoted from L3 prompt-level (current) to L1 (scaffold-level fix) or L4 (auto-repair task). See `CODEGEN_HARDENING_PLAN.md` §6.3.",
+      "",
+    );
+  }
 
   for (const entry of entries) {
     lines.push(
@@ -425,6 +501,73 @@ async function updateReportHistoryIndex(
       "utf-8",
     ),
   ]);
+}
+
+async function readRuntimeReadinessSummary(
+  outputDir: string,
+): Promise<RuntimeReadinessSummary> {
+  const filePath = path.join(
+    outputDir,
+    ".ralph",
+    "runtime-integration-audit.json",
+  );
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    const parsed = JSON.parse(raw) as {
+      clean?: boolean;
+      hasError?: boolean;
+      findings?: Array<{
+        ruleId?: string;
+        severity?: string;
+        file?: string;
+        line?: number;
+      }>;
+      byRule?: Record<string, number>;
+      bySeverity?: Record<string, number>;
+      disabledRules?: Array<{ ruleId?: string; reason?: string }>;
+    };
+    const findings = Array.isArray(parsed.findings) ? parsed.findings : [];
+    const byRule = parsed.byRule ?? {};
+    const bySeverity = parsed.bySeverity ?? {};
+    const disabledRules = (parsed.disabledRules ?? [])
+      .filter(
+        (d): d is { ruleId: string; reason: string } =>
+          !!d &&
+          typeof d.ruleId === "string" &&
+          typeof d.reason === "string",
+      )
+      .map((d) => ({ ruleId: d.ruleId, reason: d.reason }));
+
+    const ranked = [...findings]
+      .filter((f) => typeof f.ruleId === "string" && typeof f.file === "string")
+      .sort((a, b) => {
+        const sevRank = (s?: string) =>
+          s === "error" ? 0 : s === "warn" ? 1 : 2;
+        const r = sevRank(a.severity) - sevRank(b.severity);
+        return r !== 0 ? r : (a.ruleId ?? "").localeCompare(b.ruleId ?? "");
+      })
+      .slice(0, 10)
+      .map((f) => ({
+        ruleId: f.ruleId as string,
+        severity: typeof f.severity === "string" ? f.severity : "unknown",
+        file: f.file as string,
+        line: typeof f.line === "number" ? f.line : 0,
+      }));
+
+    return {
+      present: true,
+      clean: !!parsed.clean,
+      hasError: !!parsed.hasError,
+      findingsTotal: findings.length,
+      errorCount: bySeverity.error ?? 0,
+      warnCount: bySeverity.warn ?? 0,
+      byRule,
+      topFindings: ranked,
+      disabledRules,
+    };
+  } catch {
+    return EMPTY_RUNTIME_READINESS;
+  }
 }
 
 async function readRepairEventSummary(
@@ -1359,6 +1502,334 @@ function scoreCodingSession(input: {
   return { score, grade, reasons };
 }
 
+interface CodegenRetrofitSuggestion {
+  /** Stable id for grouping / deduping across sessions. */
+  id: string;
+  /** high = pipeline-blocking, medium = quality drop, low = cost / efficiency. */
+  severity: "high" | "medium" | "low";
+  /** Short headline (single sentence). */
+  title: string;
+  /** Bullet list of evidence quoted from this run's signals. */
+  evidence: string[];
+  /** Concrete change to make in the codegen pipeline. */
+  recommendation: string;
+  /**
+   * Cross-reference to CODEGEN_HARDENING_PLAN.md section (e.g. "§7.1") when
+   * the rule already exists. Null means no documented rule yet — open ticket.
+   */
+  planRef: string | null;
+}
+
+/**
+ * Parse the speculative-CRUD smell out of the route audit's
+ * `missingContractEndpoints`. We treat a resource root (path stem like
+ * `/api/users` or `/api/cached-markets`) as "speculative CRUD" when at least
+ * 3 of {GET-list, POST, PATCH:id, DELETE:id} were declared in the contract
+ * but never implemented. This is the exact pattern that wedged
+ * session 52851b86 (45 missing endpoints, all CRUD).
+ */
+function detectSpeculativeCrudResources(
+  missing: Array<{ method: string; endpoint: string }>,
+): { resources: string[]; verbsByResource: Map<string, Set<string>> } {
+  const verbsByResource = new Map<string, Set<string>>();
+  for (const m of missing) {
+    const path = m.endpoint;
+    const stemMatch = path.match(/^(\/api\/[^/:?]+)/);
+    if (!stemMatch) continue;
+    const stem = stemMatch[1];
+    const set = verbsByResource.get(stem) ?? new Set<string>();
+    const isIdPath = /\/:[\w-]+$/.test(path);
+    const verb = m.method.toUpperCase();
+    if (verb === "GET" && !isIdPath) set.add("LIST");
+    else if (verb === "POST" && !isIdPath) set.add("POST");
+    else if (verb === "PATCH" || verb === "PUT") set.add("UPDATE");
+    else if (verb === "DELETE") set.add("DELETE");
+    verbsByResource.set(stem, set);
+  }
+  const resources = [...verbsByResource.entries()]
+    .filter(([, verbs]) => verbs.size >= 3)
+    .map(([stem]) => stem)
+    .sort();
+  return { resources, verbsByResource };
+}
+
+/**
+ * Mine concrete codegen-pipeline retrofits from this run's signals.
+ * Each suggestion cites exact evidence (counts, paths, costs) and references
+ * the matching CODEGEN_HARDENING_PLAN.md section so the reader can act on it.
+ */
+function buildCodegenRetrofitSuggestions(input: {
+  integrationErrors?: string;
+  runtimeVerifyErrors?: string;
+  e2eVerifyErrors?: string;
+  finalAudit?: FeatureChecklistAuditResult | null;
+  repairSummary: RepairEventSummary;
+  modelUsage: AggregatedModelUsage[];
+  stageUsage: StageUsageSummary[];
+  preflightLedger: PreflightAutomationLedger;
+  taskResults: AuditTaskSummary[];
+  gatesExecuted?: {
+    integrationVerify: boolean;
+    runtimeVerify: boolean;
+    e2eVerify: boolean;
+  };
+}): CodegenRetrofitSuggestion[] {
+  const out: CodegenRetrofitSuggestion[] = [];
+  const repairByEvent = input.repairSummary.byEvent ?? {};
+  const integrationFailed = !!input.integrationErrors?.trim();
+  const runtimeFailed = !!input.runtimeVerifyErrors?.trim();
+  const e2eFailed = !!input.e2eVerifyErrors?.trim();
+  const route = input.preflightLedger.routeAudit;
+  const completeness = input.preflightLedger.contractCompleteness;
+  const stageMap = new Map(input.stageUsage.map((s) => [s.stage, s]));
+
+  // ── Rule 1 — Speculative CRUD in API_CONTRACTS.json ────────────────────
+  const missingFromFinal = route.final?.missingContractEndpoints ?? [];
+  const missingFromPreflight = route.preflight?.missingContractEndpoints ?? [];
+  const missing = missingFromFinal.length > 0 ? missingFromFinal : missingFromPreflight;
+  if (missing.length >= 8) {
+    const { resources } = detectSpeculativeCrudResources(missing);
+    if (resources.length >= 2) {
+      out.push({
+        id: "contract-speculative-crud",
+        severity: "high",
+        title:
+          "API_CONTRACTS.json declared speculative CRUD endpoints that nothing implements or calls",
+        evidence: [
+          `Route audit: ${missing.length} contract endpoint(s) had no backend implementation.`,
+          `${resources.length} resource root(s) show full CRUD shape (GET-list / POST / PATCH:id / DELETE:id) without justification: ${resources.slice(0, 6).join(", ")}${resources.length > 6 ? ", …" : ""}.`,
+          `Sample missing: ${missing
+            .slice(0, 4)
+            .map((m) => `${m.method} ${m.endpoint}`)
+            .join("; ")}.`,
+        ],
+        recommendation:
+          "Tighten `generate_api_contracts` prompt with the Contract Scope Rule: every endpoint must carry `prdJustification` (verbatim PRD line) and `audience` (user|admin); reject default-enumerated CRUD when the model isn't named in PRD user flows. Add a `contract-usage-coverage` audit (4-quadrant decision tree) to prune surplus before integration_verify_fix is invoked.",
+        planRef: "§7.1 (Contract scope rule) + §7.2 (4-quadrant decision tree)",
+      });
+    }
+  }
+
+  // ── Rule 2 — integration_verify_fix stagnated → pipeline aborted ───────
+  const stagnationCount = repairByEvent.stagnation_warning ?? 0;
+  const verifyFixStage = stageMap.get("integration_verify_fix");
+  if (
+    stagnationCount >= 2 ||
+    (integrationFailed && (verifyFixStage?.llmCalls ?? 0) >= 20)
+  ) {
+    out.push({
+      id: "verify-fix-stagnation",
+      severity: "high",
+      title:
+        "`integration_verify_fix` looped without producing mutations and ran out of budget",
+      evidence: [
+        `stagnation_warning events: ${stagnationCount}.`,
+        `integration_verify_fix: calls=${verifyFixStage?.llmCalls ?? 0}, cost=$${(verifyFixStage?.costUsd ?? 0).toFixed(4)}, duration=${formatDuration(verifyFixStage?.durationMs ?? 0)}.`,
+        integrationFailed
+          ? "Stage exited with blocking integration errors still present."
+          : "Stage burned budget without final failure (still suboptimal).",
+      ],
+      recommendation:
+        "Inject the four-quadrant decision tree into `integration_verify_fix`'s system prompt: explicitly authorise (a) implement, (b) prune contract, (c) add to contract, (d) delete frontend rogue call, (e) implement backend route. Also wire the stagnation fallback: when the in-loop watcher trips, issue ONE batch-classify prompt (read-once / classify-once / write-once) and cap at 2 more iterations.",
+      planRef: "§7.2 + §7.4 (stagnation fallback)",
+    });
+  }
+
+  // ── Rule 3 — Single gate failure halted runtime/E2E entirely ───────────
+  const integrationRan = input.gatesExecuted?.integrationVerify === true;
+  const runtimeRan = input.gatesExecuted?.runtimeVerify === true;
+  const e2eRan = input.gatesExecuted?.e2eVerify === true;
+  if (integrationFailed && integrationRan && (!runtimeRan || !e2eRan)) {
+    out.push({
+      id: "gate-cascade-skip",
+      severity: "high",
+      title:
+        "Integration gate failure short-circuited runtime/E2E verification",
+      evidence: [
+        `Integration verify: FAIL.`,
+        `Runtime verify: ${runtimeRan ? "PASS/FAIL (executed)" : "SKIPPED"}.`,
+        `E2E verify: ${e2eRan ? "PASS/FAIL (executed)" : "SKIPPED"}.`,
+        "Skipped gates leave the report blind to whether the project actually starts and serves traffic.",
+      ],
+      recommendation:
+        "Switch the orchestrator's gate policy from `graph_error` to `FAILED_BUT_CONTINUED`: integration FAIL records the failure but lets runtime + E2E + e2e-triage still run. Only runtime FAIL should block E2E (since the app can't serve traffic). Surface gates as PASS / FAIL / FAIL_CONTINUED / SKIPPED in the report.",
+      planRef: "§7.3 (one gate FAIL ≠ pipeline halt)",
+    });
+  }
+
+  // ── Rule 4 — Worker context truncation ─────────────────────────────────
+  const truncated =
+    (repairByEvent.doc_truncated ?? 0) +
+    (repairByEvent.truncation_detected ?? 0) +
+    (repairByEvent.worker_context_trimmed ?? 0);
+  if (truncated >= 1) {
+    out.push({
+      id: "worker-context-truncation",
+      severity: truncated >= 4 ? "medium" : "low",
+      title: "PRD / implementation context was truncated for workers",
+      evidence: [
+        `doc_truncated=${repairByEvent.doc_truncated ?? 0}, truncation_detected=${repairByEvent.truncation_detected ?? 0}, worker_context_trimmed=${repairByEvent.worker_context_trimmed ?? 0}.`,
+      ],
+      recommendation:
+        "Increase `WORKER_CONTEXT_BUDGET_CHARS` for large-window providers (DeepSeek V4 Pro 1M, Gemini 1M). Improve `doc-section-picker.ts` priority so contract-relevant sections + PRD user flows are never the ones dropped first. Consider per-role budgets (frontend gets API client + design spec; backend gets contract + ORM models).",
+      planRef: null,
+    });
+  }
+
+  // ── Rule 5 — task ↔ file plan mismatches ───────────────────────────────
+  const planUnfulfilled = repairByEvent.task_plan_unfulfilled ?? 0;
+  if (planUnfulfilled >= 2) {
+    out.push({
+      id: "task-plan-unfulfilled",
+      severity: "medium",
+      title: "Workers' file plans repeatedly diverged from the files they wrote",
+      evidence: [`task_plan_unfulfilled events: ${planUnfulfilled}.`],
+      recommendation:
+        "Tighten `task-file-plan-verifier`: after the worker emits its plan, gate the worker so it cannot complete until either every planned path was written OR an explicit `<plan-amendment>` block justifies the delta. This converts silent mismatches into a fast-fail loop instead of accumulating noise.",
+      planRef: null,
+    });
+  }
+
+  // ── Rule 6 — Convention auto-fix did heavy rewrites ────────────────────
+  const conv = input.preflightLedger.conventionAutofix;
+  if (conv.totalFixedFiles >= 5) {
+    out.push({
+      id: "convention-baked-into-scaffold",
+      severity: "low",
+      title:
+        "Workers wrote files using non-canonical paths; convention auto-fix had to rewrite them",
+      evidence: [
+        `conventionAutofix: invocations=${conv.invocations}, files rewritten=${conv.totalFixedFiles}, unfixable=${conv.totalUnfixable}.`,
+        `Sample notes: ${conv.notes.slice(0, 3).join(" | ")}`,
+      ],
+      recommendation:
+        "Promote the canonical paths the auto-fixer keeps writing back (e.g. `frontend/src/contexts/`, `backend/src/middleware/`) into `ROLE_PROMPTS` 'Project-specific conventions' as HARD RULES with explicit anti-patterns. Each canonical path that triggered ≥2 rewrites this session should become an example in the prompt.",
+      planRef: "§4 (Worker prompt 'Project-specific conventions')",
+    });
+  }
+
+  // ── Rule 7 — Missing-import auto-installs ──────────────────────────────
+  const importGap = input.preflightLedger.importGapInstalls;
+  if (importGap.totalPackages >= 2) {
+    const pkgList = importGap.scopes
+      .flatMap((s) => s.packages.map((p) => `${s.scope}:${p}`))
+      .slice(0, 6);
+    out.push({
+      id: "missing-deps-auto-install",
+      severity: "low",
+      title:
+        "Workers imported packages without declaring them in package.json",
+      evidence: [
+        `Auto-installed ${importGap.totalPackages} package(s) across ${importGap.scopes.length} scope(s): ${pkgList.join(", ")}.`,
+      ],
+      recommendation:
+        "Either (a) add the well-known feature packages (the optional scaffold's `extraDeps`) so the dep is present from day one, or (b) inject a HARD RULE in worker prompts: 'before importing a package, ensure it appears in `package.json`; emit a separate `package.json` patch in the same response if missing'.",
+      planRef: "§4.1 (Conditional scaffold extraDeps) + §4.10 (manifest)",
+    });
+  }
+
+  // ── Rule 8 — ORM-derived contract completeness gap ─────────────────────
+  const completenessGap =
+    completeness.preflight?.missingScopedEndpoints.length ??
+    completeness.postGenerate?.missingScopedEndpoints.length ??
+    0;
+  if (completenessGap >= 2) {
+    const samples =
+      completeness.preflight?.missingScopedEndpoints.slice(0, 3) ??
+      completeness.postGenerate?.missingScopedEndpoints.slice(0, 3) ??
+      [];
+    out.push({
+      id: "contract-orm-scoped-gap",
+      severity: "medium",
+      title:
+        "Generated contract missed scoped-list endpoints derivable from ORM relationships",
+      evidence: [
+        `${completenessGap} scoped-list endpoint(s) inferred from ORM hasMany relationships were absent in API_CONTRACTS.json.`,
+        `Examples: ${samples.map((m) => `${m.expectedPath} (${m.parent}→${m.child})`).join("; ")}.`,
+      ],
+      recommendation:
+        "Move the ORM-relationship inference UPSTREAM into `generate_api_contracts` (currently it's only caught post-hoc by the completeness audit). Feed the agent the parsed Sequelize model relationships as input; require it to emit scoped endpoints when a hasMany is present AND the PRD describes a parent-detail page.",
+      planRef: null,
+    });
+  }
+
+  // ── Rule 9 — Backend modules exported but never registered ─────────────
+  const unregistered = route.preflight?.unregisteredModules ?? [];
+  const dangling = route.preflight?.unresolvedRegistrations ?? [];
+  if (unregistered.length + dangling.length >= 1) {
+    out.push({
+      id: "backend-route-registration-gap",
+      severity: "medium",
+      title:
+        "Backend route registrars existed but weren't wired into the app router",
+      evidence: [
+        `Unregistered modules: ${unregistered.length} (${unregistered.slice(0, 3).join(", ") || "—"}).`,
+        `Dangling registration imports: ${dangling.length} (${dangling.slice(0, 3).join(", ") || "—"}).`,
+      ],
+      recommendation:
+        "Add to `ROLE_PROMPTS.backend` 'Project-specific conventions': **after** creating any `register<Domain>Routes()`, you MUST import + call it inside `apiRouter` (or the canonical aggregator) in the SAME response. Provide the exact aggregator file path in the Project Convention Card.",
+      planRef: "§4.4 (Background jobs / route registration)",
+    });
+  }
+
+  // ── Rule 10 — Cost-heavy repair stage relative to generation ───────────
+  const codegenStage = stageMap.get("worker_codegen");
+  const totalRepairCost =
+    (stageMap.get("integration_verify_fix")?.costUsd ?? 0) +
+    (stageMap.get("phase_verify_fix")?.costUsd ?? 0) +
+    (stageMap.get("worker_codefix")?.costUsd ?? 0);
+  const codegenCost = codegenStage?.costUsd ?? 0;
+  // Either a high absolute spend OR repair > 0.5x of codegen.
+  if (totalRepairCost >= 1.0 && totalRepairCost >= codegenCost * 0.5) {
+    out.push({
+      id: "repair-spend-imbalance",
+      severity: "low",
+      title:
+        "Repair / verify stages cost as much (or more) than first-pass codegen",
+      evidence: [
+        `worker_codegen cost=$${codegenCost.toFixed(4)}.`,
+        `integration_verify_fix=$${(stageMap.get("integration_verify_fix")?.costUsd ?? 0).toFixed(4)}, phase_verify_fix=$${(stageMap.get("phase_verify_fix")?.costUsd ?? 0).toFixed(4)}, worker_codefix=$${(stageMap.get("worker_codefix")?.costUsd ?? 0).toFixed(4)}.`,
+        `Repair total / codegen ratio = ${(codegenCost > 0 ? totalRepairCost / codegenCost : Infinity).toFixed(2)}.`,
+      ],
+      recommendation:
+        "Push fixes upstream: the cheapest dollar is the one not spent on repair. Strengthen preflight (route audit, contract completeness, dep audit) so issues fail fast at low cost; route the most common repair patterns (4-quadrant contract, missing routers) into deterministic codemods rather than LLM iteration.",
+      planRef: "§3 (L4 Static Audit) + §7.1 + §7.2",
+    });
+  }
+
+  // ── Rule 11 — Runtime verify failure with no actionable signal ─────────
+  if (runtimeFailed) {
+    out.push({
+      id: "runtime-verify-failure",
+      severity: "medium",
+      title: "Runtime verify reported blocking errors",
+      evidence: [
+        `Runtime errors (truncated): ${input.runtimeVerifyErrors!.split("\n").slice(0, 3).join(" | ")}.`,
+      ],
+      recommendation:
+        "Add structured runtime probes: dedicated health endpoint (`/api/health`), env presence check, DB connect check, queue connect check, LLM client smoke. The runtime verify gate should categorise failures (env / db / queue / external API) instead of dumping a raw error blob, and feed the category into the next repair worker as context.",
+      planRef: "§4.4 (Background jobs) + §4.5 (LLM client) + §4.6 (Auth state)",
+    });
+  }
+
+  // ── Rule 12 — E2E verify failure (only when telemetry exists) ──────────
+  if (e2eFailed) {
+    out.push({
+      id: "e2e-verify-failure",
+      severity: "medium",
+      title: "E2E verify still has failing scenarios",
+      evidence: [
+        `E2E error blob (truncated): ${input.e2eVerifyErrors!.split("\n").slice(0, 3).join(" | ")}.`,
+      ],
+      recommendation:
+        "Pair e2e-triage output with the integration_verify_fix decision tree: deterministic failures should auto-dispatch a `worker_codefix` task scoped to the failing spec's surface area; flaky failures should be retried in isolation; infra-only failures should NOT count against the gate (already halved in scoring — keep that).",
+      planRef: null,
+    });
+  }
+
+  return out;
+}
+
 function buildImprovementSuggestions(input: {
   integrationErrors?: string;
   runtimeVerifyErrors?: string;
@@ -1430,9 +1901,11 @@ function formatMarkdownReport(input: {
   taskResults: AuditTaskSummary[];
   fileRegistry: GeneratedFile[];
   repairSummary: RepairEventSummary;
+  runtimeReadiness: RuntimeReadinessSummary;
   finalAudit?: FeatureChecklistAuditResult | null;
   fatalError?: string;
   suggestions: string[];
+  codegenRetrofits: CodegenRetrofitSuggestion[];
   integrationErrors?: string;
   runtimeVerifyErrors?: string;
   e2eVerifyErrors?: string;
@@ -1461,12 +1934,26 @@ function formatMarkdownReport(input: {
   const softUncoveredIds = input.finalAudit?.uncovered.filter((e) => /^IC-\d+$/i.test(e.id)).map((e) => e.id) ?? [];
   const uncoveredIds = hardUncoveredIds;
 
+  // Runtime Readiness header signal (CODEGEN_HARDENING_PLAN.md §6.2):
+  // surfaces the runtime-integration-audit verdict at the very top so
+  // operators don't have to scroll. Three states:
+  //   • not present  → audit didn't run (preflight aborted)
+  //   • clean        → 0 findings
+  //   • findings     → "N findings (X error, Y warn)"
+  const readiness = input.runtimeReadiness;
+  const readinessHeader = !readiness.present
+    ? "not run (preflight skipped)"
+    : readiness.clean
+      ? "✅ CLEAN (0 findings)"
+      : `${readiness.findingsTotal} finding(s) — ${readiness.errorCount} error, ${readiness.warnCount} warn`;
+
   const lines: string[] = [
     "# Coding Session Report",
     "",
     `- Session ID: \`${input.sessionId}\``,
     `- Status: **${input.status.toUpperCase()}**`,
     `- Score: **${input.score.score}/100 (${input.score.grade})**`,
+    `- Runtime readiness: ${readinessHeader}`,
     `- Started at: ${input.startedAt}`,
     `- Ended at: ${input.endedAt}`,
     `- Generator git: \`${input.generatorGitSha ?? "(unknown)"}\``,
@@ -1481,6 +1968,55 @@ function formatMarkdownReport(input: {
     input.terminalSummary || "(no terminal summary captured)",
     "",
   ];
+
+  // ── Runtime Readiness section (CODEGEN_HARDENING_PLAN.md §6.2) ──────────
+  // Detailed breakdown of `runtime-integration-audit.json`. Renders even in
+  // the CLEAN case so operators get an explicit "audit ran, found nothing"
+  // signal — a missing section means the audit never ran.
+  if (readiness.present) {
+    lines.push("## Runtime Readiness");
+    lines.push(
+      "Static §4.2/§4.3/§4.4/§4.5/§4.7 audit of generated source. Findings here mean known runtime pitfalls slipped past the verify-fix worker. Full report: `.ralph/runtime-integration-audit.json`.",
+    );
+    lines.push("");
+    if (readiness.clean) {
+      lines.push("✅ **No findings.** All 8 rules either passed or were correctly skipped (see Disabled rules below).");
+    } else {
+      lines.push(
+        `**${readiness.findingsTotal} finding(s)** — ${readiness.errorCount} error, ${readiness.warnCount} warn.`,
+      );
+      lines.push("");
+      lines.push("| Rule | Severity | Locations |");
+      lines.push("| --- | --- | --- |");
+      const grouped = new Map<
+        string,
+        { sev: string; locs: string[] }
+      >();
+      for (const f of readiness.topFindings) {
+        const g = grouped.get(f.ruleId) ?? { sev: f.severity, locs: [] };
+        g.locs.push(`${f.file}:${f.line}`);
+        grouped.set(f.ruleId, g);
+      }
+      for (const [ruleId, g] of grouped) {
+        const totalForRule = readiness.byRule[ruleId] ?? g.locs.length;
+        const more =
+          totalForRule > g.locs.length
+            ? ` (+${totalForRule - g.locs.length} more)`
+            : "";
+        lines.push(
+          `| \`${ruleId}\` | ${g.sev.toUpperCase()} | ${g.locs.join(", ")}${more} |`,
+        );
+      }
+    }
+    if (readiness.disabledRules.length > 0) {
+      lines.push("");
+      lines.push("**Disabled rules:**");
+      for (const d of readiness.disabledRules) {
+        lines.push(`- \`${d.ruleId}\` — ${d.reason}`);
+      }
+    }
+    lines.push("");
+  }
 
   // Only render Fatal Error if it carries distinct information from the summary.
   if (
@@ -1637,21 +2173,47 @@ function formatMarkdownReport(input: {
     lines.push("");
   }
 
+  // FAIL_CONTINUED policy (CODEGEN_HARDENING_PLAN.md §7.3): a gate that
+  // failed but did NOT block the next gate in the pipeline is labelled
+  // "FAIL (continued)". This makes it visible that the failure was treated
+  // as soft — downstream gates still produced evidence — versus a
+  // hard "FAIL" that aborted the pipeline.
+  //
+  // Concretely:
+  //   • integration_verify failed AND e2e_verify executed
+  //         → "FAIL (continued)"  ← what session 52851b86 should have shown
+  //   • integration_verify failed AND e2e_verify did not execute
+  //         → "FAIL"               ← genuine pipeline abort
+  //   • integration_verify failed AND e2e_verify failed too
+  //         → integration is "FAIL (continued)" (it didn't block e2e),
+  //           e2e is "FAIL".
+  const e2eRanForFailContinuedCheck =
+    input.gatesExecuted?.e2eVerify === true;
+  const integrationFailContinued =
+    input.gatesExecuted?.integrationVerify === true &&
+    !!input.integrationErrors?.trim() &&
+    e2eRanForFailContinuedCheck;
+  const runtimeFailContinued =
+    input.gatesExecuted?.runtimeVerify === true &&
+    !!input.runtimeVerifyErrors?.trim() &&
+    e2eRanForFailContinuedCheck;
+
   const gateState = (
     executed: boolean | undefined,
     errors: string | undefined,
-  ): "PASS" | "FAIL" | "SKIPPED" => {
-    if (errors?.trim()) return "FAIL";
+    failContinued = false,
+  ): "PASS" | "FAIL" | "FAIL (continued)" | "SKIPPED" => {
+    if (errors?.trim()) return failContinued ? "FAIL (continued)" : "FAIL";
     if (!executed) return "SKIPPED";
     return "PASS";
   };
 
   lines.push("## Quality Gates");
   lines.push(
-    `- Integration verify: ${gateState(input.gatesExecuted?.integrationVerify, input.integrationErrors)}`,
+    `- Integration verify: ${gateState(input.gatesExecuted?.integrationVerify, input.integrationErrors, integrationFailContinued)}`,
   );
   lines.push(
-    `- Runtime verify: ${gateState(input.gatesExecuted?.runtimeVerify, input.runtimeVerifyErrors)}`,
+    `- Runtime verify: ${gateState(input.gatesExecuted?.runtimeVerify, input.runtimeVerifyErrors, runtimeFailContinued)}`,
   );
   lines.push(
     `- E2E verify: ${gateState(input.gatesExecuted?.e2eVerify, input.e2eVerifyErrors)}`,
@@ -1811,6 +2373,125 @@ function formatMarkdownReport(input: {
   }
   lines.push("");
 
+  // ── Pipeline Anomalies (CODEGEN_HARDENING_PLAN.md §7.4) ────────────────
+  // Stagnation, fallback prompts, contract pruning and contract-scope-rule
+  // violations are SIGNALS ABOUT THE PIPELINE — not about model quality.
+  // Surfacing them separately stops the model-scoring system from
+  // misattributing "session bombed" to "deepseek-v4-pro is bad" when the
+  // root cause was actually pipeline-level (contract over-spec, gate
+  // short-circuit, etc.).
+  const repairByEventForAnomalies = input.repairSummary.byEvent ?? {};
+  const stagnationWarningCount =
+    repairByEventForAnomalies.stagnation_warning ?? 0;
+  const stagnationFallbackInjectedCount =
+    repairByEventForAnomalies.stagnation_fallback_injected ?? 0;
+  const stagnationFallbackPassedCount =
+    repairByEventForAnomalies.stagnation_fallback_passed ?? 0;
+  const stagnationFallbackExhaustedCount =
+    repairByEventForAnomalies.stagnation_fallback_exhausted ?? 0;
+  const contractScopeViolationCount =
+    repairByEventForAnomalies.contract_scope_rule_violation ?? 0;
+  const contractUsageCoverageCount =
+    repairByEventForAnomalies.contract_usage_coverage_audit ?? 0;
+  const contractUsageCoverageFailCount =
+    repairByEventForAnomalies.contract_usage_coverage_fail ?? 0;
+  const truncationCount = repairByEventForAnomalies.doc_truncated ?? 0;
+  // Runtime integration audit (CODEGEN_HARDENING_PLAN.md §4.2 / §4.3 / §4.4 /
+  // §4.5 / §4.7). Static grep audit emitted as `runtime_integration_audit`
+  // (always, once per integration-gate iteration); when findings exist it
+  // additionally emits `runtime_integration_audit_failure` (severity=error)
+  // OR `runtime_integration_audit_warning` (warn-only).
+  const runtimeAuditRunCount =
+    repairByEventForAnomalies.runtime_integration_audit ?? 0;
+  const runtimeAuditFailureCount =
+    repairByEventForAnomalies.runtime_integration_audit_failure ?? 0;
+  const runtimeAuditWarningCount =
+    repairByEventForAnomalies.runtime_integration_audit_warning ?? 0;
+  const anomalyTotal =
+    stagnationWarningCount +
+    stagnationFallbackInjectedCount +
+    contractScopeViolationCount +
+    contractUsageCoverageFailCount +
+    runtimeAuditFailureCount +
+    runtimeAuditWarningCount +
+    truncationCount;
+  if (
+    anomalyTotal > 0 ||
+    contractUsageCoverageCount > 0 ||
+    runtimeAuditRunCount > 0
+  ) {
+    lines.push("## Pipeline Anomalies");
+    lines.push(
+      "Pipeline-level events that affect interpretation of model scores. These reflect the orchestrator behaviour, not the LLM's code quality.",
+    );
+    lines.push("");
+    lines.push("| Event | Count | What it means |");
+    lines.push("| --- | --- | --- |");
+    if (stagnationWarningCount > 0) {
+      lines.push(
+        `| stagnation_warning | ${stagnationWarningCount} | Worker re-read the same files without writing. Threshold-driven nudge. |`,
+      );
+    }
+    if (stagnationFallbackInjectedCount > 0) {
+      const recovered = stagnationFallbackPassedCount;
+      const exhausted = stagnationFallbackExhaustedCount;
+      const verdict =
+        recovered > 0
+          ? `recovered: ${recovered}`
+          : exhausted > 0
+            ? `aborted after fallback: ${exhausted}`
+            : "in-flight";
+      lines.push(
+        `| stagnation_fallback_injected | ${stagnationFallbackInjectedCount} | Pre-abort batch-classify retry was injected (CODEGEN_HARDENING_PLAN.md §7.4). ${verdict}. |`,
+      );
+    }
+    if (contractScopeViolationCount > 0) {
+      lines.push(
+        `| contract_scope_rule_violation | ${contractScopeViolationCount} | Generated contract entries lacked \`prdJustification\` — at risk of being pruned by usage-coverage audit. |`,
+      );
+    }
+    if (contractUsageCoverageCount > 0) {
+      lines.push(
+        `| contract_usage_coverage_audit | ${contractUsageCoverageCount} | 4-quadrant audit ran (post-contract / pre-integration). Decisions in \`.ralph/contract-usage-coverage.json\`. |`,
+      );
+    }
+    if (contractUsageCoverageFailCount > 0) {
+      lines.push(
+        `| contract_usage_coverage_fail | ${contractUsageCoverageFailCount} | Surplus contract entries detected with \`policy=fail\` — operator review required. |`,
+      );
+    }
+    if (truncationCount > 0) {
+      lines.push(
+        `| doc_truncated | ${truncationCount} | Context budget exhausted; relevance picker dropped sections. Symptoms include "lost" PRD detail. |`,
+      );
+    }
+    if (runtimeAuditRunCount > 0) {
+      lines.push(
+        `| runtime_integration_audit | ${runtimeAuditRunCount} | Static §4.2/§4.3/§4.4/§4.5/§4.7 grep audit ran. Findings persisted to \`.ralph/runtime-integration-audit.json\`. |`,
+      );
+    }
+    if (runtimeAuditFailureCount > 0) {
+      lines.push(
+        `| runtime_integration_audit_failure | ${runtimeAuditFailureCount} | Audit found ERROR-severity violations (useSyncExternalStore not cached, useBlocker w/o data router, external-id used as DB PK, SSE not branched on \`inproc:\`, direct vendor LLM SDK import). The verify-fix worker received a deterministic repair directive for each. |`,
+      );
+    }
+    if (runtimeAuditWarningCount > 0) {
+      lines.push(
+        `| runtime_integration_audit_warning | ${runtimeAuditWarningCount} | Audit found WARN-severity issues (missing \`clearActiveRunsForUser\`, worker not started in server.ts, aggregation throws on empty result). Worker repair directives surfaced. |`,
+      );
+    }
+    lines.push("");
+    if (
+      stagnationWarningCount > 0 &&
+      stagnationFallbackInjectedCount === 0
+    ) {
+      lines.push(
+        "> Worker stagnated but the fallback retry was not triggered — verify `MAX_INTEGRATION_VERIFY_FIX_ITERATIONS` / abort threshold; or check whether the abort happened mid-iteration.",
+        "",
+      );
+    }
+  }
+
   lines.push("## Repair / Self-Heal Telemetry");
   lines.push(`- Total repair events: ${input.repairSummary.totalEvents}`);
   const stageEntries = Object.entries(input.repairSummary.byStage).sort(
@@ -1827,6 +2508,51 @@ function formatMarkdownReport(input: {
   }
   lines.push("");
 
+  // ── Codegen Retrofit Suggestions (inferred from this run) ──────────────
+  lines.push("## Codegen Retrofit Suggestions (inferred from this run)");
+  if (input.codegenRetrofits.length === 0) {
+    lines.push(
+      "- This run produced no signals that map to a known codegen retrofit. The pipeline behaved as designed.",
+      "",
+    );
+  } else {
+    lines.push(
+      "Concrete codegen-pipeline changes derived from the signals above. Cross-references point at `CODEGEN_HARDENING_PLAN.md` sections so each item is actionable.",
+      "",
+    );
+    const severityRank = { high: 0, medium: 1, low: 2 } as const;
+    const sorted = [...input.codegenRetrofits].sort(
+      (a, b) => severityRank[a.severity] - severityRank[b.severity],
+    );
+    const sevBadge = (s: CodegenRetrofitSuggestion["severity"]): string => {
+      if (s === "high") return "🔴 HIGH";
+      if (s === "medium") return "🟡 MED";
+      return "🟢 LOW";
+    };
+    lines.push(
+      "| # | Severity | Issue | Plan ref |",
+      "| --- | --- | --- | --- |",
+    );
+    sorted.forEach((s, i) => {
+      lines.push(
+        `| ${i + 1} | ${sevBadge(s.severity)} | ${s.title.replace(/\|/g, "\\|")} | ${(s.planRef ?? "_(no rule yet — open ticket)_").replace(/\|/g, "\\|")} |`,
+      );
+    });
+    lines.push("");
+    sorted.forEach((s, i) => {
+      lines.push(
+        `### ${i + 1}. ${sevBadge(s.severity)} — ${s.title}`,
+        "",
+        `- **id**: \`${s.id}\``,
+        `- **plan ref**: ${s.planRef ?? "_(no rule yet — open ticket)_"}`,
+        "- **evidence**:",
+        ...s.evidence.map((e) => `    - ${e}`),
+        `- **recommendation**: ${s.recommendation}`,
+        "",
+      );
+    });
+  }
+
   return lines.join("\n");
 }
 
@@ -1841,6 +2567,7 @@ export async function writeCodingSessionReport(
     input.startedAt,
     input.endedAt,
   );
+  const runtimeReadiness = await readRuntimeReadinessSummary(input.outputDir);
   const stageUsage = aggregateStageUsage({
     usage,
     repairSummary,
@@ -1880,13 +2607,29 @@ export async function writeCodingSessionReport(
     finalAudit: input.finalAudit,
     gatesExecuted: input.gatesExecuted,
   });
+  const codegenRetrofits = buildCodegenRetrofitSuggestions({
+    integrationErrors: input.integrationErrors,
+    runtimeVerifyErrors: input.runtimeVerifyErrors,
+    e2eVerifyErrors: input.e2eVerifyErrors,
+    finalAudit: input.finalAudit,
+    repairSummary,
+    modelUsage,
+    stageUsage,
+    preflightLedger,
+    taskResults: input.taskResults,
+    gatesExecuted: input.gatesExecuted,
+  });
   const generatorGitSha = await resolveGeneratorGitSha();
 
+  // CODEGEN_HARDENING_PLAN.md §7.3 — JSON twin of the markdown gateState:
+  // a gate is "fail_continued" when it failed but the next gate still ran.
+  const jsonE2eRan = input.gatesExecuted?.e2eVerify === true;
   const renderGateState = (
     executed: boolean | undefined,
     errors: string | undefined,
-  ): "pass" | "fail" | "skipped" => {
-    if (errors?.trim()) return "fail";
+    failContinued = false,
+  ): "pass" | "fail" | "fail_continued" | "skipped" => {
+    if (errors?.trim()) return failContinued ? "fail_continued" : "fail";
     if (!executed) return "skipped";
     return "pass";
   };
@@ -1911,10 +2654,16 @@ export async function writeCodingSessionReport(
       integrationVerify: renderGateState(
         input.gatesExecuted?.integrationVerify,
         input.integrationErrors,
+        input.gatesExecuted?.integrationVerify === true &&
+          !!input.integrationErrors?.trim() &&
+          jsonE2eRan,
       ),
       runtimeVerify: renderGateState(
         input.gatesExecuted?.runtimeVerify,
         input.runtimeVerifyErrors,
+        input.gatesExecuted?.runtimeVerify === true &&
+          !!input.runtimeVerifyErrors?.trim() &&
+          jsonE2eRan,
       ),
       e2eVerify: renderGateState(
         input.gatesExecuted?.e2eVerify,
@@ -1933,10 +2682,12 @@ export async function writeCodingSessionReport(
     modelPerformance,
     stageUsage,
     repairSummary,
+    runtimeReadiness,
     preflightLedger,
     defectCategories,
     finalAudit: input.finalAudit ?? null,
     suggestions,
+    codegenRetrofits,
   };
 
   const markdown = formatMarkdownReport({
@@ -1952,9 +2703,11 @@ export async function writeCodingSessionReport(
     taskResults: input.taskResults,
     fileRegistry: input.fileRegistry,
     repairSummary,
+    runtimeReadiness,
     finalAudit: input.finalAudit,
     fatalError: input.fatalError,
     suggestions,
+    codegenRetrofits,
     integrationErrors: input.integrationErrors,
     runtimeVerifyErrors: input.runtimeVerifyErrors,
     e2eVerifyErrors: input.e2eVerifyErrors,
@@ -2013,5 +2766,11 @@ export async function writeCodingSessionReport(
     primaryModelGrade: modelPerformance[0]?.grade ?? "N/A",
     archiveJsonFile,
     archiveMdFile,
+    runtimeReadinessFindings: runtimeReadiness.present
+      ? runtimeReadiness.findingsTotal
+      : -1,
+    runtimeReadinessErrors: runtimeReadiness.errorCount,
+    runtimeReadinessWarnings: runtimeReadiness.warnCount,
+    runtimeReadinessHasError: runtimeReadiness.hasError,
   });
 }
