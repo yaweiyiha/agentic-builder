@@ -240,8 +240,12 @@ export default function MarkdownRenderer({
   if (!content) return null;
   const components =
     variant === "prd" ? createMarkdownComponents("prd") : defaultComponents;
+  const proseClass =
+    variant === "prd"
+      ? "prose prose-slate max-w-none prose-headings:font-semibold prose-headings:text-[#1f2328] prose-p:text-[#1f2328] prose-li:text-[#1f2328]"
+      : "prose prose-sm prose-zinc max-w-none";
   return (
-    <div className={`markdown-body ${className}`}>
+    <div className={`${proseClass} ${className}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>

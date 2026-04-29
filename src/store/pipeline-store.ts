@@ -31,7 +31,7 @@ function scheduleSync(getState: () => PipelineState) {
           isRunning:     s.isRunning,
           fastFromPrd:   s.fastFromPrd,
           codeOutputDir: s.codeOutputDir,
-          stepsJson:     s.steps,
+          // steps are not persisted — they come from the live SSE stream only
         },
       }),
     }).catch((err) => console.error("[pipeline-store] sync error:", err));
@@ -713,9 +713,8 @@ export const usePipelineStore = create<PipelineState>()(
             isRunning:     false,
             fastFromPrd:   ps.fastFromPrd   ?? true,
             codeOutputDir: ps.codeOutputDir ?? "generated-code",
-            steps:         ps.stepsJson
-              ? ({ ...EMPTY_STEPS, ...(ps.stepsJson as Record<PipelineStepId, StepResult | null>) })
-              : { ...EMPTY_STEPS },
+            // steps are never restored from DB — always start fresh on page load
+            steps:         { ...EMPTY_STEPS },
           });
         } catch (err) {
           console.error("[pipeline-store] loadFromServer error:", err);
@@ -805,7 +804,7 @@ function handleEvent(
     };
     const cost = get().totalCostUsd + (stepData.costUsd ?? 0);
     set({ steps, totalCostUsd: cost });
-    scheduleSync(get);
+    console.log(`[SSE step_complete][${stepId}] full content:`, stepData.content);
 
     // When the intent step completes, extract AI-generated project_name and
     // update the stage store so the sidebar immediately reflects the name.

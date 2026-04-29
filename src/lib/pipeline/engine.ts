@@ -213,10 +213,9 @@ export class PipelineEngine {
     const pmAgent = new PMAgent(tier);
 
     let staticPrd = await this.readStaticPrd();
-    if (staticPrd === null && fast) {
-      const outputDocs = await this.readExistingDocsFromOutput(outputRoot);
-      staticPrd = outputDocs.prd;
-    }
+    // NOTE: in fast mode we do NOT reuse generated-code/PRD.md as a static PRD
+    // because it belongs to a previous unrelated run. Only .blueprint/PRD.md
+    // (an explicitly imported PRD) is treated as a static override.
     if (staticPrd !== null) {
       run = this.applyStaticPrdStep(run, staticPrd);
     } else {
