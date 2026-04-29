@@ -821,3 +821,49 @@ Your job is to:
    ```
 4. 期望：所有 hard 项 ✅；§7.6 的五项数字目标（contract count ≤12 / int-fix ≤5 / runtime+E2E 不 SKIPPED / score ≥75 / cost ≤\$2.50）全部命中。
 5. 任意 ❌ → 回到对应 Phase 复看（错误类别在 plan 文档里有锚点，比如 `useSyncExternalStore-cached` 失败 → §4.2 / Phase 4 + Phase 5）。
+
+---
+
+## 附录 D · 并行运行两个项目（双 dev server）
+
+> 单个 dev server 不能同时跑两个 codegen session（共享 in-process queue + LLM rate-limit）。如果要并行两个独立项目，起两个完全隔离的 dev server 实例。
+
+### 一次性配置
+
+```bash
+# 1. 在 Postgres 里建第二套库（generated 项目跑起来时不撞 schema）
+psql -U postgres -c "CREATE DATABASE tasks_dev_b OWNER tasks_user;"
+
+# 2. 复制并行环境模板
+cp .env.parallel.example .env.parallel
+# 默认就是 PORT=3001 / generated-code-b / tasks_dev_b，按需改
+```
+
+### 启动
+
+| 终端 | 命令 | URL |
+|---|---|---|
+| Project A（用 `.env.local`） | `pnpm dev` | http://localhost:3000 |
+| Project B（用 `.env.parallel`） | `./scripts/start-parallel-dev.sh` | http://localhost:3001 |
+
+每个 dev server 写自己 `CODE_OUTPUT_DIR` 指向的目录、用自己的 `BLUEPRINT_GENERATED_DATABASE_URL`。LLM 密钥 / `MEMORY_INJECT` 等只读配置仍共享 `.env.local`。
+
+### 跑起 generated 应用时（两个项目都跑完之后）
+
+`generated-code/.env`、`backend/.env`、`frontend/vite.config.ts` 里的 PORT 都不会自动错开。如果你想同时跑两个 generated app：
+
+```bash
+# Project A 用默认端口
+cd generated-code && pnpm dev
+
+# Project B 改端口（开两个终端）
+cd generated-code-b/backend && PORT=4001 pnpm dev
+cd generated-code-b/frontend && pnpm dev -- --port 5174
+# 同时把 frontend/.env 里 VITE_API_BASE_URL（如有）改成 http://localhost:4001
+```
+
+### 注意事项
+
+- **不要**两个 dev server 共用同一个 `CODE_OUTPUT_DIR` —— coding session 启动时会做强清理（保留 `.git/.ralph/` + 8 个 markdown，删除其它）；两个 session 同时清同一目录会互删。
+- **不要**把 `.env.parallel` 提交（已加到 `.gitignore`）。
+- **MEMORY 写入**有锁（`.memory/.lock-target`），两个 session 同时触发 memory 注入会自动串行等待，安全但会有额外延迟。
