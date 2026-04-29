@@ -136,20 +136,22 @@ export default function AppNav() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen w-[240px] bg-[#f8fafc] border-r border-[#e2e8f0] flex flex-col justify-between z-50 pr-px py-4"
+      className="fixed left-0 top-0 h-screen w-60 bg-white border-r border-slate-200 flex flex-col justify-between z-50 pr-px py-4"
       style={dragStyle}
     >
       {/* Logo & Brand */}
       <div className="px-6 pb-8" style={noDragStyle}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-black rounded-[2px] flex items-center justify-center shrink-0">
-            <LogoMark />
+          <div className="w-8 h-8 bg-slate-900 rounded-xs flex items-center justify-center shrink-0">
+            <svg width="10.5" height="11.667" viewBox="0 0 12 14" fill="white" aria-hidden>
+              <path d="M6 0L12 3.5V10.5L6 14L0 10.5V3.5L6 0Z" />
+            </svg>
           </div>
           <div className="flex flex-col">
-            <span className="text-[18px] font-bold tracking-[-0.45px] text-[#0f172a] leading-7">
+            <span className="text-[18px] font-bold tracking-[-0.45px] text-slate-900 leading-7">
               Agentic Builder
             </span>
-            <span className="text-[10px] uppercase text-[#64748b] leading-[15px] font-space-grotesk">
+            <span className="text-xs uppercase text-slate-600 leading-3.75 font-space-grotesk">
               V1.0.4
             </span>
           </div>
@@ -158,80 +160,70 @@ export default function AppNav() {
 
       {/* Navigation */}
       <nav className="flex-1 min-h-0 px-4 overflow-y-auto" style={noDragStyle}>
-        <details open className="group/details">
-          <summary
-            style={noDragStyle}
-            className="flex items-center justify-between px-2 py-2.5 rounded-sm hover:bg-[#f1f5f9] active:bg-[#e2e8f0] transition-colors cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="text-[#64748b] shrink-0"><FolderIcon /></span>
-              <span className="text-[13px] font-semibold tracking-[-0.3px] text-[#475569]">Projects</span>
-            </div>
-            <span className="text-[#94a3b8] transition-transform duration-200 group-open/details:rotate-0 -rotate-90">
-              <ChevronDownIcon />
-            </span>
-          </summary>
-
-          <div className="flex flex-col gap-0.5 ml-1 mt-1">
-              {loading && (
-                <span className="px-3 py-2 text-[12px] text-[#94a3b8]">Loading…</span>
-              )}
-              {!loading && projects.length === 0 && (
-                <span className="px-3 py-2 text-[12px] text-[#94a3b8]">No projects yet</span>
-              )}
-              {projects.map((project) => {
-                const href = `/project/${project.id}`;
-                const isActive = pathname?.startsWith(href);
-                const displayName =
-                  isActive && stageProjectId === project.id && stageProjectName
-                    ? stageProjectName
-                    : project.name;
-                return (
-                  <div
-                    key={project.id}
-                    className={`border-l-2 pl-0.5 transition-all ${
-                      isActive ? "border-[#4f46e5]" : "border-transparent"
-                    }`}
-                  >
-                    <div className={`rounded-sm transition-colors ${isActive ? "bg-[rgba(79,70,229,0.08)]" : ""}`}>
-                      <Link
-                        href={href}
-                        className="flex items-center gap-3 px-3 py-2 rounded-sm transition-all hover:bg-[rgba(226,232,240,0.6)]"
-                      >
-                        <span className={`transition-colors shrink-0 ${isActive ? "text-[#4f46e5]" : "text-[#94a3b8]"}`}>
-                          <FileIcon />
-                        </span>
-                        <span className={`text-[13px] tracking-[-0.3px] truncate transition-colors ${isActive ? "text-[#4f46e5] font-semibold" : "text-[#475569] font-medium"}`}>
-                          {displayName}
-                        </span>
-                      </Link>
-                    </div>
+        <div className="mb-4">
+          <h3 className="text-[12px] uppercase font-semibold text-slate-600 px-2 mb-3 tracking-wide">Projects</h3>
+          
+          {loading && (
+            <span className="px-3 py-2 text-[12px] text-slate-600 block">Loading…</span>
+          )}
+          {!loading && projects.length === 0 && (
+            <span className="px-3 py-2 text-[12px] text-slate-600 block">No projects yet</span>
+          )}
+          
+          <div className="flex flex-col gap-2">
+            {projects.map((project) => {
+              const href = `/project/${project.id}`;
+              const isActive = pathname?.startsWith(href);
+              const displayName =
+                isActive && stageProjectId === project.id && stageProjectName
+                  ? stageProjectName
+                  : project.name;
+              return (
+                <Link
+                  key={project.id}
+                  href={href}
+                  className={`group flex flex-col gap-1.5 p-3 rounded-lg border transition-all ${
+                    isActive
+                      ? "bg-slate-100 border-slate-300 shadow-md"
+                      : "bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`transition-colors shrink-0 ${isActive ? "text-slate-700" : "text-slate-500 group-hover:text-slate-600"}`}>
+                      <FileIcon />
+                    </span>
+                    <span className={`text-[13px] tracking-[-0.3px] truncate transition-colors font-medium ${isActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"}`}>
+                      {displayName}
+                    </span>
                   </div>
-                );
-              })}
+                  <div className="h-px bg-linear-to-r from-slate-300 to-transparent"></div>
+                  <span className="text-[11px] text-slate-600">Click to edit</span>
+                </Link>
+              );
+            })}
           </div>
-        </details>
+        </div>
       </nav>
 
       {/* Bottom: New Project + User Profile */}
       <div className="flex flex-col gap-6 px-4" style={noDragStyle}>
         <button
           onClick={handleNewProject}
-          className="flex items-center justify-center gap-2 w-full py-2 bg-[#4f46e5] text-white text-[14px] font-bold rounded-[2px] hover:bg-[#4338ca] transition-colors"
+          className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-950 text-white text-[14px] font-bold rounded-lg hover:bg-slate-800 hover:shadow-md hover:scale-105 transition-all active:bg-slate-950 active:scale-95"
         >
           <PlusIcon />
           <span>New Project</span>
         </button>
 
-        <div className="border-t border-[#e2e8f0] flex items-center gap-3 pt-[17px] pb-2 px-3">
-          <div className="w-8 h-8 rounded-[12px] bg-[#e2e8f0] shrink-0 overflow-hidden">
-            <div className="w-full h-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-white text-[13px] font-bold">
+        <div className="border-t border-slate-200 flex items-center gap-3 pt-4.25 pb-2 px-3">
+          <div className="w-8 h-8 rounded-xl bg-slate-200 shrink-0 overflow-hidden">
+            <div className="w-full h-full bg-linear-to-br from-slate-400 to-slate-500 flex items-center justify-center text-white text-sm font-bold">
               A
             </div>
           </div>
           <div className="flex flex-col overflow-hidden">
-            <span className="text-[12px] font-bold text-[#0f172a] leading-4 truncate">Alex Chen</span>
-            <span className="text-[10px] text-[#64748b] leading-[15px] truncate">Senior Architect</span>
+            <span className="text-[12px] font-bold text-slate-900 leading-4 truncate">Alex Chen</span>
+            <span className="text-xs text-slate-600 leading-3.75 truncate">Senior Architect</span>
           </div>
         </div>
       </div>

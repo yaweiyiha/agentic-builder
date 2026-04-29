@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Paperclip, ImageIcon, Zap, ArrowRight, Info } from "lucide-react";
+import { Paperclip, Zap, ArrowRight, Info } from "lucide-react";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore, STAGE_ORDER, STAGE_META } from "@/store/stage-store";
 import ImportPrdDialog from "@/components/ImportPrdDialog";
-import DesignReferencesDialog from "@/components/DesignReferencesDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,7 +47,6 @@ export default function InitialSubStage() {
   const [mode, setMode] = useState<"Quick" | "Advanced">("Quick");
   const [prompt, setPrompt] = useState("");
   const [prdDialogOpen, setPrdDialogOpen] = useState(false);
-  const [designDialogOpen, setDesignDialogOpen] = useState(false);
 
   const setPendingBrief = usePipelineStore((s) => s.setPendingBrief);
   const setFastFromPrd  = usePipelineStore((s) => s.setFastFromPrd);
@@ -68,7 +66,7 @@ export default function InitialSubStage() {
 
   return (
     <>
-      <div className="flex flex-col items-center flex-1 px-8 pt-8 pb-12 gap-10 overflow-auto">
+      <div className="flex flex-col justify-center items-center flex-1 h-full px-8 pt-8 pb-12 gap-10 overflow-auto">
         <div className="flex flex-col items-center w-full max-w-230 gap-8">
 
           {/* Heading */}
@@ -127,15 +125,6 @@ export default function InitialSubStage() {
                       <Paperclip className="size-3" />
                       PRD
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDesignDialogOpen(true)}
-                      className="text-xs text-[#64748b] h-7 px-2.5"
-                    >
-                      <ImageIcon className="size-3" />
-                      Design
-                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-[#94a3b8]">
                       <Zap className="size-3.5" />
                     </Button>
@@ -146,7 +135,7 @@ export default function InitialSubStage() {
                     size="sm"
                     className="text-[13px] font-bold px-5 h-9"
                   >
-                    {isRunning ? "Starting…" : "Initialize Pipeline"}
+                    {isRunning ? "Starting…" : "Start Generation"}
                     <ArrowRight className="size-3" />
                   </Button>
                 </div>
@@ -172,10 +161,6 @@ export default function InitialSubStage() {
       <ImportPrdDialog
         isOpen={prdDialogOpen}
         onClose={() => setPrdDialogOpen(false)}
-      />
-      <DesignReferencesDialog
-        isOpen={designDialogOpen}
-        onClose={() => setDesignDialogOpen(false)}
       />
     </>
   );

@@ -2,8 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Sparkles, Bot, User, Loader2, Send, ArrowRight,
-  RefreshCw, MoreVertical, Paperclip, Check, CheckCheck
+  Sparkles,
+  Bot,
+  User,
+  Loader2,
+  Send,
+  ArrowRight,
+  Plus,
+  Grid2X2,
+  ArrowUp,
+  RefreshCw,
+  MoreVertical,
+  Paperclip,
+  Check,
+  CheckCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePipelineStore } from "@/store/pipeline-store";
@@ -40,32 +52,43 @@ function parseIntentForm(content: string): IntentFormData | undefined {
 }
 
 type UserConvMsg = { role: "user"; text: string; id: string };
-type AiConvMsg = { role: "ai"; content: string; intentForm?: IntentFormData; id: string };
+type AiConvMsg = {
+  role: "ai";
+  content: string;
+  intentForm?: IntentFormData;
+  id: string;
+};
 type ConvMsg = UserConvMsg | AiConvMsg;
 
 // ── Icon aliases (lucide-react) ────────────────────────────────────────────
-const AgentIcon  = () => <Sparkles size={14} className="text-white" />;
-const RobotIcon  = () => <Bot size={16} className="text-white" />;
-const UserIcon   = () => <User size={12} className="text-white" />;
-const SpinnerIcon = ({ size = 14 }: { size?: number }) => <Loader2 size={size} className="animate-spin" />;
-const SendIcon   = () => <Send size={12} className="text-white" />;
+const AgentIcon = () => <Sparkles size={14} className="text-white" />;
+const RobotIcon = () => <Bot size={16} className="text-white" />;
+const UserIcon = () => <User size={12} className="text-white" />;
+const SpinnerIcon = ({ size = 14 }: { size?: number }) => (
+  <Loader2 size={size} className="animate-spin" />
+);
+const SendIcon = () => <Send size={12} className="text-white" />;
 const ArrowRightIcon = () => <ArrowRight size={12} className="text-white" />;
 const RefreshIcon = () => <RefreshCw size={16} />;
-const MoreIcon   = () => <MoreVertical size={16} />;
+const MoreIcon = () => <MoreVertical size={16} />;
 const AttachIcon = () => <Paperclip size={16} />;
 const CheckSmallIcon = () => <Check size={10} className="text-white" />;
-const CheckGatheredIcon = () => <CheckCheck size={11} className="text-emerald-500 shrink-0 mt-0.5" />;
+const CheckGatheredIcon = () => (
+  <CheckCheck size={11} className="text-emerald-500 shrink-0 mt-0.5" />
+);
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function UserMessage({ text }: { text: string }) {
   return (
-    <div className="flex gap-3 items-start justify-end">
-      <div className="bg-linear-to-br from-[#07c160] to-[#05a042] text-white rounded-3xl rounded-tr-none px-5 py-3.5 shadow-md hover:shadow-lg transition-shadow">
-        <p className="text-[15px] leading-7 whitespace-pre-wrap font-medium">{text}</p>
+    <div className="flex gap-3 items-end justify-end">
+      <div className="bg-slate-900 text-white rounded-xl rounded-br-none px-5 py-3 max-w-sm lg:max-w-md shadow-md hover:shadow-lg transition-shadow">
+        <p className="text-sm leading-relaxed whitespace-pre-wrap font-medium">
+          {text}
+        </p>
       </div>
-      <div className="shrink-0 w-7 h-7 rounded-lg bg-linear-to-br from-[#07c160] to-[#05a042] flex items-center justify-center flex-none">
-        <UserIcon />
+      <div className="shrink-0 w-8 h-8 rounded-full bg-linear-to-br from-slate-700 to-slate-800 flex items-center justify-center flex-none shadow-sm">
+        <User size={16} className="text-white" />
       </div>
     </div>
   );
@@ -76,9 +99,9 @@ function UserMessage({ text }: { text: string }) {
 function TypingDots() {
   return (
     <span className="inline-flex items-end gap-0.75 h-4 ml-1">
-      <span className="w-1 h-1 rounded-full bg-[#712ae2] animate-bounce [animation-delay:0ms]" />
-      <span className="w-1 h-1 rounded-full bg-[#712ae2] animate-bounce [animation-delay:150ms]" />
-      <span className="w-1 h-1 rounded-full bg-[#712ae2] animate-bounce [animation-delay:300ms]" />
+      <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce [animation-delay:0ms]" />
+      <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce [animation-delay:150ms]" />
+      <span className="w-1 h-1 rounded-full bg-slate-400 animate-bounce [animation-delay:300ms]" />
     </span>
   );
 }
@@ -91,9 +114,18 @@ function IntentFormCard({
   isRechecking,
 }: {
   form: IntentFormData;
-  onSubmit: (questions: IntentQuestion[], answers: Record<string, string | string[]>) => void;
+  onSubmit: (
+    questions: IntentQuestion[],
+    answers: Record<string, string | string[]>,
+  ) => void;
   /** Called when current question is text-type so parent can route chat-bar input here */
-  onTextQuestion?: (ctx: { questions: IntentQuestion[]; answers: Record<string, string | string[]>; id: string } | null) => void;
+  onTextQuestion?: (
+    ctx: {
+      questions: IntentQuestion[];
+      answers: Record<string, string | string[]>;
+      id: string;
+    } | null,
+  ) => void;
   disabled?: boolean;
   isRechecking?: boolean;
 }) {
@@ -107,22 +139,28 @@ function IntentFormCard({
   function toggleCheckbox(id: string, value: string) {
     setAnswers((a) => {
       const prev = (a[id] as string[]) ?? [];
-      const next = prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value];
+      const next = prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value];
       return { ...a, [id]: next };
     });
   }
 
   const currentQuestion = form.questions[currentIdx];
-  const isLastQuestion  = currentIdx === form.questions.length - 1;
+  const isLastQuestion = currentIdx === form.questions.length - 1;
 
   // Notify parent whenever the current question changes (or on mount)
   useEffect(() => {
     if (currentQuestion?.type === "text") {
-      onTextQuestion?.({ questions: form.questions, answers, id: currentQuestion.id });
+      onTextQuestion?.({
+        questions: form.questions,
+        answers,
+        id: currentQuestion.id,
+      });
     } else {
       onTextQuestion?.(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIdx, currentQuestion?.id]);
 
   function isCurrentAnswered() {
@@ -130,39 +168,66 @@ function IntentFormCard({
     // text-type answers are collected via the bottom chat bar, always allow advancing
     if (currentQuestion.type === "text") return true;
     const a = answers[currentQuestion.id];
-    if (currentQuestion.type === "checkbox") return Array.isArray(a) && a.length > 0;
+    if (currentQuestion.type === "checkbox")
+      return Array.isArray(a) && a.length > 0;
     return typeof a === "string" && a.length > 0;
   }
 
   return (
     <div className="space-y-5">
       {/* All-clear banner */}
-      {(form.all_clear || form.questions.length === 0) && form.gathered && form.gathered.length > 0 && (
-        <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" className="shrink-0 mt-0.5">
-            <circle cx="10" cy="10" r="9" stroke="#10b981" strokeWidth="1.5" />
-            <path d="M6 10l3 3 5-5" stroke="#10b981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <div>
-            <p className="text-[12px] font-bold text-emerald-700 uppercase tracking-wide">All information gathered</p>
-            <p className="text-[13px] text-emerald-800 mt-0.5">You can now start generation.</p>
+      {(form.all_clear || form.questions.length === 0) &&
+        form.gathered &&
+        form.gathered.length > 0 && (
+          <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 20 20"
+              fill="none"
+              className="shrink-0 mt-0.5"
+            >
+              <circle
+                cx="10"
+                cy="10"
+                r="9"
+                stroke="#10b981"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M6 10l3 3 5-5"
+                stroke="#10b981"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div>
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">
+                All information gathered
+              </p>
+              <p className="text-sm text-emerald-700 mt-1">
+                You can now start generation.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Summary */}
-      <div className="prose prose-sm max-w-none text-[#1f2937] leading-relaxed">
+      <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
         <MarkdownRenderer content={form.summary} />
       </div>
 
       {/* Already gathered */}
       {form.gathered && form.gathered.length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 space-y-1.5">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Already gathered</p>
+        <div className="border border-slate-200 rounded-lg px-4 py-3 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide">
+            Already gathered
+          </p>
           {form.gathered.map((item, i) => (
             <div key={i} className="flex items-start gap-2">
               <CheckGatheredIcon />
-              <span className="text-[13px] text-emerald-800 leading-5">{item}</span>
+              <span className="text-sm text-foreground leading-5">{item}</span>
             </div>
           ))}
         </div>
@@ -170,57 +235,88 @@ function IntentFormCard({
 
       {/* One question at a time */}
       {currentQuestion && (
-        <div className="space-y-5 border-t border-[#f1f5f9] pt-4">
+        <div className="space-y-4 border-t border-slate-200 pt-4">
           {/* Progress indicator */}
           {form.questions.length > 1 && (
-            <p className="text-[11px] text-[#94a3b8]">
+            <p className="text-xs text-muted-foreground">
               Question {currentIdx + 1} of {form.questions.length}
             </p>
           )}
 
-          <div className="space-y-2.5">
-            <p className="text-[14px] font-semibold text-[#111827] leading-6">{currentQuestion.label}</p>
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-foreground leading-6">
+              {currentQuestion.label}
+            </p>
 
-            {currentQuestion.type === "radio" && currentQuestion.options?.map((opt) => {
-              const selected = answers[currentQuestion.id] === opt;
-              return (
-                <label key={opt} onClick={() => !disabled && toggleRadio(currentQuestion.id, opt)} className="flex items-center gap-2.5 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${selected ? "border-[#712ae2] bg-[#712ae2]" : "border-[#cbd5e1] group-hover:border-[#a78bfa]"}`}>
-                    {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+            {currentQuestion.type === "radio" &&
+              currentQuestion.options?.map((opt) => {
+                const selected = answers[currentQuestion.id] === opt;
+                return (
+                  <div
+                    key={opt}
+                    className="flex items-center gap-2.5 cursor-pointer group select-none"
+                    onClick={() => { if (!disabled) toggleRadio(currentQuestion.id, opt); }}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        selected
+                          ? "border-slate-800 bg-slate-800"
+                          : "border-slate-300 group-hover:border-slate-500"
+                      }`}
+                    >
+                      {selected && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      )}
+                    </div>
+                    <span className={`text-sm font-medium ${ selected ? "text-slate-900" : "text-slate-600 group-hover:text-slate-800" }`}>
+                      {opt}
+                    </span>
                   </div>
-                  <span className="text-[13px] text-[#4b5563] select-none font-medium">{opt}</span>
-                </label>
-              );
-            })}
+                );
+              })}
 
-            {currentQuestion.type === "checkbox" && currentQuestion.options?.map((opt) => {
-              const checked = ((answers[currentQuestion.id] as string[]) ?? []).includes(opt);
-              return (
-                <label key={opt} onClick={() => !disabled && toggleCheckbox(currentQuestion.id, opt)} className="flex items-center gap-2.5 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${checked ? "border-[#712ae2] bg-[#712ae2]" : "border-[#cbd5e1] group-hover:border-[#a78bfa]"}`}>
-                    {checked && <CheckSmallIcon />}
+            {currentQuestion.type === "checkbox" &&
+              currentQuestion.options?.map((opt) => {
+                const checked = (
+                  (answers[currentQuestion.id] as string[]) ?? []
+                ).includes(opt);
+                return (
+                  <div
+                    key={opt}
+                    className="flex items-center gap-2.5 cursor-pointer group select-none"
+                    onClick={() => { if (!disabled) toggleCheckbox(currentQuestion.id, opt); }}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                        checked
+                          ? "border-slate-800 bg-slate-800"
+                          : "border-slate-300 group-hover:border-slate-500"
+                      }`}
+                    >
+                      {checked && <CheckSmallIcon />}
+                    </div>
+                    <span className={`text-sm font-medium ${ checked ? "text-slate-900" : "text-slate-600 group-hover:text-slate-800" }`}>
+                      {opt}
+                    </span>
                   </div>
-                  <span className="text-[13px] text-[#4b5563] select-none font-medium">{opt}</span>
-                </label>
-              );
-            })}
+                );
+              })}
 
             {currentQuestion.type === "text" && (
-              <p className="text-[12px] text-[#6b7280] italic font-medium">
+              <p className="text-xs text-muted-foreground italic font-medium">
                 ↓ Type your answer in the chat bar below and press Send
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pt-1">
             {/* Next question button */}
             {!isLastQuestion && (
               <Button
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 onClick={() => setCurrentIdx((i) => i + 1)}
                 disabled={!isCurrentAnswered() || disabled}
-                className="gap-1.5"
               >
                 Next <ArrowRight size={13} />
               </Button>
@@ -231,12 +327,16 @@ function IntentFormCard({
                 size="sm"
                 onClick={() => onSubmit(form.questions, answers)}
                 disabled={!isCurrentAnswered() || disabled || isRechecking}
-                className="gap-1.5 bg-[#712ae2] hover:bg-[#5f22c7]"
               >
                 {isRechecking ? (
-                  <><Loader2 size={13} className="animate-spin" />Checking…</>
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Checking…
+                  </>
                 ) : (
-                  <>Confirm &amp; Check <ArrowRight size={13} /></>
+                  <>
+                    Confirm &amp; Check <ArrowRight size={13} />
+                  </>
                 )}
               </Button>
             )}
@@ -255,29 +355,42 @@ function AIMessage({
   isLastMessage,
 }: {
   intentForm?: IntentFormData;
-  onFormSubmit?: (questions: IntentQuestion[], answers: Record<string, string | string[]>) => void;
-  onTextQuestion?: (ctx: { questions: IntentQuestion[]; answers: Record<string, string | string[]>; id: string } | null) => void;
+  onFormSubmit?: (
+    questions: IntentQuestion[],
+    answers: Record<string, string | string[]>,
+  ) => void;
+  onTextQuestion?: (
+    ctx: {
+      questions: IntentQuestion[];
+      answers: Record<string, string | string[]>;
+      id: string;
+    } | null,
+  ) => void;
   isRechecking?: boolean;
   isLastMessage?: boolean;
 }) {
   return (
     <div className="flex gap-3 items-start">
-      <div className={`shrink-0 w-8 h-8 rounded-lg bg-linear-to-br from-[#712ae2] to-[#5f22c7] flex items-center justify-center flex-none text-white ${isRechecking && isLastMessage ? "animate-pulse" : ""}`}>
-        <RobotIcon />
+      <div
+        className={`shrink-0 w-8 h-8 rounded-full bg-linear-to-br from-slate-600 to-slate-700 flex items-center justify-center flex-none text-white shadow-md ${isRechecking && isLastMessage ? "animate-pulse" : ""}`}
+      >
+        <Bot size={16} />
       </div>
-      <div className="flex-1 min-w-0 bg-linear-to-br from-[#f1f5ff] to-[#ede9f6] border border-[#e9e5f5] rounded-3xl rounded-tl-none p-5 shadow-md hover:shadow-lg transition-shadow">
+      <div className="flex-1 min-w-0">
         {intentForm ? (
-          <IntentFormCard
-            form={intentForm}
-            onSubmit={onFormSubmit ?? (() => {})}
-            onTextQuestion={isLastMessage ? onTextQuestion : undefined}
-            disabled={isRechecking}
-            isRechecking={isRechecking && isLastMessage}
-          />
+          <div className="bg-white rounded-xl rounded-tl-none border border-slate-100 p-6 shadow-sm hover:shadow-md transition-shadow">
+            <IntentFormCard
+              form={intentForm}
+              onSubmit={onFormSubmit ?? (() => {})}
+              onTextQuestion={isLastMessage ? onTextQuestion : undefined}
+              disabled={isRechecking}
+              isRechecking={isRechecking && isLastMessage}
+            />
+          </div>
         ) : (
-          <div className="flex items-center gap-2.5 text-[#6b7280] text-sm font-medium">
-            <SpinnerIcon size={14} />
-            <span>Processing…</span>
+          <div className="flex items-center gap-2.5 text-slate-600 text-sm font-medium">
+            <Loader2 size={14} className="animate-spin" />
+            <span>Analyzing your brief…</span>
           </div>
         )}
       </div>
@@ -295,7 +408,11 @@ type Classification = {
   reasoning: string;
 };
 
-const TIER_LABEL: Record<string, string> = { S: "Simple", M: "Standard", L: "Enterprise" };
+const TIER_LABEL: Record<string, string> = {
+  S: "Simple",
+  M: "Standard",
+  L: "Enterprise",
+};
 const TIER_COLOR: Record<string, string> = {
   S: "bg-emerald-50 text-emerald-700 border-emerald-200",
   M: "bg-amber-50 text-amber-700 border-amber-200",
@@ -307,44 +424,59 @@ function ClassificationCard({ cls }: { cls: Classification }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-semibold ${tierStyle}`}>
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${tierStyle}`}
+        >
           Tier {cls.tier} · {TIER_LABEL[cls.tier] ?? cls.tier}
         </span>
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-[#e2e8f0] bg-white text-[12px] text-[#475569]">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-input bg-background text-xs text-muted-foreground">
           {cls.type}
         </span>
         {cls.needsBackend && (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-blue-200 bg-blue-50 text-[12px] text-blue-700">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-blue-200 bg-blue-50 text-xs text-blue-700">
             Backend
           </span>
         )}
         {cls.needsDatabase && (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-violet-200 bg-violet-50 text-[12px] text-violet-700">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-violet-200 bg-violet-50 text-xs text-violet-700">
             Database
           </span>
         )}
       </div>
-      <p className="text-[14px] text-[#374151] leading-6">{cls.reasoning}</p>
+      <p className="text-sm text-foreground leading-6">{cls.reasoning}</p>
     </div>
   );
 }
 
-function MetaBadge({ step }: { step: { model?: string; costUsd?: number; durationMs?: number } }) {
+function MetaBadge({
+  step,
+}: {
+  step: { model?: string; costUsd?: number; durationMs?: number };
+}) {
   return (
     <div className="flex items-center gap-4 pl-12 mt-1">
       {step.model && (
-        <span className="text-[11px] text-[#94a3b8]">
-          Model: <span className="font-medium text-[#64748b]">{step.model}</span>
+        <span className="text-xs text-muted-foreground">
+          Model:{" "}
+          <span className="font-medium text-muted-foreground">
+            {step.model}
+          </span>
         </span>
       )}
       {step.costUsd != null && (
-        <span className="text-[11px] text-[#94a3b8]">
-          Cost: <span className="font-medium text-[#64748b]">${step.costUsd.toFixed(4)}</span>
+        <span className="text-xs text-muted-foreground">
+          Cost:{" "}
+          <span className="font-medium text-muted-foreground">
+            ${step.costUsd.toFixed(4)}
+          </span>
         </span>
       )}
       {step.durationMs != null && (
-        <span className="text-[11px] text-[#94a3b8]">
-          Time: <span className="font-medium text-[#64748b]">{(step.durationMs / 1000).toFixed(1)}s</span>
+        <span className="text-xs text-muted-foreground">
+          Time:{" "}
+          <span className="font-medium text-muted-foreground">
+            {(step.durationMs / 1000).toFixed(1)}s
+          </span>
         </span>
       )}
     </div>
@@ -354,34 +486,40 @@ function MetaBadge({ step }: { step: { model?: string; costUsd?: number; duratio
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function IntentSubStage() {
-  const isRunning             = usePipelineStore((s) => s.isRunning);
-  const startPipeline         = usePipelineStore((s) => s.startPipeline);
-  const featureBrief          = usePipelineStore((s) => s.featureBrief);
-  const goToSubStage          = useStageStore((s) => s.goToSubStage);
-  const setProjectName        = useStageStore((s) => s.setProjectName);
-  const isStageHydrated       = useStageStore((s) => s.isStageHydrated);
-  const intentMessages        = useStageStore((s) => s.intentMessages);
-  const intentEnrichedBrief   = useStageStore((s) => s.intentEnrichedBrief);
+  const isRunning = usePipelineStore((s) => s.isRunning);
+  const startPipeline = usePipelineStore((s) => s.startPipeline);
+  const featureBrief = usePipelineStore((s) => s.featureBrief);
+  const goToSubStage = useStageStore((s) => s.goToSubStage);
+  const setProjectName = useStageStore((s) => s.setProjectName);
+  const isStageHydrated = useStageStore((s) => s.isStageHydrated);
+  const intentMessages = useStageStore((s) => s.intentMessages);
+  const intentEnrichedBrief = useStageStore((s) => s.intentEnrichedBrief);
   const setIntentConversation = useStageStore((s) => s.setIntentConversation);
 
-  const [inputValue, setInputValue]         = useState("");
-  const [messages, setMessages]             = useState<ConvMsg[]>([]);
-  const [isRechecking, setIsRechecking]     = useState(false);
-  const [streamingText, setStreamingText]   = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [messages, setMessages] = useState<ConvMsg[]>([]);
+  const [isRechecking, setIsRechecking] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const [intentAllClear, setIntentAllClear] = useState(false);
 
-  const qaHistoryRef           = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
-  const enrichedBriefRef        = useRef("");
-  const bottomRef               = useRef<HTMLDivElement>(null);
-  const inputRef                = useRef<HTMLInputElement>(null);
-  const autoStartedRef          = useRef(false); // prevent StrictMode double-fire
+  const qaHistoryRef = useRef<
+    { role: "user" | "assistant"; content: string }[]
+  >([]);
+  const enrichedBriefRef = useRef("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autoStartedRef = useRef(false); // prevent StrictMode double-fire
 
   // Auto-scroll to bottom whenever messages update or streaming text changes
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, streamingText, isRechecking]);
   // Set when the last AI message is waiting for a text-type answer via the chat bar
-  const pendingTextQuestionRef  = useRef<{ questions: IntentQuestion[]; answers: Record<string, string | string[]>; id: string } | null>(null);
+  const pendingTextQuestionRef = useRef<{
+    questions: IntentQuestion[];
+    answers: Record<string, string | string[]>;
+    id: string;
+  } | null>(null);
 
   // Intent stage runs BEFORE the full pipeline — only block on isRechecking here.
   // isRunning reflects the main pipeline which hasn't started yet.
@@ -399,16 +537,24 @@ export default function IntentSubStage() {
       enrichedBriefRef.current = intentEnrichedBrief || featureBrief.trim();
       setMessages(msgs);
       // Restore derived state from the last AI message
-      const lastAiMsg = [...msgs].reverse().find((m) => m.role === "ai") as AiConvMsg | undefined;
+      const lastAiMsg = [...msgs].reverse().find((m) => m.role === "ai") as
+        | AiConvMsg
+        | undefined;
       if (lastAiMsg?.intentForm) {
-        if (lastAiMsg.intentForm.all_clear || lastAiMsg.intentForm.questions.length === 0) {
+        if (
+          lastAiMsg.intentForm.all_clear ||
+          lastAiMsg.intentForm.questions.length === 0
+        ) {
           setIntentAllClear(true);
         }
         if (lastAiMsg.intentForm.project_name?.trim()) {
           setProjectName(lastAiMsg.intentForm.project_name.trim());
         }
       }
-      console.log("[intent] restored conversation from DB, messages:", msgs.length);
+      console.log(
+        "[intent] restored conversation from DB, messages:",
+        msgs.length,
+      );
       return;
     }
 
@@ -419,41 +565,62 @@ export default function IntentSubStage() {
     enrichedBriefRef.current = featureBrief.trim();
     qaHistoryRef.current = [];
     setMessages([
-      { role: "user", text: featureBrief.trim(), id: `user-auto-${Date.now()}` } satisfies UserConvMsg,
+      {
+        role: "user",
+        text: featureBrief.trim(),
+        id: `user-auto-${Date.now()}`,
+      } satisfies UserConvMsg,
     ]);
     setIsRechecking(true);
     callRecheckStream(featureBrief.trim(), [])
       .then((result) => {
         console.log("[intent] auto-start result:", result ? "ok" : "null");
         if (!result) {
-          setMessages((prev) => [...prev, {
-            role: "ai",
-            content: "Error analyzing brief.",
-            intentForm: { summary: "Error analyzing brief. Please try again.", questions: [] },
-            id: `ai-err-auto-${Date.now()}`,
-          } satisfies AiConvMsg]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "ai",
+              content: "Error analyzing brief.",
+              intentForm: {
+                summary: "Error analyzing brief. Please try again.",
+                questions: [],
+              },
+              id: `ai-err-auto-${Date.now()}`,
+            } satisfies AiConvMsg,
+          ]);
           return;
         }
-        if (result.project_name?.trim()) setProjectName(result.project_name.trim());
-        if (result.all_clear || result.questions.length === 0) setIntentAllClear(true);
-        setMessages((prev) => [...prev, {
-          role: "ai",
-          content: JSON.stringify(result),
-          intentForm: result,
-          id: `ai-auto-${Date.now()}`,
-        } satisfies AiConvMsg]);
+        if (result.project_name?.trim())
+          setProjectName(result.project_name.trim());
+        if (result.all_clear || result.questions.length === 0)
+          setIntentAllClear(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "ai",
+            content: JSON.stringify(result),
+            intentForm: result,
+            id: `ai-auto-${Date.now()}`,
+          } satisfies AiConvMsg,
+        ]);
       })
       .catch((err) => {
         console.error("[intent] auto-start error:", err);
-        setMessages((prev) => [...prev, {
-          role: "ai",
-          content: `Error: ${err instanceof Error ? err.message : "Unknown error"}.`,
-          intentForm: { summary: "Network error — please try again.", questions: [] },
-          id: `ai-err-auto-${Date.now()}`,
-        } satisfies AiConvMsg]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "ai",
+            content: `Error: ${err instanceof Error ? err.message : "Unknown error"}.`,
+            intentForm: {
+              summary: "Network error — please try again.",
+              questions: [],
+            },
+            id: `ai-err-auto-${Date.now()}`,
+          } satisfies AiConvMsg,
+        ]);
       })
       .finally(() => setIsRechecking(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStageHydrated]);
 
   // Sync conversation to store (→ DB) whenever messages or enrichedBrief change.
@@ -461,7 +628,7 @@ export default function IntentSubStage() {
     if (messages.length > 0) {
       setIntentConversation(messages as unknown[], enrichedBriefRef.current);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   // ── Shared SSE streaming helper ────────────────────────────────────────
@@ -472,14 +639,26 @@ export default function IntentSubStage() {
     brief: string,
     history: { role: "user" | "assistant"; content: string }[],
   ): Promise<IntentFormData | null> {
-    console.log("[intent] callRecheckStream called, brief length:", brief.length, "history:", history.length);
+    console.log(
+      "[intent] callRecheckStream called, brief length:",
+      brief.length,
+      "history:",
+      history.length,
+    );
     setStreamingText("");
     const resp = await fetch("/api/agents/intent-recheck", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ brief, conversationHistory: history }),
     });
-    console.log("[intent] fetch response status:", resp.status, "ok:", resp.ok, "body:", !!resp.body);
+    console.log(
+      "[intent] fetch response status:",
+      resp.status,
+      "ok:",
+      resp.ok,
+      "body:",
+      !!resp.body,
+    );
     if (!resp.ok || !resp.body) {
       console.error("[intent] fetch failed or no body");
       return null;
@@ -497,7 +676,14 @@ export default function IntentSubStage() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          console.log("[intent] stream done. frames processed:", frameCount, "stream events:", streamCount, "result:", result ? "✓" : "null");
+          console.log(
+            "[intent] stream done. frames processed:",
+            frameCount,
+            "stream events:",
+            streamCount,
+            "result:",
+            result ? "✓" : "null",
+          );
           break;
         }
         buf += decoder.decode(value, { stream: true });
@@ -507,9 +693,14 @@ export default function IntentSubStage() {
         for (const frame of frames) {
           if (!frame.trim()) continue;
           frameCount++;
-          const line = frame.startsWith("data: ") ? frame : frame.split("\n").find((l) => l.startsWith("data: "));
+          const line = frame.startsWith("data: ")
+            ? frame
+            : frame.split("\n").find((l) => l.startsWith("data: "));
           if (!line) {
-            console.warn("[intent] frame with no data: line →", JSON.stringify(frame.slice(0, 80)));
+            console.warn(
+              "[intent] frame with no data: line →",
+              JSON.stringify(frame.slice(0, 80)),
+            );
             continue;
           }
           try {
@@ -518,7 +709,12 @@ export default function IntentSubStage() {
               stepId?: string;
               data?: Record<string, unknown>;
             };
-            console.log("[intent] SSE event type:", event.type, "stepId:", event.stepId);
+            console.log(
+              "[intent] SSE event type:",
+              event.type,
+              "stepId:",
+              event.stepId,
+            );
             if (event.type === "step_stream") {
               const chunk = (event.data?.chunk as string) ?? "";
               if (chunk) {
@@ -527,20 +723,38 @@ export default function IntentSubStage() {
               }
             } else if (event.type === "step_complete") {
               const content = (event.data?.content as string) ?? "";
-              console.log("[intent] step_complete content length:", content.length, "preview:", content.slice(0, 120));
+              console.log(
+                "[intent] step_complete content length:",
+                content.length,
+                "preview:",
+                content.slice(0, 120),
+              );
               if (content) {
                 try {
                   result = JSON.parse(content) as IntentFormData;
-                  console.log("[intent] parsed IntentFormData — project_name:", result.project_name, "questions:", result.questions?.length);
+                  console.log(
+                    "[intent] parsed IntentFormData — project_name:",
+                    result.project_name,
+                    "questions:",
+                    result.questions?.length,
+                  );
                 } catch (e) {
-                  console.error("[intent] failed to parse step_complete content as JSON:", e, content.slice(0, 200));
+                  console.error(
+                    "[intent] failed to parse step_complete content as JSON:",
+                    e,
+                    content.slice(0, 200),
+                  );
                 }
               }
             } else if (event.type === "step_error") {
               console.error("[intent] step_error:", event.data?.error);
             }
           } catch (e) {
-            console.error("[intent] failed to parse SSE frame:", e, JSON.stringify(frame.slice(0, 120)));
+            console.error(
+              "[intent] failed to parse SSE frame:",
+              e,
+              JSON.stringify(frame.slice(0, 120)),
+            );
           }
         }
       }
@@ -548,7 +762,10 @@ export default function IntentSubStage() {
       reader.releaseLock();
       setStreamingText("");
     }
-    console.log("[intent] callRecheckStream returning:", result ? JSON.stringify(result).slice(0, 120) : "null");
+    console.log(
+      "[intent] callRecheckStream returning:",
+      result ? JSON.stringify(result).slice(0, 120) : "null",
+    );
     return result;
   }
 
@@ -571,39 +788,84 @@ export default function IntentSubStage() {
 
     setMessages((prev) => [
       ...prev,
-      { role: "user", text: userMsgText, id: `user-${Date.now()}` } satisfies UserConvMsg,
+      {
+        role: "user",
+        text: userMsgText,
+        id: `user-${Date.now()}`,
+      } satisfies UserConvMsg,
     ]);
 
     qaHistoryRef.current = [
       ...qaHistoryRef.current,
-      { role: "assistant", content: `Questions asked: ${questions.map((q) => q.label).join("; ")}` },
+      {
+        role: "assistant",
+        content: `Questions asked: ${questions.map((q) => q.label).join("; ")}`,
+      },
       { role: "user", content: userMsgText },
     ];
 
     setIsRechecking(true);
     try {
-      const result = await callRecheckStream(enrichedBriefRef.current, qaHistoryRef.current);
-      console.log("[handleFormSubmit] callRecheckStream result:", result ? "ok" : "null");
+      const result = await callRecheckStream(
+        enrichedBriefRef.current,
+        qaHistoryRef.current,
+      );
+      console.log(
+        "[handleFormSubmit] callRecheckStream result:",
+        result ? "ok" : "null",
+      );
 
       if (!result) {
-        console.warn("[handleFormSubmit] result is null — appending error AI message");
-        setMessages((prev) => [...prev, { role: "ai", content: "Error: could not parse response.", intentForm: { summary: "Error — please try again.", questions: [] }, id: `ai-err-${Date.now()}` } satisfies AiConvMsg]);
+        console.warn(
+          "[handleFormSubmit] result is null — appending error AI message",
+        );
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "ai",
+            content: "Error: could not parse response.",
+            intentForm: { summary: "Error — please try again.", questions: [] },
+            id: `ai-err-${Date.now()}`,
+          } satisfies AiConvMsg,
+        ]);
         return;
       }
 
-      if (result.project_name?.trim()) setProjectName(result.project_name.trim());
-      if (result.all_clear || result.questions.length === 0) setIntentAllClear(true);
+      if (result.project_name?.trim())
+        setProjectName(result.project_name.trim());
+      if (result.all_clear || result.questions.length === 0)
+        setIntentAllClear(true);
 
-      console.log("[handleFormSubmit] appending AI message, questions:", result.questions?.length);
-      setMessages((prev) => [...prev, {
-        role: "ai",
-        content: JSON.stringify(result),
-        intentForm: { ...result, questions: result.all_clear ? [] : result.questions },
-        id: `ai-${Date.now()}`,
-      } satisfies AiConvMsg]);
+      console.log(
+        "[handleFormSubmit] appending AI message, questions:",
+        result.questions?.length,
+      );
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: JSON.stringify(result),
+          intentForm: {
+            ...result,
+            questions: result.all_clear ? [] : result.questions,
+          },
+          id: `ai-${Date.now()}`,
+        } satisfies AiConvMsg,
+      ]);
     } catch (err) {
       console.error("[handleFormSubmit] caught error:", err);
-      setMessages((prev) => [...prev, { role: "ai", content: `Error: ${err instanceof Error ? err.message : "Network error"}.`, intentForm: { summary: `Network error — please try again.`, questions: [] }, id: `ai-err-${Date.now()}` } satisfies AiConvMsg]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: `Error: ${err instanceof Error ? err.message : "Network error"}.`,
+          intentForm: {
+            summary: `Network error — please try again.`,
+            questions: [],
+          },
+          id: `ai-err-${Date.now()}`,
+        } satisfies AiConvMsg,
+      ]);
     } finally {
       setIsRechecking(false);
     }
@@ -633,7 +895,11 @@ export default function IntentSubStage() {
 
     setMessages((prev) => [
       ...prev,
-      { role: "user", text: val, id: `user-${Date.now()}` } satisfies UserConvMsg,
+      {
+        role: "user",
+        text: val,
+        id: `user-${Date.now()}`,
+      } satisfies UserConvMsg,
     ]);
 
     // New brief — reset context
@@ -644,16 +910,26 @@ export default function IntentSubStage() {
     setIsRechecking(true);
     try {
       const result = await callRecheckStream(val, []);
-      console.log("[handleSend] callRecheckStream result:", result ? "ok" : "null");
+      console.log(
+        "[handleSend] callRecheckStream result:",
+        result ? "ok" : "null",
+      );
 
       if (!result) {
-        console.warn("[handleSend] result is null — appending error AI message");
+        console.warn(
+          "[handleSend] result is null — appending error AI message",
+        );
         setMessages((prev) => [
           ...prev,
           {
             role: "ai",
-            content: "Sorry, there was an error analyzing your brief. Please try again.",
-            intentForm: { summary: "Sorry, there was an error analyzing your brief. Please try again.", questions: [] },
+            content:
+              "Sorry, there was an error analyzing your brief. Please try again.",
+            intentForm: {
+              summary:
+                "Sorry, there was an error analyzing your brief. Please try again.",
+              questions: [],
+            },
             id: `ai-err-${Date.now()}`,
           } satisfies AiConvMsg,
         ]);
@@ -669,7 +945,10 @@ export default function IntentSubStage() {
         setIntentAllClear(true);
       }
 
-      console.log("[handleSend] appending AI message with intentForm, questions:", result.questions?.length);
+      console.log(
+        "[handleSend] appending AI message with intentForm, questions:",
+        result.questions?.length,
+      );
       setMessages((prev) => [
         ...prev,
         {
@@ -698,33 +977,59 @@ export default function IntentSubStage() {
   const isEmpty = messages.length === 0 && !isAgentActive;
 
   return (
-    <div className="flex flex-col w-full flex-1 min-h-0 bg-white border border-[#e2e8f0] rounded-lg p-5 shadow-sm overflow-hidden">
-
+    <div className="flex flex-col w-full flex-1 min-h-0 bg-linear-to-br from-slate-50 via-slate-50 to-slate-100 rounded-2xl overflow-hidden shadow-lg">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-[#f1f5f9] bg-white/80 backdrop-blur-sm">
+      <div className="shrink-0 flex items-center justify-between px-8 py-6 bg-white/60 backdrop-blur-md border-b border-white/40">
         <div>
-          <h2 className="text-[16px] font-semibold text-[#0b1c30] leading-6">Intent Refinement</h2>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className={`w-2 h-2 rounded-full ${isRechecking ? "bg-[#f59e0b] animate-pulse" : intentAllClear ? "bg-[#10b981]" : "bg-[#cbd5e1]"}`} />
-            <span className="text-[14px] text-[#45464d]">
-              {isRechecking ? "Agent active: analyzing intent…" : intentAllClear ? "Intent confirmed — ready to generate" : "Waiting for project brief"}
+          <h2 className="text-lg font-bold text-slate-900 leading-6">
+            Project Intent Refinement
+          </h2>
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className={`w-2.5 h-2.5 rounded-full transition-colors ${isRechecking ? "bg-amber-500 animate-pulse" : intentAllClear ? "bg-emerald-500" : "bg-slate-300"}`}
+            />
+            <span className="text-xs text-slate-600 font-medium">
+              {isRechecking
+                ? "Analyzing…"
+                : intentAllClear
+                  ? "Ready to generate"
+                  : "Describe your project"}
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" title="Refresh" className="text-[#64748b]"><RefreshCw size={16} /></Button>
-          <Button variant="ghost" size="icon" title="More" className="text-[#64748b]"><MoreVertical size={16} /></Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-slate-500 hover:text-slate-700 hover:bg-white/50"
+          >
+            <RefreshCw size={16} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-slate-500 hover:text-slate-700 hover:bg-white/50"
+          >
+            <MoreVertical size={16} />
+          </Button>
         </div>
       </div>
 
       {/* Chat History */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-8 py-8 space-y-6">
         {isEmpty && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-[#94a3b8]">
-            <div className="w-12 h-12 rounded-full bg-[#f8fafc] border border-[#e2e8f0] flex items-center justify-center">
-              <AgentIcon />
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-500">
+            <div className="w-16 h-16 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center shadow-sm">
+              <Sparkles size={24} className="text-slate-400" />
             </div>
-            <p className="text-[13px]">Describe your project idea to get started…</p>
+            <div className="text-center">
+              <p className="text-base font-medium text-slate-700">
+                Start your project journey
+              </p>
+              <p className="text-sm text-slate-500 mt-1">
+                Describe your project idea to get started…
+              </p>
+            </div>
           </div>
         )}
 
@@ -736,27 +1041,29 @@ export default function IntentSubStage() {
               key={msg.id}
               intentForm={(msg as AiConvMsg).intentForm}
               onFormSubmit={handleFormSubmit}
-              onTextQuestion={(ctx) => { pendingTextQuestionRef.current = ctx; }}
+              onTextQuestion={(ctx) => {
+                pendingTextQuestionRef.current = ctx;
+              }}
               isRechecking={isRechecking}
               isLastMessage={idx === messages.length - 1}
             />
-          )
+          ),
         )}
 
         {isRechecking && (
           <div className="flex gap-3 items-start">
-            <div className="shrink-0 w-8 h-8 rounded-lg bg-linear-to-br from-[#712ae2] to-[#5f22c7] flex items-center justify-center animate-pulse flex-none text-white">
-              <RobotIcon />
+            <div className="shrink-0 w-8 h-8 rounded-full bg-linear-to-br from-slate-600 to-slate-700 flex items-center justify-center animate-pulse flex-none text-white shadow-md">
+              <Bot size={16} />
             </div>
-            <div className="flex-1 min-w-0 bg-linear-to-br from-[#f1f5ff] to-[#ede9f6] border border-[#e9e5f5] rounded-3xl rounded-tl-none p-5 shadow-md">
+            <div className="flex-1 min-w-0 bg-white rounded-2xl rounded-tl-lg border border-slate-100 p-6 shadow-sm hover:shadow-md transition-shadow">
               {streamingText ? (
-                <div className="prose prose-sm max-w-none text-[#1f2937] leading-relaxed">
+                <div className="prose prose-sm max-w-none text-slate-900 leading-relaxed">
                   <MarkdownRenderer content={streamingText} />
                   <TypingDots />
                 </div>
               ) : (
-                <div className="flex items-center gap-2.5 text-[#6b7280] text-sm font-medium">
-                  <SpinnerIcon size={13} />
+                <div className="flex items-center gap-2.5 text-slate-600 text-sm">
+                  <Loader2 size={13} className="animate-spin" />
                   <span>Analyzing your brief</span>
                   <TypingDots />
                 </div>
@@ -769,39 +1076,51 @@ export default function IntentSubStage() {
       </div>
 
       {/* Input Area */}
-      <div className="shrink-0 border-t border-[#f1f5f9] bg-white px-6 py-5">
-        <div className="flex items-center gap-4 border border-[#e2e8f0] rounded-lg bg-[#f8fafc] px-2.5 py-2.5">
-          <Button variant="ghost" size="icon" className="text-[#94a3b8] hover:text-[#64748b] shrink-0">
-            <Paperclip size={16} />
-          </Button>
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isAgentActive ? "Agent is thinking…" : "Describe or refine your project idea…"}
-            className="flex-1 bg-transparent text-[16px] text-[#0b1c30] placeholder:text-[#6b7280] outline-none min-w-0 px-3 py-2"
-            disabled={isAgentActive}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
+      <div className="shrink-0 px-8 py-5 bg-white/40 backdrop-blur-sm border-t border-white/40">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 border-2 border-slate-200 rounded-full bg-white px-2 py-2 shadow-md hover:border-slate-500 focus-within:border-slate-500 transition-colors flex-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder={
+                isAgentActive
+                  ? "Analyzing…"
+                  : "Drop your script or tell me your story ideas…"
               }
-            }}
-          />
-          <Button
-            onClick={() => { console.log("[intent] Send clicked, inputValue:", inputValue.trim(), "isAgentActive:", isAgentActive); void handleSend(); }}
-            disabled={!inputValue.trim() || isAgentActive}
-            className="gap-2 bg-[#07c160] hover:bg-[#06a050] shrink-0"
-          >
-            Send <Send size={13} />
-          </Button>
+              className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none min-w-0 px-2"
+              disabled={isAgentActive}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSend();
+                }
+              }}
+            />
+
+            <div className="flex items-center gap-1">
+              <Button
+                onClick={() => {
+                  void handleSend();
+                }}
+                disabled={!inputValue.trim() || isAgentActive}
+                size="icon"
+                className="text-white bg-slate-700 hover:bg-slate-800 rounded-full h-7 w-7 shrink-0 shadow-md"
+                title="Send"
+              >
+                <ArrowUp size={14} />
+              </Button>
+            </div>
+          </div>
+
           <Button
             onClick={handleStartGeneration}
             disabled={isAgentActive}
-            className="gap-2 bg-[#4f46e5] hover:bg-[#4338ca] shrink-0"
+            className="text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
+            title="Next Step"
           >
-            Next Step <ArrowRight size={13} />
+            Next Step <ArrowRight size={16} />
           </Button>
         </div>
       </div>

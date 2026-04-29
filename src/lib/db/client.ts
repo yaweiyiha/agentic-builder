@@ -41,20 +41,27 @@ function getPool(): Pool {
         host:     socketHost ?? (u.hostname || "/tmp"),
         port:     u.port ? Number(u.port) : undefined,
         database: u.pathname.replace(/^\//, "") || "agentic_builder",
-        max: 10,
-        idleTimeoutMillis: 30_000,
       };
     } catch {
-      poolOpts = { connectionString: connStr, max: 10, idleTimeoutMillis: 30_000 };
+      poolOpts = { connectionString: connStr };
     }
 
     console.log("[db] Pool opts (host):", (poolOpts as Record<string, unknown>).host);
     globalForPg.__pgPool = new Pool({
       ...poolOpts,
-      // Fail fast if a connection cannot be acquired within 8 s.
-      connectionTimeoutMillis: 8_000,
+      // Allow up to 20 connections in the pool.
+      max: 20,
+      // Minimum idle connections kept alive.
+      min: 2,
+      // Fail fast if a connection cannot be acquired within 15 s.
+      connectionTimeoutMillis: 15_000,
       // Kill runaway queries after 30 s so the pool slot is freed.
       statement_timeout: 30_000,
+      // Reap idle connections after 60 s (rather than 30 s default).
+      idleTimeoutMillis: 60_000,
+      // Keep-alive to prevent NAT/firewall from silently dropping idle connections.
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
     });
     globalForPg.__pgPool.on("error", (err) => {
       console.error("[db] Unexpected pool error:", err);
