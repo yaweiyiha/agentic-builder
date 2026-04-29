@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2, CheckCircle2, AlertCircle, Clock, Code2, Eye } from "lucide-react";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore } from "@/store/stage-store";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,25 +80,26 @@ export default function EnvSetupSubStage() {
       <div className="flex flex-col gap-6 px-5 py-6 w-full">
 
         {/* ── Page Header ── */}
-        <div className="flex items-center justify-between pb-[17px] border-b border-[#e2e8f0]">
-          <h1 className="text-[30px] font-semibold text-[#0b1c30] tracking-[-0.3px] leading-[36px]">
+        <div className="flex items-center justify-between pb-4">
+          <h1 className="text-2xl font-semibold text-[#0b1c30] tracking-tight">
             Sprint Kick-off Summary
           </h1>
           <div className="flex items-center gap-3">
             <StatusBadge running={isThisRunning} status={step?.status} />
-            <button className="bg-white border border-[#e2e8f0] text-[#334155] text-[14px] font-medium px-[17px] py-[9px] rounded-[4px] hover:bg-[#f8fafc] transition-colors">
+            <Button variant="outline" size="sm">
               Export Report
-            </button>
+            </Button>
           </div>
         </div>
+        <Separator />
 
         {/* ── Project Stats ── */}
         <div className="bg-white border border-[#e2e8f0] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-[25px] flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="text-[24px] font-semibold text-[#0b1c30]">Project Stats</h2>
-            <span className="bg-[#eaddff] text-[#712ae2] text-[12px] font-bold tracking-[0.6px] px-2 py-[3.5px] rounded-[2px]">
+            <Badge variant="warning" className="rounded text-[11px] font-bold tracking-wide">
               Live Data
-            </span>
+            </Badge>
           </div>
           <div className="grid grid-cols-7 gap-4">
             {STATS.map((stat, i) => (
@@ -233,9 +239,9 @@ export default function EnvSetupSubStage() {
           <div className="bg-white border border-[#e2e8f0] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-[25px] flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <h2 className="text-[24px] font-semibold text-[#0b1c30]">Abilities</h2>
-              <span className="bg-[#ecfdf5] text-[#059669] text-[12px] font-bold tracking-[0.6px] px-2 py-[3.5px] rounded-[2px]">
+              <Badge variant="success" className="rounded text-[11px] font-bold tracking-wide">
                 1 Configured
-              </span>
+              </Badge>
             </div>
             <div className="bg-[#eff4ff] border border-[#f1f5f9] rounded-[4px] p-[17px] flex flex-col gap-4">
               {/* Integration header */}
@@ -268,7 +274,7 @@ export default function EnvSetupSubStage() {
                     onClick={() => setApiKeyVisible((v) => !v)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#94a3b8] hover:text-[#334155] transition-colors"
                   >
-                    <IconEye />
+                    <Eye className="size-4" />
                   </button>
                 </div>
               </div>
@@ -303,13 +309,13 @@ export default function EnvSetupSubStage() {
 
         {/* ── Footer CTA ── */}
         <div className="flex justify-end pb-8 pt-4">
-          <button
+          <Button
             onClick={() => step?.status === "completed" && goToSubStage("task-breakdown", "kickoff")}
-            className="relative bg-[#712ae2] text-white text-[14px] font-bold px-8 py-3 rounded-[4px] flex items-center gap-2 hover:bg-[#5f24c2] transition-colors shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)]"
+            className="bg-[#712ae2] hover:bg-[#5f24c2] font-bold px-8"
           >
-            <IconCode />
+            <Code2 className="size-4" />
             Proceed to coding
-          </button>
+          </Button>
         </div>
 
       </div>
@@ -321,24 +327,24 @@ export default function EnvSetupSubStage() {
 
 function StatusBadge({ running, status }: { running: boolean; status?: string }) {
   if (running) return (
-    <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#712ae2] bg-[rgba(113,42,226,0.06)] border border-[rgba(113,42,226,0.2)] px-3 py-1 rounded-full shrink-0">
-      <span className="w-2 h-2 rounded-full bg-[#712ae2] animate-pulse" /> Generating
-    </span>
+    <Badge variant="warning">
+      <Loader2 className="size-3 animate-spin" /> Generating
+    </Badge>
   );
   if (status === "completed") return (
-    <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#16a34a] bg-[#f0fdf4] border border-[#bbf7d0] px-3 py-1 rounded-full shrink-0">
-      ✓ Done
-    </span>
+    <Badge variant="success">
+      <CheckCircle2 className="size-3" /> Done
+    </Badge>
   );
   if (status === "failed") return (
-    <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#dc2626] bg-[#fef2f2] border border-[#fecaca] px-3 py-1 rounded-full shrink-0">
-      ! Failed
-    </span>
+    <Badge variant="destructive">
+      <AlertCircle className="size-3" /> Failed
+    </Badge>
   );
   return (
-    <span className="text-[12px] font-medium text-[#94a3b8] bg-[#f8fafc] border border-[#e2e8f0] px-3 py-1 rounded-full shrink-0">
-      Waiting
-    </span>
+    <Badge variant="muted">
+      <Clock className="size-3" /> Waiting
+    </Badge>
   );
 }
 

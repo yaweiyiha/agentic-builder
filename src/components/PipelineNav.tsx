@@ -44,12 +44,12 @@ export default function PipelineNav({ basePath = "/dashboard/pipeline" }: Pipeli
           >
             <div
               className={`flex flex-col flex-1 justify-start min-h-0 pb-[18px] ${
-                isActive ? "border-b-2 border-[#9333ea]" : ""
+                isActive ? "border-b-2 border-[#000000]" : ""
               }`}
             >
               <span
                 className={`text-[14px] font-semibold tracking-[0.7px] uppercase leading-5 ${
-                  isActive ? "text-[#9333ea]" : "text-[#94a3b8]"
+                  isActive ? "text-[#000000]" : "text-[#94a3b8]"
                 }`}
               >
                 {stage}

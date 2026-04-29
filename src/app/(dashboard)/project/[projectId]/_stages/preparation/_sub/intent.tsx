@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  Sparkles, Bot, User, Loader2, Send, ArrowRight,
+  RefreshCw, MoreVertical, Paperclip, Check, CheckCheck
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore } from "@/store/stage-store";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
@@ -38,102 +43,18 @@ type UserConvMsg = { role: "user"; text: string; id: string };
 type AiConvMsg = { role: "ai"; content: string; intentForm?: IntentFormData; id: string };
 type ConvMsg = UserConvMsg | AiConvMsg;
 
-// ── Icons ──────────────────────────────────────────────────────────────────
-
-function AgentIcon() {
-  return (
-    <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
-      <path d="M7 0L8.5 4.5H13.5L9.5 7.5L11 12L7 9L3 12L4.5 7.5L0.5 4.5H5.5L7 0Z" fill="white" />
-    </svg>
-  );
-}
-
-function RobotIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M9 11h6M9 15h6" />
-      <circle cx="9" cy="7" r="1" fill="white" />
-      <circle cx="15" cy="7" r="1" fill="white" />
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-      <circle cx="5" cy="3" r="2.5" fill="white" />
-      <path d="M0 9.5C0 7.567 2.239 6 5 6s5 1.567 5 3.5" stroke="white" strokeWidth="1.2" fill="none" />
-    </svg>
-  );
-}
-
-function SpinnerIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg className="animate-spin" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-    </svg>
-  );
-}
-
-function SendIcon() {
-  return (
-    <svg width="12" height="11" viewBox="0 0 12 11" fill="none">
-      <path d="M11 5.5L1 1l2 4.5L1 10l10-4.5z" fill="white" />
-    </svg>
-  );
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-      <path d="M2 5h6M5.5 2.5L8 5l-2.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 4 23 10 17 10" />
-      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-    </svg>
-  );
-}
-
-function MoreIcon() {
-  return (
-    <svg width="4" height="16" viewBox="0 0 4 16" fill="currentColor">
-      <circle cx="2" cy="2" r="1.5" />
-      <circle cx="2" cy="8" r="1.5" />
-      <circle cx="2" cy="14" r="1.5" />
-    </svg>
-  );
-}
-
-function AttachIcon() {
-  return (
-    <svg width="13" height="20" viewBox="0 0 13 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11.5 8v5.5a5 5 0 0 1-10 0V5.5a3.5 3.5 0 0 1 7 0V13a2 2 0 0 1-4 0V7" />
-    </svg>
-  );
-}
-
-function CheckSmallIcon() {
-  return (
-    <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-      <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function CheckGatheredIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="shrink-0 mt-0.5">
-      <path d="M2 6l3 3 5-5" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+// ── Icon aliases (lucide-react) ────────────────────────────────────────────
+const AgentIcon  = () => <Sparkles size={14} className="text-white" />;
+const RobotIcon  = () => <Bot size={16} className="text-white" />;
+const UserIcon   = () => <User size={12} className="text-white" />;
+const SpinnerIcon = ({ size = 14 }: { size?: number }) => <Loader2 size={size} className="animate-spin" />;
+const SendIcon   = () => <Send size={12} className="text-white" />;
+const ArrowRightIcon = () => <ArrowRight size={12} className="text-white" />;
+const RefreshIcon = () => <RefreshCw size={16} />;
+const MoreIcon   = () => <MoreVertical size={16} />;
+const AttachIcon = () => <Paperclip size={16} />;
+const CheckSmallIcon = () => <Check size={10} className="text-white" />;
+const CheckGatheredIcon = () => <CheckCheck size={11} className="text-emerald-500 shrink-0 mt-0.5" />;
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -294,28 +215,30 @@ function IntentFormCard({
           <div className="flex items-center gap-3">
             {/* Next question button */}
             {!isLastQuestion && (
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setCurrentIdx((i) => i + 1)}
                 disabled={!isCurrentAnswered() || disabled}
-                className="flex items-center gap-2 px-4 py-2 bg-[#f1f5f9] text-[#374151] text-[13px] font-semibold rounded-md hover:bg-[#e2e8f0] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="gap-1.5"
               >
-                Next
-                <ArrowRightIcon />
-              </button>
+                Next <ArrowRight size={13} />
+              </Button>
             )}
             {/* Submit all answers */}
             {isLastQuestion && (
-              <button
+              <Button
+                size="sm"
                 onClick={() => onSubmit(form.questions, answers)}
                 disabled={!isCurrentAnswered() || disabled || isRechecking}
-                className="flex items-center gap-2 px-4 py-2 bg-[#712ae2] text-white text-[13px] font-semibold rounded-md hover:bg-[#5f22c7] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="gap-1.5 bg-[#712ae2] hover:bg-[#5f22c7]"
               >
                 {isRechecking ? (
-                  <><SpinnerIcon size={13} />Checking…</>
+                  <><Loader2 size={13} className="animate-spin" />Checking…</>
                 ) : (
-                  <>Confirm &amp; Check<ArrowRightIcon /></>
+                  <>Confirm &amp; Check <ArrowRight size={13} /></>
                 )}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -789,8 +712,8 @@ export default function IntentSubStage() {
           </div>
         </div>
         <div className="flex items-center gap-0.5">
-          <button className="p-2 rounded hover:bg-[#f1f5f9] text-[#64748b] transition-colors" title="Refresh"><RefreshIcon /></button>
-          <button className="p-2 rounded hover:bg-[#f1f5f9] text-[#64748b] transition-colors" title="More"><MoreIcon /></button>
+          <Button variant="ghost" size="icon" title="Refresh" className="text-[#64748b]"><RefreshCw size={16} /></Button>
+          <Button variant="ghost" size="icon" title="More" className="text-[#64748b]"><MoreVertical size={16} /></Button>
         </div>
       </div>
 
@@ -848,9 +771,9 @@ export default function IntentSubStage() {
       {/* Input Area */}
       <div className="shrink-0 border-t border-[#f1f5f9] bg-white px-6 py-5">
         <div className="flex items-center gap-4 border border-[#e2e8f0] rounded-lg bg-[#f8fafc] px-2.5 py-2.5">
-          <button className="p-2 rounded text-[#94a3b8] hover:text-[#64748b] hover:bg-[#f1f5f9] transition-colors shrink-0">
-            <AttachIcon />
-          </button>
+          <Button variant="ghost" size="icon" className="text-[#94a3b8] hover:text-[#64748b] shrink-0">
+            <Paperclip size={16} />
+          </Button>
           <input
             ref={inputRef}
             type="text"
@@ -866,22 +789,20 @@ export default function IntentSubStage() {
               }
             }}
           />
-          <button
+          <Button
             onClick={() => { console.log("[intent] Send clicked, inputValue:", inputValue.trim(), "isAgentActive:", isAgentActive); void handleSend(); }}
             disabled={!inputValue.trim() || isAgentActive}
-            className="flex items-center gap-2 px-4 py-2 bg-[#07c160] text-white text-[16px] font-semibold rounded shrink-0 hover:bg-[#06a050] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="gap-2 bg-[#07c160] hover:bg-[#06a050] shrink-0"
           >
-            <span>Send</span>
-            <SendIcon />
-          </button>
-          <button
+            Send <Send size={13} />
+          </Button>
+          <Button
             onClick={handleStartGeneration}
             disabled={isAgentActive}
-            className="flex items-center gap-2 px-4 py-2 bg-[#4f46e5] text-white text-[16px] font-semibold rounded shrink-0 shadow-sm hover:bg-[#4338ca] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="gap-2 bg-[#4f46e5] hover:bg-[#4338ca] shrink-0"
           >
-            <span>Next Step -&gt;</span>
-            <ArrowRightIcon />
-          </button>
+            Next Step <ArrowRight size={13} />
+          </Button>
         </div>
       </div>
     </div>

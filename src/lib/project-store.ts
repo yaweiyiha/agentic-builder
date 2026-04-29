@@ -11,12 +11,11 @@ import { db } from "@/lib/db/client";
 import type { Project } from "@/types/project";
 
 // ─── Auto-init tables (runs lazily on first query) ────────────────────────────
-const _g = globalThis as typeof globalThis & { __dbInitialized?: boolean };
+const _g = globalThis as typeof globalThis & { __dbInitPromise?: Promise<void> };
 
 async function ensureTablesExist(): Promise<void> {
-  if (_g.__dbInitialized) return;
-  _g.__dbInitialized = true;
-  await db.query(`
+  if (_g.__dbInitPromise) return _g.__dbInitPromise;
+  _g.__dbInitPromise = db.query(`
     CREATE TABLE IF NOT EXISTS projects (
       id         TEXT        PRIMARY KEY,
       slug       TEXT        NOT NULL UNIQUE,
@@ -45,7 +44,12 @@ async function ensureTablesExist(): Promise<void> {
     ALTER TABLE project_stage_state
       ADD COLUMN IF NOT EXISTS intent_messages_json  JSONB NOT NULL DEFAULT '[]',
       ADD COLUMN IF NOT EXISTS intent_enriched_brief TEXT  NOT NULL DEFAULT '';
-  `);
+  `).then(() => undefined).catch((err) => {
+    // Reset so next request retries init.
+    _g.__dbInitPromise = undefined;
+    throw err;
+  });
+  return _g.__dbInitPromise;
 }
 
 // ─── Projects CRUD ────────────────────────────────────────────────────────────

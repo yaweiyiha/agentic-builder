@@ -9,7 +9,7 @@ import { usePipelineStore } from "@/store/pipeline-store";
 
 function FolderIcon() {
   return (
-    <svg width="21" height="16" viewBox="0 0 24 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="18" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
     </svg>
   );
@@ -108,7 +108,6 @@ function LogoMark() {
 export default function AppNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [projectsOpen, setProjectsOpen] = useState(true);
   const { projects, loading, createProject } = useProjects();
   const resetStage = useStageStore((s) => s.resetStage);
   const setProjectSlugForSync = useStageStore((s) => s.setProjectSlugForSync);
@@ -159,26 +158,21 @@ export default function AppNav() {
 
       {/* Navigation */}
       <nav className="flex-1 min-h-0 px-4 overflow-y-auto" style={noDragStyle}>
-        <div className="flex flex-col gap-1">
-          {/* Projects header row */}
-          <button
-            onClick={() => setProjectsOpen((v) => !v)}
-            className="flex items-center justify-between px-3 py-2 rounded-sm hover:bg-[#f1f5f9] transition-colors w-full"
+        <details open className="group/details">
+          <summary
+            style={noDragStyle}
+            className="flex items-center justify-between px-2 py-2.5 rounded-sm hover:bg-[#f1f5f9] active:bg-[#e2e8f0] transition-colors cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-[#475569]">
-                <FolderIcon />
-              </span>
-              <span className="text-[14px] tracking-[-0.35px] text-[#475569]">Projects</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-[#64748b] shrink-0"><FolderIcon /></span>
+              <span className="text-[13px] font-semibold tracking-[-0.3px] text-[#475569]">Projects</span>
             </div>
-            <span className={`transition-transform duration-150 ${projectsOpen ? "rotate-0" : "-rotate-90"}`}>
+            <span className="text-[#94a3b8] transition-transform duration-200 group-open/details:rotate-0 -rotate-90">
               <ChevronDownIcon />
             </span>
-          </button>
+          </summary>
 
-          {/* Project list */}
-          {projectsOpen && (
-            <div className="flex flex-col gap-0.5 ml-1">
+          <div className="flex flex-col gap-0.5 ml-1 mt-1">
               {loading && (
                 <span className="px-3 py-2 text-[12px] text-[#94a3b8]">Loading…</span>
               )}
@@ -188,7 +182,6 @@ export default function AppNav() {
               {projects.map((project) => {
                 const href = `/project/${project.id}`;
                 const isActive = pathname?.startsWith(href);
-                // Use AI-generated name from stage store for the current active project
                 const displayName =
                   isActive && stageProjectId === project.id && stageProjectName
                     ? stageProjectName
@@ -196,23 +189,19 @@ export default function AppNav() {
                 return (
                   <div
                     key={project.id}
-                    className={`border-l-2 pl-[2px] w-[191px] ${
+                    className={`border-l-2 pl-0.5 transition-all ${
                       isActive ? "border-[#4f46e5]" : "border-transparent"
                     }`}
                   >
-                    <div className={isActive ? "bg-[rgba(226,232,240,0.5)] rounded-sm" : ""}>
+                    <div className={`rounded-sm transition-colors ${isActive ? "bg-[rgba(79,70,229,0.08)]" : ""}`}>
                       <Link
                         href={href}
-                        className="flex items-center gap-3 px-3 py-2 hover:bg-[rgba(226,232,240,0.4)] rounded-sm transition-colors"
+                        className="flex items-center gap-3 px-3 py-2 rounded-sm transition-all hover:bg-[rgba(226,232,240,0.6)]"
                       >
-                        <span className={isActive ? "text-[#4f46e5]" : "text-[#64748b]"}>
+                        <span className={`transition-colors shrink-0 ${isActive ? "text-[#4f46e5]" : "text-[#94a3b8]"}`}>
                           <FileIcon />
                         </span>
-                        <span
-                          className={`text-[14px] tracking-[-0.35px] truncate ${
-                            isActive ? "text-[#4f46e5]" : "text-[#475569]"
-                          }`}
-                        >
+                        <span className={`text-[13px] tracking-[-0.3px] truncate transition-colors ${isActive ? "text-[#4f46e5] font-semibold" : "text-[#475569] font-medium"}`}>
                           {displayName}
                         </span>
                       </Link>
@@ -220,9 +209,8 @@ export default function AppNav() {
                   </div>
                 );
               })}
-            </div>
-          )}
-        </div>
+          </div>
+        </details>
       </nav>
 
       {/* Bottom: New Project + User Profile */}

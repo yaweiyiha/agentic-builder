@@ -5,8 +5,12 @@
  * Displays real-time agent logs and task status for the given role.
  */
 
+import { Clock, CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useCodingStore } from "@/store/coding-store";
 import { useStageStore } from "@/store/stage-store";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CodingAgentRole } from "@/lib/pipeline/types";
 import type { CodingSubStageId } from "@/store/stage-store";
 
@@ -17,26 +21,26 @@ interface Props {
   nextSubStage?: CodingSubStageId;
 }
 
-const STATUS_COLOR: Record<string, { dot: string; label: string; badge: string }> = {
-  idle:      { dot: "bg-[#e2e8f0]",   label: "Idle",    badge: "text-[#94a3b8] bg-[#f8fafc] border-[#e2e8f0]" },
-  working:   { dot: "bg-[#712ae2] animate-pulse", label: "Running", badge: "text-[#712ae2] bg-[rgba(113,42,226,0.06)] border-[rgba(113,42,226,0.2)]" },
-  completed: { dot: "bg-[#22c55e]",   label: "Done",    badge: "text-[#16a34a] bg-[#f0fdf4] border-[#bbf7d0]" },
-  failed:    { dot: "bg-[#ef4444]",   label: "Failed",  badge: "text-[#dc2626] bg-[#fef2f2] border-[#fecaca]" },
-};
+function statusBadge(status: string) {
+  switch (status) {
+    case "working":
+      return <Badge variant="warning" className="gap-1.5"><Loader2 size={11} className="animate-spin" />Running</Badge>;
+    case "completed":
+      return <Badge variant="success" className="gap-1.5"><CheckCircle2 size={11} />Done</Badge>;
+    case "failed":
+      return <Badge variant="destructive" className="gap-1.5"><AlertCircle size={11} />Failed</Badge>;
+    default:
+      return <Badge variant="muted" className="gap-1.5"><Clock size={11} />Idle</Badge>;
+  }
+}
 
 export default function AgentRoleSubStage({ role, title, description, nextSubStage }: Props) {
   const agents       = useCodingStore((s) => s.agents);
   const tasks        = useCodingStore((s) => s.tasks);
   const goToSubStage = useStageStore((s) => s.goToSubStage);
 
-  const agent    = agents.find((a) => a.role === role);
-  const roleTasks = tasks.filter((t) => {
-    // KickoffWorkItem doesn't have role directly; match via assignedAgentId
-    return agent ? t.assignedAgentId === agent.id || agent.completedTaskIds.includes(t.id) || agent.failedTaskIds.includes(t.id) : false;
-  });
-
+  const agent     = agents.find((a) => a.role === role);
   const agentStatus = agent?.status ?? "idle";
-  const colors      = STATUS_COLOR[agentStatus] ?? STATUS_COLOR.idle;
 
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden">
@@ -44,16 +48,12 @@ export default function AgentRoleSubStage({ role, title, description, nextSubSta
       <div className="shrink-0 px-8 pt-8 pb-4 border-b border-[#f1f5f9]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-[20px] font-bold text-[#0b1c30]">{title}</h2>
+            <h2 className="text-xl font-bold text-[#0b1c30]">{title}</h2>
             <p className="text-[13px] text-[#94a3b8] mt-0.5">{description}</p>
           </div>
-          <span className={`flex items-center gap-1.5 text-[12px] font-medium border px-3 py-1 rounded-full shrink-0 ${colors.badge}`}>
-            <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
-            {colors.label}
-          </span>
+          {statusBadge(agentStatus)}
         </div>
 
-        {/* Agent stats */}
         {agent && (
           <div className="flex items-center gap-5 mt-3">
             <span className="text-[11px] text-[#94a3b8]">
@@ -72,13 +72,11 @@ export default function AgentRoleSubStage({ role, title, description, nextSubSta
       </div>
 
       {/* Body: agent logs */}
-      <div className="flex-1 overflow-auto px-8 py-5">
+      <ScrollArea className="flex-1 px-8 py-5">
         {!agent && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+          <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
             <div className="w-10 h-10 rounded-full border-2 border-[#e2e8f0] flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" />
-              </svg>
+              <Clock size={16} className="text-[#cbd5e1]" />
             </div>
             <p className="text-[14px] text-[#94a3b8] max-w-xs">
               The {title.toLowerCase()} agent will start automatically when coding begins.
@@ -109,17 +107,18 @@ export default function AgentRoleSubStage({ role, title, description, nextSubSta
             ))}
           </div>
         )}
-      </div>
+      </ScrollArea>
 
       {/* Footer CTA */}
       {agent?.status === "completed" && nextSubStage && (
         <div className="shrink-0 flex justify-end px-8 py-4 border-t border-[#f1f5f9]">
-          <button
+          <Button
+            variant="outline"
             onClick={() => goToSubStage(nextSubStage, "coding")}
-            className="flex items-center gap-2 px-5 py-2 text-[13px] font-semibold text-[#712ae2] border border-[rgba(113,42,226,0.3)] rounded-md hover:bg-[rgba(113,42,226,0.05)] transition-colors"
+            className="gap-2 text-[#712ae2] border-[rgba(113,42,226,0.3)] hover:bg-[rgba(113,42,226,0.05)]"
           >
-            Next →
-          </button>
+            Next <ArrowRight size={14} />
+          </Button>
         </div>
       )}
     </div>

@@ -49,7 +49,13 @@ function getPool(): Pool {
     }
 
     console.log("[db] Pool opts (host):", (poolOpts as Record<string, unknown>).host);
-    globalForPg.__pgPool = new Pool(poolOpts);
+    globalForPg.__pgPool = new Pool({
+      ...poolOpts,
+      // Fail fast if a connection cannot be acquired within 8 s.
+      connectionTimeoutMillis: 8_000,
+      // Kill runaway queries after 30 s so the pool slot is freed.
+      statement_timeout: 30_000,
+    });
     globalForPg.__pgPool.on("error", (err) => {
       console.error("[db] Unexpected pool error:", err);
     });
