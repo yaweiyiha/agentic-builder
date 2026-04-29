@@ -255,6 +255,10 @@ export const useStageStore = create<StageStoreState>()(
           activeSubStages: { ...s.activeSubStages, [targetStage]: subStage },
         }));
         scheduleStageSync(get);
+        // Restore the pipeline snapshot for the clicked sub-stage (lazy import to avoid circular dep)
+        import("@/store/pipeline-store").then(({ usePipelineStore }) => {
+          usePipelineStore.getState().loadSubStageSnapshot(targetStage, subStage);
+        }).catch(() => {/* ignore */});
       },
 
       advanceSubStage: (opts = {}) => {

@@ -11,11 +11,11 @@ import { db } from "@/lib/db/client";
 import type { Project } from "@/types/project";
 
 // ─── Auto-init tables (runs lazily on first query) ────────────────────────────
-const _g = globalThis as typeof globalThis & { __dbInitPromise?: Promise<void> };
+const _g = globalThis as typeof globalThis & { __dbInitPromise_v2?: Promise<void> };
 
 async function ensureTablesExist(): Promise<void> {
-  if (_g.__dbInitPromise) return _g.__dbInitPromise;
-  _g.__dbInitPromise = db.query(`
+  if (_g.__dbInitPromise_v2) return _g.__dbInitPromise_v2;
+  _g.__dbInitPromise_v2 = db.query(`
     CREATE TABLE IF NOT EXISTS projects (
       id         TEXT        PRIMARY KEY,
       slug       TEXT        NOT NULL UNIQUE,
@@ -44,12 +44,20 @@ async function ensureTablesExist(): Promise<void> {
     ALTER TABLE project_stage_state
       ADD COLUMN IF NOT EXISTS intent_messages_json  JSONB NOT NULL DEFAULT '[]',
       ADD COLUMN IF NOT EXISTS intent_enriched_brief TEXT  NOT NULL DEFAULT '';
+    CREATE TABLE IF NOT EXISTS project_substage_snapshot (
+      project_id   TEXT        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      stage_id     TEXT        NOT NULL,
+      sub_stage_id TEXT        NOT NULL,
+      snapshot     JSONB       NOT NULL DEFAULT '{}',
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (project_id, stage_id, sub_stage_id)
+    );
   `).then(() => undefined).catch((err) => {
     // Reset so next request retries init.
-    _g.__dbInitPromise = undefined;
+    _g.__dbInitPromise_v2 = undefined;
     throw err;
   });
-  return _g.__dbInitPromise;
+  return _g.__dbInitPromise_v2;
 }
 
 // ─── Projects CRUD ────────────────────────────────────────────────────────────
@@ -225,4 +233,65 @@ export async function upsertStageState(
       state.intentEnrichedBrief  ?? "",
     ],
   );
+}
+
+// ─── Sub-Stage Snapshots ──────────────────────────────────────────────────────
+
+/** Full pipeline state persisted per (project, stage, sub-stage). */
+export interface SubStageSnapshot {
+  featureBrief:  string;
+  currentStep:   string | null;
+  activeTab:     string;
+  totalCostUsd:  number;
+  isRunning:     boolean;
+  fastFromPrd:   boolean;
+  codeOutputDir: string;
+  /** All pipeline step results at the time this snapshot was taken. */
+  steps:         Record<string, unknown>;
+}
+
+export async function upsertSubStageSnapshot(
+  projectId: string,
+  stageId: string,
+  subStageId: string,
+  snapshot: SubStageSnapshot,
+): Promise<void> {
+  await ensureTablesExist();
+  await db.query(
+    `INSERT INTO project_substage_snapshot (project_id, stage_id, sub_stage_id, snapshot, updated_at)
+     VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (project_id, stage_id, sub_stage_id) DO UPDATE SET
+       snapshot   = EXCLUDED.snapshot,
+       updated_at = NOW()`,
+    [projectId, stageId, subStageId, JSON.stringify(snapshot)],
+  );
+}
+
+export async function getSubStageSnapshot(
+  projectId: string,
+  stageId: string,
+  subStageId: string,
+): Promise<SubStageSnapshot | null> {
+  await ensureTablesExist();
+  const { rows } = await db.query(
+    `SELECT snapshot FROM project_substage_snapshot
+     WHERE project_id = $1 AND stage_id = $2 AND sub_stage_id = $3`,
+    [projectId, stageId, subStageId],
+  );
+  return (rows[0]?.snapshot as SubStageSnapshot) ?? null;
+}
+
+/**
+ * Returns the snapshot for the project's currently-active stage+sub-stage.
+ * Returns null when no snapshot has been saved yet.
+ */
+export async function getActiveSubStageSnapshot(
+  projectId: string,
+): Promise<{ stageId: string; subStageId: string; snapshot: SubStageSnapshot | null }> {
+  await ensureTablesExist();
+  const stageRow = await getStageState(projectId);
+  const stageId    = stageRow?.activeStage ?? "preparation";
+  const subStageId = (stageRow?.activeSubStages?.[stageId] as string | undefined) ?? "initial";
+  const snapshot   = await getSubStageSnapshot(projectId, stageId, subStageId);
+  return { stageId, subStageId, snapshot };
 }

@@ -31,11 +31,55 @@ function scheduleSync(getState: () => PipelineState) {
           isRunning:     s.isRunning,
           fastFromPrd:   s.fastFromPrd,
           codeOutputDir: s.codeOutputDir,
-          // steps are not persisted — they come from the live SSE stream only
         },
       }),
     }).catch((err) => console.error("[pipeline-store] sync error:", err));
   }, 600);
+}
+
+/**
+ * Maps a pipeline step ID to the (stage, subStage) it belongs to.
+ * Used to determine where to file a substage snapshot when a step completes.
+ */
+const STEP_TO_STAGE_SUBSTAGE: Partial<Record<PipelineStepId, { stage: string; subStage: string }>> = {
+  intent:    { stage: "preparation", subStage: "intent" },
+  prd:       { stage: "preparation", subStage: "prd" },
+  trd:       { stage: "preparation", subStage: "trd" },
+  sysdesign: { stage: "preparation", subStage: "sysdesign" },
+  implguide: { stage: "preparation", subStage: "implguide" },
+  design:    { stage: "preparation", subStage: "design" },
+  pencil:    { stage: "preparation", subStage: "pencil" },
+  mockup:    { stage: "preparation", subStage: "mockup" },
+  qa:        { stage: "preparation", subStage: "qa" },
+  kickoff:   { stage: "kickoff",     subStage: "task-breakdown" },
+  verify:    { stage: "coding",      subStage: "verify" },
+};
+
+/** Saves a full pipeline snapshot for the given step's (stage, subStage). */
+function saveSubStageSnapshot(getState: () => PipelineState, stepId: PipelineStepId): void {
+  if (!_currentProjectSlug) return;
+  const mapping = STEP_TO_STAGE_SUBSTAGE[stepId];
+  if (!mapping) return;
+  const s = getState();
+  const snapshot = {
+    featureBrief:  s.featureBrief,
+    currentStep:   s.currentStep,
+    activeTab:     s.activeTab,
+    totalCostUsd:  s.totalCostUsd,
+    isRunning:     false,
+    fastFromPrd:   s.fastFromPrd,
+    codeOutputDir: s.codeOutputDir,
+    steps:         s.steps as Record<string, unknown>,
+  };
+  fetch(`/api/projects/${_currentProjectSlug}/substage-snapshot`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      stageId:    mapping.stage,
+      subStageId: mapping.subStage,
+      snapshot,
+    }),
+  }).catch((err) => console.error(`[pipeline-store] substage snapshot error (${stepId}):`, err));
 }
 
 const DEFAULT_CODE_OUTPUT_DIR = "generated-code";
@@ -155,6 +199,11 @@ interface PipelineState {
    * Called once on page mount after setProjectSlugForSync.
    */
   loadFromServer: (slug: string) => Promise<void>;
+  /**
+   * Load and restore the pipeline state snapshot for the given
+   * (stage, subStage). Called when the user clicks a sub-stage in the sidebar.
+   */
+  loadSubStageSnapshot: (stageId: string, subStageId: string) => Promise<void>;
 }
 
 export const usePipelineStore = create<PipelineState>()(
@@ -688,6 +737,39 @@ export const usePipelineStore = create<PipelineState>()(
       loadFromServer: async (slug: string) => {
         _currentProjectSlug = slug;
         try {
+          // First, try to restore the active substage snapshot (has steps)
+          const snapResp = await fetch(`/api/projects/${slug}/substage-snapshot`, { cache: "no-store" });
+          if (snapResp.ok) {
+            const snapData = (await snapResp.json()) as {
+              snapshot?: {
+                featureBrief?:  string;
+                currentStep?:   string | null;
+                activeTab?:     string;
+                totalCostUsd?:  number;
+                isRunning?:     boolean;
+                fastFromPrd?:   boolean;
+                codeOutputDir?: string;
+                steps?:         Record<string, unknown>;
+              } | null;
+            };
+            if (snapData.snapshot) {
+              const snap = snapData.snapshot;
+              set({
+                featureBrief:  snap.featureBrief  ?? "",
+                currentStep:   (snap.currentStep  as PipelineStepId | null) ?? null,
+                activeTab:     (snap.activeTab    as PipelineStepId) ?? "intent",
+                totalCostUsd:  snap.totalCostUsd  ?? 0,
+                isRunning:     false,
+                fastFromPrd:   snap.fastFromPrd   ?? true,
+                codeOutputDir: snap.codeOutputDir ?? "generated-code",
+                steps:         snap.steps
+                  ? { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) }
+                  : { ...EMPTY_STEPS },
+              });
+              return;
+            }
+          }
+          // Fallback: load base pipeline state (no steps)
           const resp = await fetch(`/api/projects/${slug}/state`, { cache: "no-store" });
           if (!resp.ok) return;
           const data = (await resp.json()) as {
@@ -699,7 +781,6 @@ export const usePipelineStore = create<PipelineState>()(
               isRunning?:     boolean;
               fastFromPrd?:   boolean;
               codeOutputDir?: string;
-              stepsJson?:     Record<string, unknown>;
             } | null;
           };
           const ps = data.pipelineState;
@@ -709,15 +790,50 @@ export const usePipelineStore = create<PipelineState>()(
             currentStep:   (ps.currentStep  as PipelineStepId | null) ?? null,
             activeTab:     (ps.activeTab    as PipelineStepId) ?? "intent",
             totalCostUsd:  ps.totalCostUsd  ?? 0,
-            // Always restore as not-running on page load — the browser can't resume a lost SSE stream
             isRunning:     false,
             fastFromPrd:   ps.fastFromPrd   ?? true,
             codeOutputDir: ps.codeOutputDir ?? "generated-code",
-            // steps are never restored from DB — always start fresh on page load
             steps:         { ...EMPTY_STEPS },
           });
         } catch (err) {
           console.error("[pipeline-store] loadFromServer error:", err);
+        }
+      },
+
+      loadSubStageSnapshot: async (stageId: string, subStageId: string) => {
+        if (!_currentProjectSlug) return;
+        try {
+          const url = `/api/projects/${_currentProjectSlug}/substage-snapshot?stage=${encodeURIComponent(stageId)}&subStage=${encodeURIComponent(subStageId)}`;
+          const resp = await fetch(url, { cache: "no-store" });
+          if (!resp.ok) return;
+          const data = (await resp.json()) as {
+            snapshot?: {
+              featureBrief?:  string;
+              currentStep?:   string | null;
+              activeTab?:     string;
+              totalCostUsd?:  number;
+              isRunning?:     boolean;
+              fastFromPrd?:   boolean;
+              codeOutputDir?: string;
+              steps?:         Record<string, unknown>;
+            } | null;
+          };
+          if (!data.snapshot) return;
+          const snap = data.snapshot;
+          set({
+            featureBrief:  snap.featureBrief  ?? "",
+            currentStep:   (snap.currentStep  as PipelineStepId | null) ?? null,
+            activeTab:     (snap.activeTab    as PipelineStepId) ?? "intent",
+            totalCostUsd:  snap.totalCostUsd  ?? 0,
+            isRunning:     false,
+            fastFromPrd:   snap.fastFromPrd   ?? true,
+            codeOutputDir: snap.codeOutputDir ?? "generated-code",
+            steps:         snap.steps
+              ? { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) }
+              : { ...EMPTY_STEPS },
+          });
+        } catch (err) {
+          console.error(`[pipeline-store] loadSubStageSnapshot error (${stageId}/${subStageId}):`, err);
         }
       },
     }),
@@ -805,6 +921,9 @@ function handleEvent(
     const cost = get().totalCostUsd + (stepData.costUsd ?? 0);
     set({ steps, totalCostUsd: cost });
     console.log(`[SSE step_complete][${stepId}] full content:`, stepData.content);
+
+    // Persist a full substage snapshot so the user can revisit this sub-stage later.
+    saveSubStageSnapshot(get, stepId);
 
     // When the intent step completes, extract AI-generated project_name and
     // update the stage store so the sidebar immediately reflects the name.
