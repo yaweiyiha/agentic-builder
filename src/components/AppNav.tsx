@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useProjects } from "@/hooks/useProjects";
-import { useStageStore } from "@/store/stage-store";
+import { useStageStore, STAGE_META, type StageId } from "@/store/stage-store";
 import { usePipelineStore } from "@/store/pipeline-store";
 
 function FolderIcon() {
@@ -114,6 +114,7 @@ export default function AppNav() {
   const setProjectName = useStageStore((s) => s.setProjectName);
   const stageProjectId = useStageStore((s) => s.projectId);
   const stageProjectName = useStageStore((s) => s.projectName);
+  const activeStage = useStageStore((s) => s.activeStage);
   const resetPipeline = usePipelineStore((s) => s.reset);
   const pipelineSetProjectSlugForSync = usePipelineStore((s) => s.setProjectSlugForSync);
 
@@ -174,30 +175,47 @@ export default function AppNav() {
             {projects.map((project) => {
               const href = `/project/${project.id}`;
               const isActive = pathname?.startsWith(href);
+              const isCurrentStageProject = isActive && stageProjectId === project.id;
               const displayName =
-                isActive && stageProjectId === project.id && stageProjectName
+                isCurrentStageProject && stageProjectName
                   ? stageProjectName
                   : project.name;
+              const stageMeta = isCurrentStageProject
+                ? STAGE_META[activeStage as StageId]
+                : null;
+
               return (
                 <Link
                   key={project.id}
                   href={href}
                   className={`group flex flex-col gap-1.5 p-3 rounded-lg border transition-all ${
                     isActive
-                      ? "bg-slate-100 border-slate-300 shadow-md"
+                      ? "bg-slate-100 border-slate-200 shadow-sm"
                       : "bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`transition-colors shrink-0 ${isActive ? "text-slate-700" : "text-slate-500 group-hover:text-slate-600"}`}>
+                    <span className={`transition-colors shrink-0 ${isActive ? "text-slate-600" : "text-slate-500 group-hover:text-slate-600"}`}>
                       <FileIcon />
                     </span>
                     <span className={`text-[13px] tracking-[-0.3px] truncate transition-colors font-medium ${isActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"}`}>
                       {displayName}
                     </span>
                   </div>
-                  <div className="h-px bg-linear-to-r from-slate-300 to-transparent"></div>
-                  <span className="text-[11px] text-slate-600">Click to edit</span>
+                  <div className={`h-px bg-linear-to-r ${isActive ? "from-slate-400 to-transparent" : "from-slate-300 to-transparent"}`}></div>
+                  {stageMeta ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                      <span className="text-[11px] text-slate-700 font-medium">
+                        {stageMeta.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500 truncate">
+                        — {stageMeta.desc}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-slate-500">Ready</span>
+                  )}
                 </Link>
               );
             })}

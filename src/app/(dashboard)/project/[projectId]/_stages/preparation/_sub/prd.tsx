@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore } from "@/store/stage-store";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import StageInputBar from "@/components/StageInputBar";
+import { ArrowRight } from "lucide-react";
 
 function SpinnerIcon() {
   return (
@@ -244,13 +246,13 @@ export default function PrdSubStage() {
         </div>
 
         {/* Proceed to Kick-off */}
-        <button
+        {/* <button
           onClick={() => goToStage("kickoff")}
           className="flex items-center gap-2 border border-[rgba(113,42,226,0.2)] text-[#712ae2] text-[12px] font-bold px-[17px] py-[7px] rounded-[4px] hover:bg-[rgba(113,42,226,0.05)] transition-colors"
         >
           Proceed to Kick-off
           <ArrowRightIcon size={9.333} color="#712ae2" />
-        </button>
+        </button> */}
       </div>
 
       {/* ── PRD Content Canvas ── */}
@@ -326,49 +328,32 @@ export default function PrdSubStage() {
       </div>
 
       {/* ── Footer ── */}
-      <div className="shrink-0 backdrop-blur-[6px] bg-[rgba(255,255,255,0.8)] border-t border-[#e2e8f0] flex items-center justify-between px-8 py-4 gap-8">
-
-        {/* AI Edit Input */}
-        <div className="flex-1 min-w-0 relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <SparkleIcon />
-          </div>
-          <input
-            value={editInput}
-            onChange={(e) => setEditInput(e.target.value)}
-            placeholder="Ask AgenticBuilder to edit this PRD..."
-            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-[4px] pl-10 pr-12 py-[10px] text-[14px] text-[#0f172a] placeholder:text-[#6b7280] focus:outline-none focus:ring-1 focus:ring-[#712ae2] focus:border-[#712ae2] transition-colors"
-          />
-          {editInput && (
+      <StageInputBar
+        value={editInput}
+        onChange={setEditInput}
+        onSubmit={() => { /* AI edit — TODO */ }}
+        placeholder="Ask AgenticBuilder to edit this PRD…"
+        disabled={isThisRunning}
+        actions={
+          <div className="flex items-center gap-3 shrink-0">
             <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:opacity-70 transition-opacity"
-              title="Send"
+              onClick={handleDownloadPdf}
+              disabled={!isDone || isPrinting}
+              className="flex items-center gap-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <SendIcon />
+              {isPrinting ? <SpinnerIcon /> : <DownloadIcon />}
+              {isPrinting ? "Preparing…" : "Download PDF"}
             </button>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={handleDownloadPdf}
-            disabled={!isDone || isPrinting}
-            className="flex items-center gap-2 border border-[#e2e8f0] text-[#334155] text-[14px] font-bold px-[17px] py-[9px] rounded-[4px] hover:bg-[#f8fafc] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {isPrinting ? <SpinnerIcon /> : <DownloadIcon />}
-            {isPrinting ? "Preparing…" : "Download PDF"}
-          </button>
-          <button
-            onClick={() => goToSubStage("trd", "preparation")}
-            className="relative flex items-center gap-2 bg-[#712ae2] text-white text-[14px] font-bold px-6 py-2 rounded-[4px] hover:bg-[#5b22b8] transition-colors shadow-[0px_10px_15px_-3px_rgba(113,42,226,0.2),0px_4px_6px_-4px_rgba(113,42,226,0.2)]"
-          >
-            Confirm PRD
-            <ArrowRightIcon size={11.667} color="white" />
-          </button>
-        </div>
-
-      </div>
+            <button
+              onClick={() => goToSubStage("trd", "preparation")}
+              className="flex items-center gap-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
+            >
+              Confirm PRD
+              <ArrowRight size={16} color="white" />
+            </button>
+          </div>
+        }
+      />
     </div>
   );
 }

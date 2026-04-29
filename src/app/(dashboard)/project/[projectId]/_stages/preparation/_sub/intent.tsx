@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore } from "@/store/stage-store";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import StageInputBar from "@/components/StageInputBar";
 
 // ── Conversation message types ─────────────────────────────────────────────
 
@@ -1076,44 +1077,13 @@ export default function IntentSubStage() {
       </div>
 
       {/* Input Area */}
-      <div className="shrink-0 px-8 py-5 bg-white/40 backdrop-blur-sm border-t border-white/40">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 border-2 border-slate-200 rounded-full bg-white px-2 py-2 shadow-md hover:border-slate-500 focus-within:border-slate-500 transition-colors flex-1">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={
-                isAgentActive
-                  ? "Analyzing…"
-                  : "Drop your script or tell me your story ideas…"
-              }
-              className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none min-w-0 px-2"
-              disabled={isAgentActive}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
-            />
-
-            <div className="flex items-center gap-1">
-              <Button
-                onClick={() => {
-                  void handleSend();
-                }}
-                disabled={!inputValue.trim() || isAgentActive}
-                size="icon"
-                className="text-white bg-slate-700 hover:bg-slate-800 rounded-full h-7 w-7 shrink-0 shadow-md"
-                title="Send"
-              >
-                <ArrowUp size={14} />
-              </Button>
-            </div>
-          </div>
-
+      <StageInputBar
+        value={inputValue}
+        onChange={setInputValue}
+        onSubmit={() => { void handleSend(); }}
+        placeholder="Drop your script or tell me your story ideas…"
+        disabled={isAgentActive}
+        actions={
           <Button
             onClick={handleStartGeneration}
             disabled={isAgentActive}
@@ -1122,8 +1092,8 @@ export default function IntentSubStage() {
           >
             Next Step <ArrowRight size={16} />
           </Button>
-        </div>
-      </div>
+        }
+      />
     </div>
   );
 }
