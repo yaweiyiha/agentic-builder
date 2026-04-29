@@ -841,12 +841,28 @@ cp .env.parallel.example .env.parallel
 
 ### 启动
 
+两种模式可选：
+
+**A. 浏览器模式**（轻量、调试方便）
+
 | 终端 | 命令 | URL |
 |---|---|---|
 | Project A（用 `.env.local`） | `pnpm dev` | http://localhost:3000 |
 | Project B（用 `.env.parallel`） | `./scripts/start-parallel-dev.sh` | http://localhost:3001 |
 
-每个 dev server 写自己 `CODE_OUTPUT_DIR` 指向的目录、用自己的 `BLUEPRINT_GENERATED_DATABASE_URL`。LLM 密钥 / `MEMORY_INJECT` 等只读配置仍共享 `.env.local`。
+**B. Electron 模式**（独立窗口、更像桌面 app）
+
+| 终端 | 命令 | 窗口 |
+|---|---|---|
+| Project A | `pnpm electron:dev` | "Agentic Builder"（指向 :3000） |
+| Project B | `./scripts/start-parallel-dev.sh --electron` | "Agentic Builder · B"（指向 :3001） |
+
+Electron 模式下：
+- `electron/main.js` 通过 `BUILDER_DEV_URL` env 读 dev server URL，`BUILDER_INSTANCE_LABEL` env 给窗口加后缀
+- B 实例用 `--user-data-dir=$HOME/.agentic-builder-electron-b` 隔离 cookies / localStorage / cache，否则 macOS Electron 会把两次启动合并成同一进程
+- `concurrently --kill-others-on-fail`（不是 `--kill-others`）：正常关闭某个窗口不会误杀另一个实例的 dev server，只有崩溃才连带退
+
+每个实例写自己 `CODE_OUTPUT_DIR` 指向的目录、用自己的 `BLUEPRINT_GENERATED_DATABASE_URL`。LLM 密钥 / `MEMORY_INJECT` 等只读配置仍共享 `.env.local`。
 
 ### 跑起 generated 应用时（两个项目都跑完之后）
 

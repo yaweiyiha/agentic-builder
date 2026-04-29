@@ -3,6 +3,18 @@ const path = require("path");
 
 const isDev = process.env.NODE_ENV !== "production";
 
+// ── Parallel-instance support ────────────────────────────────────────────
+// Two parallel codegen projects launch two Electron instances. Each one
+// reads:
+//   BUILDER_DEV_URL          — Next.js dev server URL (default :3000)
+//   BUILDER_INSTANCE_LABEL   — short tag prefixed in the window title
+// Pair this with `--user-data-dir=...` (passed on the electron CLI) to
+// keep cookies / localStorage / cache fully partitioned between the two
+// instances. See `scripts/start-parallel-dev.sh --electron` for the
+// canonical invocation.
+const DEV_URL = (process.env.BUILDER_DEV_URL ?? "http://localhost:3000").trim();
+const INSTANCE_LABEL = (process.env.BUILDER_INSTANCE_LABEL ?? "").trim();
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -11,6 +23,9 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: "#ffffff",
     titleBarStyle: "hiddenInset",
+    title: INSTANCE_LABEL
+      ? `Agentic Builder · ${INSTANCE_LABEL}`
+      : "Agentic Builder",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -19,7 +34,7 @@ function createWindow() {
   });
 
   if (isDev) {
-    mainWindow.loadURL("http://localhost:3000");
+    mainWindow.loadURL(DEV_URL);
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, "../out/index.html"));
