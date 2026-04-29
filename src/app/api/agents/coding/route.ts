@@ -25,6 +25,8 @@ import {
   upsertBackendPortEnv,
   upsertFrontendApiBaseUrlEnv,
   resolveBackendPort,
+  upsertBackendPrivyAppIdMirror,
+  resolvePrivyAppIdMirrorFromFilledResources,
 } from "@/lib/pipeline/generated-code-env";
 import {
   readResourceRequirements,
@@ -857,9 +859,14 @@ export async function POST(request: NextRequest) {
     const withJwt = upsertJwtEnvVars(withDbUrl);
     const withPort = upsertBackendPortEnv(withJwt);
     const withResources = upsertResourceEnvVars(withPort, backendResources);
-    await fs.writeFile(backendEnvPath, withResources, "utf-8");
+    const privyMirror = resolvePrivyAppIdMirrorFromFilledResources(filledResources);
+    const withPrivyMirror = upsertBackendPrivyAppIdMirror(
+      withResources,
+      privyMirror,
+    );
+    await fs.writeFile(backendEnvPath, withPrivyMirror, "utf-8");
     console.log(
-      `[CodingAPI] Synced backend/.env (PORT + DATABASE_URL + JWT vars + ${backendResources.length} user resource(s)).`,
+      `[CodingAPI] Synced backend/.env (PORT + DATABASE_URL + JWT + PRIVY_APP_ID mirror + ${backendResources.length} backend resource(s)).`,
     );
   } catch (e) {
     console.warn(

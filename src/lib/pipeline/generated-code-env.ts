@@ -118,6 +118,34 @@ export function upsertFrontendApiBaseUrlEnv(
   return `${normalized}${line}\n`;
 }
 
+/** Same Privy dashboard app ID as frontend `VITE_PRIVY_*` — required server-side for `verifyAccessToken`. */
+export function upsertBackendPrivyAppIdMirror(
+  envContent: string,
+  privyAppId: string | null | undefined,
+): string {
+  const v = (privyAppId ?? "").trim();
+  if (!v) return envContent;
+  const line = `PRIVY_APP_ID=${JSON.stringify(v)}`;
+  if (!envContent.trim()) return `${line}\n`;
+  if (/^\s*PRIVY_APP_ID\s*=/m.test(envContent)) {
+    return envContent.replace(/^\s*PRIVY_APP_ID\s*=.*$/m, line);
+  }
+  const normalized = envContent.endsWith("\n") ? envContent : `${envContent}\n`;
+  return `${normalized}${line}\n`;
+}
+
+/** Read `VITE_PRIVY_APP_ID` / `NEXT_PUBLIC_PRIVY_APP_ID` from filled resource-requirements payloads. */
+export function resolvePrivyAppIdMirrorFromFilledResources(
+  filledResources: Array<{ envKey: string; value?: string | null }>,
+): string | null {
+  for (const key of ["VITE_PRIVY_APP_ID", "NEXT_PUBLIC_PRIVY_APP_ID"] as const) {
+    const r = filledResources.find((x) => x.envKey === key);
+    const v = (r?.value ?? "").trim();
+    if (v.length > 0) return v;
+  }
+  return null;
+}
+
 /**
  * Upsert JWT_SECRET and JWT_EXPIRES_IN into an existing .env payload.
  * Only adds them if they are not already present, so user-set values are preserved.

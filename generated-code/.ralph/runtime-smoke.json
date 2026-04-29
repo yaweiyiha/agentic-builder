@@ -1,0 +1,96 @@
+{
+  "generatedAt": "2026-04-29T12:09:16.948Z",
+  "sessionId": "95b01ba1-a282-46de-a7d0-cc27a08246d1",
+  "pass": true,
+  "bootFailed": false,
+  "failures": [],
+  "successes": [
+    {
+      "target": "GET /api/health",
+      "detail": "reachable (200)"
+    },
+    {
+      "target": "POST /api/auth/verify",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "GET /api/users/me",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "PUT /api/users/me/interests",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "POST /api/users/me/style-assessment",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "GET /api/feed",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "POST /api/feed/refresh",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "GET /api/feed/stream",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "GET /api/feed/status",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "POST /api/scan",
+      "detail": "reachable (401)"
+    },
+    {
+      "target": "GET /api/scan/stream",
+      "detail": "reachable (401)"
+    }
+  ],
+  "port": 4000,
+  "probedEndpoints": [
+    {
+      "method": "POST",
+      "endpoint": "/api/auth/verify"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/users/me"
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/api/users/me/interests"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/users/me/style-assessment"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/feed"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/feed/refresh"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/feed/stream"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/feed/status"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/scan"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/scan/stream"
+    }
+  ]
+}

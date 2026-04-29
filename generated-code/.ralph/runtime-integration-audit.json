@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-29T06:38:46.719Z",
-  "sessionId": "dfdf2753-a3eb-428e-9e78-d08982d8163f",
+  "generatedAt": "2026-04-29T11:52:02.799Z",
+  "sessionId": "95b01ba1-a282-46de-a7d0-cc27a08246d1",
   "appliedOptionalFeatures": [
     "auth-privy"
   ],
@@ -14,35 +14,35 @@
   ],
   "findings": [
     {
-      "id": "bg-job-clear-stale-runs|backend/src/api/modules/feed/feed.routes.ts|26",
+      "id": "bg-job-clear-stale-runs|backend/src/api/modules/feed/feed.routes.ts|38",
       "ruleId": "bg-job-clear-stale-runs",
       "scope": "backend",
       "severity": "warn",
       "file": "backend/src/api/modules/feed/feed.routes.ts",
-      "line": 26,
-      "snippet": "getFeedHandler);\n  router.post(\"/feed/refresh\", authGate, refreshFeedHandler);\n  router.get(\"/feed/stream\", authGate, feedStreamHandler);\n  router.get(\"/feed/status\", authGate, fe",
+      "line": 38,
+      "snippet": "/api/feed/refresh\n  apiRouter.post(\n    \"/feed/refresh\",\n    requirePrivyAuthMiddleware,\n    handleRefreshFeed,\n  );\n\n  // GET /api/feed/stream?run_id=...\n  apiRouter.get(\n    \"/fe",
       "reason": "This route kicks off a background aggregation but never clears stale `running` rows. A crashed previous run leaves the user with `ALREADY_RUNNING` errors forever.",
       "directive": "Implement a `clearActiveRunsForUser(userId)` helper in the matching service file that updates every `status='running'` row for the user to `failed` (with `completed_at = new Date()`), and call it as the FIRST line of this refresh handler — before `enqueueXxx`."
     },
     {
-      "id": "bg-job-inproc-branch|backend/src/api/modules/feed/feed.service.ts|296",
+      "id": "bg-job-inproc-branch|backend/src/api/modules/feed/feed.controller.ts|210",
       "ruleId": "bg-job-inproc-branch",
       "scope": "backend",
       "severity": "error",
-      "file": "backend/src/api/modules/feed/feed.service.ts",
-      "line": 296,
-      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"id\", \"status\", \"step_log\", \"story_count\"],\n  });\n\n  if (!run) {\n    return {\n      run_id: runId,\n      s",
+      "file": "backend/src/api/modules/feed/feed.controller.ts",
+      "line": 210,
+      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"status\", \"step_log\", \"story_count\"],\n  });\n\n  if (!run) {\n    ctx.throw(404, \"Run not found\");\n  }\n\n  con",
       "reason": "This file queries the *Run table by id but does not branch on `inproc:` run-ids. In-process runs use ids like `inproc:<userId>:<ts>` that are NOT UUIDs — Postgres throws `invalid input syntax for type uuid`, the SSE / status endpoint 5xxs, and the user sees an indefinite spinner.",
       "directive": "Wrap the lookup in a discriminator: `if (runId.startsWith(\"inproc:\")) { /* subscribe to in-memory event emitter; do NOT touch DB */ } else if (isUuid(runId)) { const run = await XxxRun.findByPk(runId); ... } else { ctx.throw(400, \"Invalid run_id\"); }`. Apply to every status / stream handler in this file."
     },
     {
-      "id": "bg-job-inproc-branch|backend/src/services/feedAggregationService.ts|76",
+      "id": "bg-job-inproc-branch|backend/src/api/modules/feed/feed.service.ts|188",
       "ruleId": "bg-job-inproc-branch",
       "scope": "backend",
       "severity": "error",
-      "file": "backend/src/services/feedAggregationService.ts",
-      "line": 76,
-      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"id\", \"step_log\"],\n  });\n  if (!run) return;\n\n  const currentLog: StepLogEntry[] = Array.isArray(run.step_",
+      "file": "backend/src/api/modules/feed/feed.service.ts",
+      "line": 188,
+      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"status\", \"step_log\", \"completed_at\", \"story_count\"],\n  });\n\n  if (!run) {\n    return {\n      run_id: runI",
       "reason": "This file queries the *Run table by id but does not branch on `inproc:` run-ids. In-process runs use ids like `inproc:<userId>:<ts>` that are NOT UUIDs — Postgres throws `invalid input syntax for type uuid`, the SSE / status endpoint 5xxs, and the user sees an indefinite spinner.",
       "directive": "Wrap the lookup in a discriminator: `if (runId.startsWith(\"inproc:\")) { /* subscribe to in-memory event emitter; do NOT touch DB */ } else if (isUuid(runId)) { const run = await XxxRun.findByPk(runId); ... } else { ctx.throw(400, \"Invalid run_id\"); }`. Apply to every status / stream handler in this file."
     }

@@ -1,13 +1,14 @@
 # Coding Session Report History
 
-- Total archived reports: 12
+- Total archived reports: 13
 
 ## Sessions
 ## Compare Table
 
 | Ended At | Status | Score | Runtime | Duration | Calls | Tokens | Cost | Primary Model | Model Score | Report |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| 2026-04-29T06:50:35.667Z | FAIL | 38/100 (F) | 3 (2E/1W) | 187m 5s | 386 | 13269261 | $4.2783 | deepseek-v4-pro | 100/100 (A) | [view](./report-history/coding-session-report.2026-04-29T06-50-35-667Z.dfdf2753-a3eb-428e-9e78-d08982d8163f.md) |
+| 2026-04-29T12:09:22.007Z | FAIL | 38/100 (F) | 3 (2E/1W) | 147m 16s | 345 | 10952879 | $4.4443 | deepseek-v4-pro | 100/100 (A) | [view](./report-history/coding-session-report.2026-04-29T12-09-22-007Z.95b01ba1-a282-46de-a7d0-cc27a08246d1.md) |
+| 2026-04-29T06:50:35.667Z | FAIL | 38/100 (F) | n/a | 187m 5s | 386 | 13269261 | $4.2783 | deepseek-v4-pro | 100/100 (A) | [view](./report-history/coding-session-report.2026-04-29T06-50-35-667Z.dfdf2753-a3eb-428e-9e78-d08982d8163f.md) |
 | 2026-04-28T12:45:11.101Z | FAIL | 58/100 (F) | n/a | 138m 5s | 351 | 11994558 | $4.0887 | deepseek-v4-pro | 100/100 (A) | [view](./report-history/coding-session-report.2026-04-28T12-45-11-101Z.52851b86-63eb-4e90-a9c2-5f99fe94a9bd.md) |
 | 2026-04-27T10:34:58.772Z | FAIL | 29/100 (F) | n/a | 81m 15s | 221 | 6884233 | $1.2405 | deepseek-v4-pro | 88/100 (B) | [view](./report-history/coding-session-report.2026-04-27T10-34-58-772Z.2c0034f3-ad9f-41e1-8558-dd1071123ad7.md) |
 | 2026-04-27T06:35:46.637Z | FAIL | 29/100 (F) | n/a | 156m 5s | 193 | 3913112 | $4.5467 | openai/gpt-5.3-codex-20260224 | 88.8/100 (B) | [view](./report-history/coding-session-report.2026-04-27T06-35-46-637Z.a5c1d064-9745-45b0-8224-f983d0bb8371.md) |
@@ -20,6 +21,8 @@
 | 2026-04-22T07:56:34.466Z | ABORTED | 56/100 (F) | n/a | 12m 40s | 9 | 171427 | $0.0564 | moonshotai/kimi-k2.6-20260420 | 100/100 (A) | [view](./report-history/coding-session-report.2026-04-22T07-56-34-466Z.a1243654-aed0-45be-b668-f6e5ba8c5a64.md) |
 | 2026-04-21T13:21:19.776Z | FAIL | 19/100 (F) | n/a | 42m 57s | 120 | 1886257 | $0.0000 | openai/gpt-5.3-codex-20260224 | 0/100 (N/A) | [view](./report-history/coding-session-report.2026-04-21T13-21-19-776Z.05231d7c-b20a-4b93-a052-abb96e447c80.md) |
 
+- [2026-04-29T12:09:22.007Z | FAIL | 38/100 (F)](./report-history/coding-session-report.2026-04-29T12-09-22-007Z.95b01ba1-a282-46de-a7d0-cc27a08246d1.md)
+  duration=147m 16s, calls=345, tokens=10952879, cost=$4.4443, primaryModel=deepseek-v4-pro 100/100 (A), session=`95b01ba1-a282-46de-a7d0-cc27a08246d1`
 - [2026-04-29T06:50:35.667Z | FAIL | 38/100 (F)](./report-history/coding-session-report.2026-04-29T06-50-35-667Z.dfdf2753-a3eb-428e-9e78-d08982d8163f.md)
   duration=187m 5s, calls=386, tokens=13269261, cost=$4.2783, primaryModel=deepseek-v4-pro 100/100 (A), session=`dfdf2753-a3eb-428e-9e78-d08982d8163f`
 - [2026-04-28T12:45:11.101Z | FAIL | 58/100 (F)](./report-history/coding-session-report.2026-04-28T12-45-11-101Z.52851b86-63eb-4e90-a9c2-5f99fe94a9bd.md)

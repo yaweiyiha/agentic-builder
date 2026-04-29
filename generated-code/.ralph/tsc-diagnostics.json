@@ -1,0 +1,491 @@
+{
+  "generatedAt": "2026-04-29T11:52:05.208Z",
+  "sessionId": "95b01ba1-a282-46de-a7d0-cc27a08246d1",
+  "ran": true,
+  "workspaces": [
+    {
+      "workspace": "backend",
+      "skipped": false,
+      "exitCode": 2,
+      "diagnosticCount": 47
+    },
+    {
+      "workspace": "frontend",
+      "skipped": false,
+      "exitCode": 0,
+      "diagnosticCount": 0
+    }
+  ],
+  "tasks": [
+    {
+      "id": "backend|src/api/modules/auth/auth.controller.ts|30|TS2339",
+      "workspace": "backend",
+      "file": "src/api/modules/auth/auth.controller.ts",
+      "line": 30,
+      "column": 35,
+      "code": "TS2339",
+      "message": "Property 'getUser' does not exist on type 'PrivyClient'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'getUser' does not exist on type 'PrivyClient'."
+    },
+    {
+      "id": "backend|src/api/modules/users/users.service.ts|176|TS2741",
+      "workspace": "backend",
+      "file": "src/api/modules/users/users.service.ts",
+      "line": 176,
+      "column": 3,
+      "code": "TS2741",
+      "message": "Property 'style_tag' is missing in type 'UserStyle' but required in type 'StyleAssessmentResponse'.",
+      "directive": "Property required by the target type is missing on the source. Add the field to the source factory, using the canonical DTO in `types/api.ts` as the source of truth. Original: Property 'style_tag' is missing in type 'UserStyle' but required in type 'StyleAssessmentResponse'."
+    },
+    {
+      "id": "backend|src/database/migrations/001-create-tables.ts|107|TS2820",
+      "workspace": "backend",
+      "file": "src/database/migrations/001-create-tables.ts",
+      "line": 107,
+      "column": 5,
+      "code": "TS2820",
+      "message": "Type '\"PRIMARY KEY\"' is not assignable to type '\"default\" | \"unique\" | \"check\" | \"primary key\" | \"foreign key\"'. Did you mean '\"primary key\"'?",
+      "directive": "tsc reported `TS2820`. Original: Type '\"PRIMARY KEY\"' is not assignable to type '\"default\" | \"unique\" | \"check\" | \"primary key\" | \"foreign key\"'. Did you mean '\"primary key\"'?"
+    },
+    {
+      "id": "backend|src/models/index.ts|126|TS2724",
+      "workspace": "backend",
+      "file": "src/models/index.ts",
+      "line": 126,
+      "column": 15,
+      "code": "TS2724",
+      "message": "'\"./CachedMarket\"' has no exported member named 'Vene'. Did you mean 'Venue'?",
+      "directive": "tsc reported `TS2724`. Original: '\"./CachedMarket\"' has no exported member named 'Vene'. Did you mean 'Venue'?"
+    },
+    {
+      "id": "backend|src/services/externalApis/polymarket.ts|113|TS2740",
+      "workspace": "backend",
+      "file": "src/services/externalApis/polymarket.ts",
+      "line": 113,
+      "column": 11,
+      "code": "TS2740",
+      "message": "Type '{}' is missing the following properties from type 'PolymarketMarket[]': length, pop, push, concat, and 28 more.",
+      "directive": "tsc reported `TS2740`. Original: Type '{}' is missing the following properties from type 'PolymarketMarket[]': length, pop, push, concat, and 28 more."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|541|TS2353",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 541,
+      "column": 9,
+      "code": "TS2353",
+      "message": "Object literal may only specify known properties, and 'limit' does not exist in type 'PolymarketSearchOptions'.",
+      "directive": "Object literal contains a property the target type does not declare. EITHER remove the surplus property, OR add the property to the type (after confirming API_CONTRACTS.json wants it). Never silence with `as any`. Original: Object literal may only specify known properties, and 'limit' does not exist in type 'PolymarketSearchOptions'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|549|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 549,
+      "column": 45,
+      "code": "TS2339",
+      "message": "Property 'id' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'id' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|550|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 550,
+      "column": 36,
+      "code": "TS2339",
+      "message": "Property 'title' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'title' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|552|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 552,
+      "column": 28,
+      "code": "TS2551",
+      "message": "Property 'volume24hr' does not exist on type 'PolymarketMarket'. Did you mean 'volume_24h'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'volume24hr' does not exist on type 'PolymarketMarket'. Did you mean 'volume_24h'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|552|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 552,
+      "column": 45,
+      "code": "TS2339",
+      "message": "Property 'volume' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'volume' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|553|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 553,
+      "column": 27,
+      "code": "TS2339",
+      "message": "Property 'outcomePrices' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'outcomePrices' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|554|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 554,
+      "column": 26,
+      "code": "TS2339",
+      "message": "Property 'outcomePrices' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'outcomePrices' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|555|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 555,
+      "column": 26,
+      "code": "TS2551",
+      "message": "Property 'endDate' does not exist on type 'PolymarketMarket'. Did you mean 'end_date'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'endDate' does not exist on type 'PolymarketMarket'. Did you mean 'end_date'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|556|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 556,
+      "column": 32,
+      "code": "TS2339",
+      "message": "Property 'clobTokenIds' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'clobTokenIds' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|562|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 562,
+      "column": 45,
+      "code": "TS2339",
+      "message": "Property 'id' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'id' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|563|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 563,
+      "column": 36,
+      "code": "TS2339",
+      "message": "Property 'title' does not exist on type 'PolymarketMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'title' does not exist on type 'PolymarketMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|591|TS2345",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 591,
+      "column": 56,
+      "code": "TS2345",
+      "message": "Argument of type 'HyperLiquidMetaResponse' is not assignable to parameter of type 'HyperLiquidUniverseAsset[]'.",
+      "directive": "Argument type does not match the parameter type. Two common causes: (a) you passed an object where the API expects a sub-property of it (e.g. `getMetaAndAssetCtxs()` returns `{ universe }`, but `fuzzyMatchEntity` expects the bare array — pass `.universe`); (b) the function returns `Promise<T>` and you forgot `await`, so a promise lands where `T` was wanted. Inspect the call site. Original: Argument of type 'HyperLiquidMetaResponse' is not assignable to parameter of type 'HyperLiquidUniverseAsset[]'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|593|TS2488",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 593,
+      "column": 18,
+      "code": "TS2488",
+      "message": "Type 'HyperLiquidMarket' must have a '[Symbol.iterator]()' method that returns an iterator.",
+      "directive": "Tried to iterate (`for…of`) something that is not iterable. Almost always a missing `await` on a function that returns `Promise<T[]>`. Add the `await`. Original: Type 'HyperLiquidMarket' must have a '[Symbol.iterator]()' method that returns an iterator."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|620|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 620,
+      "column": 82,
+      "code": "TS2339",
+      "message": "Property 'size' does not exist on type 'HyperLiquidMarket[]'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'size' does not exist on type 'HyperLiquidMarket[]'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|640|TS2345",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 640,
+      "column": 32,
+      "code": "TS2345",
+      "message": "Argument of type 'string' is not assignable to parameter of type 'boolean'.",
+      "directive": "Argument type does not match the parameter type. Two common causes: (a) you passed an object where the API expects a sub-property of it (e.g. `getMetaAndAssetCtxs()` returns `{ universe }`, but `fuzzyMatchEntity` expects the bare array — pass `.universe`); (b) the function returns `Promise<T>` and you forgot `await`, so a promise lands where `T` was wanted. Inspect the call site. Original: Argument of type 'string' is not assignable to parameter of type 'boolean'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|641|TS2345",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 641,
+      "column": 32,
+      "code": "TS2345",
+      "message": "Argument of type 'string' is not assignable to parameter of type 'boolean'.",
+      "directive": "Argument type does not match the parameter type. Two common causes: (a) you passed an object where the API expects a sub-property of it (e.g. `getMetaAndAssetCtxs()` returns `{ universe }`, but `fuzzyMatchEntity` expects the bare array — pass `.universe`); (b) the function returns `Promise<T>` and you forgot `await`, so a promise lands where `T` was wanted. Inspect the call site. Original: Argument of type 'string' is not assignable to parameter of type 'boolean'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|650|TS2345",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 650,
+      "column": 50,
+      "code": "TS2345",
+      "message": "Argument of type 'Map<DeribitCurrency, DeribitMarket[]>' is not assignable to parameter of type 'string'.",
+      "directive": "Argument type does not match the parameter type. Two common causes: (a) you passed an object where the API expects a sub-property of it (e.g. `getMetaAndAssetCtxs()` returns `{ universe }`, but `fuzzyMatchEntity` expects the bare array — pass `.universe`); (b) the function returns `Promise<T>` and you forgot `await`, so a promise lands where `T` was wanted. Inspect the call site. Original: Argument of type 'Map<DeribitCurrency, DeribitMarket[]>' is not assignable to parameter of type 'string'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|655|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 655,
+      "column": 32,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|656|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 656,
+      "column": 26,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|658|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 658,
+      "column": 33,
+      "code": "TS2551",
+      "message": "Property 'mark_price' does not exist on type 'DeribitMarket'. Did you mean 'markPrice'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'mark_price' does not exist on type 'DeribitMarket'. Did you mean 'markPrice'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|659|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 659,
+      "column": 25,
+      "code": "TS2339",
+      "message": "Property 'mark_iv' does not exist on type 'DeribitMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'mark_iv' does not exist on type 'DeribitMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|660|TS2352",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 660,
+      "column": 25,
+      "code": "TS2352",
+      "message": "Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
+      "directive": "tsc reported `TS2352`. Original: Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|661|TS2352",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 661,
+      "column": 25,
+      "code": "TS2352",
+      "message": "Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
+      "directive": "tsc reported `TS2352`. Original: Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|662|TS2352",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 662,
+      "column": 24,
+      "code": "TS2352",
+      "message": "Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
+      "directive": "tsc reported `TS2352`. Original: Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|663|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 663,
+      "column": 36,
+      "code": "TS2551",
+      "message": "Property 'open_interest' does not exist on type 'DeribitMarket'. Did you mean 'openInterest'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'open_interest' does not exist on type 'DeribitMarket'. Did you mean 'openInterest'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|665|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 665,
+      "column": 29,
+      "code": "TS2551",
+      "message": "Property 'expiration_timestamp' does not exist on type 'DeribitMarket'. Did you mean 'expiryTimestamp'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'expiration_timestamp' does not exist on type 'DeribitMarket'. Did you mean 'expiryTimestamp'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|666|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 666,
+      "column": 34,
+      "code": "TS2339",
+      "message": "Property 'option_type' does not exist on type 'DeribitMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'option_type' does not exist on type 'DeribitMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|673|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 673,
+      "column": 32,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|674|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 674,
+      "column": 26,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|682|TS2345",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 682,
+      "column": 50,
+      "code": "TS2345",
+      "message": "Argument of type 'Map<DeribitCurrency, DeribitMarket[]>' is not assignable to parameter of type 'string'.",
+      "directive": "Argument type does not match the parameter type. Two common causes: (a) you passed an object where the API expects a sub-property of it (e.g. `getMetaAndAssetCtxs()` returns `{ universe }`, but `fuzzyMatchEntity` expects the bare array — pass `.universe`); (b) the function returns `Promise<T>` and you forgot `await`, so a promise lands where `T` was wanted. Inspect the call site. Original: Argument of type 'Map<DeribitCurrency, DeribitMarket[]>' is not assignable to parameter of type 'string'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|687|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 687,
+      "column": 32,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|688|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 688,
+      "column": 26,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|690|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 690,
+      "column": 33,
+      "code": "TS2551",
+      "message": "Property 'mark_price' does not exist on type 'DeribitMarket'. Did you mean 'markPrice'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'mark_price' does not exist on type 'DeribitMarket'. Did you mean 'markPrice'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|691|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 691,
+      "column": 25,
+      "code": "TS2339",
+      "message": "Property 'mark_iv' does not exist on type 'DeribitMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'mark_iv' does not exist on type 'DeribitMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|692|TS2352",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 692,
+      "column": 25,
+      "code": "TS2352",
+      "message": "Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
+      "directive": "tsc reported `TS2352`. Original: Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|693|TS2352",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 693,
+      "column": 25,
+      "code": "TS2352",
+      "message": "Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
+      "directive": "tsc reported `TS2352`. Original: Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|694|TS2352",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 694,
+      "column": 24,
+      "code": "TS2352",
+      "message": "Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
+      "directive": "tsc reported `TS2352`. Original: Conversion of type 'DeribitMarket' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|695|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 695,
+      "column": 36,
+      "code": "TS2551",
+      "message": "Property 'open_interest' does not exist on type 'DeribitMarket'. Did you mean 'openInterest'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'open_interest' does not exist on type 'DeribitMarket'. Did you mean 'openInterest'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|697|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 697,
+      "column": 29,
+      "code": "TS2551",
+      "message": "Property 'expiration_timestamp' does not exist on type 'DeribitMarket'. Did you mean 'expiryTimestamp'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'expiration_timestamp' does not exist on type 'DeribitMarket'. Did you mean 'expiryTimestamp'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|698|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 698,
+      "column": 34,
+      "code": "TS2339",
+      "message": "Property 'option_type' does not exist on type 'DeribitMarket'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'option_type' does not exist on type 'DeribitMarket'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|705|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 705,
+      "column": 32,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|706|TS2551",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 706,
+      "column": 26,
+      "code": "TS2551",
+      "message": "Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?",
+      "directive": "tsc reported `TS2551`. Original: Property 'instrument_name' does not exist on type 'DeribitMarket'. Did you mean 'instrumentName'?"
+    }
+  ]
+}

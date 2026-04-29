@@ -1,5 +1,26 @@
 [
   {
+    "sessionId": "95b01ba1-a282-46de-a7d0-cc27a08246d1",
+    "startedAt": "2026-04-29T09:42:05.681Z",
+    "endedAt": "2026-04-29T12:09:22.007Z",
+    "status": "fail",
+    "score": 38,
+    "grade": "F",
+    "durationMs": 8836326,
+    "totalCalls": 345,
+    "totalTokens": 10952879,
+    "totalCostUsd": 4.444279,
+    "primaryModel": "deepseek-v4-pro",
+    "primaryModelScore": 100,
+    "primaryModelGrade": "A",
+    "archiveJsonFile": "coding-session-report.2026-04-29T12-09-22-007Z.95b01ba1-a282-46de-a7d0-cc27a08246d1.json",
+    "archiveMdFile": "coding-session-report.2026-04-29T12-09-22-007Z.95b01ba1-a282-46de-a7d0-cc27a08246d1.md",
+    "runtimeReadinessFindings": 3,
+    "runtimeReadinessErrors": 2,
+    "runtimeReadinessWarnings": 1,
+    "runtimeReadinessHasError": true
+  },
+  {
     "sessionId": "dfdf2753-a3eb-428e-9e78-d08982d8163f",
     "startedAt": "2026-04-29T03:43:30.189Z",
     "endedAt": "2026-04-29T06:50:35.667Z",
@@ -14,11 +35,7 @@
     "primaryModelScore": 100,
     "primaryModelGrade": "A",
     "archiveJsonFile": "coding-session-report.2026-04-29T06-50-35-667Z.dfdf2753-a3eb-428e-9e78-d08982d8163f.json",
-    "archiveMdFile": "coding-session-report.2026-04-29T06-50-35-667Z.dfdf2753-a3eb-428e-9e78-d08982d8163f.md",
-    "runtimeReadinessFindings": 3,
-    "runtimeReadinessErrors": 2,
-    "runtimeReadinessWarnings": 1,
-    "runtimeReadinessHasError": true
+    "archiveMdFile": "coding-session-report.2026-04-29T06-50-35-667Z.dfdf2753-a3eb-428e-9e78-d08982d8163f.md"
   },
   {
     "sessionId": "52851b86-63eb-4e90-a9c2-5f99fe94a9bd",
