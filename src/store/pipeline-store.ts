@@ -164,6 +164,8 @@ interface PipelineState {
   startPipeline: (featureBrief: string) => void;
   /** Re-run the PRD step only, applying the given edit instruction to the current PRD content. */
   rerunPrd: (editInstruction: string) => void;
+  /** Generate (or re-generate) the Design Document. Pass editInstruction to revise an existing draft. */
+  runDesignDoc: (editInstruction?: string) => void;
   setActiveTab: (tab: PipelineStepId) => void;
   /** Batch-update step results (e.g. from parallel generation). */
   updateSteps: (updates: Partial<Record<PipelineStepId, StepResult>>) => void;
@@ -410,6 +412,137 @@ export const usePipelineStore = create<PipelineState>()(
           .catch((err) => {
             set({
               isRunning: false,
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          });
+      },
+
+      runDesignDoc: (editInstruction?: string) => {
+        const { steps, featureBrief, codeOutputDir } = get();
+        const prdContent = steps.prd?.content ?? featureBrief;
+        if (!prdContent.trim()) return;
+
+        // Mark design as running
+        const updatedSteps = {
+          ...steps,
+          design: {
+            stepId: "design" as PipelineStepId,
+            status: "running" as const,
+            timestamp: new Date().toISOString(),
+          },
+        };
+        set({
+          isRunning: true,
+          error: null,
+          currentStep: "design",
+          streamingContent: "",
+          streamingThinking: "",
+          steps: updatedSteps,
+        });
+        scheduleSync(get);
+
+        fetch("/api/agents/parallel-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prdContent,
+            selectedDocs: ["design"],
+            sessionId: steps.intent?.timestamp ?? "session",
+            codeOutputDir,
+            tier: (
+              (steps.intent?.metadata as Record<string, unknown> | undefined)
+                ?.classification as { tier?: string } | undefined
+            )?.tier ?? "M",
+            ...(editInstruction?.trim() ? {
+              editInstruction: editInstruction.trim(),
+              existingDesign: steps.design?.content ?? "",
+            } : {}),
+          }),
+        })
+          .then(async (resp) => {
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              set({
+                isRunning: false,
+                currentStep: null,
+                steps: {
+                  ...get().steps,
+                  design: {
+                    stepId: "design" as PipelineStepId,
+                    status: "failed" as const,
+                    error: (errData as { error?: string }).error || "Design generation failed",
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              });
+              return;
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) {
+              set({ isRunning: false, currentStep: null });
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let designContent = "";
+            let designCost = 0;
+            let designDuration = 0;
+
+            const handleParallelEvent = (payload: Record<string, unknown>) => {
+              const type = payload.type as string;
+              if (type === "doc_stream") {
+                const chunk = payload.chunk as string | undefined;
+                if (chunk) {
+                  designContent += chunk;
+                  set({ streamingContent: designContent });
+                }
+              } else if (type === "doc_complete" && payload.docId === "design") {
+                designContent = (payload.content as string) || designContent;
+                designCost = (payload.costUsd as number) || 0;
+                designDuration = (payload.durationMs as number) || 0;
+                const completedStep: StepResult = {
+                  stepId: "design",
+                  status: "completed",
+                  content: designContent,
+                  costUsd: designCost,
+                  durationMs: designDuration,
+                  timestamp: new Date().toISOString(),
+                };
+                set({
+                  steps: { ...get().steps, design: completedStep },
+                  totalCostUsd: get().totalCostUsd + designCost,
+                  streamingContent: "",
+                });
+                scheduleSync(get);
+                saveSubStageSnapshot(get, "design");
+              } else if (type === "generation_complete") {
+                set({ isRunning: false, currentStep: null });
+                scheduleSync(get);
+              }
+            };
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try { handleParallelEvent(JSON.parse(line.slice(6))); } catch { /* skip */ }
+              }
+            }
+            if (buffer.startsWith("data: ")) {
+              try { handleParallelEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
+            }
+            if (get().isRunning) set({ isRunning: false, currentStep: null });
+          })
+          .catch((err) => {
+            set({
+              isRunning: false,
+              currentStep: null,
               error: err instanceof Error ? err.message : "Unknown error",
             });
           });

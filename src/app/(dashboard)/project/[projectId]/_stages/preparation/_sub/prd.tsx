@@ -692,7 +692,7 @@ export default function PrdSubStage() {
               {isPrinting ? "Preparing…" : "Download PDF"}
             </button>
             <button
-              onClick={() => goToSubStage("trd", "preparation")}
+              onClick={() => goToSubStage("design", "preparation")}
               className="flex items-center gap-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
             >
               Confirm PRD
