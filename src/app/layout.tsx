@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased min-h-screen bg-(--background) text-(--foreground) flex">
+      <body className="antialiased min-h-screen bg-(--background) text-(--foreground) flex" suppressHydrationWarning>
         <AppNav />
         <div className="flex-1 min-w-0 flex flex-col pl-60 overflow-hidden">
           {children}

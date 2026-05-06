@@ -166,6 +166,8 @@ interface PipelineState {
   rerunPrd: (editInstruction: string) => void;
   /** Generate (or re-generate) the Design Document. Pass editInstruction to revise an existing draft. */
   runDesignDoc: (editInstruction?: string) => void;
+  /** Generate (or re-generate) the Pencil wireframe from the PRD + chosen design style. */
+  runPencilDoc: (styleId: string, styleReferenceImage?: string | null, editInstruction?: string) => void;
   setActiveTab: (tab: PipelineStepId) => void;
   /** Batch-update step results (e.g. from parallel generation). */
   updateSteps: (updates: Partial<Record<PipelineStepId, StepResult>>) => void;
@@ -206,8 +208,9 @@ interface PipelineState {
   /**
    * Load and restore the pipeline state snapshot for the given
    * (stage, subStage). Called when the user clicks a sub-stage in the sidebar.
+   * Returns `true` if a snapshot was found and applied, `false` otherwise.
    */
-  loadSubStageSnapshot: (stageId: string, subStageId: string) => Promise<void>;
+  loadSubStageSnapshot: (stageId: string, subStageId: string) => Promise<boolean>;
 }
 
 export const usePipelineStore = create<PipelineState>()(
@@ -441,10 +444,7 @@ export const usePipelineStore = create<PipelineState>()(
         });
         scheduleSync(get);
 
-        fetch("/api/agents/parallel-generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const requestPayload = {
             prdContent,
             selectedDocs: ["design"],
             sessionId: steps.intent?.timestamp ?? "session",
@@ -457,11 +457,22 @@ export const usePipelineStore = create<PipelineState>()(
               editInstruction: editInstruction.trim(),
               existingDesign: steps.design?.content ?? "",
             } : {}),
-          }),
+          };
+        console.log("[runDesignDoc] → request payload", {
+          ...requestPayload,
+          prdContent: requestPayload.prdContent.slice(0, 500) + (requestPayload.prdContent.length > 500 ? "…(truncated)" : ""),
+        });
+
+        fetch("/api/agents/parallel-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
         })
           .then(async (resp) => {
+            console.log("[runDesignDoc] ← response status", resp.status, resp.statusText);
             if (!resp.ok) {
               const errData = await resp.json().catch(() => ({}));
+              console.error("[runDesignDoc] ✗ error response", errData);
               set({
                 isRunning: false,
                 currentStep: null,
@@ -492,6 +503,7 @@ export const usePipelineStore = create<PipelineState>()(
 
             const handleParallelEvent = (payload: Record<string, unknown>) => {
               const type = payload.type as string;
+              console.log("[runDesignDoc] SSE event", type, payload.docId ?? "");
               if (type === "doc_stream") {
                 const chunk = payload.chunk as string | undefined;
                 if (chunk) {
@@ -502,6 +514,12 @@ export const usePipelineStore = create<PipelineState>()(
                 designContent = (payload.content as string) || designContent;
                 designCost = (payload.costUsd as number) || 0;
                 designDuration = (payload.durationMs as number) || 0;
+                console.log("[runDesignDoc] ✓ doc_complete", {
+                  contentLength: designContent.length,
+                  costUsd: designCost,
+                  durationMs: designDuration,
+                  contentPreview: designContent.slice(0, 300) + (designContent.length > 300 ? "…" : ""),
+                });
                 const completedStep: StepResult = {
                   stepId: "design",
                   status: "completed",
@@ -536,6 +554,140 @@ export const usePipelineStore = create<PipelineState>()(
             }
             if (buffer.startsWith("data: ")) {
               try { handleParallelEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
+            }
+            if (get().isRunning) set({ isRunning: false, currentStep: null });
+          })
+          .catch((err) => {
+            set({
+              isRunning: false,
+              currentStep: null,
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          });
+      },
+
+      runPencilDoc: (styleId: string, styleReferenceImage?: string | null, editInstruction?: string) => {
+        const { steps, featureBrief, codeOutputDir } = get();
+        const prdContent = steps.prd?.content ?? featureBrief;
+        if (!prdContent.trim()) return;
+
+        const updatedSteps = {
+          ...steps,
+          pencil: {
+            stepId: "pencil" as PipelineStepId,
+            status: "running" as const,
+            timestamp: new Date().toISOString(),
+          },
+        };
+        set({
+          isRunning: true,
+          error: null,
+          currentStep: "pencil",
+          streamingContent: "",
+          streamingThinking: "",
+          steps: updatedSteps,
+        });
+        scheduleSync(get);
+
+        fetch("/api/agents/parallel-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prdContent,
+            selectedDocs: ["pencil"],
+            sessionId: steps.intent?.timestamp ?? "session",
+            codeOutputDir,
+            tier: (
+              (steps.intent?.metadata as Record<string, unknown> | undefined)
+                ?.classification as { tier?: string } | undefined
+            )?.tier ?? "M",
+            designStyleId: styleId,
+            designSpecContent: steps.design?.content ?? "",
+            ...(styleReferenceImage ? { styleReferenceImageBase64: styleReferenceImage } : {}),
+            ...(editInstruction?.trim() ? {
+              editInstruction: editInstruction.trim(),
+              existingDesign: steps.pencil?.content ?? "",
+            } : {}),
+          }),
+        })
+          .then(async (resp) => {
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              set({
+                isRunning: false,
+                currentStep: null,
+                steps: {
+                  ...get().steps,
+                  pencil: {
+                    stepId: "pencil" as PipelineStepId,
+                    status: "failed" as const,
+                    error: (errData as { error?: string }).error || "Pencil generation failed",
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              });
+              return;
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) {
+              set({ isRunning: false, currentStep: null });
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let pencilContent = "";
+            let pencilCost = 0;
+            let pencilDuration = 0;
+
+            const handleEvent = (payload: Record<string, unknown>) => {
+              const type = payload.type as string;
+              if (type === "doc_stream") {
+                const chunk = payload.chunk as string | undefined;
+                if (chunk) {
+                  pencilContent += chunk;
+                  set({ streamingContent: pencilContent });
+                }
+              } else if (type === "doc_complete" && payload.docId === "pencil") {
+                pencilContent = (payload.content as string) || pencilContent;
+                pencilCost = (payload.costUsd as number) || 0;
+                pencilDuration = (payload.durationMs as number) || 0;
+                const completedStep: StepResult = {
+                  stepId: "pencil",
+                  status: "completed",
+                  content: pencilContent,
+                  costUsd: pencilCost,
+                  durationMs: pencilDuration,
+                  timestamp: new Date().toISOString(),
+                  metadata: { designStyleId: styleId },
+                };
+                set({
+                  steps: { ...get().steps, pencil: completedStep },
+                  totalCostUsd: get().totalCostUsd + pencilCost,
+                  streamingContent: "",
+                });
+                scheduleSync(get);
+                saveSubStageSnapshot(get, "pencil");
+              } else if (type === "generation_complete") {
+                set({ isRunning: false, currentStep: null });
+                scheduleSync(get);
+              }
+            };
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try { handleEvent(JSON.parse(line.slice(6))); } catch { /* skip */ }
+              }
+            }
+            if (buffer.startsWith("data: ")) {
+              try { handleEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
             }
             if (get().isRunning) set({ isRunning: false, currentStep: null });
           })
@@ -1027,16 +1179,16 @@ export const usePipelineStore = create<PipelineState>()(
         }
       },
 
-      loadSubStageSnapshot: async (stageId: string, subStageId: string) => {
-        if (!_currentProjectSlug) return;
+      loadSubStageSnapshot: async (stageId: string, subStageId: string): Promise<boolean> => {
+        if (!_currentProjectSlug) return false;
         // If the pipeline is actively running, do not clobber in-flight state
         // with a stale DB snapshot (e.g. user just called startPipeline and
         // immediately navigated to the next sub-stage).
-        if (get().isRunning) return;
+        if (get().isRunning) return false;
         try {
           const url = `/api/projects/${_currentProjectSlug}/substage-snapshot?stage=${encodeURIComponent(stageId)}&subStage=${encodeURIComponent(subStageId)}`;
           const resp = await fetch(url, { cache: "no-store" });
-          if (!resp.ok) return;
+          if (!resp.ok) return false;
           const data = (await resp.json()) as {
             snapshot?: {
               featureBrief?:  string;
@@ -1049,7 +1201,7 @@ export const usePipelineStore = create<PipelineState>()(
               steps?:         Record<string, unknown>;
             } | null;
           };
-          if (!data.snapshot) return;
+          if (!data.snapshot) return false;
           const snap = data.snapshot;
           set({
             featureBrief:  snap.featureBrief  ?? "",
@@ -1063,8 +1215,10 @@ export const usePipelineStore = create<PipelineState>()(
               ? { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) }
               : { ...EMPTY_STEPS },
           });
+          return true;
         } catch (err) {
           console.error(`[pipeline-store] loadSubStageSnapshot error (${stageId}/${subStageId}):`, err);
+          return false;
         }
       },
     }),
