@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-29T11:52:02.799Z",
-  "sessionId": "95b01ba1-a282-46de-a7d0-cc27a08246d1",
+  "generatedAt": "2026-04-29T11:51:31.142Z",
+  "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
   "appliedOptionalFeatures": [
     "auth-privy"
   ],
@@ -14,46 +14,47 @@
   ],
   "findings": [
     {
-      "id": "bg-job-clear-stale-runs|backend/src/api/modules/feed/feed.routes.ts|38",
-      "ruleId": "bg-job-clear-stale-runs",
+      "id": "bg-job-inproc-branch|backend/src/services/feedAggregation.service.ts|26",
+      "ruleId": "bg-job-inproc-branch",
+      "scope": "backend",
+      "severity": "error",
+      "file": "backend/src/services/feedAggregation.service.ts",
+      "line": 26,
+      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"id\", \"status\", \"step_log\", \"started_at\", \"completed_at\", \"story_count\"],\n  });\n  if (!run) return null;",
+      "reason": "This file queries the *Run table by id but does not branch on `inproc:` run-ids. In-process runs use ids like `inproc:<userId>:<ts>` that are NOT UUIDs — Postgres throws `invalid input syntax for type uuid`, the SSE / status endpoint 5xxs, and the user sees an indefinite spinner.",
+      "directive": "Wrap the lookup in a discriminator: `if (runId.startsWith(\"inproc:\")) { /* subscribe to in-memory event emitter; do NOT touch DB */ } else if (isUuid(runId)) { const run = await XxxRun.findByPk(runId); ... } else { ctx.throw(400, \"Invalid run_id\"); }`. Apply to every status / stream handler in this file."
+    },
+    {
+      "id": "bg-job-worker-startup|backend/src/workers/feedAggregationWorker.ts|7",
+      "ruleId": "bg-job-worker-startup",
       "scope": "backend",
       "severity": "warn",
-      "file": "backend/src/api/modules/feed/feed.routes.ts",
-      "line": 38,
-      "snippet": "/api/feed/refresh\n  apiRouter.post(\n    \"/feed/refresh\",\n    requirePrivyAuthMiddleware,\n    handleRefreshFeed,\n  );\n\n  // GET /api/feed/stream?run_id=...\n  apiRouter.get(\n    \"/fe",
-      "reason": "This route kicks off a background aggregation but never clears stale `running` rows. A crashed previous run leaves the user with `ALREADY_RUNNING` errors forever.",
-      "directive": "Implement a `clearActiveRunsForUser(userId)` helper in the matching service file that updates every `status='running'` row for the user to `failed` (with `completed_at = new Date()`), and call it as the FIRST line of this refresh handler — before `enqueueXxx`."
+      "file": "backend/src/workers/feedAggregationWorker.ts",
+      "line": 7,
+      "snippet": "export async function startFeedWorker(...) { ... }",
+      "reason": "`startFeedWorker` is exported from a worker module but `backend/src/server.ts` never calls it. The in-process queue then has no consumer — every enqueued run hangs forever.",
+      "directive": "In `backend/src/server.ts`, after the app is created and BEFORE `app.listen(...)`, import and call `await startFeedWorker();`. This registers the in-process consumer at boot."
     },
     {
-      "id": "bg-job-inproc-branch|backend/src/api/modules/feed/feed.controller.ts|210",
-      "ruleId": "bg-job-inproc-branch",
+      "id": "empty-results-not-failure|backend/src/services/feedAggregator.ts|185",
+      "ruleId": "empty-results-not-failure",
       "scope": "backend",
-      "severity": "error",
-      "file": "backend/src/api/modules/feed/feed.controller.ts",
-      "line": 210,
-      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"status\", \"step_log\", \"story_count\"],\n  });\n\n  if (!run) {\n    ctx.throw(404, \"Run not found\");\n  }\n\n  con",
-      "reason": "This file queries the *Run table by id but does not branch on `inproc:` run-ids. In-process runs use ids like `inproc:<userId>:<ts>` that are NOT UUIDs — Postgres throws `invalid input syntax for type uuid`, the SSE / status endpoint 5xxs, and the user sees an indefinite spinner.",
-      "directive": "Wrap the lookup in a discriminator: `if (runId.startsWith(\"inproc:\")) { /* subscribe to in-memory event emitter; do NOT touch DB */ } else if (isUuid(runId)) { const run = await XxxRun.findByPk(runId); ... } else { ctx.throw(400, \"Invalid run_id\"); }`. Apply to every status / stream handler in this file."
-    },
-    {
-      "id": "bg-job-inproc-branch|backend/src/api/modules/feed/feed.service.ts|188",
-      "ruleId": "bg-job-inproc-branch",
-      "scope": "backend",
-      "severity": "error",
-      "file": "backend/src/api/modules/feed/feed.service.ts",
-      "line": 188,
-      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"status\", \"step_log\", \"completed_at\", \"story_count\"],\n  });\n\n  if (!run) {\n    return {\n      run_id: runI",
-      "reason": "This file queries the *Run table by id but does not branch on `inproc:` run-ids. In-process runs use ids like `inproc:<userId>:<ts>` that are NOT UUIDs — Postgres throws `invalid input syntax for type uuid`, the SSE / status endpoint 5xxs, and the user sees an indefinite spinner.",
-      "directive": "Wrap the lookup in a discriminator: `if (runId.startsWith(\"inproc:\")) { /* subscribe to in-memory event emitter; do NOT touch DB */ } else if (isUuid(runId)) { const run = await XxxRun.findByPk(runId); ... } else { ctx.throw(400, \"Invalid run_id\"); }`. Apply to every status / stream handler in this file."
+      "severity": "warn",
+      "file": "backend/src/services/feedAggregator.ts",
+      "line": 185,
+      "snippet": "al NO_SOURCES\n      throw new Error(\"NO_SOURCES\");\n    }\n    // Levenshtein dedup on titles (≥0.85)\n    const deduped = deduplicateByTitle(allTitles, 0.85);",
+      "reason": "Aggregation throws `NO_SOURCES` when all upstream sources return zero rows. Empty result is a normal user-visible state, not an error — throwing turns a benign empty feed into a hard failure that leaves stale 'running' rows in the DB.",
+      "directive": "Replace the throw with a graceful empty-feed completion: mark the run `status='completed'` with `item_count=0`, clear the user's existing items (or leave them — depending on the empty-state UX you want), and emit a final SSE `complete` event so the frontend transitions to an empty state instead of an error toast."
     }
   ],
   "byRule": {
-    "bg-job-clear-stale-runs": 1,
-    "bg-job-inproc-branch": 2
+    "bg-job-inproc-branch": 1,
+    "bg-job-worker-startup": 1,
+    "empty-results-not-failure": 1
   },
   "bySeverity": {
-    "warn": 1,
-    "error": 2
+    "error": 1,
+    "warn": 2
   },
   "hasError": true,
   "clean": false,

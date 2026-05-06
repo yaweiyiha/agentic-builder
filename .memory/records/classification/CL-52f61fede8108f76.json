@@ -1,0 +1,31 @@
+{
+  "id": "CL-52f61fede8108f76",
+  "layer": "L1",
+  "kind": "classification",
+  "title": "Classification · M · tool",
+  "tags": [
+    "classifier",
+    "tier:M",
+    "type:tool",
+    "promptVersion:v1-2026-04-28"
+  ],
+  "source": "cache",
+  "refs": {},
+  "createdAt": 1778046353294,
+  "updatedAt": 1778046353294,
+  "schemaVersion": 1,
+  "body": {
+    "tier": "M",
+    "type": "tool",
+    "needsBackend": false,
+    "needsDatabase": false,
+    "needsAuth": false,
+    "needsMultipleServices": false,
+    "reasoning": "The project is a simple tool that does not require any backend or database.",
+    "costUsd": 0.0000846,
+    "durationMs": 2186,
+    "briefHash": "52f61fede8108f76",
+    "promptVersion": "v1-2026-04-28",
+    "modelUsed": "openai/gpt-4o-mini"
+  }
+}

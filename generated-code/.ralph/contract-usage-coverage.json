@@ -2,10 +2,10 @@
   "policy": "prune",
   "totals": {
     "contractEntries": 10,
-    "frontendCalls": 1,
-    "consistent": 1,
+    "frontendCalls": 4,
+    "consistent": 3,
     "surplus": 0,
-    "frontendWiringMissing": 9,
+    "frontendWiringMissing": 7,
     "contractGap": 0,
     "frontendRogue": 0,
     "adminSkipped": 0
@@ -34,7 +34,7 @@
       "reason": "prd-keyword-hit:users"
     },
     {
-      "case": "frontend-wiring-missing",
+      "case": "consistent",
       "contract": {
         "method": "PUT",
         "endpoint": "/api/users/me/interests",
@@ -42,10 +42,10 @@
         "prdJustification": "PUT /api/users/me/interests | Save interest selection | {clusters: string[]} | {success, feed_reaggregation_enqueued}"
       },
       "prdJustified": true,
-      "reason": "prdJustification-quote-found"
+      "reason": "frontend has at least one call site for this endpoint"
     },
     {
-      "case": "frontend-wiring-missing",
+      "case": "consistent",
       "contract": {
         "method": "POST",
         "endpoint": "/api/users/me/style-assessment",
@@ -53,7 +53,7 @@
         "prdJustification": "POST /api/users/me/style-assessment | Submit 6 answers | {answers: [{question_id, option_id}]} | {style_tag, tagline, description, icon_key}"
       },
       "prdJustified": true,
-      "reason": "prdJustification-quote-found"
+      "reason": "frontend has at least one call site for this endpoint"
     },
     {
       "case": "frontend-wiring-missing",
@@ -130,22 +130,6 @@
       "directive": "Wire up frontend to call GET /api/users/me from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
       "endpoint": "/api/users/me",
       "method": "GET"
-    },
-    {
-      "id": "wire-put-/api/users/me/interests",
-      "case": "frontend-wiring-missing",
-      "role": "frontend",
-      "directive": "Wire up frontend to call PUT /api/users/me/interests from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
-      "endpoint": "/api/users/me/interests",
-      "method": "PUT"
-    },
-    {
-      "id": "wire-post-/api/users/me/style-assessment",
-      "case": "frontend-wiring-missing",
-      "role": "frontend",
-      "directive": "Wire up frontend to call POST /api/users/me/style-assessment from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
-      "endpoint": "/api/users/me/style-assessment",
-      "method": "POST"
     },
     {
       "id": "wire-get-/api/feed",
