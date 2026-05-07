@@ -31,6 +31,19 @@ export interface ApiContract {
   /** Legacy: kept for backward compat, prefer requestFields + responseFields */
   schema: string;
   generatedBy: string;
+  /**
+   * Verbatim PRD line / section that justifies this endpoint's existence.
+   * Required when emitted by `generate_api_contracts` after the v2 scope
+   * rule (see CODEGEN_HARDENING_PLAN.md §7.1). Optional here for back-compat
+   * with older contract files persisted before the schema upgrade.
+   */
+  prdJustification?: string;
+  /**
+   * "user" — called by the consumer-facing frontend (covered by usage audit).
+   * "admin" — internal / admin UI / cron / webhook (skipped by usage audit
+   * because the consumer is not in `frontend/src/api/**`).
+   */
+  audience?: "user" | "admin";
 }
 
 export interface TaskResult {

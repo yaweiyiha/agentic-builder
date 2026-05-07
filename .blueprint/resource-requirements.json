@@ -1,0 +1,62 @@
+[
+  {
+    "envKey": "VITE_PRIVY_APP_ID",
+    "label": "Privy App ID",
+    "description": "Client-side app identifier for Privy social login (Twitter + Farcaster) authentication flow.",
+    "category": "auth",
+    "required": true,
+    "example": "clp1a2b3c4d5e6f7g8h9i0j1k",
+    "docsUrl": "https://dashboard.privy.io",
+    "value": "cmocly8bj01ak0cjy3662inlh"
+  },
+  {
+    "envKey": "PRIVY_APP_SECRET",
+    "label": "Privy App Secret",
+    "description": "Server-side secret for verifying Privy JWT tokens in the auth verification endpoint.",
+    "category": "auth",
+    "required": true,
+    "example": "privy_app_secret_...",
+    "docsUrl": "https://dashboard.privy.io",
+    "value": "privy_app_secret_2yxkWQ3ujNeREhjvQWDBraMZ43vKdZxxVZZnhsUUdbrdzHRQtcGbM9aoyiNWTZR9gBhx6wa6EBA9ru63ut8N4xpA"
+  },
+  {
+    "envKey": "OPENAI_API_KEY",
+    "label": "OpenAI API Key",
+    "description": "API key for LLM calls in both Feed aggregator entity extraction and Markets scanner pipeline.",
+    "category": "ai",
+    "required": true,
+    "example": "sk-proj-...",
+    "docsUrl": "https://platform.openai.com/api-keys",
+    "value": "sk-1841d0bb06814436b1093bbe41a55b2a"
+  },
+  {
+    "envKey": "X_BEARER_TOKEN",
+    "label": "X (Twitter) Bearer Token",
+    "description": "Bearer token for fetching tweet content in Markets scanner when user inputs Twitter URLs.",
+    "category": "other",
+    "required": false,
+    "example": "AAAAAAAAAAAAAAAAAAAAAA...",
+    "docsUrl": "https://developer.twitter.com/en/portal/dashboard",
+    "value": "AAAAAAAAAAAAAAAAAAAAAGov9QEAAAAACA4ilcNl%2BrJrWWeKlgtnhav7ASs%3DeocmnGmV1FB0wzTKUejRwIzUmy05qUUjv0wR5cCiNPGzEk1OWO"
+  },
+  {
+    "envKey": "JINA_API_KEY",
+    "label": "Jina Reader API Key",
+    "description": "API key for article content scraping in both Feed aggregator and Markets scanner pipelines.",
+    "category": "other",
+    "required": false,
+    "example": "jina_...",
+    "docsUrl": "https://jina.ai/reader/",
+    "value": "jina_b6538d490485450baf220e6fd425cd43hzem8T_iePbi9ZW-dTpuWjCnlKBZ"
+  },
+  {
+    "envKey": "QUOTIENT_API_KEY",
+    "label": "Quotient Intelligence API Key",
+    "description": "API key for AI fair-odds data to display edge badges on Polymarket prediction cards.",
+    "category": "other",
+    "required": false,
+    "example": "quotient_...",
+    "docsUrl": "https://quotient.social",
+    "value": ""
+  }
+]

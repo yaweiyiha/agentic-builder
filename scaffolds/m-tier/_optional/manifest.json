@@ -1,0 +1,53 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": 1,
+  "description": "Optional scaffold features for the M-tier template. Each entry is copied into the generated project IFF the kickoff-detected ResourceRequirement[] declares ANY of its triggerEnvKeys (presence of the declaration is enough — the user does NOT need to have filled the value yet). See CODEGEN_HARDENING_PLAN.md §4.10.",
+  "features": {
+    "auth-privy": {
+      "label": "Privy OAuth (server + client SDK)",
+      "triggerEnvKeys": [
+        "VITE_PRIVY_APP_ID",
+        "NEXT_PUBLIC_PRIVY_APP_ID",
+        "PRIVY_APP_ID",
+        "PRIVY_APP_SECRET"
+      ],
+      "extraDeps": {
+        "frontend": {
+          "@privy-io/react-auth": "^3.22.0"
+        },
+        "backend": {
+          "@privy-io/node": "^0.16.0"
+        }
+      }
+    },
+    "auth-clerk": {
+      "label": "Clerk OAuth (server + client SDK)",
+      "triggerEnvKeys": [
+        "VITE_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "CLERK_SECRET_KEY"
+      ],
+      "extraDeps": {
+        "frontend": {
+          "@clerk/clerk-react": "^5.0.0"
+        },
+        "backend": {
+          "@clerk/backend": "^1.0.0"
+        }
+      }
+    },
+    "payment-stripe": {
+      "label": "Stripe payments (server SDK + webhooks)",
+      "triggerEnvKeys": [
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "VITE_STRIPE_PUBLISHABLE_KEY"
+      ],
+      "extraDeps": {
+        "backend": {
+          "stripe": "^17.0.0"
+        }
+      }
+    }
+  }
+}

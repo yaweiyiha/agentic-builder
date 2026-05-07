@@ -2,9 +2,7 @@ import "dotenv/config";
 
 export const PORT = Number(process.env.PORT || 4000);
 
-// Privy (server-side)
-//
-// IMPORTANT: do NOT hardcode `PRIVY_APP_SECRET` in source control. Set it via env.
-export const PRIVY_APP_ID =
-  process.env.PRIVY_APP_ID || "cmocly8bj01ak0cjy3662inlh";
-export const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET || "";
+// Optional auth providers (Privy, Clerk, Auth0, etc.) live in
+// `scaffolds/m-tier/_optional/<feature>/backend/src/config/<feature>-env.ts`.
+// They are copied into the generated project only when the kickoff phase
+// detects matching `triggerEnvKeys` on `.blueprint/resource-requirements.json`.

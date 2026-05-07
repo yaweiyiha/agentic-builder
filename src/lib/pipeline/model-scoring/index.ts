@@ -112,7 +112,9 @@ export async function runModelScoringStage(
   if (save.error) errors.push(`snapshot-save: ${save.error}`);
 
   // Render three markdown payloads.
-  const scorecardMd = renderScorecardMarkdown(scorecard);
+  const scorecardMd = renderScorecardMarkdown(scorecard, {
+    leaderboard: leaderboardBuckets,
+  });
   const leaderboardMd = renderLeaderboardMarkdown(leaderboardBuckets);
   const changeMd = renderModelChangeMarkdown(changes, {
     leaderboard: leaderboardBuckets,

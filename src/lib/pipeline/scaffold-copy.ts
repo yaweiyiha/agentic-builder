@@ -1,5 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
+import type { ResourceRequirement } from "./resource-requirements";
+import {
+  copyOptionalScaffolds,
+  type CopyOptionalScaffoldsResult,
+} from "./scaffold-optional";
 
 export type ScaffoldTier = "S" | "M" | "L";
 
@@ -42,19 +47,48 @@ const UNPROTECTED_SCAFFOLD_PATHS = new Set([
   "frontend/playwright.config.ts",
 ]);
 
+export interface CopyScaffoldResult {
+  copied: string[];
+  skipped: string[];
+  /**
+   * Result of the optional-feature pass. Always present; when the tier has
+   * no `_optional/manifest.json` (back-compat), `manifestFound: false`.
+   */
+  optional: CopyOptionalScaffoldsResult;
+}
+
 /**
  * Copy the scaffold template for the given tier into outputDir.
  * By default, existing files are not overwritten.
  * Pass { forceOverwrite: true } to always write scaffold files (safe for fresh coding sessions).
+ *
+ * When `resourceRequirements` is provided, the optional-scaffold layer is
+ * applied on top of the base copy: each feature in
+ * `scaffolds/<tier>/_optional/manifest.json` whose `triggerEnvKeys` match
+ * any declared requirement is copied into outputDir with full overwrite
+ * semantics (optional features may replace base wiring), and the
+ * matching `extraDeps` are appended to `frontend/package.json` and
+ * `backend/package.json`. See CODEGEN_HARDENING_PLAN.md §4.1 / §4.10.
  */
 export async function copyScaffold(
   tier: ScaffoldTier,
   outputDir: string,
-  options?: { forceOverwrite?: boolean },
-): Promise<{ copied: string[]; skipped: string[] }> {
+  options?: {
+    forceOverwrite?: boolean;
+    resourceRequirements?: ResourceRequirement[];
+  },
+): Promise<CopyScaffoldResult> {
   const forceOverwrite = options?.forceOverwrite ?? false;
   const tierDir = tier.toLowerCase() + "-tier";
   const scaffoldRoot = path.resolve(process.cwd(), "scaffolds", tierDir);
+
+  const emptyOptional: CopyOptionalScaffoldsResult = {
+    applied: [],
+    skipped: [],
+    copiedFiles: [],
+    depsAppended: [],
+    manifestFound: false,
+  };
 
   try {
     await fs.access(scaffoldRoot);
@@ -62,7 +96,7 @@ export async function copyScaffold(
     console.warn(
       `[Scaffold] No scaffold found for tier ${tier} at ${scaffoldRoot}, skipping.`,
     );
-    return { copied: [], skipped: [] };
+    return { copied: [], skipped: [], optional: emptyOptional };
   }
 
   const copied: string[] = [];
@@ -81,7 +115,43 @@ export async function copyScaffold(
     `[Scaffold] Tier ${tier}: copied ${copied.length} file(s), skipped ${skipped.length} existing file(s).`,
   );
 
-  return { copied, skipped };
+  // ── Phase 2: optional-feature layer (CODEGEN_HARDENING_PLAN.md §4.10) ──
+  // The base scaffold ships only the always-on parts. OAuth providers,
+  // payment SDKs, analytics, etc. live in `<tier>/_optional/<feature>/` and
+  // are copied here based on which env vars the kickoff detector declared.
+  let optional = emptyOptional;
+  if (options?.resourceRequirements) {
+    try {
+      optional = await copyOptionalScaffolds(
+        tier,
+        outputDir,
+        options.resourceRequirements,
+      );
+      if (optional.applied.length > 0) {
+        console.log(
+          `[Scaffold] Tier ${tier}: applied optional feature(s): ${optional.applied.join(", ")} (${optional.copiedFiles.length} additional file(s)).`,
+        );
+        for (const dep of optional.depsAppended) {
+          console.log(
+            `[Scaffold] Tier ${tier}: ${dep.scope} package.json — added ${dep.packages.length} dep(s) for ${dep.feature}: ${dep.packages.join(", ")}.`,
+          );
+        }
+      }
+      if (optional.skipped.length > 0) {
+        for (const s of optional.skipped) {
+          console.warn(
+            `[Scaffold] Tier ${tier}: optional feature ${s.feature} skipped — ${s.reason}.`,
+          );
+        }
+      }
+    } catch (e) {
+      console.warn(
+        `[Scaffold] Tier ${tier}: optional-feature pass failed (continuing without): ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  return { copied, skipped, optional };
 }
 
 /**

@@ -74,8 +74,20 @@ export interface FeatureChecklistAuditResult {
   passed: boolean;
   /** Every id checked, with its verdict. */
   entries: AuditEntry[];
-  /** Subset of `entries` that did NOT reach `implemented`. */
+  /**
+   * All entries that did NOT reach `implemented` (includes IC-xx soft IDs).
+   * Used for reporting only — does NOT affect `passed`.
+   */
   uncovered: AuditEntry[];
+  /**
+   * Subset of `uncovered` that belong to hard requirement types:
+   * AC-xx, FR-xx, US-xx, PAGE-xx, CMP-xx.
+   * IC-xx (interactive component specs) are excluded because they describe
+   * granular UI interaction behaviours rather than functional requirements,
+   * and their textual IDs are not expected to appear literally in generated
+   * source code. `passed` is derived from this field.
+   */
+  hardUncovered: AuditEntry[];
 }
 
 /**
@@ -94,7 +106,7 @@ export async function runFeatureChecklistAudit(
       event: "audit_skipped_no_ids",
       details: { reason: "No PRD ids extracted — nothing to audit." },
     });
-    return { passed: true, entries: [], uncovered: [] };
+    return { passed: true, entries: [], uncovered: [], hardUncovered: [] };
   }
 
   emitter({
@@ -201,17 +213,24 @@ export async function runFeatureChecklistAudit(
   }
 
   const uncovered = entries.filter((e) => e.verdict !== "implemented");
+  // IC-xx IDs are interactive-component specs (e.g. "click Login button →
+  // navigate to login page"). They are extracted from PRD interaction tables
+  // and describe UX behaviours, not functional modules. Generated source files
+  // are not expected to contain literal "IC-01" anchors, so we treat them as
+  // soft warnings that do NOT block the gate.
+  const hardUncovered = uncovered.filter((e) => !isInteractionSpecId(e.id));
 
   emitter({
     stage: "post-gen-audit",
-    event: uncovered.length > 0 ? "uncovered_detected" : "audit_clean",
-    missingIds: uncovered.filter((e) => e.verdict === "missing").map((e) => e.id),
-    stillMissing: uncovered.map((e) => e.id),
+    event: hardUncovered.length > 0 ? "uncovered_detected" : "audit_clean",
+    missingIds: hardUncovered.filter((e) => e.verdict === "missing").map((e) => e.id),
+    stillMissing: hardUncovered.map((e) => e.id),
     details: {
       totalChecked: entries.length,
       implemented: entries.length - uncovered.length,
       partial: uncovered.filter((e) => e.verdict === "partial").length,
       missing: uncovered.filter((e) => e.verdict === "missing").length,
+      softWarnings: uncovered.filter((e) => isInteractionSpecId(e.id)).length,
     },
   });
 
@@ -222,7 +241,16 @@ export async function runFeatureChecklistAudit(
     );
   });
 
-  return { passed: uncovered.length === 0, entries, uncovered };
+  return { passed: hardUncovered.length === 0, entries, uncovered, hardUncovered };
+}
+
+/**
+ * Returns true for IC-xx IDs (Interactive Component specs from PRD interaction
+ * tables). These describe per-element UX behaviours and are treated as soft
+ * warnings rather than hard gate failures.
+ */
+function isInteractionSpecId(id: string): boolean {
+  return /^IC-\d+$/i.test(id);
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────
@@ -425,20 +453,51 @@ async function writeUncoveredReport(
     return;
   }
 
+  const hardUncovered = uncovered.filter((e) => !isInteractionSpecId(e.id));
+  const softUncovered = uncovered.filter((e) => isInteractionSpecId(e.id));
+
   const lines: string[] = [
     `# Feature Checklist Audit — uncovered requirements`,
     ``,
-    `Checked ${entries.length} PRD id(s). **${uncovered.length} did not reach \`implemented\`**.`,
+    `Checked ${entries.length} PRD id(s). **${hardUncovered.length} hard requirement(s)** did not reach \`implemented\`${softUncovered.length > 0 ? ` (plus ${softUncovered.length} soft IC-xx interaction spec(s) — see below)` : ""}.`,
     ``,
-    `| id | verdict | layer | covering tasks | reason |`,
-    `| --- | --- | --- | --- | --- |`,
   ];
-  for (const e of uncovered) {
-    lines.push(
-      `| \`${e.id}\` | ${e.verdict} | ${e.layer} | ${e.coveringTaskIds.join(", ") || "(none)"} | ${escapeTableCell(e.reason)} |`,
-    );
+
+  if (hardUncovered.length > 0) {
+    lines.push(`## Hard Failures (block the gate)`, ``);
+    lines.push(`| id | verdict | layer | covering tasks | reason |`);
+    lines.push(`| --- | --- | --- | --- | --- |`);
+    for (const e of hardUncovered) {
+      lines.push(
+        `| \`${e.id}\` | ${e.verdict} | ${e.layer} | ${e.coveringTaskIds.join(", ") || "(none)"} | ${escapeTableCell(e.reason)} |`,
+      );
+    }
+    lines.push(``);
+  } else {
+    lines.push(`## Hard Failures\n\nNone — gate passed.\n`);
   }
-  lines.push(``, `## Notes`, ``);
+
+  if (softUncovered.length > 0) {
+    lines.push(
+      `## Soft Warnings — IC-xx Interactive Component Specs`,
+      ``,
+      `These IDs come from the PRD interaction table and describe per-element UX behaviours`,
+      `(e.g. "click Login button → navigate to login page"). They are **not expected to appear`,
+      `as literal anchors in generated source code** and therefore do **not block the gate**.`,
+      `They are listed here for reference only.`,
+      ``,
+      `| id | verdict | layer | covering tasks | reason |`,
+      `| --- | --- | --- | --- | --- |`,
+    );
+    for (const e of softUncovered) {
+      lines.push(
+        `| \`${e.id}\` | ${e.verdict} | ${e.layer} | ${e.coveringTaskIds.join(", ") || "(none)"} | ${escapeTableCell(e.reason)} |`,
+      );
+    }
+    lines.push(``);
+  }
+
+  lines.push(`## Notes`, ``);
   lines.push(
     `- \`missing\` (layer l1): no task declared coverage, or covering tasks produced no files.`,
   );

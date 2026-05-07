@@ -1,12 +1,19 @@
 # dependencies
 /node_modules
+/.pnpm-store/
 # scaffold templates must stay source-only; local installs break copyScaffold
 scaffolds/**/node_modules
-generated-code
+# generated-code: ignore bulk of output; allow pipeline/session dirs to be tracked
+generated-code/*
+!generated-code/.ralph/
+!generated-code/.ralph/**
+!generated-code/.agentic-snapshot/
+!generated-code/.agentic-snapshot/**
 generated-code 2
 generated-code/node_modules/
 generated-code/dist/
 generated-code/public/design/*.png
+example
 /.pnp
 .pnp.*
 .yarn/*
@@ -19,7 +26,11 @@ generated-code/public/design/*.png
 
 # next.js
 /.next/
+/.next-*/
 /out/
+
+# parallel-instance generated-code roots (kept untracked alongside generated-code/)
+/generated-code-*/
 
 # electron
 /dist/
@@ -28,6 +39,7 @@ generated-code/public/design/*.png
 .env
 .env.local
 .env*.local
+.env.parallel
 
 # testing
 /coverage
@@ -43,3 +55,8 @@ generated-code/public/design/*.png
 next-env.d.ts
 
 worklog-automation
+
+# memory runtime / locks (L1 records under .memory/records are tracked separately)
+.memory/.lock-target
+.memory/metrics.json
+.memory/trace.jsonl

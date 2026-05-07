@@ -12,7 +12,7 @@ interface ImportPrdDialogProps {
 
 const ACCEPTED_EXTS = [".md", ".markdown", ".txt", ".pdf"];
 const MAX_BYTES = 500_000;
-const PDF_MAX_BYTES = 20_000_000; // 20 MB for PDFs
+const MAX_PDF_BYTES = 20_000_000;
 
 function isAcceptedFile(file: File): boolean {
   const lower = file.name.toLowerCase();
@@ -20,38 +20,68 @@ function isAcceptedFile(file: File): boolean {
 }
 
 function isPdfFile(file: File): boolean {
-  return file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
-}
-
-async function parsePdfToText(file: File): Promise<string> {
-  const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
-  // 使用内置 worker，避免跨域问题
-  GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.mjs",
-    import.meta.url,
-  ).toString();
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await getDocument({ data: arrayBuffer }).promise;
-  const numPages = pdf.numPages;
-  const pageTexts: string[] = [];
-
-  for (let i = 1; i <= numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => ("str" in item ? item.str : ""))
-      .join(" ");
-    pageTexts.push(pageText);
-  }
-
-  return pageTexts.join("\n\n");
+  return file.name.toLowerCase().endsWith(".pdf");
 }
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+async function parsePdfToText(file: File): Promise<string> {
+  const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) })
+    .promise;
+
+  const pageTexts: string[] = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+
+    // Group text items into lines by their Y coordinate.
+    // transform[5] is the Y position in PDF coordinate space.
+    const lineMap = new Map<number, { x: number; text: string }[]>();
+    const Y_THRESHOLD = 2;
+
+    for (const item of textContent.items) {
+      if (!("str" in item) || !item.str.trim()) continue;
+      const rawY = (item.transform as number[])[5];
+      // Round Y to nearest threshold bucket so near-same-line items merge.
+      const bucketY = Math.round(rawY / Y_THRESHOLD) * Y_THRESHOLD;
+      const x = (item.transform as number[])[4];
+      if (!lineMap.has(bucketY)) lineMap.set(bucketY, []);
+      lineMap.get(bucketY)!.push({ x, text: item.str });
+    }
+
+    // Sort lines top-to-bottom (PDF Y goes bottom-up, so descending).
+    const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+
+    const lines: string[] = [];
+    let prevY: number | null = null;
+
+    for (const y of sortedYs) {
+      const chunks = lineMap.get(y)!.sort((a, b) => a.x - b.x);
+      const lineText = chunks.map((c) => c.text).join("").replace(/ +/g, " ").trim();
+      if (!lineText) continue;
+
+      // Insert blank line between paragraphs (large Y gap between lines).
+      if (prevY !== null && prevY - y > 20) {
+        lines.push("");
+      }
+      lines.push(lineText);
+      prevY = y;
+    }
+
+    const pageText = lines.join("\n").trim();
+    if (pageText) pageTexts.push(pageText);
+  }
+
+  return pageTexts.join("\n\n---\n\n");
 }
 
 export default function ImportPrdDialog({
@@ -70,7 +100,7 @@ export default function ImportPrdDialog({
   const [draft, setDraft] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [pdfParsing, setPdfParsing] = useState(false);
+  const [parsingPdf, setParsingPdf] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -80,7 +110,7 @@ export default function ImportPrdDialog({
     setDraft("");
   }, [isOpen, refreshImportedPrdStatus]);
 
-  const isBusy = loading === "saving" || loading === "clearing" || pdfParsing;
+  const isBusy = loading === "saving" || loading === "clearing" || parsingPdf;
 
   const readFile = useCallback(async (file: File) => {
     if (!isAcceptedFile(file)) {
@@ -89,52 +119,38 @@ export default function ImportPrdDialog({
       );
       return;
     }
-
-    if (isPdfFile(file)) {
-      if (file.size > PDF_MAX_BYTES) {
-        setLocalError(
-          `PDF is ${formatBytes(file.size)} — larger than the ${formatBytes(PDF_MAX_BYTES)} import limit.`,
-        );
-        return;
-      }
-      try {
-        setPdfParsing(true);
-        setLocalError(null);
-        const text = await parsePdfToText(file);
-        if (!text.trim()) {
-          setLocalError("Could not extract any text from the PDF. It may be scanned or image-based.");
-          return;
-        }
-        setDraft(text);
-        requestAnimationFrame(() => {
-          textareaRef.current?.focus();
-        });
-      } catch (err) {
-        setLocalError(
-          err instanceof Error ? `PDF parse error: ${err.message}` : "Failed to parse the PDF.",
-        );
-      } finally {
-        setPdfParsing(false);
-      }
-      return;
-    }
-
-    if (file.size > MAX_BYTES) {
+    const sizeLimit = isPdfFile(file) ? MAX_PDF_BYTES : MAX_BYTES;
+    if (file.size > sizeLimit) {
       setLocalError(
-        `File is ${formatBytes(file.size)} — larger than the ${formatBytes(
-          MAX_BYTES,
-        )} import limit.`,
+        `File is ${formatBytes(file.size)} — larger than the ${formatBytes(sizeLimit)} import limit.`,
       );
       return;
     }
     try {
-      const text = await file.text();
+      let text: string;
+      if (isPdfFile(file)) {
+        setParsingPdf(true);
+        try {
+          text = await parsePdfToText(file);
+        } finally {
+          setParsingPdf(false);
+        }
+        if (!text.trim()) {
+          setLocalError(
+            "Could not extract text from this PDF. It may be image-based or encrypted.",
+          );
+          return;
+        }
+      } else {
+        text = await file.text();
+      }
       setDraft(text);
       setLocalError(null);
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
       });
     } catch (err) {
+      setParsingPdf(false);
       setLocalError(
         err instanceof Error ? err.message : "Failed to read the file.",
       );
@@ -294,24 +310,27 @@ export default function ImportPrdDialog({
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                   </svg>
-                  {pdfParsing ? (
-                    <span className="text-[#475569]">Parsing PDF…</span>
+                  {parsingPdf ? (
+                    <span className="text-indigo-600">Parsing PDF…</span>
                   ) : (
                     <span>
                       Drop a{" "}
-                      <span className="font-mono text-[11px] text-[#475569]">
+                      <span className="font-mono text-[11px]">
                         .md / .markdown / .txt / .pdf
                       </span>{" "}
-                      file here, or
+                      file here or
                     </span>
                   )}
                 </div>
-                <label className="cursor-pointer rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[11px] font-medium text-[#475569] shadow-sm transition-colors hover:bg-[#f8f9ff] hover:text-[#0b1c30]">
+                <label
+                  className={`cursor-pointer rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-[11px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 ${parsingPdf ? "pointer-events-none opacity-50" : ""}`}
+                >
                   Choose file
                   <input
                     type="file"
                     accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf"
                     onChange={handleFileInput}
+                    disabled={parsingPdf}
                     className="hidden"
                   />
                 </label>
@@ -338,7 +357,7 @@ export default function ImportPrdDialog({
                   className="min-h-65 resize-y rounded-xl border border-[#e2e8f0] bg-white px-3.5 py-3 font-mono text-[12px] leading-relaxed text-[#0b1c30] placeholder:text-[#94a3b8] transition-colors focus:border-[#0f172a]/30 focus:outline-none focus:ring-2 focus:ring-[#0f172a]/8"
                 />
                 <p className="text-[10.5px] text-[#94a3b8]">
-                  Max {formatBytes(MAX_BYTES)} for text files, {formatBytes(PDF_MAX_BYTES)} for PDF.
+                  Max {formatBytes(MAX_BYTES)} for text files, {formatBytes(MAX_PDF_BYTES)} for PDF.
                   PDF text will be extracted automatically. The next pipeline run
                   will reuse this PRD verbatim and skip PM generation.
                 </p>
@@ -365,10 +384,12 @@ export default function ImportPrdDialog({
               )}
             </div>
 
-            {/* ── Footer ── */}
-            <div className="flex items-center justify-between gap-2 border-t border-[#e2e8f0] bg-[#fafbfc] px-6 py-3">
-              <div className="flex items-center gap-2 text-[11px] text-[#94a3b8]">
-                {loading === "loading" && (
+            <div className="flex items-center justify-between gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3">
+              <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                {parsingPdf && (
+                  <Loading size="sm" text="Extracting text from PDF..." />
+                )}
+                {!parsingPdf && loading === "loading" && (
                   <Loading size="sm" text="Loading status..." />
                 )}
               </div>

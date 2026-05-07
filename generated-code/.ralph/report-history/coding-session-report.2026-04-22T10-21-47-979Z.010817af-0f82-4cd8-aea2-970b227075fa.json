@@ -1,0 +1,5503 @@
+{
+  "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+  "startedAt": "2026-04-22T09:04:57.594Z",
+  "endedAt": "2026-04-22T10:21:47.979Z",
+  "status": "fail",
+  "terminalSummary": "Integration verify gate failed.\nIntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/App.tsx(28,24): error TS2503: Cannot find namespace 'JSX'.\nsrc/App.tsx(59,32): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/LoginForm.tsx(40,59): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/LoginForm.tsx(78,13): error TS2322: Type 'User' is not assignable to type 'MeResponse'.\n  Types of property 'notificationPreferences' are incompatible.\n    Type 'NotificationPreferences | Record<string, boolean>' is not assignable to type 'Record<string, boolean> | undefined'.\n      Type 'NotificationPreferences' is not assignable to type 'Record<string, boolean>'.\n        Index signature for type 'string' is missing in type 'NotificationPreferences'.\nsrc/components/Auth/RegisterForm.tsx(41,65): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/RegisterForm.tsx(87,13): error TS2322: Type 'User' is not assignable to type 'MeResponse'.\n  Types of property 'notificationPreferences' are incompatible.\n    Type 'NotificationPreferences | Record<string, boolean>' is not assignable to type 'Record<string, boolean> | undefined'.\n      Type 'NotificationPreferences' is not assignable to type 'Record<string, boolean>'.\n        Index signature for type 'string' is missing in type 'NotificationPreferences'.\nsrc/components/Dashboard/QuickActions.tsx(4,33): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/RecentTasks.tsx(56,59): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/RecentTasks.tsx(77,50): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/SummaryCards.tsx(8,63): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Landing/FeatureCards.tsx(1,1): error TS6133: 'React' is declared but its value is never read.\nsrc/components/Landing/FeatureCards.tsx(3,33): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Landing/HeroSection.tsx(11,23): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Layout/Header.tsx(11,65): error TS2503: Cannot find namespace 'JSX'.\nsrc/c\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/App.tsx\u001b[0m:\u001b[93m28\u001b[0m:\u001b[93m24\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m28\u001b[0m function AppContent(): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m                       ~~~\u001b[0m\n\n\u001b[96msrc/App.tsx\u001b[0m:\u001b[93m59\u001b[0m:\u001b[93m32\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m59\u001b[0m export default function App(): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m                               ~~~\u001b[0m\n\n\u001b[96msrc/components/Auth/LoginForm.tsx\u001b[0m:\u001b[93m40\u001b[0m:\u001b[93m59\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m40\u001b[0m export function LoginForm({ onSuccess }: LoginF",
+  "fatalError": "Integration verify gate failed.\nIntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/App.tsx(28,24): error TS2503: Cannot find namespace 'JSX'.\nsrc/App.tsx(59,32): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/LoginForm.tsx(40,59): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/LoginForm.tsx(78,13): error TS2322: Type 'User' is not assignable to type 'MeResponse'.\n  Types of property 'notificationPreferences' are incompatible.\n    Type 'NotificationPreferences | Record<string, boolean>' is not assignable to type 'Record<string, boolean> | undefined'.\n      Type 'NotificationPreferences' is not assignable to type 'Record<string, boolean>'.\n        Index signature for type 'string' is missing in type 'NotificationPreferences'.\nsrc/components/Auth/RegisterForm.tsx(41,65): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/RegisterForm.tsx(87,13): error TS2322: Type 'User' is not assignable to type 'MeResponse'.\n  Types of property 'notificationPreferences' are incompatible.\n    Type 'NotificationPreferences | Record<string, boolean>' is not assignable to type 'Record<string, boolean> | undefined'.\n      Type 'NotificationPreferences' is not assignable to type 'Record<string, boolean>'.\n        Index signature for type 'string' is missing in type 'NotificationPreferences'.\nsrc/components/Dashboard/QuickActions.tsx(4,33): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/RecentTasks.tsx(56,59): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/RecentTasks.tsx(77,50): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/SummaryCards.tsx(8,63): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Landing/FeatureCards.tsx(1,1): error TS6133: 'React' is declared but its value is never read.\nsrc/components/Landing/FeatureCards.tsx(3,33): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Landing/HeroSection.tsx(11,23): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Layout/Header.tsx(11,65): error TS2503: Cannot find namespace 'JSX'.\nsrc/c\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/App.tsx\u001b[0m:\u001b[93m28\u001b[0m:\u001b[93m24\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m28\u001b[0m function AppContent(): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m                       ~~~\u001b[0m\n\n\u001b[96msrc/App.tsx\u001b[0m:\u001b[93m59\u001b[0m:\u001b[93m32\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m59\u001b[0m export default function App(): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m                               ~~~\u001b[0m\n\n\u001b[96msrc/components/Auth/LoginForm.tsx\u001b[0m:\u001b[93m40\u001b[0m:\u001b[93m59\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m40\u001b[0m export function LoginForm({ onSuccess }: LoginF",
+  "generatorGitSha": null,
+  "scaffoldFixAttempts": 50,
+  "integrationFixAttempts": 18,
+  "score": {
+    "score": 54,
+    "grade": "F",
+    "reasons": [
+      "Run status is fail.",
+      "Integration verification still has blocking errors.",
+      "Context truncation happened 2 time(s).",
+      "Task plan/file-plan mismatches happened 1 time(s)."
+    ]
+  },
+  "gateErrors": {
+    "integrationErrors": "IntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/App.tsx(28,24): error TS2503: Cannot find namespace 'JSX'.\nsrc/App.tsx(59,32): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/LoginForm.tsx(40,59): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/LoginForm.tsx(78,13): error TS2322: Type 'User' is not assignable to type 'MeResponse'.\n  Types of property 'notificationPreferences' are incompatible.\n    Type 'NotificationPreferences | Record<string, boolean>' is not assignable to type 'Record<string, boolean> | undefined'.\n      Type 'NotificationPreferences' is not assignable to type 'Record<string, boolean>'.\n        Index signature for type 'string' is missing in type 'NotificationPreferences'.\nsrc/components/Auth/RegisterForm.tsx(41,65): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Auth/RegisterForm.tsx(87,13): error TS2322: Type 'User' is not assignable to type 'MeResponse'.\n  Types of property 'notificationPreferences' are incompatible.\n    Type 'NotificationPreferences | Record<string, boolean>' is not assignable to type 'Record<string, boolean> | undefined'.\n      Type 'NotificationPreferences' is not assignable to type 'Record<string, boolean>'.\n        Index signature for type 'string' is missing in type 'NotificationPreferences'.\nsrc/components/Dashboard/QuickActions.tsx(4,33): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/RecentTasks.tsx(56,59): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/RecentTasks.tsx(77,50): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Dashboard/SummaryCards.tsx(8,63): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Landing/FeatureCards.tsx(1,1): error TS6133: 'React' is declared but its value is never read.\nsrc/components/Landing/FeatureCards.tsx(3,33): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Landing/HeroSection.tsx(11,23): error TS2503: Cannot find namespace 'JSX'.\nsrc/components/Layout/Header.tsx(11,65): error TS2503: Cannot find namespace 'JSX'.\nsrc/c\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/App.tsx\u001b[0m:\u001b[93m28\u001b[0m:\u001b[93m24\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m28\u001b[0m function AppContent(): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m                       ~~~\u001b[0m\n\n\u001b[96msrc/App.tsx\u001b[0m:\u001b[93m59\u001b[0m:\u001b[93m32\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m59\u001b[0m export default function App(): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m                               ~~~\u001b[0m\n\n\u001b[96msrc/components/Auth/LoginForm.tsx\u001b[0m:\u001b[93m40\u001b[0m:\u001b[93m59\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m40\u001b[0m export function LoginForm({ onSuccess }: LoginFormProps): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m                                                          ~~~\u001b[0m\n\n\u001b[96msrc/components/Auth/LoginForm.tsx\u001b[0m:\u001b[93m78\u001b[0m:\u001b[93m13\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'User' is not assignable to type 'MeResponse'.\n  Types of property 'notificationPreferences' are incompatible.\n    Type 'NotificationPreferences | Record<string, boolean>' is not assignable to type 'Record<string, boolean> | undefined'.\n      Type 'NotificationPreferences' is not assignable to type 'Record<string, boolean>'.\n        Index signature for type 'string' is missing in type 'NotificationPreferences'.\n\n\u001b[7m78\u001b[0m       const me: MeResponse = await withMinDuration(authApi.me(), MIN_TRANSIENT_MS);\n\u001b[7m  \u001b[0m \u001b[91m            ~~\u001b[0m\n\n\u001b[96msrc/components/Auth/RegisterForm.tsx\u001b[0m:\u001b[93m41\u001b[0m:\u001b[93m65\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2503: \u001b[0mCannot find namespace 'JSX'.\n\n\u001b[7m41\u001b[0m export function RegisterForm({ onSuccess }: RegisterFormProps): JSX.Element {\n\u001b[7m  \u001b[0m \u001b[91m",
+    "runtimeVerifyErrors": "",
+    "e2eVerifyErrors": ""
+  },
+  "gateStates": {
+    "integrationVerify": "fail",
+    "runtimeVerify": "skipped",
+    "e2eVerify": "skipped",
+    "featureAudit": "pass"
+  },
+  "taskResults": [
+    {
+      "id": "T-001",
+      "title": "Implement Sequelize models and database schema",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-TS01",
+        "FR-TS02",
+        "FR-PR01",
+        "FR-CO01"
+      ],
+      "generatedFiles": [
+        "backend/src/config/database.ts",
+        "backend/src/models/User.ts",
+        "backend/src/models/Team.ts",
+        "backend/src/models/TeamMember.ts",
+        "backend/src/models/Project.ts",
+        "backend/src/models/Task.ts",
+        "backend/src/models/Comment.ts",
+        "backend/src/models/Notification.ts",
+        "backend/src/models/ActivityLog.ts",
+        "backend/src/models/index.ts",
+        "backend/src/migrations/001-initial-schema.sql",
+        "backend/src/types/models.ts",
+        "backend/src/validation/schemas.ts",
+        ".env"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-002",
+      "title": "Define API contracts and frontend client",
+      "coversRequirementIds": [
+        "FR-AU02",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-PR02",
+        "FR-CO01"
+      ],
+      "generatedFiles": [
+        "frontend/src/types/models.ts",
+        "frontend/src/types/api.ts",
+        "frontend/src/utils/apiError.ts",
+        "frontend/src/api/client.ts",
+        "frontend/src/api/auth.ts",
+        "frontend/src/api/tasks.ts",
+        "frontend/src/api/projects.ts",
+        "frontend/src/api/teams.ts",
+        "frontend/src/api/notifications.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-003",
+      "title": "Implement authentication and user management APIs",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU03",
+        "FR-AU04",
+        "FR-AU05",
+        "AC-01",
+        "AC-02"
+      ],
+      "generatedFiles": [
+        "backend/src/utils/password.ts",
+        "backend/src/utils/jwt.ts",
+        "backend/src/utils/email.ts",
+        "backend/src/middlewares/auth.ts",
+        "backend/src/api/modules/auth/auth.service.ts",
+        "backend/src/api/modules/auth/auth.controller.ts",
+        "backend/src/api/modules/users/users.service.ts",
+        "backend/src/api/modules/users/users.controller.ts",
+        "backend/src/api/modules/auth/auth.routes.ts",
+        "backend/src/api/modules/users/users.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-004",
+      "title": "Implement team and project management APIs",
+      "coversRequirementIds": [
+        "FR-TS01",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-TS04",
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "AC-03",
+        "AC-04"
+      ],
+      "generatedFiles": [
+        "backend/src/middlewares/teamAccess.ts",
+        "backend/src/api/modules/teams/teams.service.ts",
+        "backend/src/api/modules/teams/teams.controller.ts",
+        "backend/src/api/modules/teams/teams.routes.ts",
+        "backend/src/api/modules/projects/projects.service.ts",
+        "backend/src/middlewares/projectAccess.ts",
+        "backend/src/api/modules/projects/projects.controller.ts",
+        "backend/src/api/modules/projects/projects.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-005",
+      "title": "Implement task management and collaboration APIs",
+      "coversRequirementIds": [
+        "FR-TS01",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-TS04",
+        "FR-TS05",
+        "FR-TS06",
+        "FR-TS07",
+        "FR-TS08",
+        "FR-TS09",
+        "FR-CO01",
+        "FR-CO02",
+        "FR-CO03",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10"
+      ],
+      "generatedFiles": [
+        "backend/src/utils/taskFilters.ts",
+        "backend/src/utils/activityLogger.ts",
+        "backend/src/api/modules/tasks/tasks.service.ts",
+        "backend/src/api/modules/tasks/tasks.controller.ts",
+        "backend/src/api/modules/tasks/tasks.routes.ts",
+        "backend/src/api/modules/comments/comments.service.ts",
+        "backend/src/api/modules/comments/comments.controller.ts",
+        "backend/src/api/modules/comments/comments.routes.ts",
+        "backend/src/api/modules/notifications/notifications.service.ts",
+        "backend/src/api/modules/notifications/notifications.controller.ts",
+        "backend/src/api/modules/notifications/notifications.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-006",
+      "title": "Implement app shell and navigation layout",
+      "coversRequirementIds": [
+        "FR-AU03",
+        "FR-ST01"
+      ],
+      "generatedFiles": [
+        "frontend/src/utils/storage.ts",
+        "frontend/src/contexts/AuthContext.tsx",
+        "frontend/src/hooks/useAuth.ts",
+        "frontend/src/components/UI/LoadingSpinner.tsx",
+        "frontend/src/components/UI/ErrorBoundary.tsx",
+        "frontend/src/components/Layout/Header.tsx",
+        "frontend/src/components/Layout/Sidebar.tsx",
+        "frontend/src/components/Layout/MainLayout.tsx",
+        "frontend/src/App.tsx",
+        "frontend/src/main.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-007",
+      "title": "Implement landing and authentication pages",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU04",
+        "AC-01",
+        "AC-02",
+        "AC-11"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/Landing/HeroSection.tsx",
+        "frontend/src/components/Landing/FeatureCards.tsx",
+        "frontend/src/components/Auth/LoginForm.tsx",
+        "frontend/src/components/Auth/RegisterForm.tsx",
+        "frontend/src/views/LandingPage.tsx",
+        "frontend/src/views/LoginPage.tsx",
+        "frontend/src/views/RegisterPage.tsx",
+        "frontend/src/views/ForgotPasswordPage.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-008",
+      "title": "Implement dashboard and overview page",
+      "coversRequirementIds": [
+        "FR-TS06",
+        "AC-14"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useDashboardData.ts",
+        "frontend/src/components/Dashboard/SummaryCards.tsx",
+        "frontend/src/components/Dashboard/RecentTasks.tsx",
+        "frontend/src/components/Dashboard/QuickActions.tsx",
+        "frontend/src/views/DashboardPage.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-009",
+      "title": "Implement project list and detail pages",
+      "coversRequirementIds": [
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-TS09",
+        "AC-04"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useProjects.ts",
+        "frontend/src/components/Projects/CreateProjectModal.tsx",
+        "frontend/src/components/Projects/ProjectCard.tsx",
+        "frontend/src/components/Projects/ProjectHeader.tsx",
+        "frontend/src/components/Tasks/TaskListView.tsx",
+        "frontend/src/components/Tasks/TaskKanbanView.tsx",
+        "frontend/src/views/ProjectListPage.tsx",
+        "frontend/src/views/ProjectDetailPage.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-010",
+      "title": "Implement task list and detail pages",
+      "coversRequirementIds": [
+        "FR-TS01",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-TS05",
+        "FR-TS06",
+        "FR-TS07",
+        "FR-TS08",
+        "FR-CO01",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useTasks.ts",
+        "frontend/src/hooks/useTaskDetail.ts",
+        "frontend/src/components/Tasks/TaskFilters.tsx",
+        "frontend/src/components/Tasks/TaskTable.tsx",
+        "frontend/src/components/Tasks/CreateTaskModal.tsx",
+        "frontend/src/components/Tasks/TaskComments.tsx",
+        "frontend/src/components/Tasks/TaskActivity.tsx",
+        "frontend/src/components/Tasks/TaskProperties.tsx",
+        "frontend/src/views/TaskListPage.tsx",
+        "frontend/src/views/TaskDetailPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-011",
+      "title": "Implement team management and settings pages",
+      "coversRequirementIds": [
+        "FR-TS02",
+        "FR-TS03",
+        "FR-AU05",
+        "FR-ST01",
+        "FR-CO03",
+        "AC-03",
+        "AC-10",
+        "AC-16"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useTeamMembers.ts",
+        "frontend/src/hooks/useNotifications.ts",
+        "frontend/src/components/Team/MemberTable.tsx",
+        "frontend/src/components/Team/InviteMemberModal.tsx",
+        "frontend/src/components/Settings/ProfileForm.tsx",
+        "frontend/src/components/Settings/NotificationSettings.tsx",
+        "frontend/src/components/Notifications/NotificationPanel.tsx",
+        "frontend/src/views/TeamMembersPage.tsx",
+        "frontend/src/views/SettingsPage.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-012",
+      "title": "Setup infrastructure and environment configuration",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02"
+      ],
+      "generatedFiles": [
+        "docker-compose.yml",
+        "backend/.env.example",
+        "frontend/.env.example",
+        "backend/src/middlewares/cors.ts",
+        "backend/src/middlewares/errorHandler.ts",
+        "backend/src/app.ts",
+        "frontend/vite.config.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-013",
+      "title": "Implement team creation and management endpoints",
+      "coversRequirementIds": [
+        "FR-TS01",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-TS04"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/teams/teams.validation.ts",
+        "backend/src/api/modules/teams/teams.controller.ts",
+        "backend/src/api/modules/teams/teams.service.ts",
+        "backend/src/api/modules/teams/teams.routes.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-014",
+      "title": "Implement team settings and admin configuration endpoints",
+      "coversRequirementIds": [
+        "FR-ST02"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/teams/settings.service.ts",
+        "backend/src/api/modules/teams/settings.controller.ts",
+        "backend/src/api/modules/teams/teams.routes.ts",
+        "backend/src/api/modules/teams/teams.validation.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-015",
+      "title": "Implement team member invitation and management endpoints",
+      "coversRequirementIds": [
+        "FR-TS02",
+        "FR-TS03",
+        "FR-TS04"
+      ],
+      "generatedFiles": [
+        "backend/src/services/emailService.ts",
+        "backend/src/services/invitationService.ts",
+        "backend/src/api/modules/team/invitations.controller.ts",
+        "backend/src/api/modules/team/invitations.routes.ts",
+        "backend/src/api/modules/index.ts",
+        "backend/src/api/modules/team/team.controller.ts",
+        "backend/src/api/modules/team/team.routes.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-001",
+      "title": "Set up Playwright E2E harness",
+      "coversRequirementIds": [],
+      "generatedFiles": [
+        "frontend/playwright.config.ts",
+        "frontend/package.json",
+        "frontend/tests/e2e/utils.ts",
+        "frontend/tests/e2e/fixtures.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-002",
+      "title": "Implement PRD browser journeys",
+      "coversRequirementIds": [
+        "US-01",
+        "FR-AU01",
+        "AC-01",
+        "AC-11",
+        "PAGE-001",
+        "PAGE-003",
+        "PAGE-005",
+        "CMP-002",
+        "CMP-005",
+        "FR-AU02",
+        "FR-AU03",
+        "FR-AU04",
+        "AC-02",
+        "PAGE-002",
+        "PAGE-004",
+        "CMP-004",
+        "CMP-006",
+        "FR-TM01",
+        "FR-TM02",
+        "AC-03",
+        "US-06",
+        "PAGE-010",
+        "CMP-016",
+        "FR-TM03",
+        "FR-TM04",
+        "AC-16",
+        "PAGE-015",
+        "CMP-022",
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "AC-04",
+        "PAGE-006",
+        "PAGE-014",
+        "CMP-009",
+        "CMP-021",
+        "FR-TS01",
+        "FR-TS05",
+        "FR-TS09",
+        "AC-05",
+        "US-02",
+        "US-03",
+        "PAGE-007",
+        "PAGE-013",
+        "CMP-010",
+        "CMP-011",
+        "CMP-020",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-CO02",
+        "AC-06",
+        "AC-12",
+        "AC-13",
+        "PAGE-009",
+        "CMP-014",
+        "CMP-015",
+        "FR-TS04",
+        "FR-TS06",
+        "FR-TS07",
+        "FR-TS08",
+        "AC-07",
+        "AC-08",
+        "AC-14",
+        "US-04",
+        "PAGE-008",
+        "CMP-012",
+        "CMP-013",
+        "FR-CO01",
+        "AC-09",
+        "AC-15",
+        "US-05",
+        "FR-CO03",
+        "AC-10",
+        "PAGE-012",
+        "CMP-007",
+        "CMP-018",
+        "CMP-019",
+        "FR-AU05",
+        "FR-ST01",
+        "FR-ST02",
+        "PAGE-011",
+        "PAGE-016",
+        "CMP-017",
+        "CMP-023"
+      ],
+      "generatedFiles": [
+        "frontend/tests/e2e/generated/e2e-001-landing-to-register-to-first-dashboard-s.spec.ts",
+        "frontend/tests/e2e/generated/e2e-002-login-forgot-password-entry-logout-and-g.spec.ts",
+        "frontend/tests/e2e/generated/e2e-003-owner-creates-workspace-and-invites-memb.spec.ts",
+        "frontend/tests/e2e/generated/e2e-004-owner-removes-member-and-removed-user-lo.spec.ts",
+        "frontend/tests/e2e/generated/e2e-005-owner-creates-edits-and-archives-a-proje.spec.ts",
+        "frontend/tests/e2e/generated/e2e-006-create-task-from-project-detail-with-val.spec.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-REPAIR-FRONTEND",
+      "title": "Backfill uncovered features (frontend): IC-01, IC-02, IC-03, IC-04 …+24",
+      "coversRequirementIds": [
+        "IC-01",
+        "IC-02",
+        "IC-03",
+        "IC-04",
+        "IC-05",
+        "IC-06",
+        "IC-07",
+        "IC-08",
+        "IC-09",
+        "IC-10",
+        "IC-11",
+        "IC-12",
+        "IC-13",
+        "IC-14",
+        "IC-15",
+        "IC-16",
+        "IC-17",
+        "IC-18",
+        "IC-19",
+        "IC-20",
+        "IC-21",
+        "IC-22",
+        "IC-23",
+        "IC-24",
+        "IC-25",
+        "IC-26",
+        "IC-27",
+        "IC-28"
+      ],
+      "generatedFiles": [
+        "frontend/src/router.tsx",
+        "frontend/src/views/ForgotPasswordPage.tsx",
+        "frontend/src/components/Auth/LoginForm.tsx",
+        "frontend/src/components/Auth/RegisterForm.tsx",
+        "frontend/src/views/LoginPage.tsx",
+        "frontend/src/views/RegisterPage.tsx",
+        "frontend/src/components/Notifications/NotificationPanel.tsx",
+        "frontend/src/components/Layout/MainLayout.tsx",
+        "frontend/src/views/TeamMembersPage.tsx",
+        "frontend/src/views/SettingsPage.tsx",
+        "frontend/src/views/DashboardPage.tsx",
+        "frontend/src/views/NotFoundPage.tsx"
+      ],
+      "status": "completed"
+    }
+  ],
+  "fileRegistryCount": 185,
+  "llmUsageEvents": [
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06165949999999999,
+      "promptTokens": 20130,
+      "completionTokens": 1888,
+      "totalTokens": 22018,
+      "timestamp": "2026-04-22T09:05:28.799Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.056392,
+      "promptTokens": 21168,
+      "completionTokens": 1382,
+      "totalTokens": 22550,
+      "timestamp": "2026-04-22T09:05:49.023Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.061162499999999995,
+      "promptTokens": 22406,
+      "completionTokens": 1568,
+      "totalTokens": 23974,
+      "timestamp": "2026-04-22T09:06:10.630Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.061519500000000005,
+      "promptTokens": 24186,
+      "completionTokens": 1371,
+      "totalTokens": 25557,
+      "timestamp": "2026-04-22T09:06:28.599Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07293125,
+      "promptTokens": 25587,
+      "completionTokens": 2011,
+      "totalTokens": 27598,
+      "timestamp": "2026-04-22T09:06:56.179Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08716925,
+      "promptTokens": 27139,
+      "completionTokens": 2834,
+      "totalTokens": 29973,
+      "timestamp": "2026-04-22T09:07:35.680Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.074256,
+      "promptTokens": 29576,
+      "completionTokens": 1607,
+      "totalTokens": 31183,
+      "timestamp": "2026-04-22T09:08:03.980Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "generate_api_contracts",
+      "model": "qwen/qwen3.6-plus-04-02",
+      "costUsd": 0.018264024999999996,
+      "promptTokens": 6037,
+      "completionTokens": 8360,
+      "totalTokens": 14397,
+      "timestamp": "2026-04-22T09:11:42.539Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.065156,
+      "promptTokens": 20976,
+      "completionTokens": 2032,
+      "totalTokens": 23008,
+      "timestamp": "2026-04-22T09:12:14.874Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0778715,
+      "promptTokens": 23050,
+      "completionTokens": 2681,
+      "totalTokens": 25731,
+      "timestamp": "2026-04-22T09:12:27.435Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06847575,
+      "promptTokens": 24841,
+      "completionTokens": 1786,
+      "totalTokens": 26627,
+      "timestamp": "2026-04-22T09:12:57.540Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07463575,
+      "promptTokens": 21969,
+      "completionTokens": 2585,
+      "totalTokens": 24554,
+      "timestamp": "2026-04-22T09:12:58.340Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06336925,
+      "promptTokens": 26411,
+      "completionTokens": 1225,
+      "totalTokens": 27636,
+      "timestamp": "2026-04-22T09:13:15.813Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.05997425,
+      "promptTokens": 27575,
+      "completionTokens": 837,
+      "totalTokens": 28412,
+      "timestamp": "2026-04-22T09:13:27.516Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.054733000000000004,
+      "promptTokens": 28524,
+      "completionTokens": 344,
+      "totalTokens": 28868,
+      "timestamp": "2026-04-22T09:13:35.521Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07466025,
+      "promptTokens": 22143,
+      "completionTokens": 2565,
+      "totalTokens": 24708,
+      "timestamp": "2026-04-22T09:13:44.197Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06638625000000001,
+      "promptTokens": 23151,
+      "completionTokens": 1848,
+      "totalTokens": 24999,
+      "timestamp": "2026-04-22T09:14:05.449Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07448525,
+      "promptTokens": 23875,
+      "completionTokens": 2336,
+      "totalTokens": 26211,
+      "timestamp": "2026-04-22T09:14:18.927Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0566055,
+      "promptTokens": 24586,
+      "completionTokens": 970,
+      "totalTokens": 25556,
+      "timestamp": "2026-04-22T09:14:23.238Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0833035,
+      "promptTokens": 25746,
+      "completionTokens": 2732,
+      "totalTokens": 28478,
+      "timestamp": "2026-04-22T09:14:53.830Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08193500000000001,
+      "promptTokens": 25420,
+      "completionTokens": 2675,
+      "totalTokens": 28095,
+      "timestamp": "2026-04-22T09:15:05.599Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.065968,
+      "promptTokens": 27328,
+      "completionTokens": 1296,
+      "totalTokens": 28624,
+      "timestamp": "2026-04-22T09:15:24.256Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06275675,
+      "promptTokens": 28557,
+      "completionTokens": 913,
+      "totalTokens": 29470,
+      "timestamp": "2026-04-22T09:15:41.124Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0621285,
+      "promptTokens": 29142,
+      "completionTokens": 795,
+      "totalTokens": 29937,
+      "timestamp": "2026-04-22T09:15:57.207Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06720174999999999,
+      "promptTokens": 29729,
+      "completionTokens": 1084,
+      "totalTokens": 30813,
+      "timestamp": "2026-04-22T09:16:24.261Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.11491725,
+      "promptTokens": 24827,
+      "completionTokens": 5105,
+      "totalTokens": 29932,
+      "timestamp": "2026-04-22T09:17:53.208Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.087206,
+      "promptTokens": 28216,
+      "completionTokens": 2702,
+      "totalTokens": 30918,
+      "timestamp": "2026-04-22T09:18:39.355Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09359525,
+      "promptTokens": 30651,
+      "completionTokens": 2854,
+      "totalTokens": 33505,
+      "timestamp": "2026-04-22T09:19:24.298Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.088284,
+      "promptTokens": 33016,
+      "completionTokens": 2179,
+      "totalTokens": 35195,
+      "timestamp": "2026-04-22T09:19:56.331Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10994025,
+      "promptTokens": 34927,
+      "completionTokens": 3487,
+      "totalTokens": 38414,
+      "timestamp": "2026-04-22T09:20:48.768Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10009475,
+      "promptTokens": 25053,
+      "completionTokens": 4018,
+      "totalTokens": 29071,
+      "timestamp": "2026-04-22T09:21:54.586Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.13381375,
+      "promptTokens": 28185,
+      "completionTokens": 6035,
+      "totalTokens": 34220,
+      "timestamp": "2026-04-22T09:23:27.203Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07977375,
+      "promptTokens": 33465,
+      "completionTokens": 1515,
+      "totalTokens": 34980,
+      "timestamp": "2026-04-22T09:23:49.176Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07222775000000001,
+      "promptTokens": 34777,
+      "completionTokens": 812,
+      "totalTokens": 35589,
+      "timestamp": "2026-04-22T09:24:00.142Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07935025000000001,
+      "promptTokens": 35719,
+      "completionTokens": 1203,
+      "totalTokens": 36922,
+      "timestamp": "2026-04-22T09:24:18.052Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.07120925,
+      "promptTokens": 36907,
+      "completionTokens": 473,
+      "totalTokens": 37380,
+      "timestamp": "2026-04-22T09:24:24.367Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0548135,
+      "promptTokens": 23618,
+      "completionTokens": 963,
+      "totalTokens": 24581,
+      "timestamp": "2026-04-22T09:24:51.471Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.05237225,
+      "promptTokens": 24143,
+      "completionTokens": 723,
+      "totalTokens": 24866,
+      "timestamp": "2026-04-22T09:25:02.035Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.05767125,
+      "promptTokens": 24859,
+      "completionTokens": 1012,
+      "totalTokens": 25871,
+      "timestamp": "2026-04-22T09:25:20.894Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codefix",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.020142499999999997,
+      "promptTokens": 2654,
+      "completionTokens": 1107,
+      "totalTokens": 3761,
+      "timestamp": "2026-04-22T09:25:39.028Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.1071105,
+      "promptTokens": 25190,
+      "completionTokens": 4502,
+      "totalTokens": 29692,
+      "timestamp": "2026-04-22T09:26:43.401Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.1124935,
+      "promptTokens": 28522,
+      "completionTokens": 4470,
+      "totalTokens": 32992,
+      "timestamp": "2026-04-22T09:27:54.261Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0666155,
+      "promptTokens": 31706,
+      "completionTokens": 795,
+      "totalTokens": 32501,
+      "timestamp": "2026-04-22T09:28:14.411Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08456174999999999,
+      "promptTokens": 25105,
+      "completionTokens": 2902,
+      "totalTokens": 28007,
+      "timestamp": "2026-04-22T09:29:16.601Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09003925,
+      "promptTokens": 26771,
+      "completionTokens": 3085,
+      "totalTokens": 29856,
+      "timestamp": "2026-04-22T09:30:18.076Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09976399999999999,
+      "promptTokens": 25080,
+      "completionTokens": 3991,
+      "totalTokens": 29071,
+      "timestamp": "2026-04-22T09:31:32.508Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08471925,
+      "promptTokens": 27203,
+      "completionTokens": 2651,
+      "totalTokens": 29854,
+      "timestamp": "2026-04-22T09:32:16.039Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0823375,
+      "promptTokens": 28866,
+      "completionTokens": 2273,
+      "totalTokens": 31139,
+      "timestamp": "2026-04-22T09:33:07.875Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.083531,
+      "promptTokens": 29956,
+      "completionTokens": 2222,
+      "totalTokens": 32178,
+      "timestamp": "2026-04-22T09:33:41.279Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0029575,
+      "promptTokens": 1210,
+      "completionTokens": 60,
+      "totalTokens": 1270,
+      "timestamp": "2026-04-22T09:33:55.366Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0032060000000000005,
+      "promptTokens": 1304,
+      "completionTokens": 66,
+      "totalTokens": 1370,
+      "timestamp": "2026-04-22T09:34:13.634Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.005663,
+      "promptTokens": 2460,
+      "completionTokens": 97,
+      "totalTokens": 2557,
+      "timestamp": "2026-04-22T09:34:16.322Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0058449999999999995,
+      "promptTokens": 3028,
+      "completionTokens": 39,
+      "totalTokens": 3067,
+      "timestamp": "2026-04-22T09:34:18.658Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.006459250000000001,
+      "promptTokens": 3059,
+      "completionTokens": 79,
+      "totalTokens": 3138,
+      "timestamp": "2026-04-22T09:34:21.239Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.009569,
+      "promptTokens": 4156,
+      "completionTokens": 164,
+      "totalTokens": 4320,
+      "timestamp": "2026-04-22T09:34:33.133Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00989275,
+      "promptTokens": 5077,
+      "completionTokens": 72,
+      "totalTokens": 5149,
+      "timestamp": "2026-04-22T09:34:36.526Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.011837,
+      "promptTokens": 6196,
+      "completionTokens": 71,
+      "totalTokens": 6267,
+      "timestamp": "2026-04-22T09:34:55.541Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01581475,
+      "promptTokens": 7317,
+      "completionTokens": 215,
+      "totalTokens": 7532,
+      "timestamp": "2026-04-22T09:35:01.928Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02257325,
+      "promptTokens": 10955,
+      "completionTokens": 243,
+      "totalTokens": 11198,
+      "timestamp": "2026-04-22T09:35:06.627Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.028633500000000003,
+      "promptTokens": 15786,
+      "completionTokens": 72,
+      "totalTokens": 15858,
+      "timestamp": "2026-04-22T09:35:08.956Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0302225,
+      "promptTokens": 16814,
+      "completionTokens": 57,
+      "totalTokens": 16871,
+      "timestamp": "2026-04-22T09:35:10.926Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.031773,
+      "promptTokens": 17780,
+      "completionTokens": 47,
+      "totalTokens": 17827,
+      "timestamp": "2026-04-22T09:35:16.966Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03399375,
+      "promptTokens": 18817,
+      "completionTokens": 76,
+      "totalTokens": 18893,
+      "timestamp": "2026-04-22T09:35:22.919Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.035790999999999996,
+      "promptTokens": 19996,
+      "completionTokens": 57,
+      "totalTokens": 20053,
+      "timestamp": "2026-04-22T09:35:25.790Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03758125,
+      "promptTokens": 21147,
+      "completionTokens": 41,
+      "totalTokens": 21188,
+      "timestamp": "2026-04-22T09:35:29.894Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0090825,
+      "promptTokens": 4726,
+      "completionTokens": 58,
+      "totalTokens": 4784,
+      "timestamp": "2026-04-22T09:35:32.721Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01119475,
+      "promptTokens": 5845,
+      "completionTokens": 69,
+      "totalTokens": 5914,
+      "timestamp": "2026-04-22T09:35:37.153Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0152145,
+      "promptTokens": 6974,
+      "completionTokens": 215,
+      "totalTokens": 7189,
+      "timestamp": "2026-04-22T09:35:44.305Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01978725,
+      "promptTokens": 10939,
+      "completionTokens": 46,
+      "totalTokens": 10985,
+      "timestamp": "2026-04-22T09:35:47.873Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.020027,
+      "promptTokens": 11036,
+      "completionTokens": 51,
+      "totalTokens": 11087,
+      "timestamp": "2026-04-22T09:35:55.304Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.021843500000000002,
+      "promptTokens": 12146,
+      "completionTokens": 42,
+      "totalTokens": 12188,
+      "timestamp": "2026-04-22T09:35:56.895Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0270375,
+      "promptTokens": 13106,
+      "completionTokens": 293,
+      "totalTokens": 13399,
+      "timestamp": "2026-04-22T09:36:10.886Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0274225,
+      "promptTokens": 14326,
+      "completionTokens": 168,
+      "totalTokens": 14494,
+      "timestamp": "2026-04-22T09:36:16.517Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.025845749999999997,
+      "promptTokens": 14377,
+      "completionTokens": 49,
+      "totalTokens": 14426,
+      "timestamp": "2026-04-22T09:36:20.151Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.028675500000000003,
+      "promptTokens": 14538,
+      "completionTokens": 231,
+      "totalTokens": 14769,
+      "timestamp": "2026-04-22T09:36:28.265Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0329035,
+      "promptTokens": 15618,
+      "completionTokens": 398,
+      "totalTokens": 16016,
+      "timestamp": "2026-04-22T09:36:39.122Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.041485499999999995,
+      "promptTokens": 16082,
+      "completionTokens": 953,
+      "totalTokens": 17035,
+      "timestamp": "2026-04-22T09:36:58.663Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.031660999999999995,
+      "promptTokens": 16220,
+      "completionTokens": 234,
+      "totalTokens": 16454,
+      "timestamp": "2026-04-22T09:37:04.670Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03466925,
+      "promptTokens": 16451,
+      "completionTokens": 420,
+      "totalTokens": 16871,
+      "timestamp": "2026-04-22T09:37:13.325Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.034854750000000004,
+      "promptTokens": 16813,
+      "completionTokens": 388,
+      "totalTokens": 17201,
+      "timestamp": "2026-04-22T09:37:18.446Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.037548,
+      "promptTokens": 17184,
+      "completionTokens": 534,
+      "totalTokens": 17718,
+      "timestamp": "2026-04-22T09:37:30.187Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03226125,
+      "promptTokens": 18107,
+      "completionTokens": 41,
+      "totalTokens": 18148,
+      "timestamp": "2026-04-22T09:37:31.374Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03862425,
+      "promptTokens": 18543,
+      "completionTokens": 441,
+      "totalTokens": 18984,
+      "timestamp": "2026-04-22T09:37:43.693Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03966025,
+      "promptTokens": 18695,
+      "completionTokens": 496,
+      "totalTokens": 19191,
+      "timestamp": "2026-04-22T09:37:52.391Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03354925,
+      "promptTokens": 18963,
+      "completionTokens": 26,
+      "totalTokens": 18989,
+      "timestamp": "2026-04-22T09:37:54.136Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0353815,
+      "promptTokens": 19890,
+      "completionTokens": 41,
+      "totalTokens": 19931,
+      "timestamp": "2026-04-22T09:37:57.660Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0363195,
+      "promptTokens": 20186,
+      "completionTokens": 71,
+      "totalTokens": 20257,
+      "timestamp": "2026-04-22T09:37:59.706Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03998575,
+      "promptTokens": 20849,
+      "completionTokens": 250,
+      "totalTokens": 21099,
+      "timestamp": "2026-04-22T09:38:04.736Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03728375,
+      "promptTokens": 21001,
+      "completionTokens": 38,
+      "totalTokens": 21039,
+      "timestamp": "2026-04-22T09:38:06.832Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.044464000000000004,
+      "promptTokens": 22080,
+      "completionTokens": 416,
+      "totalTokens": 22496,
+      "timestamp": "2026-04-22T09:38:21.267Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0397565,
+      "promptTokens": 22318,
+      "completionTokens": 50,
+      "totalTokens": 22368,
+      "timestamp": "2026-04-22T09:38:23.517Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.04150125,
+      "promptTokens": 22731,
+      "completionTokens": 123,
+      "totalTokens": 22854,
+      "timestamp": "2026-04-22T09:38:28.518Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.010059,
+      "promptTokens": 4364,
+      "completionTokens": 173,
+      "totalTokens": 4537,
+      "timestamp": "2026-04-22T09:38:32.070Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01326325,
+      "promptTokens": 7115,
+      "completionTokens": 58,
+      "totalTokens": 7173,
+      "timestamp": "2026-04-22T09:38:35.886Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.015162,
+      "promptTokens": 8328,
+      "completionTokens": 42,
+      "totalTokens": 8370,
+      "timestamp": "2026-04-22T09:38:37.345Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.015674749999999998,
+      "promptTokens": 8445,
+      "completionTokens": 64,
+      "totalTokens": 8509,
+      "timestamp": "2026-04-22T09:38:39.974Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02126425,
+      "promptTokens": 8943,
+      "completionTokens": 401,
+      "totalTokens": 9344,
+      "timestamp": "2026-04-22T09:38:49.081Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.018935,
+      "promptTokens": 10252,
+      "completionTokens": 71,
+      "totalTokens": 10323,
+      "timestamp": "2026-04-22T09:38:52.193Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.021479500000000002,
+      "promptTokens": 11362,
+      "completionTokens": 114,
+      "totalTokens": 11476,
+      "timestamp": "2026-04-22T09:38:54.890Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "extract_real_contracts",
+      "model": "qwen/qwen3.6-plus-04-02",
+      "costUsd": 0.025157925,
+      "promptTokens": 7749,
+      "completionTokens": 11610,
+      "totalTokens": 19359,
+      "timestamp": "2026-04-22T09:43:28.681Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10337075000000001,
+      "promptTokens": 32557,
+      "completionTokens": 3314,
+      "totalTokens": 35871,
+      "timestamp": "2026-04-22T09:44:21.456Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08747375,
+      "promptTokens": 34713,
+      "completionTokens": 1909,
+      "totalTokens": 36622,
+      "timestamp": "2026-04-22T09:44:47.046Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08948624999999999,
+      "promptTokens": 36223,
+      "completionTokens": 1864,
+      "totalTokens": 38087,
+      "timestamp": "2026-04-22T09:45:21.855Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08708525,
+      "promptTokens": 37907,
+      "completionTokens": 1482,
+      "totalTokens": 39389,
+      "timestamp": "2026-04-22T09:45:47.925Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09403275000000001,
+      "promptTokens": 39141,
+      "completionTokens": 1824,
+      "totalTokens": 40965,
+      "timestamp": "2026-04-22T09:48:28.122Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08474725,
+      "promptTokens": 32963,
+      "completionTokens": 1933,
+      "totalTokens": 34896,
+      "timestamp": "2026-04-22T09:49:00.892Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.11373425,
+      "promptTokens": 34503,
+      "completionTokens": 3811,
+      "totalTokens": 38314,
+      "timestamp": "2026-04-22T09:49:58.408Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09357075,
+      "promptTokens": 37301,
+      "completionTokens": 2021,
+      "totalTokens": 39322,
+      "timestamp": "2026-04-22T09:50:28.809Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.110369,
+      "promptTokens": 39108,
+      "completionTokens": 2995,
+      "totalTokens": 42103,
+      "timestamp": "2026-04-22T09:51:09.979Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09183125,
+      "promptTokens": 41627,
+      "completionTokens": 1356,
+      "totalTokens": 42983,
+      "timestamp": "2026-04-22T09:51:28.979Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.094227,
+      "promptTokens": 34740,
+      "completionTokens": 2388,
+      "totalTokens": 37128,
+      "timestamp": "2026-04-22T09:52:09.812Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08599675,
+      "promptTokens": 36501,
+      "completionTokens": 1580,
+      "totalTokens": 38081,
+      "timestamp": "2026-04-22T09:52:34.863Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0905345,
+      "promptTokens": 38086,
+      "completionTokens": 1706,
+      "totalTokens": 39792,
+      "timestamp": "2026-04-22T09:52:58.442Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10676575,
+      "promptTokens": 34937,
+      "completionTokens": 3259,
+      "totalTokens": 38196,
+      "timestamp": "2026-04-22T09:53:48.022Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.086191,
+      "promptTokens": 37356,
+      "completionTokens": 1487,
+      "totalTokens": 38843,
+      "timestamp": "2026-04-22T09:54:11.468Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09921975,
+      "promptTokens": 38817,
+      "completionTokens": 2235,
+      "totalTokens": 41052,
+      "timestamp": "2026-04-22T09:54:41.946Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.1265285,
+      "promptTokens": 40902,
+      "completionTokens": 3925,
+      "totalTokens": 44827,
+      "timestamp": "2026-04-22T09:55:34.450Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10904775,
+      "promptTokens": 44129,
+      "completionTokens": 2273,
+      "totalTokens": 46402,
+      "timestamp": "2026-04-22T09:56:04.315Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10810800000000001,
+      "promptTokens": 35352,
+      "completionTokens": 3303,
+      "totalTokens": 38655,
+      "timestamp": "2026-04-22T09:56:48.137Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0999565,
+      "promptTokens": 38038,
+      "completionTokens": 2385,
+      "totalTokens": 40423,
+      "timestamp": "2026-04-22T09:57:19.158Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.12872125,
+      "promptTokens": 40291,
+      "completionTokens": 4158,
+      "totalTokens": 44449,
+      "timestamp": "2026-04-22T09:58:12.810Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.1181705,
+      "promptTokens": 44206,
+      "completionTokens": 2915,
+      "totalTokens": 47121,
+      "timestamp": "2026-04-22T09:58:45.838Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.14836325,
+      "promptTokens": 47051,
+      "completionTokens": 4716,
+      "totalTokens": 51767,
+      "timestamp": "2026-04-22T09:59:40.730Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09356725,
+      "promptTokens": 34651,
+      "completionTokens": 2352,
+      "totalTokens": 37003,
+      "timestamp": "2026-04-22T10:00:13.427Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09684675,
+      "promptTokens": 36453,
+      "completionTokens": 2361,
+      "totalTokens": 38814,
+      "timestamp": "2026-04-22T10:00:45.129Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10902150000000001,
+      "promptTokens": 38666,
+      "completionTokens": 2954,
+      "totalTokens": 41620,
+      "timestamp": "2026-04-22T10:01:24.098Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.11910675000000001,
+      "promptTokens": 41365,
+      "completionTokens": 3337,
+      "totalTokens": 44702,
+      "timestamp": "2026-04-22T10:02:07.231Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.115563,
+      "promptTokens": 44260,
+      "completionTokens": 2722,
+      "totalTokens": 46982,
+      "timestamp": "2026-04-22T10:02:51.893Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.002856,
+      "promptTokens": 1048,
+      "completionTokens": 73,
+      "totalTokens": 1121,
+      "timestamp": "2026-04-22T10:02:59.593Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0026249999999999997,
+      "promptTokens": 1156,
+      "completionTokens": 43,
+      "totalTokens": 1199,
+      "timestamp": "2026-04-22T10:03:04.340Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.002625,
+      "promptTokens": 1196,
+      "completionTokens": 38,
+      "totalTokens": 1234,
+      "timestamp": "2026-04-22T10:03:05.746Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.004592,
+      "promptTokens": 2280,
+      "completionTokens": 43,
+      "totalTokens": 2323,
+      "timestamp": "2026-04-22T10:03:07.602Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.004618249999999999,
+      "promptTokens": 2319,
+      "completionTokens": 40,
+      "totalTokens": 2359,
+      "timestamp": "2026-04-22T10:03:09.878Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00510475,
+      "promptTokens": 2349,
+      "completionTokens": 71,
+      "totalTokens": 2420,
+      "timestamp": "2026-04-22T10:03:11.641Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.010114999999999999,
+      "promptTokens": 3460,
+      "completionTokens": 290,
+      "totalTokens": 3750,
+      "timestamp": "2026-04-22T10:03:21.290Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00972125,
+      "promptTokens": 4667,
+      "completionTokens": 111,
+      "totalTokens": 4778,
+      "timestamp": "2026-04-22T10:03:23.864Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0117215,
+      "promptTokens": 5434,
+      "completionTokens": 158,
+      "totalTokens": 5592,
+      "timestamp": "2026-04-22T10:03:31.335Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01407175,
+      "promptTokens": 5729,
+      "completionTokens": 289,
+      "totalTokens": 6018,
+      "timestamp": "2026-04-22T10:03:38.944Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0181195,
+      "promptTokens": 8298,
+      "completionTokens": 257,
+      "totalTokens": 8555,
+      "timestamp": "2026-04-22T10:03:46.442Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01594425,
+      "promptTokens": 8415,
+      "completionTokens": 87,
+      "totalTokens": 8502,
+      "timestamp": "2026-04-22T10:03:56.003Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.020328,
+      "promptTokens": 9664,
+      "completionTokens": 244,
+      "totalTokens": 9908,
+      "timestamp": "2026-04-22T10:04:01.449Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.021173249999999998,
+      "promptTokens": 9731,
+      "completionTokens": 296,
+      "totalTokens": 10027,
+      "timestamp": "2026-04-22T10:04:10.868Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.022062250000000002,
+      "promptTokens": 11527,
+      "completionTokens": 135,
+      "totalTokens": 11662,
+      "timestamp": "2026-04-22T10:04:59.970Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.026656,
+      "promptTokens": 14168,
+      "completionTokens": 133,
+      "totalTokens": 14301,
+      "timestamp": "2026-04-22T10:05:03.955Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.033544,
+      "promptTokens": 15264,
+      "completionTokens": 488,
+      "totalTokens": 15752,
+      "timestamp": "2026-04-22T10:05:17.922Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.041236999999999996,
+      "promptTokens": 20956,
+      "completionTokens": 326,
+      "totalTokens": 21282,
+      "timestamp": "2026-04-22T10:05:25.181Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.012824,
+      "promptTokens": 7000,
+      "completionTokens": 41,
+      "totalTokens": 7041,
+      "timestamp": "2026-04-22T10:05:27.191Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01472625,
+      "promptTokens": 7927,
+      "completionTokens": 61,
+      "totalTokens": 7988,
+      "timestamp": "2026-04-22T10:05:29.961Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01665475,
+      "promptTokens": 8869,
+      "completionTokens": 81,
+      "totalTokens": 8950,
+      "timestamp": "2026-04-22T10:05:35.378Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01858675,
+      "promptTokens": 9733,
+      "completionTokens": 111,
+      "totalTokens": 9844,
+      "timestamp": "2026-04-22T10:05:38.797Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02257325,
+      "promptTokens": 9955,
+      "completionTokens": 368,
+      "totalTokens": 10323,
+      "timestamp": "2026-04-22T10:05:47.663Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.018894750000000002,
+      "promptTokens": 10061,
+      "completionTokens": 92,
+      "totalTokens": 10153,
+      "timestamp": "2026-04-22T10:05:49.888Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01932525,
+      "promptTokens": 10195,
+      "completionTokens": 106,
+      "totalTokens": 10301,
+      "timestamp": "2026-04-22T10:05:52.456Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.025576250000000002,
+      "promptTokens": 10623,
+      "completionTokens": 499,
+      "totalTokens": 11122,
+      "timestamp": "2026-04-22T10:06:03.904Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.019607,
+      "promptTokens": 10748,
+      "completionTokens": 57,
+      "totalTokens": 10805,
+      "timestamp": "2026-04-22T10:06:06.549Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.022846250000000002,
+      "promptTokens": 11695,
+      "completionTokens": 170,
+      "totalTokens": 11865,
+      "timestamp": "2026-04-22T10:06:11.763Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.024256750000000004,
+      "promptTokens": 11733,
+      "completionTokens": 266,
+      "totalTokens": 11999,
+      "timestamp": "2026-04-22T10:06:18.805Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02129925,
+      "promptTokens": 11763,
+      "completionTokens": 51,
+      "totalTokens": 11814,
+      "timestamp": "2026-04-22T10:06:21.020Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.025917500000000003,
+      "promptTokens": 11794,
+      "completionTokens": 377,
+      "totalTokens": 12171,
+      "timestamp": "2026-04-22T10:06:26.378Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02256625,
+      "promptTokens": 12071,
+      "completionTokens": 103,
+      "totalTokens": 12174,
+      "timestamp": "2026-04-22T10:06:28.707Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02218475,
+      "promptTokens": 12461,
+      "completionTokens": 27,
+      "totalTokens": 12488,
+      "timestamp": "2026-04-22T10:06:33.587Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02425325,
+      "promptTokens": 13571,
+      "completionTokens": 36,
+      "totalTokens": 13607,
+      "timestamp": "2026-04-22T10:06:36.731Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.026754,
+      "promptTokens": 14696,
+      "completionTokens": 74,
+      "totalTokens": 14770,
+      "timestamp": "2026-04-22T10:06:44.173Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.028050750000000003,
+      "promptTokens": 15741,
+      "completionTokens": 36,
+      "totalTokens": 15777,
+      "timestamp": "2026-04-22T10:07:00.033Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.029921499999999997,
+      "promptTokens": 15794,
+      "completionTokens": 163,
+      "totalTokens": 15957,
+      "timestamp": "2026-04-22T10:07:04.459Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.029545250000000002,
+      "promptTokens": 16451,
+      "completionTokens": 54,
+      "totalTokens": 16505,
+      "timestamp": "2026-04-22T10:07:08.434Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.031094,
+      "promptTokens": 17480,
+      "completionTokens": 36,
+      "totalTokens": 17516,
+      "timestamp": "2026-04-22T10:07:09.921Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03291925,
+      "promptTokens": 18523,
+      "completionTokens": 36,
+      "totalTokens": 18559,
+      "timestamp": "2026-04-22T10:07:11.259Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03301199999999999,
+      "promptTokens": 18576,
+      "completionTokens": 36,
+      "totalTokens": 18612,
+      "timestamp": "2026-04-22T10:07:13.892Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.037142,
+      "promptTokens": 19560,
+      "completionTokens": 208,
+      "totalTokens": 19768,
+      "timestamp": "2026-04-22T10:07:18.342Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.037229500000000006,
+      "promptTokens": 19914,
+      "completionTokens": 170,
+      "totalTokens": 20084,
+      "timestamp": "2026-04-22T10:07:28.409Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0389095,
+      "promptTokens": 20066,
+      "completionTokens": 271,
+      "totalTokens": 20337,
+      "timestamp": "2026-04-22T10:07:34.243Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.06762175,
+      "promptTokens": 20433,
+      "completionTokens": 2276,
+      "totalTokens": 22709,
+      "timestamp": "2026-04-22T10:08:06.129Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03966375,
+      "promptTokens": 22361,
+      "completionTokens": 38,
+      "totalTokens": 22399,
+      "timestamp": "2026-04-22T10:08:09.626Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03976,
+      "promptTokens": 22416,
+      "completionTokens": 38,
+      "totalTokens": 22454,
+      "timestamp": "2026-04-22T10:08:13.511Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03981425,
+      "promptTokens": 22471,
+      "completionTokens": 35,
+      "totalTokens": 22506,
+      "timestamp": "2026-04-22T10:08:15.410Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.04774,
+      "promptTokens": 23568,
+      "completionTokens": 464,
+      "totalTokens": 24032,
+      "timestamp": "2026-04-22T10:08:29.034Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.016346750000000004,
+      "promptTokens": 9069,
+      "completionTokens": 34,
+      "totalTokens": 9103,
+      "timestamp": "2026-04-22T10:11:59.248Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01880375,
+      "promptTokens": 10153,
+      "completionTokens": 74,
+      "totalTokens": 10227,
+      "timestamp": "2026-04-22T10:12:01.444Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0221725,
+      "promptTokens": 11310,
+      "completionTokens": 170,
+      "totalTokens": 11480,
+      "timestamp": "2026-04-22T10:12:04.899Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.023553249999999998,
+      "promptTokens": 13115,
+      "completionTokens": 43,
+      "totalTokens": 13158,
+      "timestamp": "2026-04-22T10:12:07.599Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0250495,
+      "promptTokens": 14114,
+      "completionTokens": 25,
+      "totalTokens": 14139,
+      "timestamp": "2026-04-22T10:12:14.503Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02758175,
+      "promptTokens": 15113,
+      "completionTokens": 81,
+      "totalTokens": 15194,
+      "timestamp": "2026-04-22T10:12:20.570Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02952075,
+      "promptTokens": 16141,
+      "completionTokens": 91,
+      "totalTokens": 16232,
+      "timestamp": "2026-04-22T10:12:23.659Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.033236,
+      "promptTokens": 16744,
+      "completionTokens": 281,
+      "totalTokens": 17025,
+      "timestamp": "2026-04-22T10:12:32.738Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.035371,
+      "promptTokens": 17972,
+      "completionTokens": 280,
+      "totalTokens": 18252,
+      "timestamp": "2026-04-22T10:12:43.836Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.038521,
+      "promptTokens": 19100,
+      "completionTokens": 364,
+      "totalTokens": 19464,
+      "timestamp": "2026-04-22T10:12:51.275Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.036524249999999994,
+      "promptTokens": 19247,
+      "completionTokens": 203,
+      "totalTokens": 19450,
+      "timestamp": "2026-04-22T10:12:56.994Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.041686749999999995,
+      "promptTokens": 20397,
+      "completionTokens": 428,
+      "totalTokens": 20825,
+      "timestamp": "2026-04-22T10:13:08.408Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.036504999999999996,
+      "promptTokens": 20516,
+      "completionTokens": 43,
+      "totalTokens": 20559,
+      "timestamp": "2026-04-22T10:13:09.875Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03696875,
+      "promptTokens": 20757,
+      "completionTokens": 46,
+      "totalTokens": 20803,
+      "timestamp": "2026-04-22T10:13:11.918Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.04645375,
+      "promptTokens": 22041,
+      "completionTokens": 563,
+      "totalTokens": 22604,
+      "timestamp": "2026-04-22T10:13:53.775Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0133455,
+      "promptTokens": 6842,
+      "completionTokens": 98,
+      "totalTokens": 6940,
+      "timestamp": "2026-04-22T10:13:56.667Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.016266250000000003,
+      "promptTokens": 7943,
+      "completionTokens": 169,
+      "totalTokens": 8112,
+      "timestamp": "2026-04-22T10:14:03.553Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.022228499999999998,
+      "promptTokens": 9158,
+      "completionTokens": 443,
+      "totalTokens": 9601,
+      "timestamp": "2026-04-22T10:14:12.215Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10293675,
+      "promptTokens": 29061,
+      "completionTokens": 3720,
+      "totalTokens": 32781,
+      "timestamp": "2026-04-22T10:16:56.989Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10607625000000001,
+      "promptTokens": 30751,
+      "completionTokens": 3733,
+      "totalTokens": 34484,
+      "timestamp": "2026-04-22T10:17:55.865Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.107625,
+      "promptTokens": 33324,
+      "completionTokens": 3522,
+      "totalTokens": 36846,
+      "timestamp": "2026-04-22T10:18:51.093Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10222624999999999,
+      "promptTokens": 35327,
+      "completionTokens": 2886,
+      "totalTokens": 38213,
+      "timestamp": "2026-04-22T10:19:32.294Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.160356,
+      "promptTokens": 37544,
+      "completionTokens": 6761,
+      "totalTokens": 44305,
+      "timestamp": "2026-04-22T10:20:51.880Z"
+    },
+    {
+      "sessionId": "010817af-0f82-4cd8-aea2-970b227075fa",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.1358,
+      "promptTokens": 43496,
+      "completionTokens": 4263,
+      "totalTokens": 47759,
+      "timestamp": "2026-04-22T10:21:47.819Z"
+    }
+  ],
+  "modelUsage": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 199,
+      "costUsd": 10.192187250000002,
+      "promptTokens": 4053275,
+      "completionTokens": 221354,
+      "totalTokens": 4274629,
+      "stages": [
+        "worker_codegen:Architect",
+        "worker_codegen:Test Engineer",
+        "worker_codegen:Backend Dev",
+        "worker_codefix:Backend Dev",
+        "phase_verify_fix",
+        "worker_codegen:Frontend Dev",
+        "integration_verify_fix",
+        "worker_codegen:Audit Backfill (frontend)"
+      ]
+    },
+    {
+      "model": "qwen/qwen3.6-plus-04-02",
+      "calls": 2,
+      "costUsd": 0.04342195,
+      "promptTokens": 13786,
+      "completionTokens": 19970,
+      "totalTokens": 33756,
+      "stages": [
+        "generate_api_contracts",
+        "extract_real_contracts"
+      ]
+    }
+  ],
+  "modelPerformance": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 199,
+      "promptTokens": 4053275,
+      "completionTokens": 221354,
+      "totalTokens": 4274629,
+      "costUsd": 10.192187250000002,
+      "stages": [
+        "worker_codegen",
+        "worker_codefix",
+        "phase_verify_fix",
+        "integration_verify_fix"
+      ],
+      "score": 95.3,
+      "grade": "A",
+      "reasons": [
+        "Earlier phase verify/fix did not fully prevent later integration failures.",
+        "Stage ended with blocking integration errors."
+      ]
+    },
+    {
+      "model": "qwen/qwen3.6-plus-04-02",
+      "calls": 2,
+      "promptTokens": 13786,
+      "completionTokens": 19970,
+      "totalTokens": 33756,
+      "costUsd": 0.04342195,
+      "stages": [
+        "generate_api_contracts",
+        "extract_real_contracts"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    }
+  ],
+  "stageUsage": [
+    {
+      "stage": "architect-triage",
+      "startAt": "2026-04-22T09:04:57.643Z",
+      "endAt": "2026-04-22T09:04:57.643Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker_codegen",
+      "startAt": "2026-04-22T09:05:28.799Z",
+      "endAt": "2026-04-22T10:21:47.819Z",
+      "durationMs": 4579020,
+      "llmCalls": 81,
+      "promptTokens": 2551324,
+      "completionTokens": 198787,
+      "totalTokens": 2750111,
+      "costUsd": 7.247835,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [
+        "Architect",
+        "Test Engineer",
+        "Backend Dev",
+        "Frontend Dev",
+        "Audit Backfill (frontend)"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "task",
+      "startAt": "2026-04-22T09:08:04.010Z",
+      "endAt": "2026-04-22T10:21:47.852Z",
+      "durationMs": 4423842,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 18,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-context",
+      "startAt": "2026-04-22T09:08:04.037Z",
+      "endAt": "2026-04-22T10:11:56.131Z",
+      "durationMs": 3832094,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 88,
+      "grade": "B",
+      "reasons": [
+        "Context was truncated 2 time(s)."
+      ]
+    },
+    {
+      "stage": "generate_api_contracts",
+      "startAt": "2026-04-22T09:11:42.539Z",
+      "endAt": "2026-04-22T09:11:42.539Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 6037,
+      "completionTokens": 8360,
+      "totalTokens": 14397,
+      "costUsd": 0.018264024999999996,
+      "models": [
+        "qwen/qwen3.6-plus-04-02"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-verify",
+      "startAt": "2026-04-22T09:25:20.917Z",
+      "endAt": "2026-04-22T09:25:20.917Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 92,
+      "grade": "A",
+      "reasons": [
+        "Task/file plan mismatches happened 1 time(s)."
+      ]
+    },
+    {
+      "stage": "worker_codefix",
+      "startAt": "2026-04-22T09:25:39.028Z",
+      "endAt": "2026-04-22T09:25:39.028Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 2654,
+      "completionTokens": 1107,
+      "totalTokens": 3761,
+      "costUsd": 0.020142499999999997,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [
+        "Backend Dev"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-convention-fix",
+      "startAt": "2026-04-22T09:33:41.441Z",
+      "endAt": "2026-04-22T10:02:52.084Z",
+      "durationMs": 1750643,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "phase_verify_fix",
+      "startAt": "2026-04-22T09:33:55.366Z",
+      "endAt": "2026-04-22T10:08:29.034Z",
+      "durationMs": 2073668,
+      "llmCalls": 99,
+      "promptTokens": 1229565,
+      "completionTokens": 18024,
+      "totalTokens": 1247589,
+      "costUsd": 2.4040747499999995,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 90,
+      "grade": "A",
+      "reasons": [
+        "Earlier phase verify/fix did not fully prevent later integration failures."
+      ]
+    },
+    {
+      "stage": "extract_real_contracts",
+      "startAt": "2026-04-22T09:43:28.681Z",
+      "endAt": "2026-04-22T09:43:28.681Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 7749,
+      "completionTokens": 11610,
+      "totalTokens": 19359,
+      "costUsd": 0.025157925,
+      "models": [
+        "qwen/qwen3.6-plus-04-02"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-deps",
+      "startAt": "2026-04-22T10:11:55.169Z",
+      "endAt": "2026-04-22T10:11:55.169Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-route-audit",
+      "startAt": "2026-04-22T10:11:56.119Z",
+      "endAt": "2026-04-22T10:11:56.119Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "integration_verify_fix",
+      "startAt": "2026-04-22T10:11:59.248Z",
+      "endAt": "2026-04-22T10:14:12.215Z",
+      "durationMs": 132967,
+      "llmCalls": 18,
+      "promptTokens": 269732,
+      "completionTokens": 3436,
+      "totalTokens": 273168,
+      "costUsd": 0.520135,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 72,
+      "grade": "C",
+      "reasons": [
+        "Stage ended with blocking integration errors."
+      ]
+    },
+    {
+      "stage": "integration-gate",
+      "startAt": "2026-04-22T10:12:32.802Z",
+      "endAt": "2026-04-22T10:15:53.111Z",
+      "durationMs": 200309,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 6,
+      "score": 64,
+      "grade": "D",
+      "reasons": [
+        "Stagnation warnings triggered 4 time(s)."
+      ]
+    },
+    {
+      "stage": "post-gen-audit",
+      "startAt": "2026-04-22T10:15:53.117Z",
+      "endAt": "2026-04-22T10:21:47.976Z",
+      "durationMs": 354859,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 7,
+      "score": 72,
+      "grade": "C",
+      "reasons": [
+        "28 requirement id(s) remained unresolved after audit."
+      ]
+    }
+  ],
+  "repairSummary": {
+    "totalEvents": 39,
+    "byStage": {
+      "architect-triage": 1,
+      "task": 18,
+      "worker-context": 2,
+      "worker-verify": 1,
+      "preflight-convention-fix": 2,
+      "preflight-deps": 1,
+      "preflight-route-audit": 1,
+      "integration-gate": 6,
+      "post-gen-audit": 7
+    },
+    "byEvent": {
+      "task_forced_to_llm": 1,
+      "snapshot_cleaned": 18,
+      "doc_truncated": 2,
+      "task_plan_unfulfilled": 1,
+      "convention_autofix_applied": 2,
+      "import_gaps_installed": 1,
+      "route_audit_snapshot": 2,
+      "stagnation_warning": 4,
+      "route_registration_audit_failed": 1,
+      "audit_start": 2,
+      "uncovered_detected": 1,
+      "repair_dispatch_start": 1,
+      "repair_dispatch_role_done": 1,
+      "repair_dispatch_done": 1,
+      "audit_clean": 1
+    },
+    "entries": [
+      {
+        "stage": "architect-triage",
+        "event": "task_forced_to_llm",
+        "timestamp": "2026-04-22T09:04:57.643Z",
+        "details": {
+          "reason": "Task references 14 file(s) outside the scaffold's protected paths — real work must be generated.",
+          "title": "Implement Sequelize models and database schema",
+          "phase": "Data Layer"
+        },
+        "taskId": "T-001"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:08:04.010Z",
+        "taskId": "T-001"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-22T09:08:04.037Z",
+        "details": {
+          "label": "api-contract-generation",
+          "keptSections": 17,
+          "droppedSections": 62,
+          "budgetChars": 12000,
+          "usedChars": 12009
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:12:58.362Z",
+        "taskId": "T-E2E-001"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:13:35.555Z",
+        "taskId": "T-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:14:53.851Z",
+        "taskId": "T-E2E-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:16:24.290Z",
+        "taskId": "T-003"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:20:48.803Z",
+        "taskId": "T-004"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:24:24.399Z",
+        "taskId": "T-005"
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-22T09:25:20.917Z",
+        "details": {
+          "missingCreates": [],
+          "unmodified": [
+            "backend/src/app.ts",
+            "frontend/vite.config.ts"
+          ],
+          "fixAttempts": 0
+        },
+        "taskId": "T-012"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:25:39.046Z",
+        "taskId": "T-012"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:28:14.441Z",
+        "taskId": "T-013"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:30:18.112Z",
+        "taskId": "T-014"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:33:41.305Z",
+        "taskId": "T-015"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-22T09:33:41.441Z",
+        "details": {
+          "phase": "backend",
+          "fixedFileCount": 24,
+          "fixedFiles": [
+            "frontend/src/providers/AppProviders.tsx",
+            "backend/src/api/modules/auth/auth.routes.ts",
+            "backend/src/api/modules/comments/comments.controller.ts",
+            "backend/src/api/modules/comments/comments.routes.ts",
+            "backend/src/api/modules/notifications/notifications.controller.ts",
+            "backend/src/api/modules/notifications/notifications.routes.ts",
+            "backend/src/api/modules/projects/projects.controller.ts",
+            "backend/src/api/modules/projects/projects.routes.ts",
+            "backend/src/api/modules/tasks/tasks.controller.ts",
+            "backend/src/api/modules/tasks/tasks.routes.ts",
+            "backend/src/api/modules/team/invitations.controller.ts",
+            "backend/src/api/modules/team/invitations.routes.ts",
+            "backend/src/api/modules/team/team.controller.ts",
+            "backend/src/api/modules/team/team.routes.ts",
+            "backend/src/api/modules/teams/settings.controller.ts",
+            "backend/src/api/modules/teams/settings.service.ts",
+            "backend/src/api/modules/teams/teams.controller.ts",
+            "backend/src/api/modules/teams/teams.routes.ts",
+            "backend/src/api/modules/users/users.controller.ts",
+            "backend/src/api/modules/users/users.routes.ts"
+          ],
+          "notes": [
+            "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+            "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+            "  ↳ rewrote import paths in 22 file(s) to track the rename.",
+            "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename."
+          ],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:48:28.153Z",
+        "taskId": "T-006"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:51:29.006Z",
+        "taskId": "T-007"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:52:58.477Z",
+        "taskId": "T-008"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:56:04.347Z",
+        "taskId": "T-009"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T09:59:40.762Z",
+        "taskId": "T-010"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T10:02:51.921Z",
+        "taskId": "T-011"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-22T10:02:52.084Z",
+        "details": {
+          "phase": "frontend",
+          "fixedFileCount": 0,
+          "fixedFiles": [],
+          "notes": [],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "preflight-deps",
+        "event": "import_gaps_installed",
+        "timestamp": "2026-04-22T10:11:55.169Z",
+        "details": {
+          "totalPackages": 3,
+          "scopes": [
+            {
+              "scope": "backend",
+              "packages": [
+                "joi"
+              ],
+              "exitCode": 1
+            },
+            {
+              "scope": "frontend",
+              "packages": [
+                "axios",
+                "dayjs"
+              ],
+              "exitCode": 0
+            }
+          ]
+        }
+      },
+      {
+        "stage": "preflight-route-audit",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-22T10:11:56.119Z",
+        "details": {
+          "when": "preflight",
+          "hardFail": true,
+          "unregisteredModules": [
+            "backend/src/api/modules/team/team.routes.ts: exports \"registerTeamRoutes\" but index.ts never calls it."
+          ],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/register"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/login"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/logout"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/forgot-password"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/reset-password"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/auth/me"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/auth/me"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/teams"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/teams/:id"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/teams/:id/invite"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams/:id/members"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/teams/:id/members/:memberId"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/teams/:id/members/:memberId"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/projects"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/projects"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/tasks"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/tasks/bulk"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/tasks/:taskId/comments"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:taskId/comments"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/comments/:id"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/notifications"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/notifications/mark-all-read"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/notifications/:id/read"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:taskId/activity"
+            }
+          ],
+          "undeclaredEndpointCount": 1
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-22T10:11:56.131Z",
+        "details": {
+          "label": "integration-review",
+          "keptSections": 30,
+          "droppedSections": 49,
+          "budgetChars": 18000,
+          "usedChars": 18028
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-22T10:12:32.802Z",
+        "details": {
+          "iterationsWithoutMutation": 8,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-22T10:12:57.018Z",
+        "details": {
+          "iterationsWithoutMutation": 11,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-22T10:13:42.524Z",
+        "details": {
+          "iterationsWithoutMutation": 14,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-22T10:14:03.558Z",
+        "details": {
+          "iterationsWithoutMutation": 17,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-22T10:15:53.110Z",
+        "details": {
+          "when": "final",
+          "hardFail": true,
+          "unregisteredModules": [
+            "backend/src/api/modules/team/team.routes.ts: exports \"registerTeamRoutes\" but index.ts never calls it."
+          ],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/register"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/login"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/logout"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/forgot-password"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/reset-password"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/auth/me"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/auth/me"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/teams"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/teams/:id"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/teams/:id/invite"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams/:id/members"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/teams/:id/members/:memberId"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/teams/:id/members/:memberId"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/projects"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/projects"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/tasks"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/tasks/bulk"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/tasks/:taskId/comments"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:taskId/comments"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/comments/:id"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/notifications"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/notifications/mark-all-read"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/notifications/:id/read"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:taskId/activity"
+            }
+          ],
+          "undeclaredEndpointCount": 1
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "route_registration_audit_failed",
+        "timestamp": "2026-04-22T10:15:53.111Z",
+        "details": {
+          "unregisteredModules": [
+            "backend/src/api/modules/team/team.routes.ts: exports \"registerTeamRoutes\" but index.ts never calls it."
+          ],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/register"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/login"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/logout"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/forgot-password"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/reset-password"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/auth/me"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/auth/me"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/teams"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/teams/:id"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/teams/:id/invite"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/teams/:id/members"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/teams/:id/members/:memberId"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/teams/:id/members/:memberId"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/projects"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/projects"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/projects/:id"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/tasks"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/tasks/:id"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/tasks/bulk"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/tasks/:taskId/comments"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:taskId/comments"
+            },
+            {
+              "method": "DELETE",
+              "endpoint": "/api/comments/:id"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/notifications"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/notifications/mark-all-read"
+            },
+            {
+              "method": "PATCH",
+              "endpoint": "/api/notifications/:id/read"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/tasks/:taskId/activity"
+            }
+          ]
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_start",
+        "timestamp": "2026-04-22T10:15:53.117Z",
+        "details": {
+          "totalIds": 77
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "uncovered_detected",
+        "timestamp": "2026-04-22T10:15:53.307Z",
+        "details": {
+          "totalChecked": 77,
+          "implemented": 49,
+          "partial": 0,
+          "missing": 28
+        },
+        "missingIds": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28"
+        ],
+        "stillMissing": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28"
+        ]
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_start",
+        "timestamp": "2026-04-22T10:15:53.310Z",
+        "details": {
+          "frontend": 28,
+          "backend": 0
+        },
+        "missingIds": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28"
+        ]
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-22T10:21:47.852Z",
+        "taskId": "T-REPAIR-FRONTEND"
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_role_done",
+        "timestamp": "2026-04-22T10:21:47.861Z",
+        "details": {
+          "role": "frontend",
+          "filesWritten": 12,
+          "taskId": "T-REPAIR-FRONTEND"
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_done",
+        "timestamp": "2026-04-22T10:21:47.862Z",
+        "details": {
+          "totalFiles": 12,
+          "costUsd": 0.7150202499999999
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_start",
+        "timestamp": "2026-04-22T10:21:47.862Z",
+        "details": {
+          "totalIds": 77
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_clean",
+        "timestamp": "2026-04-22T10:21:47.976Z",
+        "details": {
+          "totalChecked": 77,
+          "implemented": 77,
+          "partial": 0,
+          "missing": 0
+        },
+        "missingIds": [],
+        "stillMissing": []
+      }
+    ]
+  },
+  "preflightLedger": {
+    "conventionAutofix": {
+      "invocations": 2,
+      "totalFixedFiles": 24,
+      "totalUnfixable": 0,
+      "notes": [
+        "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+        "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+        "  ↳ rewrote import paths in 22 file(s) to track the rename.",
+        "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename."
+      ],
+      "unfixable": []
+    },
+    "routeAudit": {
+      "preflight": {
+        "when": "preflight",
+        "hardFail": true,
+        "unregisteredModules": [
+          "backend/src/api/modules/team/team.routes.ts: exports \"registerTeamRoutes\" but index.ts never calls it."
+        ],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/register"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/login"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/logout"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/forgot-password"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/reset-password"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/auth/me"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/auth/me"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/teams"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/teams"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/teams/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/teams/:id"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/teams/:id/invite"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/teams/:id/members"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/teams/:id/members/:memberId"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/teams/:id/members/:memberId"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/projects"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/projects"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/projects/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/projects/:id"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/projects/:id"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/tasks"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/tasks/:id"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/tasks/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/tasks/bulk"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/tasks/:taskId/comments"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks/:taskId/comments"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/comments/:id"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/notifications"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/notifications/mark-all-read"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/notifications/:id/read"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks/:taskId/activity"
+          }
+        ],
+        "undeclaredEndpointCount": 1
+      },
+      "final": {
+        "when": "final",
+        "hardFail": true,
+        "unregisteredModules": [
+          "backend/src/api/modules/team/team.routes.ts: exports \"registerTeamRoutes\" but index.ts never calls it."
+        ],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/register"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/login"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/logout"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/forgot-password"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/reset-password"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/auth/me"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/auth/me"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/teams"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/teams"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/teams/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/teams/:id"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/teams/:id/invite"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/teams/:id/members"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/teams/:id/members/:memberId"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/teams/:id/members/:memberId"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/projects"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/projects"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/projects/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/projects/:id"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/projects/:id"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/tasks"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/tasks/:id"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/tasks/:id"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/tasks/bulk"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/tasks/:taskId/comments"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks/:taskId/comments"
+          },
+          {
+            "method": "DELETE",
+            "endpoint": "/api/comments/:id"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/notifications"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/notifications/mark-all-read"
+          },
+          {
+            "method": "PATCH",
+            "endpoint": "/api/notifications/:id/read"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/tasks/:taskId/activity"
+          }
+        ],
+        "undeclaredEndpointCount": 1
+      }
+    },
+    "importGapInstalls": {
+      "totalPackages": 3,
+      "scopes": [
+        {
+          "scope": "backend",
+          "packages": [
+            "joi"
+          ],
+          "exitCode": 1
+        },
+        {
+          "scope": "frontend",
+          "packages": [
+            "axios",
+            "dayjs"
+          ],
+          "exitCode": 0
+        }
+      ]
+    }
+  },
+  "defectCategories": [
+    {
+      "key": "dependency-sync",
+      "label": "Dependency sync",
+      "state": "warn",
+      "evidence": [
+        "Auto-installed 3 missing package(s) during preflight across 2 scope(s)."
+      ]
+    },
+    {
+      "key": "directory-dedup",
+      "label": "Directory / implementation dedup",
+      "state": "pass",
+      "evidence": [
+        "Convention auto-fix rewrote 24 file(s) across 2 invocation(s)."
+      ]
+    },
+    {
+      "key": "env-alignment",
+      "label": "Env variable alignment",
+      "state": "pass",
+      "evidence": [
+        "No env alignment signal — generator injected DATABASE_URL defaults and no gate flagged env drift."
+      ]
+    },
+    {
+      "key": "contract-consistency",
+      "label": "API contract consistency",
+      "state": "fail",
+      "evidence": [
+        "Preflight: 1 unregistered module(s), 33 missing contract endpoint(s), 0 dangling registration import(s).",
+        "Final gate: 1 unregistered, 33 missing contract, 0 dangling (HARD FAIL)."
+      ]
+    },
+    {
+      "key": "build-verification",
+      "label": "Build & runtime verification",
+      "state": "fail",
+      "evidence": [
+        "14 TS error line(s) in integration output.",
+        "Build command reported failure during integration."
+      ]
+    }
+  ],
+  "finalAudit": {
+    "passed": true,
+    "entries": [
+      {
+        "id": "AC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:605 (AC-01)",
+          "PRD_E2E_SPEC.json:23 (AC-01)",
+          "PRD_E2E_SPEC.md:8 (AC-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:111 (AC-01)",
+          "frontend/tests/e2e/generated/e2e-001-landing-to-register-to-first-dashboard-s.spec.ts:30 (AC-01)"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:606 (AC-02)",
+          "PRD_E2E_SPEC.json:68 (AC-02)",
+          "PRD_E2E_SPEC.md:18 (AC-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:111 (AC-02)",
+          "frontend/tests/e2e/generated/e2e-002-login-forgot-password-entry-logout-and-g.spec.ts:47 (AC-02)"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:607 (AC-03)",
+          "PRD_E2E_SPEC.json:116 (AC-03)",
+          "PRD_E2E_SPEC.md:29 (AC-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:145 (AC-03)",
+          "frontend/tests/e2e/generated/e2e-003-owner-creates-workspace-and-invites-memb.spec.ts:25 (AC-03)"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:608 (AC-04)",
+          "PRD_E2E_SPEC.json:192 (AC-04)",
+          "PRD_E2E_SPEC.md:47 (AC-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:145 (AC-04)",
+          "frontend/tests/e2e/generated/e2e-005-owner-creates-edits-and-archives-a-proje.spec.ts:48 (AC-04)"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:609 (AC-05)",
+          "PRD_E2E_SPEC.json:236 (AC-05)",
+          "PRD_E2E_SPEC.md:57 (AC-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (AC-05)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-from-project-detail-with-val.spec.ts:54 (AC-05)"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:610 (AC-06)",
+          "PRD_E2E_SPEC.json:284 (AC-06)",
+          "PRD_E2E_SPEC.md:67 (AC-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (AC-06)"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:611 (AC-07)",
+          "PRD_E2E_SPEC.json:367 (AC-07)",
+          "PRD_E2E_SPEC.md:86 (AC-07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (AC-07)"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:612 (AC-08)",
+          "PRD_E2E_SPEC.json:368 (AC-08)",
+          "PRD_E2E_SPEC.md:86 (AC-08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (AC-08)"
+        ]
+      },
+      {
+        "id": "AC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:613 (AC-09)",
+          "PRD_E2E_SPEC.json:416 (AC-09)",
+          "PRD_E2E_SPEC.md:97 (AC-09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (AC-09)"
+        ]
+      },
+      {
+        "id": "AC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:614 (AC-10)",
+          "PRD_E2E_SPEC.json:452 (AC-10)",
+          "PRD_E2E_SPEC.md:106 (AC-10)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (AC-10)"
+        ]
+      },
+      {
+        "id": "AC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:615 (AC-11)",
+          "PRD_E2E_SPEC.json:24 (AC-11)",
+          "PRD_E2E_SPEC.md:8 (AC-11)",
+          "TASK_BREAKDOWN_ORIGINAL.md:249 (AC-11)",
+          "frontend/tests/e2e/generated/e2e-001-landing-to-register-to-first-dashboard-s.spec.ts:30 (AC-11)"
+        ]
+      },
+      {
+        "id": "AC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:616 (AC-12)",
+          "PRD_E2E_SPEC.json:285 (AC-12)",
+          "PRD_E2E_SPEC.md:67 (AC-12)",
+          "TASK_BREAKDOWN_ORIGINAL.md:349 (AC-12)"
+        ]
+      },
+      {
+        "id": "AC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:617 (AC-13)",
+          "PRD_E2E_SPEC.json:286 (AC-13)",
+          "PRD_E2E_SPEC.md:67 (AC-13)",
+          "TASK_BREAKDOWN_ORIGINAL.md:349 (AC-13)"
+        ]
+      },
+      {
+        "id": "AC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:618 (AC-14)",
+          "PRD_E2E_SPEC.json:369 (AC-14)",
+          "PRD_E2E_SPEC.md:86 (AC-14)",
+          "TASK_BREAKDOWN_ORIGINAL.md:279 (AC-14)"
+        ]
+      },
+      {
+        "id": "AC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:619 (AC-15)",
+          "PRD_E2E_SPEC.json:417 (AC-15)",
+          "PRD_E2E_SPEC.md:97 (AC-15)",
+          "TASK_BREAKDOWN_ORIGINAL.md:349 (AC-15)"
+        ]
+      },
+      {
+        "id": "AC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:620 (AC-16)",
+          "PRD_E2E_SPEC.json:153 (AC-16)",
+          "PRD_E2E_SPEC.md:38 (AC-16)",
+          "TASK_BREAKDOWN_ORIGINAL.md:384 (AC-16)",
+          "frontend/tests/e2e/generated/e2e-004-owner-removes-member-and-removed-user-lo.spec.ts:61 (AC-16)"
+        ]
+      },
+      {
+        "id": "FR-AU01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-003",
+          "T-007",
+          "T-012",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:32 (FR-AU01)",
+          "PRD_E2E_SPEC.json:22 (FR-AU01)",
+          "PRD_E2E_SPEC.md:8 (FR-AU01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:44 (FR-AU01)",
+          "frontend/tests/e2e/generated/e2e-001-landing-to-register-to-first-dashboard-s.spec.ts:30 (FR-AU01)"
+        ]
+      },
+      {
+        "id": "FR-AU02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-007",
+          "T-012",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:33 (FR-AU02)",
+          "PRD_E2E_SPEC.json:65 (FR-AU02)",
+          "PRD_E2E_SPEC.md:18 (FR-AU02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:77 (FR-AU02)",
+          "frontend/tests/e2e/generated/e2e-002-login-forgot-password-entry-logout-and-g.spec.ts:47 (FR-AU02)"
+        ]
+      },
+      {
+        "id": "FR-AU03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:34 (FR-AU03)",
+          "PRD_E2E_SPEC.json:66 (FR-AU03)",
+          "PRD_E2E_SPEC.md:18 (FR-AU03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:111 (FR-AU03)",
+          "frontend/tests/e2e/generated/e2e-002-login-forgot-password-entry-logout-and-g.spec.ts:47 (FR-AU03)"
+        ]
+      },
+      {
+        "id": "FR-AU04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:35 (FR-AU04)",
+          "PRD_E2E_SPEC.json:67 (FR-AU04)",
+          "PRD_E2E_SPEC.md:18 (FR-AU04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:111 (FR-AU04)",
+          "frontend/tests/e2e/generated/e2e-002-login-forgot-password-entry-logout-and-g.spec.ts:47 (FR-AU04)"
+        ]
+      },
+      {
+        "id": "FR-AU05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:36 (FR-AU05)",
+          "PRD_E2E_SPEC.json:493 (FR-AU05)",
+          "PRD_E2E_SPEC.md:116 (FR-AU05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:82 (FR-AU05)"
+        ]
+      },
+      {
+        "id": "FR-CO01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:62 (FR-CO01)",
+          "PRD_E2E_SPEC.json:415 (FR-CO01)",
+          "PRD_E2E_SPEC.md:97 (FR-CO01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:44 (FR-CO01)"
+        ]
+      },
+      {
+        "id": "FR-CO02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:63 (FR-CO02)",
+          "PRD_E2E_SPEC.json:283 (FR-CO02)",
+          "PRD_E2E_SPEC.md:67 (FR-CO02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (FR-CO02)"
+        ]
+      },
+      {
+        "id": "FR-CO03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:64 (FR-CO03)",
+          "PRD_E2E_SPEC.json:451 (FR-CO03)",
+          "PRD_E2E_SPEC.md:106 (FR-CO03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (FR-CO03)"
+        ]
+      },
+      {
+        "id": "FR-PR01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:45 (FR-PR01)",
+          "PRD_E2E_SPEC.json:188 (FR-PR01)",
+          "PRD_E2E_SPEC.md:47 (FR-PR01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:44 (FR-PR01)",
+          "frontend/tests/e2e/generated/e2e-005-owner-creates-edits-and-archives-a-proje.spec.ts:48 (FR-PR01)"
+        ]
+      },
+      {
+        "id": "FR-PR02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:46 (FR-PR02)",
+          "PRD_E2E_SPEC.json:189 (FR-PR02)",
+          "PRD_E2E_SPEC.md:47 (FR-PR02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:77 (FR-PR02)",
+          "frontend/tests/e2e/generated/e2e-005-owner-creates-edits-and-archives-a-proje.spec.ts:48 (FR-PR02)"
+        ]
+      },
+      {
+        "id": "FR-PR03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:47 (FR-PR03)",
+          "PRD_E2E_SPEC.json:190 (FR-PR03)",
+          "PRD_E2E_SPEC.md:47 (FR-PR03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:145 (FR-PR03)",
+          "frontend/tests/e2e/generated/e2e-005-owner-creates-edits-and-archives-a-proje.spec.ts:48 (FR-PR03)"
+        ]
+      },
+      {
+        "id": "FR-PR04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:48 (FR-PR04)",
+          "PRD_E2E_SPEC.json:191 (FR-PR04)",
+          "PRD_E2E_SPEC.md:47 (FR-PR04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:116 (FR-PR04)",
+          "frontend/tests/e2e/generated/e2e-005-owner-creates-edits-and-archives-a-proje.spec.ts:48 (FR-PR04)"
+        ]
+      },
+      {
+        "id": "FR-ST01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:67 (FR-ST01)",
+          "PRD_E2E_SPEC.json:494 (FR-ST01)",
+          "PRD_E2E_SPEC.md:116 (FR-ST01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:217 (FR-ST01)"
+        ]
+      },
+      {
+        "id": "FR-ST02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:68 (FR-ST02)",
+          "PRD_E2E_SPEC.json:495 (FR-ST02)",
+          "PRD_E2E_SPEC.md:116 (FR-ST02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:471 (FR-ST02)"
+        ]
+      },
+      {
+        "id": "FR-TM01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:39 (FR-TM01)",
+          "PRD_E2E_SPEC.json:114 (FR-TM01)",
+          "PRD_E2E_SPEC.md:29 (FR-TM01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:116 (FR-TM01)",
+          "frontend/tests/e2e/generated/e2e-003-owner-creates-workspace-and-invites-memb.spec.ts:25 (FR-TM01)"
+        ]
+      },
+      {
+        "id": "FR-TM02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:40 (FR-TM02)",
+          "PRD_E2E_SPEC.json:115 (FR-TM02)",
+          "PRD_E2E_SPEC.md:29 (FR-TM02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:421 (FR-TM02)",
+          "frontend/tests/e2e/generated/e2e-003-owner-creates-workspace-and-invites-memb.spec.ts:25 (FR-TM02)"
+        ]
+      },
+      {
+        "id": "FR-TM03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:41 (FR-TM03)",
+          "PRD_E2E_SPEC.json:151 (FR-TM03)",
+          "PRD_E2E_SPEC.md:38 (FR-TM03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:421 (FR-TM03)",
+          "frontend/tests/e2e/generated/e2e-004-owner-removes-member-and-removed-user-lo.spec.ts:61 (FR-TM03)"
+        ]
+      },
+      {
+        "id": "FR-TM04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:42 (FR-TM04)",
+          "PRD_E2E_SPEC.json:152 (FR-TM04)",
+          "PRD_E2E_SPEC.md:38 (FR-TM04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:116 (FR-TM04)",
+          "frontend/tests/e2e/generated/e2e-004-owner-removes-member-and-removed-user-lo.spec.ts:61 (FR-TM04)"
+        ]
+      },
+      {
+        "id": "FR-TS01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-004",
+          "T-005",
+          "T-010",
+          "T-013",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:51 (FR-TS01)",
+          "PRD_E2E_SPEC.json:233 (FR-TS01)",
+          "PRD_E2E_SPEC.md:57 (FR-TS01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:44 (FR-TS01)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-from-project-detail-with-val.spec.ts:54 (FR-TS01)"
+        ]
+      },
+      {
+        "id": "FR-TS02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-004",
+          "T-005",
+          "T-010",
+          "T-011",
+          "T-013",
+          "T-015",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:52 (FR-TS02)",
+          "PRD_E2E_SPEC.json:280 (FR-TS02)",
+          "PRD_E2E_SPEC.md:67 (FR-TS02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:44 (FR-TS02)"
+        ]
+      },
+      {
+        "id": "FR-TS03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-004",
+          "T-005",
+          "T-010",
+          "T-011",
+          "T-013",
+          "T-015",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:53 (FR-TS03)",
+          "PRD_E2E_SPEC.json:281 (FR-TS03)",
+          "PRD_E2E_SPEC.md:67 (FR-TS03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:77 (FR-TS03)"
+        ]
+      },
+      {
+        "id": "FR-TS04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-005",
+          "T-013",
+          "T-015",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:54 (FR-TS04)",
+          "PRD_E2E_SPEC.json:328 (FR-TS04)",
+          "PRD_E2E_SPEC.md:77 (FR-TS04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:145 (FR-TS04)"
+        ]
+      },
+      {
+        "id": "FR-TS05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:55 (FR-TS05)",
+          "PRD_E2E_SPEC.json:234 (FR-TS05)",
+          "PRD_E2E_SPEC.md:57 (FR-TS05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (FR-TS05)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-from-project-detail-with-val.spec.ts:54 (FR-TS05)"
+        ]
+      },
+      {
+        "id": "FR-TS06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-008",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:56 (FR-TS06)",
+          "PRD_E2E_SPEC.json:363 (FR-TS06)",
+          "PRD_E2E_SPEC.md:86 (FR-TS06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (FR-TS06)"
+        ]
+      },
+      {
+        "id": "FR-TS07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:57 (FR-TS07)",
+          "PRD_E2E_SPEC.json:364 (FR-TS07)",
+          "PRD_E2E_SPEC.md:86 (FR-TS07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (FR-TS07)"
+        ]
+      },
+      {
+        "id": "FR-TS08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:58 (FR-TS08)",
+          "PRD_E2E_SPEC.json:365 (FR-TS08)",
+          "PRD_E2E_SPEC.md:86 (FR-TS08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:184 (FR-TS08)"
+        ]
+      },
+      {
+        "id": "FR-TS09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:59 (FR-TS09)",
+          "PRD_E2E_SPEC.json:235 (FR-TS09)",
+          "PRD_E2E_SPEC.md:57 (FR-TS09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:150 (FR-TS09)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-from-project-detail-with-val.spec.ts:54 (FR-TS09)"
+        ]
+      },
+      {
+        "id": "IC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:562 (IC-01)"
+        ]
+      },
+      {
+        "id": "IC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:563 (IC-02)"
+        ]
+      },
+      {
+        "id": "IC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:564 (IC-03)"
+        ]
+      },
+      {
+        "id": "IC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:565 (IC-04)"
+        ]
+      },
+      {
+        "id": "IC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:566 (IC-05)"
+        ]
+      },
+      {
+        "id": "IC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:567 (IC-06)"
+        ]
+      },
+      {
+        "id": "IC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:568 (IC-07)"
+        ]
+      },
+      {
+        "id": "IC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:569 (IC-08)"
+        ]
+      },
+      {
+        "id": "IC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:570 (IC-09)"
+        ]
+      },
+      {
+        "id": "IC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:571 (IC-10)"
+        ]
+      },
+      {
+        "id": "IC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:572 (IC-11)"
+        ]
+      },
+      {
+        "id": "IC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:573 (IC-12)"
+        ]
+      },
+      {
+        "id": "IC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:574 (IC-13)"
+        ]
+      },
+      {
+        "id": "IC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:575 (IC-14)"
+        ]
+      },
+      {
+        "id": "IC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:576 (IC-15)"
+        ]
+      },
+      {
+        "id": "IC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:577 (IC-16)"
+        ]
+      },
+      {
+        "id": "IC-17",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:578 (IC-17)"
+        ]
+      },
+      {
+        "id": "IC-18",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:579 (IC-18)"
+        ]
+      },
+      {
+        "id": "IC-19",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:580 (IC-19)"
+        ]
+      },
+      {
+        "id": "IC-20",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:581 (IC-20)"
+        ]
+      },
+      {
+        "id": "IC-21",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:582 (IC-21)"
+        ]
+      },
+      {
+        "id": "IC-22",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:583 (IC-22)"
+        ]
+      },
+      {
+        "id": "IC-23",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:584 (IC-23)"
+        ]
+      },
+      {
+        "id": "IC-24",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:585 (IC-24)"
+        ]
+      },
+      {
+        "id": "IC-25",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:586 (IC-25)"
+        ]
+      },
+      {
+        "id": "IC-26",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:587 (IC-26)"
+        ]
+      },
+      {
+        "id": "IC-27",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:588 (IC-27)"
+        ]
+      },
+      {
+        "id": "IC-28",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:589 (IC-28)"
+        ]
+      },
+      {
+        "id": "US-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:594 (US-01)",
+          "PRD_E2E_SPEC.json:21 (US-01)",
+          "PRD_E2E_SPEC.md:8 (US-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:555 (US-01)",
+          "frontend/tests/e2e/generated/e2e-001-landing-to-register-to-first-dashboard-s.spec.ts:30 (US-01)"
+        ]
+      },
+      {
+        "id": "US-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:595 (US-02)",
+          "PRD_E2E_SPEC.json:237 (US-02)",
+          "PRD_E2E_SPEC.md:57 (US-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:555 (US-02)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-from-project-detail-with-val.spec.ts:54 (US-02)"
+        ]
+      },
+      {
+        "id": "US-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:596 (US-03)",
+          "PRD_E2E_SPEC.json:238 (US-03)",
+          "PRD_E2E_SPEC.md:57 (US-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:555 (US-03)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-from-project-detail-with-val.spec.ts:54 (US-03)"
+        ]
+      },
+      {
+        "id": "US-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:597 (US-04)",
+          "PRD_E2E_SPEC.json:370 (US-04)",
+          "PRD_E2E_SPEC.md:86 (US-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:555 (US-04)"
+        ]
+      },
+      {
+        "id": "US-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:598 (US-05)",
+          "PRD_E2E_SPEC.json:418 (US-05)",
+          "PRD_E2E_SPEC.md:97 (US-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:555 (US-05)"
+        ]
+      },
+      {
+        "id": "US-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:599 (US-06)",
+          "PRD_E2E_SPEC.json:117 (US-06)",
+          "PRD_E2E_SPEC.md:29 (US-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:555 (US-06)",
+          "frontend/tests/e2e/generated/e2e-003-owner-creates-workspace-and-invites-memb.spec.ts:25 (US-06)"
+        ]
+      }
+    ],
+    "uncovered": []
+  },
+  "suggestions": [
+    "Reduce context loss: improve section selection / budget allocation so critical PRD and implementation context is not truncated.",
+    "Tighten task-to-file planning: the worker should either write the planned files or immediately repair the missing file-plan deltas.",
+    "Improve final integration convergence: prioritize the highest-signal failing gate first and keep stagnation detection enabled to avoid read-only loops.",
+    "Optimize model spend: reduce repeated high-cost iterations by improving preflight checks, duplicate-file cleanup, and stricter early gates."
+  ]
+}

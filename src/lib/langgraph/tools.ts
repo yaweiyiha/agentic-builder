@@ -39,6 +39,7 @@ const ALLOWED_COMMANDS = [
   // yarn e2e
   "yarn run e2e",
   "pnpm exec playwright",
+  "pnpm exec tsc",
   "pnpm install &&",
   "pnpm add",
   "pnpm approve-builds",

@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-04-29T11:52:40.351Z",
+  "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+  "pass": false,
+  "bootFailed": true,
+  "failures": [
+    {
+      "code": "backend_did_not_start",
+      "target": "_boot",
+      "directive": "Backend `pnpm dev` did not reach a listening state. Inspect the stderr tail in `evidence` — common causes: missing PORT/DATABASE_URL/PRIVY_APP_ID in `backend/.env`, Sequelize model init throwing, or a TS error that crashed `tsx`.",
+      "evidence": "Backend did not become ready within 30000ms. tail=ode/AgenticBuilder/generated-code/backend/\u001b[39msrc/config/env.ts:12:11\u001b[90m)\u001b[39m\n    at crypto \u001b[90m(/Users/57block/code/AgenticBuilder/generated-code/backend/\u001b[39msrc/config/env.ts:38:3\u001b[90m)\u001b[39m\n    at Object.<anonymous> \u001b[90m(/Users/57block/code/AgenticBuilder/generated-code/backend/\u001b[39msrc/config/env.ts:78:71\u001b[90m)\u001b[39m\n\u001b[90m    at Module._compile (node:internal/modules/cjs/loader:1730:14)\u001b[39m\n    at Object.transformer \u001b[90m(/Users/57block/code/AgenticBuilder/generated-code/backend/\u001b[39mnode_modules/\u001b[4m.pnpm\u001b[24m/tsx@4.21.0/node_modules/\u001b[4mtsx\u001b[24m/dist/register-D46fvsV_.cjs:3:1104\u001b[90m)\u001b[39m\n\u001b[90m    at Module.load (node:internal/modules/cjs/loader:1465:32)\u001b[39m\n\u001b[90m    at Function._load (node:internal/modules/cjs/loader:1282:12)\u001b[39m\n\u001b[90m    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\u001b[39m\n\u001b[90m    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\u001b[39m\n\u001b[90m    at Module.require (node:internal/modules/cjs/loader:1487:12)\u001b[39m\n\nNode.js v22.16.0\n"
+    }
+  ],
+  "successes": [],
+  "port": 4000,
+  "probedEndpoints": []
+}

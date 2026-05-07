@@ -29,7 +29,25 @@ export type ResourceCategory =
   | "analytics"
   | "messaging"
   | "maps"
+  | "queue"
+  | "logging"
   | "other";
+
+/** Centralised list — kept in sync with ResourceCategory so detector parsing
+ *  and any UI dropdowns can iterate without duplicating the literal union. */
+export const RESOURCE_CATEGORIES: readonly ResourceCategory[] = [
+  "auth",
+  "payment",
+  "email",
+  "storage",
+  "ai",
+  "analytics",
+  "messaging",
+  "maps",
+  "queue",
+  "logging",
+  "other",
+] as const;
 
 export interface ResourceRequirement {
   /** Canonical UPPER_SNAKE_CASE env var name, e.g. STRIPE_SECRET_KEY. */
@@ -45,6 +63,18 @@ export interface ResourceRequirement {
   example?: string;
   /** Documentation URL where the user can obtain this credential. */
   docsUrl?: string;
+  /**
+   * Non-secret toggle / configuration.
+   *
+   * Default = `false` (treated as a credential — value lives in `.env`,
+   * never logged, never injected back into LLM context). Set `true` for
+   * declarations whose value is a NAME / SWITCH (e.g. `LLM_PROVIDER` =
+   * `"openai" | "gemini"`, `USE_REDIS_QUEUE` = `"1"`, `LOG_LEVEL` =
+   * `"info"`). Non-secret declarations may surface their `value` in
+   * downstream agent prompts so the worker writes provider-aware code
+   * without guessing.
+   */
+  isConfig?: boolean;
   /**
    * User-provided value, persisted locally. Empty until the user fills it.
    * NEVER commit this file — covered by .blueprint/ pattern in .gitignore.
@@ -176,6 +206,7 @@ function normalize(item: ResourceRequirement): ResourceRequirement {
     required: !!item.required,
     example: item.example?.trim() || undefined,
     docsUrl: item.docsUrl?.trim() || undefined,
+    isConfig: item.isConfig === true ? true : undefined,
     value: item.value ?? "",
   };
 }

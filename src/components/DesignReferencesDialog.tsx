@@ -13,21 +13,40 @@ interface DesignReferencesDialogProps {
   onClose: () => void;
 }
 
-const ACCEPTED_MIMES = [
+type ReferenceKind = "image" | "html";
+
+const ACCEPTED_IMAGE_MIMES = [
   "image/png",
   "image/jpeg",
   "image/jpg",
   "image/webp",
   "image/gif",
 ];
-const ACCEPTED_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
-const MAX_BYTES_PER_FILE = 6 * 1024 * 1024;
+const ACCEPTED_HTML_MIMES = ["text/html", "application/xhtml+xml"];
+const ACCEPTED_MIMES = [...ACCEPTED_IMAGE_MIMES, ...ACCEPTED_HTML_MIMES];
+
+const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+const HTML_EXTS = [".html", ".htm", ".xhtml"];
+const ACCEPTED_EXTS = [...IMAGE_EXTS, ...HTML_EXTS];
+
+const MAX_BYTES_IMAGE = 6 * 1024 * 1024;
+// HTML can inline base64 assets and CSS — give it more breathing room.
+const MAX_BYTES_HTML = 8 * 1024 * 1024;
 const MAX_TOTAL = 24;
 
-function isAcceptedImage(file: File): boolean {
-  if (ACCEPTED_MIMES.includes(file.type.toLowerCase())) return true;
+function classifyFile(file: File): ReferenceKind | null {
+  const mime = file.type.toLowerCase();
+  if (ACCEPTED_IMAGE_MIMES.includes(mime)) return "image";
+  if (ACCEPTED_HTML_MIMES.includes(mime)) return "html";
+  // MIME may be missing (drag-drop on some browsers). Fall back to extension.
   const lower = file.name.toLowerCase();
-  return ACCEPTED_EXTS.some((ext) => lower.endsWith(ext));
+  if (HTML_EXTS.some((ext) => lower.endsWith(ext))) return "html";
+  if (IMAGE_EXTS.some((ext) => lower.endsWith(ext))) return "image";
+  return null;
+}
+
+function maxBytesFor(kind: ReferenceKind): number {
+  return kind === "html" ? MAX_BYTES_HTML : MAX_BYTES_IMAGE;
 }
 
 function formatBytes(bytes: number): string {
@@ -39,16 +58,65 @@ function formatBytes(bytes: number): string {
 interface PendingUpload {
   key: string;
   file: File;
+  kind: ReferenceKind;
   label: string;
   pageHint: string;
   previewUrl: string;
   error: string | null;
 }
 
-function makePreviewUrl(file: File): string {
+function makePreviewUrl(file: File, kind: ReferenceKind): string {
+  if (kind !== "image") return "";
   return typeof URL !== "undefined" && URL.createObjectURL
     ? URL.createObjectURL(file)
     : "";
+}
+
+function HtmlThumbnail({
+  size,
+  href,
+}: {
+  size: "sm" | "md";
+  href?: string;
+}) {
+  const dim = size === "md" ? "h-28 w-28" : "h-20 w-20";
+  return (
+    <div
+      className={`${dim} relative shrink-0 overflow-hidden rounded-lg border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50`}
+    >
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-amber-700">
+        <svg
+          width={size === "md" ? "32" : "24"}
+          height={size === "md" ? "32" : "24"}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <path d="M9 13l-2 2 2 2" />
+          <path d="M15 13l2 2-2 2" />
+          <path d="M13 11l-2 6" />
+        </svg>
+        <span className="text-[10px] font-semibold uppercase tracking-wider">
+          HTML
+        </span>
+      </div>
+      {href && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute inset-x-0 bottom-0 bg-amber-900/70 py-1 text-center text-[10px] font-medium text-white opacity-0 transition-opacity hover:opacity-100"
+        >
+          Open ↗
+        </a>
+      )}
+    </div>
+  );
 }
 
 function ReferenceCard({
@@ -74,36 +142,64 @@ function ReferenceCard({
   }, [entry.id, entry.label, entry.pageHint]);
 
   const dirty = label !== entry.label || pageHint !== entry.pageHint;
+  const fileUrl = `/api/agents/pipeline/design-references/${entry.id}/file`;
 
   return (
     <div className="flex gap-3 rounded-xl border border-zinc-200 bg-white p-3">
-      <div className="h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/api/agents/pipeline/design-references/${entry.id}/file`}
-          alt={entry.label || entry.fileName}
-          className="h-full w-full object-cover"
-        />
-      </div>
+      {entry.kind === "html" ? (
+        <HtmlThumbnail size="md" href={fileUrl} />
+      ) : (
+        <div className="h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fileUrl}
+            alt={entry.label || entry.fileName}
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-[12.5px] font-medium text-zinc-800">
-              {entry.fileName}
+            <div className="flex items-center gap-1.5">
+              <div className="truncate text-[12.5px] font-medium text-zinc-800">
+                {entry.fileName}
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                  entry.kind === "html"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-sky-100 text-sky-700"
+                }`}
+              >
+                {entry.kind}
+              </span>
             </div>
             <div className="text-[10.5px] text-zinc-500">
               {formatBytes(entry.bytes)} · {entry.mime} ·{" "}
               {new Date(entry.uploadedAt).toLocaleString()}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => void onDelete(entry.id)}
-            disabled={isBusy}
-            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-          >
-            Delete
-          </button>
+          <div className="flex shrink-0 gap-1">
+            {entry.kind === "html" && (
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+              >
+                Preview
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => void onDelete(entry.id)}
+              disabled={isBusy}
+              className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </div>
         </div>
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
           <label className="w-20 shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-zinc-500">
@@ -204,14 +300,16 @@ export default function DesignReferencesDialog({
       const entries: PendingUpload[] = [];
       const issues: string[] = [];
       for (const file of files.slice(0, remainingSlots)) {
-        if (!isAcceptedImage(file)) {
+        const kind = classifyFile(file);
+        if (!kind) {
           issues.push(`${file.name}: unsupported type (${file.type || "?"}).`);
           continue;
         }
-        if (file.size > MAX_BYTES_PER_FILE) {
+        const limit = maxBytesFor(kind);
+        if (file.size > limit) {
           issues.push(
             `${file.name}: too large (${formatBytes(file.size)}, limit ${formatBytes(
-              MAX_BYTES_PER_FILE,
+              limit,
             )}).`,
           );
           continue;
@@ -221,9 +319,10 @@ export default function DesignReferencesDialog({
             .toString(36)
             .slice(2, 8)}`,
           file,
+          kind,
           label: "",
           pageHint: "",
-          previewUrl: makePreviewUrl(file),
+          previewUrl: makePreviewUrl(file, kind),
           error: null,
         });
       }
@@ -347,7 +446,11 @@ export default function DesignReferencesDialog({
                   Design references
                 </h2>
                 <p className="mt-0.5 text-[12px] leading-snug text-zinc-500">
-                  Upload screenshots or mockups. Each image is stored under{" "}
+                  Upload screenshots / mockups{" "}
+                  <span className="font-medium text-zinc-700">
+                    or self-contained HTML pages
+                  </span>
+                  . Each file is stored under{" "}
                   <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[11px] text-zinc-700">
                     .blueprint/design-references/
                   </code>{" "}
@@ -355,8 +458,9 @@ export default function DesignReferencesDialog({
                   <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[11px] text-zinc-700">
                     &lt;output&gt;/.design-references/
                   </code>{" "}
-                  at kickoff so coding agents can match the visual layout for
-                  the pages you tag.
+                  at kickoff. Coding agents study screenshots for layout, and
+                  open HTML files with their file tools to read structure +
+                  interactions.
                 </p>
               </div>
               <button
@@ -428,7 +532,7 @@ export default function DesignReferencesDialog({
                   <span>
                     Drop{" "}
                     <span className="font-mono text-[11px]">
-                      .png / .jpg / .webp / .gif
+                      .png / .jpg / .webp / .gif / .html
                     </span>{" "}
                     files here or
                   </span>
@@ -437,7 +541,7 @@ export default function DesignReferencesDialog({
                   Choose files
                   <input
                     type="file"
-                    accept={ACCEPTED_MIMES.join(",")}
+                    accept={[...ACCEPTED_MIMES, ...ACCEPTED_EXTS].join(",")}
                     multiple
                     onChange={handleFileInput}
                     className="hidden"
@@ -484,20 +588,35 @@ export default function DesignReferencesDialog({
                         key={p.key}
                         className="flex gap-3 rounded-lg bg-white p-2 ring-1 ring-indigo-100"
                       >
-                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border border-zinc-200 bg-zinc-100">
-                          {p.previewUrl && (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                              src={p.previewUrl}
-                              alt={p.file.name}
-                              className="h-full w-full object-cover"
-                            />
-                          )}
-                        </div>
+                        {p.kind === "html" ? (
+                          <HtmlThumbnail size="sm" />
+                        ) : (
+                          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border border-zinc-200 bg-zinc-100">
+                            {p.previewUrl && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={p.previewUrl}
+                                alt={p.file.name}
+                                className="h-full w-full object-cover"
+                              />
+                            )}
+                          </div>
+                        )}
                         <div className="flex min-w-0 flex-1 flex-col gap-1">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="truncate text-[12px] font-medium text-zinc-800">
-                              {p.file.name}
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <div className="truncate text-[12px] font-medium text-zinc-800">
+                                {p.file.name}
+                              </div>
+                              <span
+                                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                                  p.kind === "html"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-sky-100 text-sky-700"
+                                }`}
+                              >
+                                {p.kind}
+                              </span>
                             </div>
                             <button
                               type="button"
@@ -573,8 +692,9 @@ export default function DesignReferencesDialog({
                 )}
                 {loading === "idle" && references.length > 0 && (
                   <span>
-                    Cap: {references.length}/{MAX_TOTAL} · Per-file limit:{" "}
-                    {formatBytes(MAX_BYTES_PER_FILE)}
+                    Cap: {references.length}/{MAX_TOTAL} · Image limit:{" "}
+                    {formatBytes(MAX_BYTES_IMAGE)} · HTML limit:{" "}
+                    {formatBytes(MAX_BYTES_HTML)}
                   </span>
                 )}
               </div>

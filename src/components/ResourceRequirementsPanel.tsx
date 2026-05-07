@@ -16,6 +16,8 @@ const CATEGORY_LABEL: Record<ResourceCategory, string> = {
   analytics: "Analytics",
   messaging: "Messaging / SMS",
   maps: "Maps / Geocoding",
+  queue: "Queue / Background Jobs",
+  logging: "Logging / Observability",
   other: "Other",
 };
 
@@ -28,6 +30,8 @@ const CATEGORY_BADGE: Record<ResourceCategory, string> = {
   analytics: "bg-pink-50 text-pink-800 border-pink-200",
   messaging: "bg-orange-50 text-orange-800 border-orange-200",
   maps: "bg-teal-50 text-teal-800 border-teal-200",
+  queue: "bg-cyan-50 text-cyan-800 border-cyan-200",
+  logging: "bg-slate-100 text-slate-700 border-slate-200",
   other: "bg-zinc-100 text-zinc-700 border-zinc-200",
 };
 

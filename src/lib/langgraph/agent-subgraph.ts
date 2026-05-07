@@ -20,7 +20,8 @@ import {
   type ChatMessage,
   chatCompletionWithFallback,
 } from "@/lib/openrouter";
-import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
+import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
+import { recallAndPrepareInject } from "@/lib/memory/recall-context";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
@@ -55,12 +56,24 @@ const MAX_OUTPUT_TOKENS = (() => {
   if (!Number.isFinite(raw) || raw <= 0) {
     return DEFAULT_WORKER_CODEGEN_MAX_OUTPUT_TOKENS;
   }
-  return Math.min(Math.max(Math.floor(raw), 1024), 32768);
+  // Cap raised to 128K to support large-context models (e.g. DeepSeek V4 Pro).
+  return Math.min(Math.max(Math.floor(raw), 1024), 131_072);
 })();
 const MAX_TASK_GENERATION_RETRIES = 2;
-const MAX_WORKER_TOOL_ITERATIONS = 6;
+const MAX_WORKER_TOOL_ITERATIONS = 10;
 const MAX_WORKER_TOOL_OUTPUT_CHARS = 12000;
 const WORKER_LLM_HEARTBEAT_MS = 10_000;
+// Raise the iteration ceiling so complex tasks have enough read rounds.
+// 10 rounds gives complex tasks (markets scanner, pipeline orchestrators, etc.)
+// enough budget while still bounding the worst case.
+// Anti read-only spiral: inject a nudge when the model has read for too long.
+// Set relative to MAX_WORKER_TOOL_ITERATIONS so the nudge happens near the end,
+// not in the middle — we don't want to cut short legitimate reads.
+const READ_STALL_NUDGE_AFTER = 5;        // nudge at round 5/10
+// Force tool_choice:"none" only when very close to the limit, as a last resort.
+// At this point the model has had ample reads; we'd rather get imperfect code
+// than throw an iteration-exceeded error.
+const READ_STALL_FORCE_WRITE_AFTER = 8;  // force-write at round 8/10
 const CODEGEN_MULTI_ROUND_ENABLED = (() => {
   const raw = (process.env.CODEGEN_MULTI_ROUND_ENABLED ?? "1")
     .trim()
@@ -235,8 +248,26 @@ Generate React + TypeScript + Tailwind code for the assigned task.
 - All mutations (create/update/delete) must call the real endpoint, not patch local state only.
 - Wrap awaited calls driving loading state with a min-duration helper (~400 ms) so spinners stay visible long enough for E2E assertions.
 
-**Auth:**
-- If implementing \`AuthContext\`/\`AuthProvider\`: read token/user from localStorage on mount, expose \`login(token, user)\`/\`logout()\`, set \`isAuthenticated\` from token presence. Never ship a no-op stub.
+**Framework pitfalls (must follow exactly — these are common production crashes):**
+- **\`useSyncExternalStore\` snapshot caching (HARD RULE):** When implementing a custom store consumed via \`useSyncExternalStore\`, \`getSnapshot()\` MUST return the SAME object reference until state actually changes. Build a \`cachedSnapshot\` variable inside the setter (the function that mutates state) and return it from \`getSnapshot()\`. Returning a fresh object on every call (\`return { isAuthenticated: !!token, accessToken: token }\`) triggers React's "Maximum update depth exceeded" loop because React sees a "new" snapshot on every render. Pattern:
+    \`\`\`ts
+    let snapshot = { isAuthenticated: false, accessToken: null };
+    function setStore(next: Partial<typeof snapshot>) {
+      snapshot = { ...snapshot, ...next };  // rebuild ONCE per real change
+      listeners.forEach((l) => l());
+    }
+    function getSnapshot() { return snapshot; }   // return cached ref
+    \`\`\`
+- **\`useBlocker\` requires a data router (HARD RULE):** \`useBlocker\` from \`react-router-dom\` only works inside \`createBrowserRouter\` (data router). If the project uses \`<BrowserRouter>\` (check \`frontend/src/main.tsx\` BEFORE importing \`useBlocker\`), DO NOT import \`useBlocker\` — it crashes with "useBlocker must be used within a data router". Implement unsaved-changes blocking with \`useState\` (\`pendingNavigation\` + \`requestNavigation\` callback) instead.
+- **Data-router-only hooks**: \`useLoaderData\`, \`useActionData\`, \`useFetcher\`, \`useRouteLoaderData\`, \`useNavigation\` are also data-router-only. Same check applies.
+- **\`useEffect\` cleanup typing**: Do NOT annotate effect callbacks with \`(): void =>\`. The callback may return a cleanup function so the type must be inferred. Write \`useEffect(() => { ... })\`.
+
+**Auth state derivation (HARD RULE — applies to email+password AND OAuth projects):**
+- \`isAuthenticated\` is derived from the presence of an access token, NOT a separate boolean field that can drift. Same for \`hasCompletedOnboarding\` — derive from the user object's onboarding fields (e.g. \`!!user.style_tag\`), do NOT keep a parallel boolean state.
+- The backend is the source of truth for both fields. On \`/api/users/me\` response, set local state from the response — do NOT compute \`hasCompletedOnboarding\` from frontend-only signals.
+- \`AuthContext\` / auth store: read token from localStorage on mount, expose \`login(token, user?)\` / \`logout()\`. Never ship a no-op stub. When using a custom store + \`useSyncExternalStore\`, follow the snapshot caching pitfall above.
+- For OAuth projects (when \`scaffolds/<tier>/_optional/auth-privy\` etc. is applied — check \`.blueprint/scaffold-applied.json\` for the list): the scaffold has ALREADY shipped \`frontend/src/providers/PrivyProvider.tsx\`, an OAuth-aware \`AppProviders.tsx\`, an OAuth-aware \`LoginModal.tsx\`, and \`frontend/src/hooks/usePrivyAuthBridge.ts\`. Your job is ONLY to: (a) call \`usePrivyAuthBridge()\` once near the root (e.g. inside the top-level layout), and (b) pass \`onLogin={(token) => useAuth().login(token)}\` to \`<LoginModal>\` from the landing/login page. DO NOT re-implement these files.
+- For email+password projects (no \`auth-*\` optional applied): the base \`LoginModal.tsx\` is an email+password form. Implement \`POST /api/auth/login\` flow that returns a JWT and call \`useAuth().login(jwt)\` from the landing page.
 
 ${FRONTEND_IMPORT_RULES}
 ${WORKER_READONLY_TOOLS_GUIDE}
@@ -268,6 +299,52 @@ Generate backend code (routes, services, domain logic) for the assigned task.
 - \`validateBody(schema)\` only on POST/PUT/PATCH/DELETE — NEVER on GET routes.
 - JWT helpers: \`signJwt\` / \`verifyJwt\` from \`backend/src/utils/jwt.ts\`. Never call \`jsonwebtoken\` directly in feature code.
 - Every endpoint in \`API_CONTRACTS.json\` for this domain must be implemented and registered.
+
+**External identity vs database primary key (HARD RULE — when an OAuth provider is wired in):**
+When the project applies an \`_optional/auth-*\` scaffold (Privy, Clerk, Auth0, …), \`ctx.state.user.id\` is the EXTERNAL provider id (Privy DID like \`did:privy:cmoir...\`, Clerk userId, Auth0 sub) — NOT your database row's primary key. The User row stores it as a SEPARATE column (typically \`privy_id\` / \`clerk_id\` / \`external_id\`); the DB primary key is an internal UUID.
+
+In every controller / service that consumes \`ctx.state.user.id\`, ALWAYS resolve to the DB row first:
+\`\`\`ts
+const user = await User.findOne({ where: { privy_id: ctx.state.user.id } });
+if (!user) ctx.throw(404, "User not found");
+// from here, use \`user.id\` (UUID) for any FK queries.
+const items = await Feed.findAll({ where: { user_id: user.id } });
+\`\`\`
+NEVER pass the external id directly into Sequelize queries that expect a UUID FK — Postgres throws \`invalid input syntax for type uuid: "did:privy:..."\`. NEVER call \`User.findByPk(ctx.state.user.id)\` when \`ctx.state.user.id\` is an external id; \`findByPk\` looks up by primary key. Common pattern: extract a small helper \`async function resolveDbUser(ctx) { ... }\` per controller and call it at the top of every handler.
+
+**Background jobs (queue / worker / SSE) — must include lifecycle:**
+When implementing a background pipeline (feed aggregator, market scanner, ingestion job, scheduled digest), the SAME PR / task MUST include all of:
+
+1. \`enqueueXxx(userId)\` returns a \`run_id\`. Default impl is in-process (Promise-based) so the demo runs without Redis. Behind \`USE_REDIS_QUEUE=1\` flag, route through BullMQ. NEVER block on \`enqueueXxx\` for more than ~1.5s — wrap with a timeout and resolve early so the calling HTTP handler isn't held hostage by a missing Redis.
+2. The worker MUST use the same \`run_id\` end-to-end. Do NOT call \`randomUUID()\` inside the worker to overwrite the id; if you do, the SSE / status endpoint can't find the run.
+3. Public refresh endpoint MUST call \`clearActiveRunsForUser(userId)\` BEFORE starting a new run. \`clearActiveRunsForUser\` updates any existing \`status="running"\` rows for the user to \`failed\` with a \`completed_at\` timestamp. Without this, a crashed previous run blocks every retry with \`ALREADY_RUNNING\`.
+4. Status / stream endpoints MUST distinguish run-id formats:
+   \`\`\`ts
+   if (runId.startsWith("inproc:")) {
+     // memory-backed run: subscribe to in-process EventEmitter; do NOT touch DB
+   } else if (isUuid(runId)) {
+     const run = await XxxRun.findByPk(runId);
+     // ...
+   } else {
+     ctx.throw(400, "Invalid run_id format");
+   }
+   \`\`\`
+   Calling \`findByPk\` on an \`inproc:\` id throws \`invalid input syntax for type uuid\` and 5xxs the SSE stream.
+5. Structured file logging at every step (start / external-call / external-success / external-fail / step-N-success / complete / fail) at \`<backend>/logs/<feature>.log\`. Use a tiny \`appendLog(line)\` helper in the worker, not \`console.log\` — log files are how operators debug stalls.
+6. \`startXxxWorker()\` MUST be invoked from \`backend/src/server.ts\` on startup. Without this call the in-process queue has no consumer and \`enqueueXxx\` resolves with a \`run_id\` that NEVER advances → the user sees an indefinite spinner.
+
+**Empty results vs failure (HARD RULE for any aggregation / search pipeline):**
+When a multi-source aggregation pipeline returns zero rows from ALL upstream sources, the run MUST complete with \`status="completed"\` and an empty payload (e.g. \`story_count=0\`, clear the user's existing items). It MUST NOT throw \`NO_SOURCES\` / \`Zero stories\` / \`AGGREGATION_FAILED\`. Empty result is a normal user-visible state, NOT an error — the frontend renders an "empty feed" placeholder, the user gets a clear next-step ("try changing your topics"), and the run is recoverable. Throwing on empty turns a benign empty state into a hard failure that leaves stale \`running\` rows in the DB.
+
+**LLM client abstraction (HARD RULE when the project declares an \`LLM_*\` env bundle):**
+When the resource-detector emitted \`LLM_PROVIDER\` + \`LLM_API_KEY\` + \`LLM_BASE_URL\` + \`LLM_MODEL\` (check the External Resources block at the top of your task context), every LLM call MUST go through ONE provider-aware client at \`backend/src/services/llmService.ts\`:
+
+- The client reads \`LLM_PROVIDER\` (\`"openai" | "gemini" | "anthropic" | "openrouter"\`) and instantiates the matching adapter at module load.
+- Default model = \`process.env.LLM_MODEL\`. Default base URL = \`process.env.LLM_BASE_URL\` when set, else the provider's standard URL.
+- ALL feature code (ranking, summarisation, classification, embeddings) calls \`llmService.chat(messages, opts)\` / \`llmService.embed(text)\` — never instantiates \`new OpenAI(...)\` / Gemini SDK / Anthropic SDK directly.
+- NEVER hardcode \`"https://api.openai.com/v1"\` / \`"gpt-4o-mini"\` / a vendor-specific env var like \`OPENAI_API_KEY\` in feature files. Switching providers must be a one-line env change with zero source edits.
+
+If you're tempted to import \`OpenAI\` from \`"openai"\` inside a service file, STOP — go through \`llmService\` instead. The tests / repair gates check for direct vendor imports and will fail.
 
 ${WORKER_READONLY_TOOLS_GUIDE}
 
@@ -600,8 +677,32 @@ async function runCodegenWorkerLoop(
   let promptTokens = 0;
   let completionTokens = 0;
   let totalTokens = 0;
+  let consecutiveReadRounds = 0;
 
   for (let i = 0; i < MAX_WORKER_TOOL_ITERATIONS; i++) {
+    // Anti-spiral: inject a nudge message after too many consecutive read rounds.
+    if (consecutiveReadRounds === READ_STALL_NUDGE_AFTER) {
+      console.log(
+        `[Worker] Read-stall nudge after ${consecutiveReadRounds} consecutive read-only rounds (loop=${i + 1})`,
+      );
+      messages.push({
+        role: "user",
+        content:
+          `You have spent ${consecutiveReadRounds} rounds reading files. ` +
+          `You now have enough context. STOP calling read tools. ` +
+          `Output your implementation NOW using \`\`\`file:path\`\`\` blocks. ` +
+          `Do not read any more files — write the code directly.`,
+      });
+    }
+
+    // Anti-spiral: after even more stall, force the model to output text (no tool calls).
+    const forceWrite = consecutiveReadRounds >= READ_STALL_FORCE_WRITE_AFTER;
+    if (forceWrite) {
+      console.log(
+        `[Worker] Forcing tool_choice=none after ${consecutiveReadRounds} consecutive read-only rounds (loop=${i + 1})`,
+      );
+    }
+
     const callStartedAt = Date.now();
     const heartbeat = setInterval(() => {
       const waitedSec = Math.floor((Date.now() - callStartedAt) / 1000);
@@ -613,8 +714,9 @@ async function runCodegenWorkerLoop(
       temperature: 0.3,
       max_tokens: MAX_OUTPUT_TOKENS,
       openRouterVariant: "codeGen",
-      tools: WORKER_READONLY_TOOLS,
-      tool_choice: "auto",
+      // When forcing write, omit tools entirely so the model cannot call them.
+      tools: forceWrite ? undefined : WORKER_READONLY_TOOLS,
+      tool_choice: forceWrite ? "none" : "auto",
     }).finally(() => {
       clearInterval(heartbeat);
     });
@@ -646,10 +748,15 @@ async function runCodegenWorkerLoop(
       );
     }
 
+    const reasoningContent = choice?.message?.reasoning_content;
     messages.push({
       role: "assistant",
       content,
-      tool_calls: toolCalls,
+      // Omit tool_calls entirely when empty — DeepSeek V4 rejects [] with a 400.
+      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      // DeepSeek V4 thinking mode: echo reasoning_content back so the API
+      // doesn't reject the next turn with "must be passed back" error.
+      ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
     });
 
     if (toolCalls.length === 0) {
@@ -663,6 +770,9 @@ async function runCodegenWorkerLoop(
         totalTokens,
       };
     }
+
+    // All tool calls in this round were read-only — increment the stall counter.
+    consecutiveReadRounds++;
 
     for (const toolCall of toolCalls) {
       let args: Record<string, unknown>;
@@ -1540,6 +1650,28 @@ async function generateCode(state: WorkerState) {
         role: "system",
         content: `## Project Context\n${contextParts.join("\n\n")}`,
       });
+    }
+
+    // Memory recall (Phase C-3): inject active failure-patterns matching
+    // the current task. Layer 2 only — Layer 3 (shadow) is trace-logged
+    // by recallAndPrepareInject but does NOT modify the prompt. The
+    // helper itself respects MEMORY_ENABLED / MEMORY_INJECT flags and
+    // never throws.
+    const memoryRecall = await recallAndPrepareInject({
+      agent: "worker_codegen",
+      role: state.role,
+      task: {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        files: Array.isArray(task.files) ? task.files : undefined,
+      },
+      projectRoot: state.outputDir,
+      kickoffId: state.sessionId,
+      layers: ["L1", "L2"],
+    });
+    if (memoryRecall.block) {
+      messages.push({ role: "system", content: memoryRecall.block });
     }
     const subStepsHint =
       task.subSteps && task.subSteps.length > 0

@@ -1,0 +1,31 @@
+{
+  "id": "CL-5542e3684cd7d64d",
+  "layer": "L1",
+  "kind": "classification",
+  "title": "Classification · M · platform",
+  "tags": [
+    "classifier",
+    "tier:M",
+    "type:platform",
+    "promptVersion:v1-2026-04-28"
+  ],
+  "source": "cache",
+  "refs": {},
+  "createdAt": 1777370272843,
+  "updatedAt": 1777370272843,
+  "schemaVersion": 1,
+  "body": {
+    "tier": "M",
+    "type": "platform",
+    "needsBackend": true,
+    "needsDatabase": true,
+    "needsAuth": true,
+    "needsMultipleServices": true,
+    "reasoning": "The project involves complex code generation based on PRDs, requiring multiple services, user roles, and likely third-party integrations.",
+    "costUsd": 0.00009015,
+    "durationMs": 3327,
+    "briefHash": "5542e3684cd7d64d",
+    "promptVersion": "v1-2026-04-28",
+    "modelUsed": "openai/gpt-4o-mini"
+  }
+}

@@ -439,7 +439,12 @@ async function runBackendRuntimeChecks(
     }
 
     const endpoints = await parseBackendEndpoints(backendDir);
-    const sample = endpoints.slice(0, MAX_BACKEND_ENDPOINT_CHECKS);
+    // Skip the scaffold-provided health probe — already exercised separately
+    // above as `backend_health`. Iterating it here just doubles the noise.
+    const probeEndpoints = endpoints.filter(
+      (ep) => !/^(?:\/api)?\/health\/?$/.test(ep.path),
+    );
+    const sample = probeEndpoints.slice(0, MAX_BACKEND_ENDPOINT_CHECKS);
     for (const endpoint of sample) {
       const route = materializeDynamicPath(endpoint.path);
       const url = `http://127.0.0.1:${port}${route}`;
@@ -463,6 +468,20 @@ async function runBackendRuntimeChecks(
         failures.push({
           check: checkLabel,
           detail: `status=${result.status}, body=${result.body}`,
+        });
+      } else if (result.status === 404) {
+        // 404 on a route we just parsed out of the source means the route is
+        // declared but not actually reachable — almost always a middleware
+        // mis-mount (e.g. guard fn used as middleware without next()) or a
+        // controller-but-no-route mistake. Surface this as failure with a
+        // pointed directive so the verify-fix worker can act.
+        failures.push({
+          check: checkLabel,
+          detail:
+            `404 from a route we just parsed out of routes.ts. Likely causes: ` +
+            `(a) a guard function (e.g. requirePrivyAuth) used as middleware without calling next(); ` +
+            `(b) controller exports a *Handler that the routes file forgot to register; ` +
+            `(c) authGate throws ctx.throw(404) when the DB user row is missing — use resolveOrCreateDbUser to upsert instead.`,
         });
       } else {
         successes.push({

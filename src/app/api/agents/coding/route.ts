@@ -22,6 +22,11 @@ import {
   resolveBlueprintGeneratedDatabaseUrl,
   upsertDatabaseUrlEnv,
   upsertJwtEnvVars,
+  upsertBackendPortEnv,
+  upsertFrontendApiBaseUrlEnv,
+  resolveBackendPort,
+  upsertBackendPrivyAppIdMirror,
+  resolvePrivyAppIdMirrorFromFilledResources,
 } from "@/lib/pipeline/generated-code-env";
 import {
   readResourceRequirements,
@@ -56,6 +61,7 @@ import {
   type AuditTaskSummary,
   type FeatureChecklistAuditResult,
 } from "@/lib/pipeline/self-heal";
+import { createMemorySelfHealSink } from "@/lib/memory/self-heal-sink";
 import { extractPrdRequirementIndex } from "@/lib/requirements/extract-prd-spec";
 import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
 import type { ApiContract, GeneratedFile } from "@/lib/langgraph/state";
@@ -68,6 +74,11 @@ import {
   runModelScoringStage,
   type GateResultsSnapshot,
 } from "@/lib/pipeline/model-scoring";
+import {
+  writeSessionCheckpoint,
+  clearSessionCheckpoint,
+  type TaskCheckpointEntry,
+} from "@/lib/pipeline/session-checkpoint";
 
 const execFileAsync = promisify(execFile);
 
@@ -369,6 +380,7 @@ function summarizeBlockingGateErrors(snapshot: SupervisorGateSnapshot): string[]
  */
 function formatResourceRequirementsPromptBlock(
   items: ResourceRequirement[],
+  appliedOptionalFeatures: string[] = [],
 ): string {
   if (items.length === 0) return "";
   const filled = items.filter((r) => (r.value ?? "").trim().length > 0);
@@ -389,7 +401,15 @@ function formatResourceRequirementsPromptBlock(
     lines.push("");
     for (const r of filled) {
       const reqMark = r.required ? " — required" : " — optional";
-      lines.push(`- **\`${r.envKey}\`** (${r.category}${reqMark}): ${r.description}`);
+      // Non-secret config values (LLM_PROVIDER="gemini", USE_REDIS_QUEUE="0", …)
+      // are surfaced inline so workers can branch on them at code-gen time.
+      // Secret values are NEVER shown — only the env var name + description.
+      const inlineValue = r.isConfig
+        ? ` = \`${(r.value ?? "").trim()}\``
+        : "";
+      lines.push(
+        `- **\`${r.envKey}\`**${inlineValue} (${r.category}${reqMark}): ${r.description}`,
+      );
     }
     lines.push("");
   }
@@ -410,7 +430,205 @@ function formatResourceRequirementsPromptBlock(
     lines.push("");
   }
 
+  // ── LLM provider abstraction (when LLM_* bundle is present) ────────────
+  const declaredKeys = new Set(items.map((r) => r.envKey));
+  if (
+    declaredKeys.has("LLM_PROVIDER") ||
+    declaredKeys.has("LLM_API_KEY") ||
+    declaredKeys.has("LLM_MODEL")
+  ) {
+    lines.push("### LLM provider abstraction (HARD RULE)");
+    lines.push("");
+    lines.push(
+      "This project declared the `LLM_*` env bundle. ALL LLM calls (chat, " +
+        "summarisation, ranking, embeddings) MUST go through ONE provider-aware " +
+        "client at `backend/src/services/llmService.ts` that reads `LLM_PROVIDER` " +
+        "and instantiates the matching adapter. NEVER hardcode `https://api.openai.com/v1`, " +
+        "a vendor-specific env var (`OPENAI_API_KEY`, `GEMINI_API_KEY`), or a model id " +
+        "in feature files. Switching providers must be a one-line `.env` change with " +
+        "zero source edits — the audit will fail any direct vendor SDK import outside `llmService.ts`.",
+    );
+    lines.push("");
+  }
+
+  // ── Auth integration directives ────────────────────────────────────────
+  // Phase 3 split scaffold so OAuth SDK files are conditionally copied via
+  // `_optional/auth-*`. The prompt now distinguishes:
+  //   (a) detected provider with `_optional/auth-<x>` already applied → tell
+  //       the worker the SDK files are ALREADY on disk; only wire onLogin
+  //       and (optionally) the auth bridge hook.
+  //   (b) detected provider with NO matching optional feature → fall back to
+  //       the legacy "install + create Provider + rewrite LoginModal" flow.
+  const oauthMatches = detectOauthIntegrations(items);
+  if (oauthMatches.length > 0) {
+    const appliedSet = new Set(appliedOptionalFeatures);
+
+    const coveredByScaffold: OauthProviderInfo[] = [];
+    const needsManualWiring: OauthProviderInfo[] = [];
+    for (const m of oauthMatches) {
+      if (m.optionalScaffoldFeature && appliedSet.has(m.optionalScaffoldFeature)) {
+        coveredByScaffold.push(m);
+      } else {
+        needsManualWiring.push(m);
+      }
+    }
+
+    if (coveredByScaffold.length > 0) {
+      lines.push(
+        "### Authentication integration (scaffold already shipped — wire it up)",
+      );
+      lines.push("");
+      lines.push(
+        "The kickoff resource detector triggered the optional scaffold " +
+          "feature(s) listed below, so the SDK files have ALREADY been copied " +
+          "into the generated project (see `.blueprint/scaffold-applied.json`). " +
+          "DO NOT re-create them. Your task is to wire the existing files into " +
+          "your landing/login page and a top-level layout.",
+      );
+      lines.push("");
+      for (const m of coveredByScaffold) {
+        lines.push(
+          `- **${m.providerLabel}** — \`_optional/${m.optionalScaffoldFeature}\` applied (env: \`${m.envKey}\`)`,
+        );
+        lines.push(
+          `  - SDK already shipped: \`frontend/src/providers/${m.providerComponent}.tsx\`, an OAuth-aware \`frontend/src/providers/AppProviders.tsx\`, an OAuth-aware \`frontend/src/components/auth/LoginModal.tsx\` (uses the SDK login hook), \`frontend/src/hooks/usePrivyAuthBridge.ts\` (or equivalent helper), plus backend middleware \`backend/src/middlewares/${m.optionalScaffoldFeature?.replace("auth-", "")}Auth.ts\` and SDK client. Dependency \`${m.npmPackage}\`${m.serverPackage ? ` (and \`${m.serverPackage}\`)` : ""} already in \`package.json\`.`,
+        );
+        lines.push(
+          `  - In the landing / login page (e.g. \`frontend/src/views/LandingPage.tsx\`): render \`<LoginModal>\` and pass \`onLogin={(providerToken) => useAuth().login(providerToken)}\`. Do NOT re-implement the modal.`,
+        );
+        lines.push(
+          `  - In a top-level layout (e.g. \`frontend/src/App.tsx\` or whatever wraps the router): call the auth-bridge hook once (\`usePrivyAuthBridge()\` for \`auth-privy\`). It auto-syncs the provider's access token into \`AuthContext\` so \`apiClient\` attaches it as \`Bearer\`. The backend middleware (already shipped) verifies it on every request — no separate \`/api/auth/verify\` exchange is required unless your PRD demands an internal JWT.`,
+        );
+        lines.push(
+          `  - Backend HARD RULE: every controller / service that reads \`ctx.state.user.id\` MUST resolve the EXTERNAL provider id to the internal DB UUID first via \`User.findOne({ where: { ${m.optionalScaffoldFeature?.replace("auth-", "")}_id: ctx.state.user.id } })\`. NEVER call \`findByPk(ctx.state.user.id)\` with a provider DID — Postgres throws \`invalid input syntax for type uuid\`. See "External identity vs database primary key" in the backend role prompt.`,
+        );
+        lines.push("");
+      }
+    }
+
+    if (needsManualWiring.length > 0) {
+      lines.push(
+        "### Authentication integration (NOT covered by an _optional scaffold — implement manually)",
+      );
+      lines.push("");
+      lines.push(
+        "The provider(s) below have no matching `_optional/auth-*` scaffold " +
+          "yet, so you MUST plan and implement the integration end-to-end:",
+      );
+      lines.push("");
+      for (const m of needsManualWiring) {
+        lines.push(`- **${m.providerLabel}** (env: \`${m.envKey}\`)`);
+        lines.push(
+          `  - install: \`${m.npmPackage}\` in \`frontend/package.json\`${m.serverPackage ? ` (and \`${m.serverPackage}\` in \`backend/package.json\` for token verification)` : ""}`,
+        );
+        lines.push(
+          `  - create \`frontend/src/providers/${m.providerComponent}.tsx\`: mount the real SDK Provider using \`${m.envKey}\` from \`import.meta.env\`. Do NOT leave it as a passthrough \`<>{children}</>\`.`,
+        );
+        lines.push(
+          `  - modify \`frontend/src/components/auth/LoginModal.tsx\`: import the SDK login hook, drop the email+password fields, render a button that triggers the provider flow, and forward the resulting access token to the parent via \`onLogin(token)\`.`,
+        );
+        lines.push(
+          `  - modify \`frontend/src/providers/AppProviders.tsx\`: wrap \`<AuthProvider>\` with the new provider component.`,
+        );
+        lines.push(
+          `  - the page that renders \`LoginModal\` MUST pass an \`onLogin\` handler that calls the auth backend (e.g. \`POST /api/auth/verify\`) and then promotes local auth state on success.`,
+        );
+        lines.push("");
+      }
+    }
+  }
+
   return lines.join("\n");
+}
+
+/**
+ * Map known OAuth env keys to their SDK details so we can emit explicit
+ * integration directives. Extending this is the right way to add support
+ * for new providers (Auth0, Clerk, Supabase Auth, NextAuth, etc.).
+ */
+interface OauthProviderInfo {
+  envKey: string;
+  providerLabel: string;
+  npmPackage: string;
+  serverPackage?: string;
+  /** Component name (without extension) for the provider wrapper. */
+  providerComponent: string;
+  /**
+   * When set, this env triggers the matching `scaffolds/<tier>/_optional/<feature>`
+   * directory to be copied into the generated project (see Phase 3:
+   * `src/lib/pipeline/scaffold-optional.ts`). The prompt block uses this
+   * to decide whether to tell the worker "SDK already shipped, just wire
+   * it" (when applied) versus "you must implement end-to-end" (no
+   * matching feature yet). Keep in sync with `_optional/manifest.json`.
+   */
+  optionalScaffoldFeature?: string;
+}
+
+const OAUTH_PROVIDER_REGISTRY: OauthProviderInfo[] = [
+  {
+    envKey: "VITE_PRIVY_APP_ID",
+    providerLabel: "Privy (Twitter / Farcaster / wallet OAuth)",
+    npmPackage: "@privy-io/react-auth",
+    serverPackage: "@privy-io/node",
+    providerComponent: "PrivyProvider",
+    optionalScaffoldFeature: "auth-privy",
+  },
+  {
+    envKey: "NEXT_PUBLIC_PRIVY_APP_ID",
+    providerLabel: "Privy (Next.js)",
+    npmPackage: "@privy-io/react-auth",
+    serverPackage: "@privy-io/node",
+    providerComponent: "PrivyProvider",
+    optionalScaffoldFeature: "auth-privy",
+  },
+  {
+    envKey: "VITE_CLERK_PUBLISHABLE_KEY",
+    providerLabel: "Clerk",
+    npmPackage: "@clerk/clerk-react",
+    serverPackage: "@clerk/backend",
+    providerComponent: "ClerkProvider",
+    optionalScaffoldFeature: "auth-clerk",
+  },
+  {
+    envKey: "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    providerLabel: "Clerk (Next.js)",
+    npmPackage: "@clerk/nextjs",
+    providerComponent: "ClerkProvider",
+    optionalScaffoldFeature: "auth-clerk",
+  },
+  {
+    envKey: "VITE_AUTH0_DOMAIN",
+    providerLabel: "Auth0",
+    npmPackage: "@auth0/auth0-react",
+    providerComponent: "Auth0Provider",
+  },
+  {
+    envKey: "VITE_SUPABASE_URL",
+    providerLabel: "Supabase Auth",
+    npmPackage: "@supabase/supabase-js",
+    providerComponent: "SupabaseProvider",
+  },
+  {
+    envKey: "VITE_GOOGLE_CLIENT_ID",
+    providerLabel: "Google OAuth",
+    npmPackage: "@react-oauth/google",
+    providerComponent: "GoogleAuthProvider",
+  },
+];
+
+function detectOauthIntegrations(
+  items: ResourceRequirement[],
+): OauthProviderInfo[] {
+  const matches: OauthProviderInfo[] = [];
+  const seen = new Set<string>();
+  for (const r of items) {
+    const info = OAUTH_PROVIDER_REGISTRY.find((p) => p.envKey === r.envKey);
+    if (info && !seen.has(info.providerLabel)) {
+      seen.add(info.providerLabel);
+      matches.push(info);
+    }
+  }
+  return matches;
 }
 
 export async function POST(request: NextRequest) {
@@ -423,6 +641,7 @@ export async function POST(request: NextRequest) {
     ralph: ralphOverride,
     databaseUrl: databaseUrlBody,
     prd: prdBody,
+    retryFailedTaskIds,
   } = body as {
     runId: string;
     tasks: KickoffWorkItem[];
@@ -433,6 +652,12 @@ export async function POST(request: NextRequest) {
     databaseUrl?: string;
     /** PRD content passed from the UI to guarantee the correct project PRD is used. */
     prd?: string;
+    /**
+     * When set, ONLY tasks whose IDs are in this list will be executed.
+     * All other tasks are considered already-completed and skipped.
+     * Used for "retry failed tasks only" workflows.
+     */
+    retryFailedTaskIds?: string[];
   };
 
   const ralphConfig: RalphConfig = {
@@ -451,6 +676,27 @@ export async function POST(request: NextRequest) {
   if (tasksAfterStrip.length === 0) {
     return Response.json(
       { error: "No tasks to run after task normalization" },
+      { status: 400 },
+    );
+  }
+
+  // When retryFailedTaskIds is provided, only run those tasks.
+  // All other tasks are considered already-completed and pre-populated
+  // into collectedTaskResults as "completed_with_warnings" so the rest of
+  // the pipeline (audit, scoring, reports) still sees them.
+  const retrySet = retryFailedTaskIds && retryFailedTaskIds.length > 0
+    ? new Set(retryFailedTaskIds)
+    : null;
+  const tasksToRun = retrySet
+    ? tasksAfterStrip.filter((t) => retrySet.has(t.id))
+    : tasksAfterStrip;
+  const tasksSkipped = retrySet
+    ? tasksAfterStrip.filter((t) => !retrySet.has(t.id))
+    : [];
+
+  if (retrySet && tasksToRun.length === 0) {
+    return Response.json(
+      { error: "None of the retryFailedTaskIds matched any known task" },
       { status: 400 },
     );
   }
@@ -507,20 +753,55 @@ export async function POST(request: NextRequest) {
 
   const tier = (projectTier ?? "M").toUpperCase() as ScaffoldTier;
 
+  // Read user-provided resource requirements (API keys, OAuth secrets, etc.)
+  // collected during the kickoff phase BEFORE the scaffold copy so the
+  // optional-feature layer can use them as triggers (e.g. VITE_PRIVY_APP_ID
+  // → copy `_optional/auth-privy/**`). See CODEGEN_HARDENING_PLAN.md §4.10.
+  const resourceRequirements = await readResourceRequirements(process.cwd());
+
   // Always overwrite scaffold files so fresh copies are guaranteed even if cleanup was partial.
   let scaffoldCopied: string[] = [];
+  let appliedOptionalScaffolds: string[] = [];
   try {
     const result = await copyScaffold(tier, outputRoot, {
       forceOverwrite: true,
+      resourceRequirements,
     });
     scaffoldCopied = result.copied;
+    appliedOptionalScaffolds = result.optional.applied;
     console.log(
-      `[CodingAPI] Scaffold (${tier} tier): wrote ${scaffoldCopied.length} file(s) to ${outputRoot}`,
+      `[CodingAPI] Scaffold (${tier} tier): wrote ${scaffoldCopied.length} base file(s) + ${result.optional.copiedFiles.length} optional file(s) (${appliedOptionalScaffolds.length} feature(s) applied) to ${outputRoot}`,
     );
   } catch (e) {
     console.warn(
       `[CodingAPI] Scaffold copy warning: ${e instanceof Error ? e.message : String(e)}`,
     );
+  }
+
+  // Persist the applied optional-scaffold list so downstream stages
+  // (task-breakdown, worker prompts, post-gen audits) can reference it
+  // without re-deriving from triggers.
+  if (appliedOptionalScaffolds.length > 0) {
+    try {
+      await fs.mkdir(path.join(outputRoot, ".blueprint"), { recursive: true });
+      await fs.writeFile(
+        path.join(outputRoot, ".blueprint", "scaffold-applied.json"),
+        JSON.stringify(
+          {
+            tier,
+            generatedAt: new Date().toISOString(),
+            appliedOptionalFeatures: appliedOptionalScaffolds,
+          },
+          null,
+          2,
+        ) + "\n",
+        "utf-8",
+      );
+    } catch (e) {
+      console.warn(
+        `[CodingAPI] Failed to persist scaffold-applied.json: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   try {
@@ -555,10 +836,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Read user-provided resource requirements (API keys, OAuth secrets, etc.)
-  // collected during the kickoff phase. These are merged into backend/.env so
-  // generated code has the credentials it needs at runtime.
-  const resourceRequirements = await readResourceRequirements(process.cwd());
+  // Filled-value subset of `resourceRequirements` used for env file
+  // population (the optional-scaffold copy above only cares about the
+  // declarations, not the values). See CODEGEN_HARDENING_PLAN.md §4.10.
   const filledResources = resourceRequirements.filter(
     (r) => (r.value ?? "").trim().length > 0,
   );
@@ -577,10 +857,16 @@ export async function POST(request: NextRequest) {
       ? upsertDatabaseUrlEnv(existingBackendEnv, resolvedDbUrl)
       : existingBackendEnv;
     const withJwt = upsertJwtEnvVars(withDbUrl);
-    const withResources = upsertResourceEnvVars(withJwt, backendResources);
-    await fs.writeFile(backendEnvPath, withResources, "utf-8");
+    const withPort = upsertBackendPortEnv(withJwt);
+    const withResources = upsertResourceEnvVars(withPort, backendResources);
+    const privyMirror = resolvePrivyAppIdMirrorFromFilledResources(filledResources);
+    const withPrivyMirror = upsertBackendPrivyAppIdMirror(
+      withResources,
+      privyMirror,
+    );
+    await fs.writeFile(backendEnvPath, withPrivyMirror, "utf-8");
     console.log(
-      `[CodingAPI] Synced backend/.env (DATABASE_URL + JWT vars + ${backendResources.length} user resource(s)).`,
+      `[CodingAPI] Synced backend/.env (PORT + DATABASE_URL + JWT + PRIVY_APP_ID mirror + ${backendResources.length} backend resource(s)).`,
     );
   } catch (e) {
     console.warn(
@@ -589,19 +875,22 @@ export async function POST(request: NextRequest) {
   }
 
   // Frontend env vars (VITE_* / NEXT_PUBLIC_*) need to land in frontend/.env.
-  if (frontendResources.length > 0) {
+  // We always overwrite VITE_API_BASE_URL to keep it in sync with backend PORT
+  // (single source of truth = BLUEPRINT_BACKEND_PORT, defaults to 4000).
+  {
     const frontendEnvPath = path.join(outputRoot, "frontend", ".env");
     try {
       const existingFrontendEnv = await fs
         .readFile(frontendEnvPath, "utf-8")
         .catch(() => "");
-      const merged = upsertResourceEnvVars(
+      const withApiBase = upsertFrontendApiBaseUrlEnv(
         existingFrontendEnv,
-        frontendResources,
+        resolveBackendPort(),
       );
+      const merged = upsertResourceEnvVars(withApiBase, frontendResources);
       await fs.writeFile(frontendEnvPath, merged, "utf-8");
       console.log(
-        `[CodingAPI] Synced frontend/.env with ${frontendResources.length} user resource(s).`,
+        `[CodingAPI] Synced frontend/.env (VITE_API_BASE_URL + ${frontendResources.length} user resource(s)).`,
       );
     } catch (e) {
       console.warn(
@@ -736,6 +1025,7 @@ export async function POST(request: NextRequest) {
 
   const resourcesContextBlock = formatResourceRequirementsPromptBlock(
     resourceRequirements,
+    appliedOptionalScaffolds,
   );
   if (resourcesContextBlock) {
     baseContextParts.push(resourcesContextBlock);
@@ -790,7 +1080,7 @@ export async function POST(request: NextRequest) {
     pencilDesignDoc,
   );
 
-  const normalizedTasks = [...tasksAfterStrip, ...preparedE2e.extraTasks];
+  const normalizedTasks = [...tasksToRun, ...preparedE2e.extraTasks];
   const codingTasks: CodingTask[] = normalizedTasks.map((t) => ({
     ...t,
     assignedAgentId: null,
@@ -851,9 +1141,34 @@ export async function POST(request: NextRequest) {
         createJsonlRepairSink(outputRoot),
         consoleRepairSink,
         counterRepairSink,
+        // Memory L2 sink: persist meaningful repair events as self-heal-log
+        // records. Uses the request's runId as kickoffId so records link
+        // back to the project-card written by the pipeline/kickoff routes.
+        createMemorySelfHealSink({
+          outputDir: outputRoot,
+          kickoffSessionId: typeof runId === "string" && runId.length > 0 ? runId : sessionId,
+        }),
       ]);
       registerRepairEmitter(sessionId, repairEmitter);
       const collectedTaskResults = new Map<string, AuditTaskSummary>();
+      // Pre-populate skipped tasks (from previous session) as completed_with_warnings
+      // so they appear in audit and scoring reports without being re-generated.
+      for (const t of tasksSkipped) {
+        collectedTaskResults.set(t.id, {
+          id: t.id,
+          title: t.title,
+          coversRequirementIds: t.coversRequirementIds ?? [],
+          generatedFiles: [],
+          status: "completed_with_warnings",
+        });
+      }
+      if (retrySet) {
+        console.log(
+          `[CodingAPI] Retry mode: running ${tasksToRun.length} task(s), skipping ${tasksSkipped.length} previously-completed task(s).`,
+        );
+        // Clear the checkpoint since we're retrying — will be re-written on completion.
+        await clearSessionCheckpoint(process.cwd());
+      }
       const collectedFileRegistry = new Map<string, GeneratedFile>();
       const collectedApiContracts = new Map<string, ApiContract>();
       const collectedGateSnapshot: SupervisorGateSnapshot = {
@@ -1032,7 +1347,8 @@ export async function POST(request: NextRequest) {
             collectedGateSnapshot,
           );
           if (!finalAudit.passed) {
-            const remainingIds = finalAudit.uncovered.map((entry) => entry.id);
+            // Use hardUncovered to exclude IC-xx interaction specs (soft warnings).
+            const remainingIds = (finalAudit.hardUncovered ?? finalAudit.uncovered.filter((e) => !/^IC-\d+$/i.test(e.id))).map((entry) => entry.id);
             blockingFailures.push(
               [
                 `Feature audit gate failed: ${remainingIds.length} requirement id(s) still unresolved.`,
@@ -1196,6 +1512,25 @@ export async function POST(request: NextRequest) {
           console.warn(
             `[CodingAPI] Model scoring stage failed (ignored):`,
             scoringErr instanceof Error ? scoringErr.message : scoringErr,
+          );
+        }
+
+        // ── Session checkpoint ─────────────────────────────────────────────
+        // Persist task results so the next run can skip already-completed
+        // tasks via `retryFailedTaskIds`.
+        try {
+          const checkpointMap = new Map<string, TaskCheckpointEntry>();
+          for (const [id, result] of collectedTaskResults) {
+            checkpointMap.set(id, {
+              status: result.status,
+              generatedFiles: result.generatedFiles,
+            });
+          }
+          await writeSessionCheckpoint(process.cwd(), sessionId, checkpointMap);
+        } catch (cpErr) {
+          console.warn(
+            `[CodingAPI] Checkpoint write failed (ignored):`,
+            cpErr instanceof Error ? cpErr.message : cpErr,
           );
         }
 

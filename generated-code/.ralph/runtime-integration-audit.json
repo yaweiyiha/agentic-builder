@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-04-29T11:51:31.142Z",
+  "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+  "appliedOptionalFeatures": [
+    "auth-privy"
+  ],
+  "declaredEnvKeys": [
+    "VITE_PRIVY_APP_ID",
+    "PRIVY_APP_SECRET",
+    "OPENAI_API_KEY",
+    "X_BEARER_TOKEN",
+    "JINA_API_KEY",
+    "QUOTIENT_API_KEY"
+  ],
+  "findings": [
+    {
+      "id": "bg-job-inproc-branch|backend/src/services/feedAggregation.service.ts|26",
+      "ruleId": "bg-job-inproc-branch",
+      "scope": "backend",
+      "severity": "error",
+      "file": "backend/src/services/feedAggregation.service.ts",
+      "line": 26,
+      "snippet": "const run = await FeedAggregationRun.findByPk(runId, {\n    attributes: [\"id\", \"status\", \"step_log\", \"started_at\", \"completed_at\", \"story_count\"],\n  });\n  if (!run) return null;",
+      "reason": "This file queries the *Run table by id but does not branch on `inproc:` run-ids. In-process runs use ids like `inproc:<userId>:<ts>` that are NOT UUIDs — Postgres throws `invalid input syntax for type uuid`, the SSE / status endpoint 5xxs, and the user sees an indefinite spinner.",
+      "directive": "Wrap the lookup in a discriminator: `if (runId.startsWith(\"inproc:\")) { /* subscribe to in-memory event emitter; do NOT touch DB */ } else if (isUuid(runId)) { const run = await XxxRun.findByPk(runId); ... } else { ctx.throw(400, \"Invalid run_id\"); }`. Apply to every status / stream handler in this file."
+    },
+    {
+      "id": "bg-job-worker-startup|backend/src/workers/feedAggregationWorker.ts|7",
+      "ruleId": "bg-job-worker-startup",
+      "scope": "backend",
+      "severity": "warn",
+      "file": "backend/src/workers/feedAggregationWorker.ts",
+      "line": 7,
+      "snippet": "export async function startFeedWorker(...) { ... }",
+      "reason": "`startFeedWorker` is exported from a worker module but `backend/src/server.ts` never calls it. The in-process queue then has no consumer — every enqueued run hangs forever.",
+      "directive": "In `backend/src/server.ts`, after the app is created and BEFORE `app.listen(...)`, import and call `await startFeedWorker();`. This registers the in-process consumer at boot."
+    },
+    {
+      "id": "empty-results-not-failure|backend/src/services/feedAggregator.ts|185",
+      "ruleId": "empty-results-not-failure",
+      "scope": "backend",
+      "severity": "warn",
+      "file": "backend/src/services/feedAggregator.ts",
+      "line": 185,
+      "snippet": "al NO_SOURCES\n      throw new Error(\"NO_SOURCES\");\n    }\n    // Levenshtein dedup on titles (≥0.85)\n    const deduped = deduplicateByTitle(allTitles, 0.85);",
+      "reason": "Aggregation throws `NO_SOURCES` when all upstream sources return zero rows. Empty result is a normal user-visible state, not an error — throwing turns a benign empty feed into a hard failure that leaves stale 'running' rows in the DB.",
+      "directive": "Replace the throw with a graceful empty-feed completion: mark the run `status='completed'` with `item_count=0`, clear the user's existing items (or leave them — depending on the empty-state UX you want), and emit a final SSE `complete` event so the frontend transitions to an empty state instead of an error toast."
+    }
+  ],
+  "byRule": {
+    "bg-job-inproc-branch": 1,
+    "bg-job-worker-startup": 1,
+    "empty-results-not-failure": 1
+  },
+  "bySeverity": {
+    "error": 1,
+    "warn": 2
+  },
+  "hasError": true,
+  "clean": false,
+  "disabledRules": [
+    {
+      "ruleId": "llm-client-abstraction",
+      "reason": "no LLM_* bundle declared on resource requirements — abstraction rule N/A."
+    }
+  ]
+}

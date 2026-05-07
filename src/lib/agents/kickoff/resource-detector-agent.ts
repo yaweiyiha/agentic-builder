@@ -51,20 +51,41 @@ Return a single JSON array. Each element MUST have this exact shape:
 - **envKey**: UPPER_SNAKE_CASE only. The actual env var name a backend service would read. Use the canonical name for that vendor (e.g. STRIPE_SECRET_KEY, not PAYMENT_KEY).
 - **label**: Human-readable, ≤ 60 chars.
 - **description**: One concrete sentence explaining what feature in THIS PRD needs it (cite the feature, not generic copy).
-- **category**: One of: "auth" | "payment" | "email" | "storage" | "ai" | "analytics" | "messaging" | "maps" | "other".
+- **category**: One of: "auth" | "payment" | "email" | "storage" | "ai" | "analytics" | "messaging" | "maps" | "queue" | "logging" | "other".
 - **required**: true if the corresponding feature in the PRD is core (P0/MVP) and the app cannot function without it; false if the feature is optional / nice-to-have.
 - **example**: A short format hint (≤ 40 chars) shown as input placeholder. Optional but strongly preferred.
 - **docsUrl**: Public URL where the user can obtain the key. Omit if you are not certain.
+- **isConfig** (optional, default false): Set to \`true\` when the value is a NAME / SWITCH the app branches on (\`LLM_PROVIDER="gemini"\`, \`USE_REDIS_QUEUE="1"\`, \`LOG_LEVEL="info"\`) rather than a credential. Non-secret declarations are surfaced to coding agents so they pick the right adapter at code-gen time. Defaults to false (treat as a credential).
 
 ## What to INCLUDE
 - Third-party API keys for any service the PRD names or implies (payments, email, AI, maps, analytics, storage, push notifications, SMS).
-- OAuth client credentials when the PRD mentions "Sign in with Google/GitHub/Apple/etc."
+- OAuth client credentials when the PRD mentions "Sign in with Google/GitHub/Apple/etc." (emit GOOGLE_CLIENT_ID + VITE_GOOGLE_CLIENT_ID, etc.)
+- Privy App ID (VITE_PRIVY_APP_ID) when the PRD mentions multiple social login providers, Web3/wallet login, or explicitly names Privy as the auth layer.
 - Webhook signing secrets when the PRD describes inbound webhooks (Stripe events, GitHub events, etc.). List them as separate entries.
 - Public client IDs that ship to the frontend MUST use the appropriate prefix:
   * For Vite frontends: \`VITE_*\` (e.g. VITE_STRIPE_PUBLISHABLE_KEY, VITE_GOOGLE_CLIENT_ID)
   * For Next.js frontends: \`NEXT_PUBLIC_*\`
   * Default to VITE_ prefix when unsure (most generated projects are Vite).
   Add a separate entry for the server-side counterpart when one exists (e.g. STRIPE_SECRET_KEY).
+
+## CRITICAL: LLM provider must be declared as a 4-key bundle
+If the PRD describes ANY LLM-driven feature (ranking, recommendation, summarisation, embeddings, classification, semantic search, content moderation, "GPT-powered", "Gemini-powered", an /llm/ endpoint, etc.) you MUST emit ALL FOUR of these entries together — never just one:
+
+1. \`LLM_PROVIDER\` — category "ai", **isConfig: true**, value (example) "openai" / "gemini" / "anthropic" / "openrouter". This tells the backend which adapter to instantiate.
+2. \`LLM_API_KEY\` — category "ai", required: true. The provider-specific secret (e.g. OpenAI key, Gemini key). Description must say "Used by all LLM features (ranking, summarisation, etc.). Provider-agnostic name so the app can swap providers without touching code."
+3. \`LLM_BASE_URL\` — category "ai", **isConfig: true**, required: false (most providers have sensible defaults but Gemini / OpenAI-compatible proxies need this). Example: "https://generativelanguage.googleapis.com/v1beta/openai".
+4. \`LLM_MODEL\` — category "ai", **isConfig: true**, required: true. Example: "gpt-4o-mini" / "gemini-2.5-flash". The default model id used by the abstraction.
+
+DO NOT emit \`OPENAI_API_KEY\` / \`GEMINI_API_KEY\` / \`ANTHROPIC_API_KEY\` as separate entries. The downstream code MUST go through the \`LLM_*\` provider abstraction so that switching providers is an env-only change. If the PRD names a specific provider, set its name as the \`example\` on \`LLM_PROVIDER\` so the user defaults to it.
+
+If the PRD ALSO needs a separate non-LLM AI service (e.g. an embedding model from a different vendor, a vision API, a TTS service), emit those with vendor-specific names — only the chat / completion / "primary reasoning model" goes through the \`LLM_*\` bundle.
+
+## CRITICAL: Background-job declarations
+If the PRD describes a background pipeline / scheduled job / queue-driven flow (feed aggregator, market scanner, daily digest, notification worker), you SHOULD emit a non-secret toggle:
+
+- \`USE_REDIS_QUEUE\` — category "queue", **isConfig: true**, required: false. Example: "0" (default = in-process). Description: "Set to 1 to route background jobs through BullMQ + Redis; default in-process Promise queue keeps the demo working without Redis."
+
+Do NOT emit \`REDIS_URL\` unless the PRD explicitly says Redis is required in production — workers default to in-process queue.
 
 ## What to EXCLUDE (NEVER emit these)
 - DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, NODE_ENV, PORT, HOST — the scaffold owns these.
@@ -202,6 +223,7 @@ function normalize(raw: unknown): ResourceRequirement | null {
     typeof o.example === "string" && o.example.trim() ? o.example.trim() : undefined;
   const docsUrl =
     typeof o.docsUrl === "string" && o.docsUrl.trim() ? o.docsUrl.trim() : undefined;
+  const isConfig = o.isConfig === true ? true : undefined;
 
   if (!envKey || !label || !description) return null;
 
@@ -213,6 +235,7 @@ function normalize(raw: unknown): ResourceRequirement | null {
     required,
     example,
     docsUrl,
+    isConfig,
     value: "",
   };
 }
@@ -227,6 +250,8 @@ function isResourceCategory(s: string): s is ResourceCategory {
     "analytics",
     "messaging",
     "maps",
+    "queue",
+    "logging",
     "other",
   ].includes(s);
 }

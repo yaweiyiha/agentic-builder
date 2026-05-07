@@ -1,0 +1,5428 @@
+{
+  "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+  "startedAt": "2026-04-27T09:13:43.813Z",
+  "endedAt": "2026-04-27T10:34:58.772Z",
+  "status": "fail",
+  "terminalSummary": "Integration verify gate failed.\nCompleted final integration fix by correcting ProjectDetailPage prop contracts to match canonical component APIs (TaskFilters, TaskList, TaskBoard, ProjectModal, TaskModal, InviteMemberModal), removing invalid update handler wiring, and aligning modal callback usage. Re-ran full scoped validation after mutation: frontend tsc passed, frontend build passed, backend tsc passed, and backend startup smoke passed (backend_smoke_ok).\n\nFinal scoped validation gates passed.\n\nBackend route registration gate failed:\n\n## API_CONTRACTS endpoints with no matching implementation\n- POST /api/auth/logout\n- POST /api/auth/reset-password\n## Implemented endpoints not declared in API_CONTRACTS (verify intent)\n- GET /api/health\n\nFeature audit gate failed: 33 requirement id(s) still unresolved.\nIC-01, IC-02, IC-03, IC-04, IC-05, IC-06, IC-07, IC-08, IC-09, IC-10, IC-11, IC-12, IC-13, IC-14, IC-15, IC-16, IC-17, IC-18, IC-19, IC-20, IC-21, IC-22, IC-23, IC-24, IC-25, IC-26, IC-27, IC-28, IC-29, IC-30, IC-31, IC-32, IC-33",
+  "fatalError": "Integration verify gate failed.\nCompleted final integration fix by correcting ProjectDetailPage prop contracts to match canonical component APIs (TaskFilters, TaskList, TaskBoard, ProjectModal, TaskModal, InviteMemberModal), removing invalid update handler wiring, and aligning modal callback usage. Re-ran full scoped validation after mutation: frontend tsc passed, frontend build passed, backend tsc passed, and backend startup smoke passed (backend_smoke_ok).\n\nFinal scoped validation gates passed.\n\nBackend route registration gate failed:\n\n## API_CONTRACTS endpoints with no matching implementation\n- POST /api/auth/logout\n- POST /api/auth/reset-password\n## Implemented endpoints not declared in API_CONTRACTS (verify intent)\n- GET /api/health\n\nFeature audit gate failed: 33 requirement id(s) still unresolved.\nIC-01, IC-02, IC-03, IC-04, IC-05, IC-06, IC-07, IC-08, IC-09, IC-10, IC-11, IC-12, IC-13, IC-14, IC-15, IC-16, IC-17, IC-18, IC-19, IC-20, IC-21, IC-22, IC-23, IC-24, IC-25, IC-26, IC-27, IC-28, IC-29, IC-30, IC-31, IC-32, IC-33",
+  "generatorGitSha": "564258b",
+  "scaffoldFixAttempts": 14,
+  "integrationFixAttempts": 21,
+  "score": {
+    "score": 29,
+    "grade": "F",
+    "reasons": [
+      "Score formula: 100 − 20(fail) − 10(integration) − 25(uncovered:33) − 10(tasks-failed:2) − 4(trunc:2) − 2(plan-unfulfilled:1) = 29",
+      "Run status is fail.",
+      "Integration verification still has blocking errors.",
+      "33 PRD requirement id(s) remain uncovered.",
+      "2 coding task(s) failed.",
+      "Context truncation happened 2 time(s).",
+      "Task plan/file-plan mismatches happened 1 time(s)."
+    ]
+  },
+  "gateErrors": {
+    "integrationErrors": "Completed final integration fix by correcting ProjectDetailPage prop contracts to match canonical component APIs (TaskFilters, TaskList, TaskBoard, ProjectModal, TaskModal, InviteMemberModal), removing invalid update handler wiring, and aligning modal callback usage. Re-ran full scoped validation after mutation: frontend tsc passed, frontend build passed, backend tsc passed, and backend startup smoke passed (backend_smoke_ok).\n\nFinal scoped validation gates passed.\n\nBackend route registration gate failed:\n\n## API_CONTRACTS endpoints with no matching implementation\n- POST /api/auth/logout\n- POST /api/auth/reset-password\n## Implemented endpoints not declared in API_CONTRACTS (verify intent)\n- GET /api/health",
+    "runtimeVerifyErrors": "",
+    "e2eVerifyErrors": ""
+  },
+  "gateStates": {
+    "integrationVerify": "fail",
+    "runtimeVerify": "skipped",
+    "e2eVerify": "skipped",
+    "featureAudit": "fail"
+  },
+  "taskResults": [
+    {
+      "id": "T-001",
+      "title": "Implement database models and migrations with Sequelize",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-PJ01",
+        "FR-TS01",
+        "FR-NO01",
+        "AC-01",
+        "AC-05",
+        "AC-07",
+        "AC-12"
+      ],
+      "generatedFiles": [
+        "backend/src/models/User.ts",
+        "backend/src/models/Project.ts",
+        "backend/src/models/ProjectMember.ts",
+        "backend/src/models/Task.ts",
+        "backend/src/models/Notification.ts",
+        "backend/src/models/Invitation.ts",
+        "backend/src/models/index.ts",
+        "backend/src/database/migrations/001-create-users.ts",
+        "backend/src/database/migrations/002-create-projects.ts",
+        "backend/src/database/migrations/003-create-project-members.ts",
+        "backend/src/database/migrations/004-create-tasks.ts",
+        "backend/src/database/migrations/005-create-notifications.ts",
+        "backend/src/database/migrations/006-create-invitations.ts",
+        "backend/src/db.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-002",
+      "title": "Setup API contracts and frontend HTTP client",
+      "coversRequirementIds": [
+        "FR-AU02",
+        "FR-PJ01",
+        "FR-TS01",
+        "AC-02",
+        "AC-05",
+        "AC-07"
+      ],
+      "generatedFiles": [
+        "backend/src/types/api.ts",
+        "backend/src/validation/schemas.ts",
+        "frontend/src/types/api.ts",
+        "frontend/src/api/auth.ts",
+        "frontend/src/api/projects.ts",
+        "frontend/src/api/tasks.ts",
+        "frontend/src/api/notifications.ts",
+        "frontend/src/api/client.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-003",
+      "title": "Setup Docker Compose and environment configuration",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-PJ01",
+        "FR-TS01"
+      ],
+      "generatedFiles": [
+        "docker-compose.yml",
+        ".env.example",
+        ".env",
+        "backend/.env"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-004",
+      "title": "Implement authentication and user management APIs",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU03",
+        "FR-AU04",
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-13",
+        "US-01"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/auth/auth.service.ts",
+        "backend/src/middlewares/auth.ts",
+        "backend/src/api/modules/auth/auth.controller.ts",
+        "backend/src/api/modules/users/users.service.ts",
+        "backend/src/api/modules/auth/auth.routes.ts",
+        "backend/src/api/modules/users/users.controller.ts",
+        "backend/src/api/modules/users/users.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-005",
+      "title": "Implement project and task management APIs",
+      "coversRequirementIds": [
+        "FR-PJ01",
+        "FR-PJ02",
+        "FR-PJ03",
+        "FR-TS01",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-TS04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "US-02",
+        "US-03",
+        "US-04"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/projects/projects.service.ts",
+        "backend/src/api/modules/projects/projects.routes.ts",
+        "backend/src/api/modules/projects/projects.controller.ts",
+        "backend/src/api/modules/tasks/tasks.service.ts",
+        "backend/src/api/modules/tasks/tasks.controller.ts",
+        "backend/src/api/modules/tasks/tasks.routes.ts",
+        "backend/src/api/modules/invitations/invitations.service.ts",
+        "backend/src/api/modules/invitations/invitations.controller.ts",
+        "backend/src/api/modules/invitations/invitations.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-006",
+      "title": "Implement notifications and dashboard APIs",
+      "coversRequirementIds": [
+        "FR-DA01",
+        "FR-DA02",
+        "FR-NO01",
+        "FR-NO02",
+        "AC-04",
+        "AC-12",
+        "AC-19",
+        "US-06"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/notifications/notifications.service.ts",
+        "backend/src/api/modules/dashboard/dashboard.service.ts",
+        "backend/src/api/modules/notifications/notifications.controller.ts",
+        "backend/src/api/modules/notifications/notifications.routes.ts",
+        "backend/src/api/modules/dashboard/dashboard.controller.ts",
+        "backend/src/api/modules/dashboard/dashboard.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-007",
+      "title": "Create app shell and navigation layout",
+      "coversRequirementIds": [
+        "FR-AU02",
+        "FR-DA01",
+        "AC-02",
+        "AC-04"
+      ],
+      "generatedFiles": [
+        "frontend/src/contexts/AuthContext.tsx",
+        "frontend/src/utils/auth.ts",
+        "frontend/src/components/layout/Header.tsx",
+        "frontend/src/components/layout/Sidebar.tsx",
+        "frontend/src/components/layout/AppLayout.tsx",
+        "frontend/src/components/common/LoadingSpinner.tsx",
+        "frontend/src/hooks/useAuth.ts",
+        "frontend/src/App.tsx",
+        "frontend/src/main.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/views/LandingPage.tsx",
+        "frontend/src/views/LoginPage.tsx",
+        "frontend/src/views/RegisterPage.tsx",
+        "frontend/src/views/ForgotPasswordPage.tsx",
+        "frontend/src/views/DashboardPage.tsx",
+        "frontend/src/views/ProjectsPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-008",
+      "title": "Implement authentication pages (Landing, Login, Register, Forgot Password)",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU03",
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "US-01"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/auth/LoginForm.tsx",
+        "frontend/src/views/LoginPage.tsx",
+        "frontend/src/components/auth/RegisterForm.tsx",
+        "frontend/src/views/RegisterPage.tsx",
+        "frontend/src/components/auth/ForgotPasswordForm.tsx",
+        "frontend/src/views/ForgotPasswordPage.tsx",
+        "frontend/src/views/LandingPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-009",
+      "title": "Implement Dashboard page with task and project summaries",
+      "coversRequirementIds": [
+        "FR-DA01",
+        "FR-DA02",
+        "FR-NO01",
+        "FR-NO02",
+        "AC-04",
+        "AC-12",
+        "AC-18",
+        "AC-19"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/dashboard/SummaryCards.tsx",
+        "frontend/src/components/dashboard/TaskWidget.tsx",
+        "frontend/src/components/dashboard/ProjectList.tsx",
+        "frontend/src/components/dashboard/NotificationsPanel.tsx",
+        "frontend/src/views/DashboardPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-010",
+      "title": "Implement Projects List page with create/edit functionality",
+      "coversRequirementIds": [
+        "FR-PJ01",
+        "FR-PJ03",
+        "FR-PJ04",
+        "AC-05",
+        "AC-15",
+        "US-02"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/projects/ProjectCard.tsx",
+        "frontend/src/components/projects/ProjectModal.tsx",
+        "frontend/src/components/projects/ProjectFilters.tsx",
+        "frontend/src/views/ProjectsPage.tsx",
+        "frontend/src/views/ProjectsListPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-011",
+      "title": "Implement Project Detail page with task management",
+      "coversRequirementIds": [
+        "FR-PJ02",
+        "FR-TS01",
+        "FR-TS02",
+        "FR-TS03",
+        "FR-TS04",
+        "FR-TS05",
+        "FR-TS06",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-16",
+        "AC-17",
+        "US-03",
+        "US-04"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/tasks/TaskCard.tsx",
+        "frontend/src/components/tasks/TaskFilters.tsx",
+        "frontend/src/components/tasks/TaskModal.tsx",
+        "frontend/src/components/projects/InviteMemberModal.tsx",
+        "frontend/src/components/tasks/TaskList.tsx",
+        "frontend/src/components/tasks/TaskBoard.tsx",
+        "frontend/src/views/ProjectDetailPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-012",
+      "title": "Implement Settings page and 404 error page",
+      "coversRequirementIds": [
+        "FR-AU04",
+        "FR-ST01",
+        "FR-ST02",
+        "AC-13"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/settings/ProfileForm.tsx",
+        "frontend/src/components/settings/PasswordForm.tsx",
+        "frontend/src/components/settings/NotificationSettings.tsx",
+        "frontend/src/views/SettingsPage.tsx",
+        "frontend/src/views/NotFoundPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-013",
+      "title": "Implement end-to-end user registration and dashboard flow",
+      "coversRequirementIds": [
+        "AC-14",
+        "US-01"
+      ],
+      "generatedFiles": [],
+      "status": "failed"
+    },
+    {
+      "id": "T-REPAIR-BACKEND",
+      "title": "Backfill uncovered features (backend): AC-14, US-05",
+      "coversRequirementIds": [
+        "AC-14",
+        "US-05"
+      ],
+      "generatedFiles": [
+        "backend/src/models/User.ts",
+        "backend/src/api/modules/auth/auth.service.ts",
+        "backend/src/api/modules/auth/auth.controller.ts",
+        "backend/src/api/modules/auth/auth.routes.ts",
+        "backend/src/api/modules/tasks/tasks.controller.ts",
+        "backend/src/api/modules/tasks/tasks.service.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-REPAIR-FRONTEND",
+      "title": "Backfill uncovered features (frontend): IC-01, IC-02, IC-03, IC-04 …+29",
+      "coversRequirementIds": [
+        "IC-01",
+        "IC-02",
+        "IC-03",
+        "IC-04",
+        "IC-05",
+        "IC-06",
+        "IC-07",
+        "IC-08",
+        "IC-09",
+        "IC-10",
+        "IC-11",
+        "IC-12",
+        "IC-13",
+        "IC-14",
+        "IC-15",
+        "IC-16",
+        "IC-17",
+        "IC-18",
+        "IC-19",
+        "IC-20",
+        "IC-21",
+        "IC-22",
+        "IC-23",
+        "IC-24",
+        "IC-25",
+        "IC-26",
+        "IC-27",
+        "IC-28",
+        "IC-29",
+        "IC-30",
+        "IC-31",
+        "IC-32",
+        "IC-33"
+      ],
+      "generatedFiles": [],
+      "status": "failed"
+    }
+  ],
+  "fileRegistryCount": 153,
+  "llmUsageEvents": [
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 19139,
+      "completionTokens": 218,
+      "totalTokens": 19357,
+      "timestamp": "2026-04-27T09:13:53.481Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 20181,
+      "completionTokens": 126,
+      "totalTokens": 20307,
+      "timestamp": "2026-04-27T09:13:58.206Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 20884,
+      "completionTokens": 172,
+      "totalTokens": 21056,
+      "timestamp": "2026-04-27T09:14:05.239Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 22227,
+      "completionTokens": 2454,
+      "totalTokens": 24681,
+      "timestamp": "2026-04-27T09:15:19.634Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24926,
+      "completionTokens": 1029,
+      "totalTokens": 25955,
+      "timestamp": "2026-04-27T09:15:49.531Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 26179,
+      "completionTokens": 1037,
+      "totalTokens": 27216,
+      "timestamp": "2026-04-27T09:16:23.455Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 27449,
+      "completionTokens": 1127,
+      "totalTokens": 28576,
+      "timestamp": "2026-04-27T09:16:58.750Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 28745,
+      "completionTokens": 724,
+      "totalTokens": 29469,
+      "timestamp": "2026-04-27T09:17:23.364Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29695,
+      "completionTokens": 1016,
+      "totalTokens": 30711,
+      "timestamp": "2026-04-27T09:17:50.107Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 30930,
+      "completionTokens": 1219,
+      "totalTokens": 32149,
+      "timestamp": "2026-04-27T09:18:30.350Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 19423,
+      "completionTokens": 264,
+      "totalTokens": 19687,
+      "timestamp": "2026-04-27T09:18:43.255Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 20746,
+      "completionTokens": 212,
+      "totalTokens": 20958,
+      "timestamp": "2026-04-27T09:18:52.697Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 21215,
+      "completionTokens": 1457,
+      "totalTokens": 22672,
+      "timestamp": "2026-04-27T09:19:38.999Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 23077,
+      "completionTokens": 1023,
+      "totalTokens": 24100,
+      "timestamp": "2026-04-27T09:20:13.666Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24218,
+      "completionTokens": 711,
+      "totalTokens": 24929,
+      "timestamp": "2026-04-27T09:20:36.195Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "generate_api_contracts",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 6289,
+      "completionTokens": 3560,
+      "totalTokens": 9849,
+      "timestamp": "2026-04-27T09:21:12.468Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 21439,
+      "completionTokens": 230,
+      "totalTokens": 21669,
+      "timestamp": "2026-04-27T09:21:23.946Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 22992,
+      "completionTokens": 136,
+      "totalTokens": 23128,
+      "timestamp": "2026-04-27T09:21:29.109Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 27493,
+      "completionTokens": 203,
+      "totalTokens": 27696,
+      "timestamp": "2026-04-27T09:21:38.293Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29975,
+      "completionTokens": 145,
+      "totalTokens": 30120,
+      "timestamp": "2026-04-27T09:21:45.223Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 30876,
+      "completionTokens": 104,
+      "totalTokens": 30980,
+      "timestamp": "2026-04-27T09:21:49.950Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 31613,
+      "completionTokens": 800,
+      "totalTokens": 32413,
+      "timestamp": "2026-04-27T09:22:16.732Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 21439,
+      "completionTokens": 190,
+      "totalTokens": 21629,
+      "timestamp": "2026-04-27T09:22:24.029Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25994,
+      "completionTokens": 310,
+      "totalTokens": 26304,
+      "timestamp": "2026-04-27T09:22:34.218Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29963,
+      "completionTokens": 654,
+      "totalTokens": 30617,
+      "timestamp": "2026-04-27T09:22:55.974Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32273,
+      "completionTokens": 72,
+      "totalTokens": 32345,
+      "timestamp": "2026-04-27T09:23:00.153Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32595,
+      "completionTokens": 447,
+      "totalTokens": 33042,
+      "timestamp": "2026-04-27T09:23:15.202Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33381,
+      "completionTokens": 2942,
+      "totalTokens": 36323,
+      "timestamp": "2026-04-27T09:24:45.450Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36487,
+      "completionTokens": 2253,
+      "totalTokens": 38740,
+      "timestamp": "2026-04-27T09:25:48.937Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 38878,
+      "completionTokens": 882,
+      "totalTokens": 39760,
+      "timestamp": "2026-04-27T09:26:15.555Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39887,
+      "completionTokens": 363,
+      "totalTokens": 40250,
+      "timestamp": "2026-04-27T09:26:28.575Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codefix",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.025196499999999997,
+      "promptTokens": 5318,
+      "completionTokens": 1135,
+      "totalTokens": 6453,
+      "timestamp": "2026-04-27T09:26:44.000Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 23091,
+      "completionTokens": 218,
+      "totalTokens": 23309,
+      "timestamp": "2026-04-27T09:26:55.117Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 26766,
+      "completionTokens": 216,
+      "totalTokens": 26982,
+      "timestamp": "2026-04-27T09:27:03.229Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 28204,
+      "completionTokens": 179,
+      "totalTokens": 28383,
+      "timestamp": "2026-04-27T09:27:10.407Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29389,
+      "completionTokens": 1674,
+      "totalTokens": 31063,
+      "timestamp": "2026-04-27T09:28:03.029Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 31243,
+      "completionTokens": 190,
+      "totalTokens": 31433,
+      "timestamp": "2026-04-27T09:28:10.764Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32362,
+      "completionTokens": 203,
+      "totalTokens": 32565,
+      "timestamp": "2026-04-27T09:28:19.010Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33345,
+      "completionTokens": 1065,
+      "totalTokens": 34410,
+      "timestamp": "2026-04-27T09:28:52.908Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 34590,
+      "completionTokens": 741,
+      "totalTokens": 35331,
+      "timestamp": "2026-04-27T09:29:16.638Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 35153,
+      "completionTokens": 273,
+      "totalTokens": 35426,
+      "timestamp": "2026-04-27T09:29:25.750Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24644,
+      "completionTokens": 198,
+      "totalTokens": 24842,
+      "timestamp": "2026-04-27T09:29:35.596Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 28342,
+      "completionTokens": 187,
+      "totalTokens": 28529,
+      "timestamp": "2026-04-27T09:29:43.343Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29863,
+      "completionTokens": 1806,
+      "totalTokens": 31669,
+      "timestamp": "2026-04-27T09:30:39.073Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32516,
+      "completionTokens": 666,
+      "totalTokens": 33182,
+      "timestamp": "2026-04-27T09:31:01.165Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33901,
+      "completionTokens": 2618,
+      "totalTokens": 36519,
+      "timestamp": "2026-04-27T09:32:19.880Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36748,
+      "completionTokens": 2962,
+      "totalTokens": 39710,
+      "timestamp": "2026-04-27T09:33:47.492Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39835,
+      "completionTokens": 930,
+      "totalTokens": 40765,
+      "timestamp": "2026-04-27T09:34:16.406Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40938,
+      "completionTokens": 2636,
+      "totalTokens": 43574,
+      "timestamp": "2026-04-27T09:35:30.827Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 43523,
+      "completionTokens": 440,
+      "totalTokens": 43963,
+      "timestamp": "2026-04-27T09:35:44.674Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24174,
+      "completionTokens": 193,
+      "totalTokens": 24367,
+      "timestamp": "2026-04-27T09:35:52.853Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25835,
+      "completionTokens": 186,
+      "totalTokens": 26021,
+      "timestamp": "2026-04-27T09:35:59.506Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29068,
+      "completionTokens": 642,
+      "totalTokens": 29710,
+      "timestamp": "2026-04-27T09:36:21.139Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32170,
+      "completionTokens": 455,
+      "totalTokens": 32625,
+      "timestamp": "2026-04-27T09:36:36.084Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33620,
+      "completionTokens": 717,
+      "totalTokens": 34337,
+      "timestamp": "2026-04-27T09:37:00.258Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 34521,
+      "completionTokens": 232,
+      "totalTokens": 34753,
+      "timestamp": "2026-04-27T09:37:07.242Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24174,
+      "completionTokens": 208,
+      "totalTokens": 24382,
+      "timestamp": "2026-04-27T09:37:16.035Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25850,
+      "completionTokens": 202,
+      "totalTokens": 26052,
+      "timestamp": "2026-04-27T09:37:23.376Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29755,
+      "completionTokens": 138,
+      "totalTokens": 29893,
+      "timestamp": "2026-04-27T09:37:28.503Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32793,
+      "completionTokens": 152,
+      "totalTokens": 32945,
+      "timestamp": "2026-04-27T09:37:34.904Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 35439,
+      "completionTokens": 1407,
+      "totalTokens": 36846,
+      "timestamp": "2026-04-27T09:38:15.444Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 38643,
+      "completionTokens": 2697,
+      "totalTokens": 41340,
+      "timestamp": "2026-04-27T09:39:30.643Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41528,
+      "completionTokens": 460,
+      "totalTokens": 41988,
+      "timestamp": "2026-04-27T09:39:45.876Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42136,
+      "completionTokens": 214,
+      "totalTokens": 42350,
+      "timestamp": "2026-04-27T09:39:53.199Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42509,
+      "completionTokens": 664,
+      "totalTokens": 43173,
+      "timestamp": "2026-04-27T09:40:14.079Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24055,
+      "completionTokens": 290,
+      "totalTokens": 24345,
+      "timestamp": "2026-04-27T09:40:24.553Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24438,
+      "completionTokens": 196,
+      "totalTokens": 24634,
+      "timestamp": "2026-04-27T09:40:31.686Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 27795,
+      "completionTokens": 165,
+      "totalTokens": 27960,
+      "timestamp": "2026-04-27T09:40:37.645Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 28432,
+      "completionTokens": 94,
+      "totalTokens": 28526,
+      "timestamp": "2026-04-27T09:40:45.382Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 28654,
+      "completionTokens": 188,
+      "totalTokens": 28842,
+      "timestamp": "2026-04-27T09:40:52.413Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29465,
+      "completionTokens": 176,
+      "totalTokens": 29641,
+      "timestamp": "2026-04-27T09:40:58.662Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24055,
+      "completionTokens": 237,
+      "totalTokens": 24292,
+      "timestamp": "2026-04-27T09:41:07.479Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25222,
+      "completionTokens": 139,
+      "totalTokens": 25361,
+      "timestamp": "2026-04-27T09:41:12.473Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 26024,
+      "completionTokens": 258,
+      "totalTokens": 26282,
+      "timestamp": "2026-04-27T09:41:24.680Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 26639,
+      "completionTokens": 203,
+      "totalTokens": 26842,
+      "timestamp": "2026-04-27T09:41:31.539Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29734,
+      "completionTokens": 213,
+      "totalTokens": 29947,
+      "timestamp": "2026-04-27T09:41:38.814Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 31403,
+      "completionTokens": 184,
+      "totalTokens": 31587,
+      "timestamp": "2026-04-27T09:41:45.425Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 24055,
+      "completionTokens": 232,
+      "totalTokens": 24287,
+      "timestamp": "2026-04-27T09:41:52.743Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25280,
+      "completionTokens": 266,
+      "totalTokens": 25546,
+      "timestamp": "2026-04-27T09:42:01.203Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 28406,
+      "completionTokens": 275,
+      "totalTokens": 28681,
+      "timestamp": "2026-04-27T09:42:10.835Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29304,
+      "completionTokens": 174,
+      "totalTokens": 29478,
+      "timestamp": "2026-04-27T09:42:16.715Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 31948,
+      "completionTokens": 224,
+      "totalTokens": 32172,
+      "timestamp": "2026-04-27T09:42:25.640Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33283,
+      "completionTokens": 1245,
+      "totalTokens": 34528,
+      "timestamp": "2026-04-27T09:43:03.258Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "extract_real_contracts",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 7591,
+      "completionTokens": 3199,
+      "totalTokens": 10790,
+      "timestamp": "2026-04-27T09:44:26.650Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 30998,
+      "completionTokens": 200,
+      "totalTokens": 31198,
+      "timestamp": "2026-04-27T09:44:36.738Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32607,
+      "completionTokens": 133,
+      "totalTokens": 32740,
+      "timestamp": "2026-04-27T09:44:41.814Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33039,
+      "completionTokens": 145,
+      "totalTokens": 33184,
+      "timestamp": "2026-04-27T09:44:47.667Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36046,
+      "completionTokens": 126,
+      "totalTokens": 36172,
+      "timestamp": "2026-04-27T09:44:53.691Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36198,
+      "completionTokens": 109,
+      "totalTokens": 36307,
+      "timestamp": "2026-04-27T09:44:58.122Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36961,
+      "completionTokens": 1903,
+      "totalTokens": 38864,
+      "timestamp": "2026-04-27T09:45:53.249Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39051,
+      "completionTokens": 248,
+      "totalTokens": 39299,
+      "timestamp": "2026-04-27T09:46:02.189Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39355,
+      "completionTokens": 1942,
+      "totalTokens": 41297,
+      "timestamp": "2026-04-27T09:46:51.980Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41484,
+      "completionTokens": 816,
+      "totalTokens": 42300,
+      "timestamp": "2026-04-27T09:47:16.839Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42405,
+      "completionTokens": 694,
+      "totalTokens": 43099,
+      "timestamp": "2026-04-27T09:47:38.520Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42718,
+      "completionTokens": 1646,
+      "totalTokens": 44364,
+      "timestamp": "2026-04-27T09:48:27.352Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 43661,
+      "completionTokens": 1961,
+      "totalTokens": 45622,
+      "timestamp": "2026-04-27T09:49:23.372Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 45786,
+      "completionTokens": 2168,
+      "totalTokens": 47954,
+      "timestamp": "2026-04-27T09:50:23.617Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 48164,
+      "completionTokens": 3311,
+      "totalTokens": 51475,
+      "timestamp": "2026-04-27T09:51:57.952Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32933,
+      "completionTokens": 298,
+      "totalTokens": 33231,
+      "timestamp": "2026-04-27T09:52:08.258Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 35206,
+      "completionTokens": 147,
+      "totalTokens": 35353,
+      "timestamp": "2026-04-27T09:52:13.700Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 38424,
+      "completionTokens": 118,
+      "totalTokens": 38542,
+      "timestamp": "2026-04-27T09:52:18.225Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39589,
+      "completionTokens": 110,
+      "totalTokens": 39699,
+      "timestamp": "2026-04-27T09:52:22.662Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39728,
+      "completionTokens": 83,
+      "totalTokens": 39811,
+      "timestamp": "2026-04-27T09:52:27.948Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.093793,
+      "promptTokens": 39972,
+      "completionTokens": 1703,
+      "totalTokens": 41675,
+      "timestamp": "2026-04-27T09:54:13.814Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09821350000000001,
+      "promptTokens": 41506,
+      "completionTokens": 1827,
+      "totalTokens": 43333,
+      "timestamp": "2026-04-27T09:55:12.661Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09235275,
+      "promptTokens": 43237,
+      "completionTokens": 1192,
+      "totalTokens": 44429,
+      "timestamp": "2026-04-27T09:56:03.499Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.09841475,
+      "promptTokens": 44437,
+      "completionTokens": 1475,
+      "totalTokens": 45912,
+      "timestamp": "2026-04-27T09:56:58.104Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32499,
+      "completionTokens": 227,
+      "totalTokens": 32726,
+      "timestamp": "2026-04-27T09:57:08.057Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 34888,
+      "completionTokens": 114,
+      "totalTokens": 35002,
+      "timestamp": "2026-04-27T09:57:14.972Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 35277,
+      "completionTokens": 148,
+      "totalTokens": 35425,
+      "timestamp": "2026-04-27T09:57:19.519Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40487,
+      "completionTokens": 278,
+      "totalTokens": 40765,
+      "timestamp": "2026-04-27T09:57:28.771Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41425,
+      "completionTokens": 139,
+      "totalTokens": 41564,
+      "timestamp": "2026-04-27T09:57:33.114Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42011,
+      "completionTokens": 1372,
+      "totalTokens": 43383,
+      "timestamp": "2026-04-27T09:58:11.173Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32499,
+      "completionTokens": 336,
+      "totalTokens": 32835,
+      "timestamp": "2026-04-27T09:58:22.142Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36722,
+      "completionTokens": 152,
+      "totalTokens": 36874,
+      "timestamp": "2026-04-27T09:58:28.284Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 37355,
+      "completionTokens": 280,
+      "totalTokens": 37635,
+      "timestamp": "2026-04-27T09:58:37.663Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40014,
+      "completionTokens": 419,
+      "totalTokens": 40433,
+      "timestamp": "2026-04-27T09:58:51.273Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40448,
+      "completionTokens": 1835,
+      "totalTokens": 42283,
+      "timestamp": "2026-04-27T09:59:34.742Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42450,
+      "completionTokens": 2728,
+      "totalTokens": 45178,
+      "timestamp": "2026-04-27T10:00:50.995Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 45294,
+      "completionTokens": 1375,
+      "totalTokens": 46669,
+      "timestamp": "2026-04-27T10:01:23.590Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32700,
+      "completionTokens": 480,
+      "totalTokens": 33180,
+      "timestamp": "2026-04-27T10:01:38.283Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36656,
+      "completionTokens": 401,
+      "totalTokens": 37057,
+      "timestamp": "2026-04-27T10:01:50.692Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39097,
+      "completionTokens": 685,
+      "totalTokens": 39782,
+      "timestamp": "2026-04-27T10:02:12.758Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39924,
+      "completionTokens": 2026,
+      "totalTokens": 41950,
+      "timestamp": "2026-04-27T10:03:09.993Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42105,
+      "completionTokens": 2134,
+      "totalTokens": 44239,
+      "timestamp": "2026-04-27T10:04:09.727Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 44220,
+      "completionTokens": 1296,
+      "totalTokens": 45516,
+      "timestamp": "2026-04-27T10:04:48.732Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32691,
+      "completionTokens": 160,
+      "totalTokens": 32851,
+      "timestamp": "2026-04-27T10:04:56.063Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 35540,
+      "completionTokens": 151,
+      "totalTokens": 35691,
+      "timestamp": "2026-04-27T10:05:01.359Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36549,
+      "completionTokens": 146,
+      "totalTokens": 36695,
+      "timestamp": "2026-04-27T10:05:06.566Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39832,
+      "completionTokens": 138,
+      "totalTokens": 39970,
+      "timestamp": "2026-04-27T10:05:11.679Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41486,
+      "completionTokens": 154,
+      "totalTokens": 41640,
+      "timestamp": "2026-04-27T10:05:17.980Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 43220,
+      "completionTokens": 125,
+      "totalTokens": 43345,
+      "timestamp": "2026-04-27T10:05:22.529Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32691,
+      "completionTokens": 207,
+      "totalTokens": 32898,
+      "timestamp": "2026-04-27T10:05:30.075Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 34612,
+      "completionTokens": 126,
+      "totalTokens": 34738,
+      "timestamp": "2026-04-27T10:05:34.913Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36762,
+      "completionTokens": 169,
+      "totalTokens": 36931,
+      "timestamp": "2026-04-27T10:05:41.092Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 37951,
+      "completionTokens": 106,
+      "totalTokens": 38057,
+      "timestamp": "2026-04-27T10:05:45.932Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40825,
+      "completionTokens": 128,
+      "totalTokens": 40953,
+      "timestamp": "2026-04-27T10:05:51.074Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41815,
+      "completionTokens": 139,
+      "totalTokens": 41954,
+      "timestamp": "2026-04-27T10:05:56.539Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32691,
+      "completionTokens": 192,
+      "totalTokens": 32883,
+      "timestamp": "2026-04-27T10:06:03.073Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 34597,
+      "completionTokens": 150,
+      "totalTokens": 34747,
+      "timestamp": "2026-04-27T10:06:08.268Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 39119,
+      "completionTokens": 156,
+      "totalTokens": 39275,
+      "timestamp": "2026-04-27T10:06:14.451Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40952,
+      "completionTokens": 129,
+      "totalTokens": 41081,
+      "timestamp": "2026-04-27T10:06:19.460Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41550,
+      "completionTokens": 154,
+      "totalTokens": 41704,
+      "timestamp": "2026-04-27T10:06:25.117Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 43855,
+      "completionTokens": 1976,
+      "totalTokens": 45831,
+      "timestamp": "2026-04-27T10:07:21.333Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 46027,
+      "completionTokens": 116,
+      "totalTokens": 46143,
+      "timestamp": "2026-04-27T10:07:25.413Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 47641,
+      "completionTokens": 3455,
+      "totalTokens": 51096,
+      "timestamp": "2026-04-27T10:09:03.564Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 51292,
+      "completionTokens": 1981,
+      "totalTokens": 53273,
+      "timestamp": "2026-04-27T10:09:54.491Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 53433,
+      "completionTokens": 4090,
+      "totalTokens": 57523,
+      "timestamp": "2026-04-27T10:11:50.163Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 57363,
+      "completionTokens": 8043,
+      "totalTokens": 65406,
+      "timestamp": "2026-04-27T10:15:38.078Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32509,
+      "completionTokens": 272,
+      "totalTokens": 32781,
+      "timestamp": "2026-04-27T10:15:48.658Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 34779,
+      "completionTokens": 195,
+      "totalTokens": 34974,
+      "timestamp": "2026-04-27T10:15:55.568Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 37693,
+      "completionTokens": 2340,
+      "totalTokens": 40033,
+      "timestamp": "2026-04-27T10:17:03.313Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40199,
+      "completionTokens": 1304,
+      "totalTokens": 41503,
+      "timestamp": "2026-04-27T10:17:41.177Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41598,
+      "completionTokens": 595,
+      "totalTokens": 42193,
+      "timestamp": "2026-04-27T10:17:59.264Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00260925,
+      "promptTokens": 963,
+      "completionTokens": 66,
+      "totalTokens": 1029,
+      "timestamp": "2026-04-27T10:18:03.769Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.002744,
+      "promptTokens": 1072,
+      "completionTokens": 62,
+      "totalTokens": 1134,
+      "timestamp": "2026-04-27T10:18:06.791Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0063,
+      "promptTokens": 2200,
+      "completionTokens": 175,
+      "totalTokens": 2375,
+      "timestamp": "2026-04-27T10:18:12.783Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.004564,
+      "promptTokens": 2240,
+      "completionTokens": 46,
+      "totalTokens": 2286,
+      "timestamp": "2026-04-27T10:18:14.524Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00850325,
+      "promptTokens": 3243,
+      "completionTokens": 202,
+      "totalTokens": 3445,
+      "timestamp": "2026-04-27T10:18:20.775Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0078365,
+      "promptTokens": 3310,
+      "completionTokens": 146,
+      "totalTokens": 3456,
+      "timestamp": "2026-04-27T10:18:24.639Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.008126999999999999,
+      "promptTokens": 3348,
+      "completionTokens": 162,
+      "totalTokens": 3510,
+      "timestamp": "2026-04-27T10:18:29.663Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00916125,
+      "promptTokens": 4491,
+      "completionTokens": 93,
+      "totalTokens": 4584,
+      "timestamp": "2026-04-27T10:18:33.146Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01270675,
+      "promptTokens": 4613,
+      "completionTokens": 331,
+      "totalTokens": 4944,
+      "timestamp": "2026-04-27T10:18:39.272Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01090075,
+      "promptTokens": 5125,
+      "completionTokens": 138,
+      "totalTokens": 5263,
+      "timestamp": "2026-04-27T10:18:42.384Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.012977999999999998,
+      "promptTokens": 5192,
+      "completionTokens": 278,
+      "totalTokens": 5470,
+      "timestamp": "2026-04-27T10:18:50.834Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0205485,
+      "promptTokens": 5230,
+      "completionTokens": 814,
+      "totalTokens": 6044,
+      "timestamp": "2026-04-27T10:19:05.489Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.010683749999999999,
+      "promptTokens": 5337,
+      "completionTokens": 96,
+      "totalTokens": 5433,
+      "timestamp": "2026-04-27T10:19:08.615Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01113525,
+      "promptTokens": 5403,
+      "completionTokens": 120,
+      "totalTokens": 5523,
+      "timestamp": "2026-04-27T10:19:11.831Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0165445,
+      "promptTokens": 9166,
+      "completionTokens": 36,
+      "totalTokens": 9202,
+      "timestamp": "2026-04-27T10:19:15.918Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01873725,
+      "promptTokens": 10171,
+      "completionTokens": 67,
+      "totalTokens": 10238,
+      "timestamp": "2026-04-27T10:19:18.675Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.022645000000000002,
+      "promptTokens": 10612,
+      "completionTokens": 291,
+      "totalTokens": 10903,
+      "timestamp": "2026-04-27T10:19:23.445Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.028754250000000002,
+      "promptTokens": 13647,
+      "completionTokens": 348,
+      "totalTokens": 13995,
+      "timestamp": "2026-04-27T10:19:28.771Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.037898,
+      "promptTokens": 17632,
+      "completionTokens": 503,
+      "totalTokens": 18135,
+      "timestamp": "2026-04-27T10:19:36.445Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0216195,
+      "promptTokens": 11530,
+      "completionTokens": 103,
+      "totalTokens": 11633,
+      "timestamp": "2026-04-27T10:19:39.887Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.023024750000000004,
+      "promptTokens": 11733,
+      "completionTokens": 178,
+      "totalTokens": 11911,
+      "timestamp": "2026-04-27T10:19:45.749Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03085425,
+      "promptTokens": 14063,
+      "completionTokens": 446,
+      "totalTokens": 14509,
+      "timestamp": "2026-04-27T10:19:54.064Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.030415,
+      "promptTokens": 14260,
+      "completionTokens": 390,
+      "totalTokens": 14650,
+      "timestamp": "2026-04-27T10:20:01.339Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.026673500000000003,
+      "promptTokens": 14706,
+      "completionTokens": 67,
+      "totalTokens": 14773,
+      "timestamp": "2026-04-27T10:20:03.795Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08487850000000001,
+      "promptTokens": 14870,
+      "completionTokens": 4204,
+      "totalTokens": 19074,
+      "timestamp": "2026-04-27T10:20:52.068Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03925775,
+      "promptTokens": 19097,
+      "completionTokens": 417,
+      "totalTokens": 19514,
+      "timestamp": "2026-04-27T10:20:57.299Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.04193525,
+      "promptTokens": 21715,
+      "completionTokens": 281,
+      "totalTokens": 21996,
+      "timestamp": "2026-04-27T10:21:08.813Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.019053999999999998,
+      "promptTokens": 10544,
+      "completionTokens": 43,
+      "totalTokens": 10587,
+      "timestamp": "2026-04-27T10:21:10.649Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.020545,
+      "promptTokens": 11532,
+      "completionTokens": 26,
+      "totalTokens": 11558,
+      "timestamp": "2026-04-27T10:21:11.859Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.023757999999999998,
+      "promptTokens": 12520,
+      "completionTokens": 132,
+      "totalTokens": 12652,
+      "timestamp": "2026-04-27T10:21:17.317Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02680475,
+      "promptTokens": 13949,
+      "completionTokens": 171,
+      "totalTokens": 14120,
+      "timestamp": "2026-04-27T10:21:24.613Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0286405,
+      "promptTokens": 14998,
+      "completionTokens": 171,
+      "totalTokens": 15169,
+      "timestamp": "2026-04-27T10:21:29.506Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.08550849999999999,
+      "promptTokens": 15878,
+      "completionTokens": 4123,
+      "totalTokens": 20001,
+      "timestamp": "2026-04-27T10:22:16.396Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0388395,
+      "promptTokens": 19290,
+      "completionTokens": 363,
+      "totalTokens": 19653,
+      "timestamp": "2026-04-27T10:22:20.836Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "integration_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.037344999999999996,
+      "promptTokens": 19964,
+      "completionTokens": 172,
+      "totalTokens": 20136,
+      "timestamp": "2026-04-27T10:22:32.639Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25931,
+      "completionTokens": 460,
+      "totalTokens": 26391,
+      "timestamp": "2026-04-27T10:22:54.843Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29318,
+      "completionTokens": 348,
+      "totalTokens": 29666,
+      "timestamp": "2026-04-27T10:23:06.659Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 30372,
+      "completionTokens": 156,
+      "totalTokens": 30528,
+      "timestamp": "2026-04-27T10:23:12.146Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 34969,
+      "completionTokens": 498,
+      "totalTokens": 35467,
+      "timestamp": "2026-04-27T10:23:25.284Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 38886,
+      "completionTokens": 368,
+      "totalTokens": 39254,
+      "timestamp": "2026-04-27T10:23:36.904Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40820,
+      "completionTokens": 1041,
+      "totalTokens": 41861,
+      "timestamp": "2026-04-27T10:24:05.997Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25931,
+      "completionTokens": 637,
+      "totalTokens": 26568,
+      "timestamp": "2026-04-27T10:24:25.418Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29495,
+      "completionTokens": 727,
+      "totalTokens": 30222,
+      "timestamp": "2026-04-27T10:24:46.996Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33585,
+      "completionTokens": 977,
+      "totalTokens": 34562,
+      "timestamp": "2026-04-27T10:25:11.755Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36770,
+      "completionTokens": 759,
+      "totalTokens": 37529,
+      "timestamp": "2026-04-27T10:25:35.772Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 38320,
+      "completionTokens": 2829,
+      "totalTokens": 41149,
+      "timestamp": "2026-04-27T10:26:56.082Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 41259,
+      "completionTokens": 849,
+      "totalTokens": 42108,
+      "timestamp": "2026-04-27T10:27:21.600Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42155,
+      "completionTokens": 3094,
+      "totalTokens": 45249,
+      "timestamp": "2026-04-27T10:28:48.590Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (backend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 45268,
+      "completionTokens": 1397,
+      "totalTokens": 46665,
+      "timestamp": "2026-04-27T10:29:32.292Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 27292,
+      "completionTokens": 895,
+      "totalTokens": 28187,
+      "timestamp": "2026-04-27T10:29:59.049Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29480,
+      "completionTokens": 173,
+      "totalTokens": 29653,
+      "timestamp": "2026-04-27T10:30:05.239Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32509,
+      "completionTokens": 577,
+      "totalTokens": 33086,
+      "timestamp": "2026-04-27T10:30:23.695Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36864,
+      "completionTokens": 264,
+      "totalTokens": 37128,
+      "timestamp": "2026-04-27T10:30:31.361Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 40407,
+      "completionTokens": 202,
+      "totalTokens": 40609,
+      "timestamp": "2026-04-27T10:30:38.091Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 44279,
+      "completionTokens": 212,
+      "totalTokens": 44491,
+      "timestamp": "2026-04-27T10:30:45.074Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 27292,
+      "completionTokens": 1105,
+      "totalTokens": 28397,
+      "timestamp": "2026-04-27T10:31:16.185Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32707,
+      "completionTokens": 172,
+      "totalTokens": 32879,
+      "timestamp": "2026-04-27T10:31:22.785Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 38505,
+      "completionTokens": 495,
+      "totalTokens": 39000,
+      "timestamp": "2026-04-27T10:31:38.749Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 43131,
+      "completionTokens": 1227,
+      "totalTokens": 44358,
+      "timestamp": "2026-04-27T10:32:15.496Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 49629,
+      "completionTokens": 1335,
+      "totalTokens": 50964,
+      "timestamp": "2026-04-27T10:32:48.416Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 53944,
+      "completionTokens": 2222,
+      "totalTokens": 56166,
+      "timestamp": "2026-04-27T10:33:54.889Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 27292,
+      "completionTokens": 992,
+      "totalTokens": 28284,
+      "timestamp": "2026-04-27T10:34:24.264Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 31601,
+      "completionTokens": 191,
+      "totalTokens": 31792,
+      "timestamp": "2026-04-27T10:34:30.643Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 37950,
+      "completionTokens": 183,
+      "totalTokens": 38133,
+      "timestamp": "2026-04-27T10:34:37.085Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 42264,
+      "completionTokens": 237,
+      "totalTokens": 42501,
+      "timestamp": "2026-04-27T10:34:44.951Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 46872,
+      "completionTokens": 224,
+      "totalTokens": 47096,
+      "timestamp": "2026-04-27T10:34:53.060Z"
+    },
+    {
+      "sessionId": "2c0034f3-ad9f-41e1-8558-dd1071123ad7",
+      "stage": "worker_codegen",
+      "label": "Audit Backfill (frontend)",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 51357,
+      "completionTokens": 184,
+      "totalTokens": 51541,
+      "timestamp": "2026-04-27T10:34:58.703Z"
+    }
+  ],
+  "modelUsage": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 40,
+      "costUsd": 1.2405015,
+      "promptTokens": 528114,
+      "completionTokens": 22593,
+      "totalTokens": 550707,
+      "stages": [
+        "worker_codefix:Backend Dev",
+        "worker_codegen:Frontend Dev",
+        "phase_verify_fix",
+        "integration_verify_fix"
+      ]
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "calls": 179,
+      "costUsd": 0,
+      "promptTokens": 6175329,
+      "completionTokens": 137558,
+      "totalTokens": 6312887,
+      "stages": [
+        "worker_codegen:Architect",
+        "worker_codegen:Backend Dev",
+        "worker_codegen:Frontend Dev",
+        "worker_codegen:Audit Backfill (backend)",
+        "worker_codegen:Audit Backfill (frontend)"
+      ]
+    },
+    {
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "calls": 2,
+      "costUsd": 0,
+      "promptTokens": 13880,
+      "completionTokens": 6759,
+      "totalTokens": 20639,
+      "stages": [
+        "generate_api_contracts",
+        "extract_real_contracts"
+      ]
+    }
+  ],
+  "modelPerformance": [
+    {
+      "model": "deepseek-v4-pro",
+      "calls": 179,
+      "promptTokens": 6175329,
+      "completionTokens": 137558,
+      "totalTokens": 6312887,
+      "costUsd": 0,
+      "stages": [
+        "worker_codegen"
+      ],
+      "score": 88,
+      "grade": "B",
+      "reasons": [
+        "2 generated task(s) failed."
+      ]
+    },
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 40,
+      "promptTokens": 528114,
+      "completionTokens": 22593,
+      "totalTokens": 550707,
+      "costUsd": 1.2405015,
+      "stages": [
+        "worker_codefix",
+        "worker_codegen",
+        "phase_verify_fix",
+        "integration_verify_fix"
+      ],
+      "score": 79.2,
+      "grade": "C",
+      "reasons": [
+        "2 generated task(s) failed.",
+        "Earlier phase verify/fix did not fully prevent later integration failures.",
+        "Stage ended with blocking integration errors."
+      ]
+    },
+    {
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "calls": 2,
+      "promptTokens": 13880,
+      "completionTokens": 6759,
+      "totalTokens": 20639,
+      "costUsd": 0,
+      "stages": [
+        "generate_api_contracts",
+        "extract_real_contracts"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    }
+  ],
+  "stageUsage": [
+    {
+      "stage": "architect-triage",
+      "startAt": "2026-04-27T09:13:43.845Z",
+      "endAt": "2026-04-27T09:13:43.845Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker_codegen",
+      "startAt": "2026-04-27T09:13:53.481Z",
+      "endAt": "2026-04-27T10:34:58.703Z",
+      "durationMs": 4865222,
+      "llmCalls": 183,
+      "promptTokens": 6344481,
+      "completionTokens": 143755,
+      "totalTokens": 6488236,
+      "costUsd": 0.382774,
+      "models": [
+        "deepseek-v4-pro",
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [
+        "Architect",
+        "Backend Dev",
+        "Frontend Dev",
+        "Audit Backfill (backend)",
+        "Audit Backfill (frontend)"
+      ],
+      "repairEvents": 0,
+      "score": 88,
+      "grade": "B",
+      "reasons": [
+        "2 generated task(s) failed."
+      ]
+    },
+    {
+      "stage": "task",
+      "startAt": "2026-04-27T09:18:30.373Z",
+      "endAt": "2026-04-27T10:34:58.713Z",
+      "durationMs": 4588340,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 15,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-context",
+      "startAt": "2026-04-27T09:20:36.236Z",
+      "endAt": "2026-04-27T10:19:12.950Z",
+      "durationMs": 3516714,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 88,
+      "grade": "B",
+      "reasons": [
+        "Context was truncated 2 time(s)."
+      ]
+    },
+    {
+      "stage": "generate_api_contracts",
+      "startAt": "2026-04-27T09:21:12.468Z",
+      "endAt": "2026-04-27T09:21:12.479Z",
+      "durationMs": 11,
+      "llmCalls": 1,
+      "promptTokens": 6289,
+      "completionTokens": 3560,
+      "totalTokens": 9849,
+      "costUsd": 0,
+      "models": [
+        "anthropic/claude-4-sonnet-20250522"
+      ],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-verify",
+      "startAt": "2026-04-27T09:26:28.596Z",
+      "endAt": "2026-04-27T09:26:28.596Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 92,
+      "grade": "A",
+      "reasons": [
+        "Task/file plan mismatches happened 1 time(s)."
+      ]
+    },
+    {
+      "stage": "worker_codefix",
+      "startAt": "2026-04-27T09:26:44.000Z",
+      "endAt": "2026-04-27T09:26:44.000Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 5318,
+      "completionTokens": 1135,
+      "totalTokens": 6453,
+      "costUsd": 0.025196499999999997,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [
+        "Backend Dev"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-convention-fix",
+      "startAt": "2026-04-27T09:43:03.359Z",
+      "endAt": "2026-04-27T10:17:59.322Z",
+      "durationMs": 2095963,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "extract_real_contracts",
+      "startAt": "2026-04-27T09:44:26.650Z",
+      "endAt": "2026-04-27T09:44:26.650Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 7591,
+      "completionTokens": 3199,
+      "totalTokens": 10790,
+      "costUsd": 0,
+      "models": [
+        "anthropic/claude-4-sonnet-20250522"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "phase_verify_fix",
+      "startAt": "2026-04-27T10:18:03.769Z",
+      "endAt": "2026-04-27T10:19:11.831Z",
+      "durationMs": 68062,
+      "llmCalls": 14,
+      "promptTokens": 51767,
+      "completionTokens": 2729,
+      "totalTokens": 54496,
+      "costUsd": 0.12879825,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 90,
+      "grade": "A",
+      "reasons": [
+        "Earlier phase verify/fix did not fully prevent later integration failures."
+      ]
+    },
+    {
+      "stage": "preflight-route-audit",
+      "startAt": "2026-04-27T10:19:12.947Z",
+      "endAt": "2026-04-27T10:19:12.947Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-contract-completeness",
+      "startAt": "2026-04-27T10:19:12.947Z",
+      "endAt": "2026-04-27T10:19:12.947Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "integration_verify_fix",
+      "startAt": "2026-04-27T10:19:15.918Z",
+      "endAt": "2026-04-27T10:22:32.639Z",
+      "durationMs": 196721,
+      "llmCalls": 21,
+      "promptTokens": 301877,
+      "completionTokens": 12532,
+      "totalTokens": 314409,
+      "costUsd": 0.7037327499999999,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 72,
+      "grade": "C",
+      "reasons": [
+        "Stage ended with blocking integration errors."
+      ]
+    },
+    {
+      "stage": "integration-gate",
+      "startAt": "2026-04-27T10:19:23.453Z",
+      "endAt": "2026-04-27T10:22:38.165Z",
+      "durationMs": 194712,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 10,
+      "score": 64,
+      "grade": "D",
+      "reasons": [
+        "Stagnation warnings triggered 6 time(s)."
+      ]
+    },
+    {
+      "stage": "post-gen-audit",
+      "startAt": "2026-04-27T10:22:38.168Z",
+      "endAt": "2026-04-27T10:34:58.770Z",
+      "durationMs": 740602,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 8,
+      "score": 65,
+      "grade": "D",
+      "reasons": [
+        "35 requirement id(s) remained unresolved after audit."
+      ]
+    }
+  ],
+  "repairSummary": {
+    "totalEvents": 43,
+    "byStage": {
+      "architect-triage": 2,
+      "task": 15,
+      "worker-context": 2,
+      "generate_api_contracts": 1,
+      "worker-verify": 1,
+      "preflight-convention-fix": 2,
+      "preflight-route-audit": 1,
+      "preflight-contract-completeness": 1,
+      "integration-gate": 10,
+      "post-gen-audit": 8
+    },
+    "byEvent": {
+      "task_forced_to_llm": 2,
+      "snapshot_cleaned": 13,
+      "doc_truncated": 2,
+      "contract_completeness_snapshot": 3,
+      "task_plan_unfulfilled": 1,
+      "snapshot_restored": 2,
+      "convention_autofix_applied": 2,
+      "route_audit_snapshot": 2,
+      "stagnation_warning": 6,
+      "route_registration_audit_failed": 1,
+      "frontend_api_client_uniqueness_snapshot": 1,
+      "audit_start": 2,
+      "uncovered_detected": 2,
+      "repair_dispatch_start": 1,
+      "repair_dispatch_role_done": 2,
+      "repair_dispatch_done": 1
+    },
+    "entries": [
+      {
+        "stage": "architect-triage",
+        "event": "task_forced_to_llm",
+        "timestamp": "2026-04-27T09:13:43.845Z",
+        "details": {
+          "reason": "Task references 14 file(s) outside the scaffold's protected paths — real work must be generated.",
+          "title": "Implement database models and migrations with Sequelize",
+          "phase": "Data Layer"
+        },
+        "taskId": "T-001"
+      },
+      {
+        "stage": "architect-triage",
+        "event": "task_forced_to_llm",
+        "timestamp": "2026-04-27T09:13:43.845Z",
+        "details": {
+          "reason": "Task references 3 file(s) outside the scaffold's protected paths — real work must be generated.",
+          "title": "Setup Docker Compose and environment configuration",
+          "phase": "Infrastructure"
+        },
+        "taskId": "T-003"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:18:30.373Z",
+        "taskId": "T-001"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:20:36.215Z",
+        "taskId": "T-003"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-27T09:20:36.236Z",
+        "details": {
+          "label": "api-contract-generation",
+          "keptSections": 18,
+          "droppedSections": 64,
+          "budgetChars": 12000,
+          "usedChars": 12015,
+          "alwaysKeptSections": 0,
+          "forceKeptSections": 0,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "generate_api_contracts",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-27T09:21:12.479Z",
+        "details": {
+          "when": "post-generate",
+          "inferredRelationshipCount": 8,
+          "missingScopedEndpoints": []
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-27T09:26:28.596Z",
+        "details": {
+          "missingCreates": [],
+          "unmodified": [
+            "frontend/src/api/client.ts"
+          ],
+          "fixAttempts": 0
+        },
+        "taskId": "T-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:26:44.019Z",
+        "taskId": "T-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:29:25.771Z",
+        "taskId": "T-004"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:35:44.696Z",
+        "taskId": "T-005"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:40:14.101Z",
+        "taskId": "T-006"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_restored",
+        "timestamp": "2026-04-27T09:43:03.274Z",
+        "details": {
+          "restored": 0,
+          "deleted": 4,
+          "skipped": 0
+        },
+        "taskId": "T-013"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-27T09:43:03.359Z",
+        "details": {
+          "phase": "backend",
+          "fixedFileCount": 9,
+          "fixedFiles": [
+            "frontend/src/providers/AppProviders.tsx",
+            "backend/src/api/modules/dashboard/dashboard.routes.ts",
+            "backend/src/api/modules/invitations/invitations.routes.ts",
+            "backend/src/api/modules/notifications/notifications.routes.ts",
+            "backend/src/api/modules/projects/projects.routes.ts",
+            "backend/src/api/modules/tasks/tasks.routes.ts",
+            "backend/src/api/modules/users/users.routes.ts",
+            "backend/src/app.ts",
+            "frontend/src/router.tsx"
+          ],
+          "notes": [
+            "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+            "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+            "  ↳ rewrote import paths in 7 file(s) to track the rename.",
+            "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename."
+          ],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:51:57.977Z",
+        "taskId": "T-007"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T09:56:58.125Z",
+        "taskId": "T-008"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T10:01:23.611Z",
+        "taskId": "T-009"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T10:04:48.752Z",
+        "taskId": "T-010"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T10:15:38.105Z",
+        "taskId": "T-011"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T10:17:59.282Z",
+        "taskId": "T-012"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-27T10:17:59.322Z",
+        "details": {
+          "phase": "frontend",
+          "fixedFileCount": 0,
+          "fixedFiles": [],
+          "notes": [],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "preflight-route-audit",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-27T10:19:12.947Z",
+        "details": {
+          "when": "preflight",
+          "hardFail": true,
+          "unregisteredModules": [],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/logout"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/reset-password"
+            }
+          ],
+          "undeclaredEndpointCount": 1
+        }
+      },
+      {
+        "stage": "preflight-contract-completeness",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-27T10:19:12.947Z",
+        "details": {
+          "when": "preflight",
+          "inferredRelationshipCount": 8,
+          "missingScopedEndpoints": []
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-27T10:19:12.950Z",
+        "details": {
+          "label": "integration-review",
+          "keptSections": 22,
+          "droppedSections": 60,
+          "budgetChars": 18000,
+          "usedChars": 18019,
+          "alwaysKeptSections": 0,
+          "forceKeptSections": 0,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-27T10:19:23.453Z",
+        "details": {
+          "iterationsWithoutMutation": 3,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 1,
+          "escalated": false,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-27T10:19:36.454Z",
+        "details": {
+          "iterationsWithoutMutation": 5,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 2,
+          "escalated": true,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-27T10:19:45.793Z",
+        "details": {
+          "iterationsWithoutMutation": 7,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 3,
+          "escalated": true,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-27T10:20:01.401Z",
+        "details": {
+          "iterationsWithoutMutation": 9,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 4,
+          "escalated": true,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-27T10:21:17.343Z",
+        "details": {
+          "iterationsWithoutMutation": 4,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 1,
+          "escalated": false,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "stagnation_warning",
+        "timestamp": "2026-04-27T10:21:29.544Z",
+        "details": {
+          "iterationsWithoutMutation": 6,
+          "warnAt": 3,
+          "abortAt": 10,
+          "progressScore": 0,
+          "warningNumber": 2,
+          "escalated": true,
+          "repeatedAction": "none"
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-27T10:22:38.165Z",
+        "details": {
+          "when": "final",
+          "hardFail": true,
+          "unregisteredModules": [],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/logout"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/reset-password"
+            }
+          ],
+          "undeclaredEndpointCount": 1
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "route_registration_audit_failed",
+        "timestamp": "2026-04-27T10:22:38.165Z",
+        "details": {
+          "unregisteredModules": [],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/logout"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/auth/reset-password"
+            }
+          ]
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-27T10:22:38.165Z",
+        "details": {
+          "when": "final",
+          "hardFail": false,
+          "warnOnly": true,
+          "inferredRelationshipCount": 8,
+          "missingScopedEndpoints": [],
+          "warnOnlyEndpoints": [
+            {
+              "parent": "User",
+              "child": "Project",
+              "expectedPath": "GET /api/{users}/:id/{projects}",
+              "reason": "Model relationship User.hasMany(Project) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/projects pattern."
+            },
+            {
+              "parent": "User",
+              "child": "ProjectMember",
+              "expectedPath": "GET /api/{users}/:id/{projectmembers}",
+              "reason": "Model relationship User.hasMany(ProjectMember) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/projectmembers pattern."
+            },
+            {
+              "parent": "Project",
+              "child": "ProjectMember",
+              "expectedPath": "GET /api/{projects}/:id/{projectmembers}",
+              "reason": "Model relationship Project.hasMany(ProjectMember) found in backend/src/models/index.ts, but child has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/projectmembers pattern."
+            },
+            {
+              "parent": "User",
+              "child": "Task",
+              "expectedPath": "GET /api/{users}/:id/{tasks}",
+              "reason": "Model relationship User.hasMany(Task) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/tasks pattern."
+            },
+            {
+              "parent": "User",
+              "child": "Notification",
+              "expectedPath": "GET /api/{users}/:id/{notifications}",
+              "reason": "Model relationship User.hasMany(Notification) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/notifications pattern."
+            },
+            {
+              "parent": "Project",
+              "child": "Invitation",
+              "expectedPath": "GET /api/projects/:id/invitations",
+              "reason": "A flat GET /api/invitations endpoint exists (auth-filtered pattern). If that endpoint already returns only the current user's Invitation records, the scoped endpoint is redundant. Otherwise add it."
+            },
+            {
+              "parent": "User",
+              "child": "Invitation",
+              "expectedPath": "GET /api/{users}/:id/{invitations}",
+              "reason": "Model relationship User.hasMany(Invitation) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/invitations pattern."
+            }
+          ]
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "frontend_api_client_uniqueness_snapshot",
+        "timestamp": "2026-04-27T10:22:38.165Z",
+        "details": {
+          "when": "final",
+          "hardFail": false,
+          "canonical": "frontend/src/api/client.ts",
+          "parallelClients": []
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_start",
+        "timestamp": "2026-04-27T10:22:38.168Z",
+        "details": {
+          "totalIds": 78
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "uncovered_detected",
+        "timestamp": "2026-04-27T10:22:38.200Z",
+        "details": {
+          "totalChecked": 78,
+          "implemented": 43,
+          "partial": 0,
+          "missing": 35
+        },
+        "missingIds": [
+          "AC-14",
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28",
+          "IC-29",
+          "IC-30",
+          "IC-31",
+          "IC-32",
+          "IC-33",
+          "US-05"
+        ],
+        "stillMissing": [
+          "AC-14",
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28",
+          "IC-29",
+          "IC-30",
+          "IC-31",
+          "IC-32",
+          "IC-33",
+          "US-05"
+        ]
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_start",
+        "timestamp": "2026-04-27T10:22:38.201Z",
+        "details": {
+          "frontend": 33,
+          "backend": 2
+        },
+        "missingIds": [
+          "AC-14",
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28",
+          "IC-29",
+          "IC-30",
+          "IC-31",
+          "IC-32",
+          "IC-33",
+          "US-05"
+        ]
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-27T10:29:32.308Z",
+        "taskId": "T-REPAIR-BACKEND"
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_role_done",
+        "timestamp": "2026-04-27T10:29:32.313Z",
+        "details": {
+          "role": "backend",
+          "filesWritten": 6,
+          "taskId": "T-REPAIR-BACKEND"
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_restored",
+        "timestamp": "2026-04-27T10:34:58.713Z",
+        "details": {
+          "restored": 0,
+          "deleted": 0,
+          "skipped": 0
+        },
+        "taskId": "T-REPAIR-FRONTEND"
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_role_done",
+        "timestamp": "2026-04-27T10:34:58.718Z",
+        "details": {
+          "role": "frontend",
+          "filesWritten": 0,
+          "taskId": "T-REPAIR-FRONTEND"
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "repair_dispatch_done",
+        "timestamp": "2026-04-27T10:34:58.719Z",
+        "details": {
+          "totalFiles": 6,
+          "costUsd": 0
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_start",
+        "timestamp": "2026-04-27T10:34:58.719Z",
+        "details": {
+          "totalIds": 78
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "uncovered_detected",
+        "timestamp": "2026-04-27T10:34:58.770Z",
+        "details": {
+          "totalChecked": 78,
+          "implemented": 45,
+          "partial": 0,
+          "missing": 33
+        },
+        "missingIds": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28",
+          "IC-29",
+          "IC-30",
+          "IC-31",
+          "IC-32",
+          "IC-33"
+        ],
+        "stillMissing": [
+          "IC-01",
+          "IC-02",
+          "IC-03",
+          "IC-04",
+          "IC-05",
+          "IC-06",
+          "IC-07",
+          "IC-08",
+          "IC-09",
+          "IC-10",
+          "IC-11",
+          "IC-12",
+          "IC-13",
+          "IC-14",
+          "IC-15",
+          "IC-16",
+          "IC-17",
+          "IC-18",
+          "IC-19",
+          "IC-20",
+          "IC-21",
+          "IC-22",
+          "IC-23",
+          "IC-24",
+          "IC-25",
+          "IC-26",
+          "IC-27",
+          "IC-28",
+          "IC-29",
+          "IC-30",
+          "IC-31",
+          "IC-32",
+          "IC-33"
+        ]
+      }
+    ]
+  },
+  "preflightLedger": {
+    "conventionAutofix": {
+      "invocations": 2,
+      "totalFixedFiles": 9,
+      "totalUnfixable": 0,
+      "notes": [
+        "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename.",
+        "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+        "  ↳ rewrote import paths in 7 file(s) to track the rename.",
+        "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename."
+      ],
+      "unfixable": []
+    },
+    "routeAudit": {
+      "preflight": {
+        "when": "preflight",
+        "hardFail": true,
+        "unregisteredModules": [],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/logout"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/reset-password"
+          }
+        ],
+        "undeclaredEndpointCount": 1
+      },
+      "final": {
+        "when": "final",
+        "hardFail": true,
+        "unregisteredModules": [],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/logout"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/auth/reset-password"
+          }
+        ],
+        "undeclaredEndpointCount": 1
+      }
+    },
+    "importGapInstalls": {
+      "totalPackages": 0,
+      "scopes": []
+    },
+    "contractCompleteness": {
+      "postGenerate": {
+        "when": "post-generate",
+        "inferredRelationshipCount": 8,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      },
+      "preflight": {
+        "when": "preflight",
+        "inferredRelationshipCount": 8,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      },
+      "final": {
+        "when": "final",
+        "inferredRelationshipCount": 8,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      }
+    }
+  },
+  "defectCategories": [
+    {
+      "key": "dependency-sync",
+      "label": "Dependency sync",
+      "state": "pass",
+      "evidence": [
+        "No missing-import installs were needed."
+      ]
+    },
+    {
+      "key": "directory-dedup",
+      "label": "Directory / implementation dedup",
+      "state": "pass",
+      "evidence": [
+        "Convention auto-fix rewrote 9 file(s) across 2 invocation(s)."
+      ]
+    },
+    {
+      "key": "env-alignment",
+      "label": "Env variable alignment",
+      "state": "pass",
+      "evidence": [
+        "No env alignment signal — generator injected DATABASE_URL defaults and no gate flagged env drift."
+      ]
+    },
+    {
+      "key": "contract-consistency",
+      "label": "API contract consistency",
+      "state": "fail",
+      "evidence": [
+        "Preflight: 0 unregistered module(s), 2 missing contract endpoint(s), 0 dangling registration import(s).",
+        "Final gate: 0 unregistered, 2 missing contract, 0 dangling (HARD FAIL)."
+      ]
+    },
+    {
+      "key": "contract-completeness",
+      "label": "API contract completeness (ORM-derived)",
+      "state": "pass",
+      "evidence": [
+        "Post-generate: 8 ORM relationship(s), 0 scoped endpoint(s) missing.",
+        "Preflight: 8 relationship(s), 0 missing.",
+        "Final gate: 0 missing."
+      ]
+    },
+    {
+      "key": "build-verification",
+      "label": "Build & runtime verification",
+      "state": "fail",
+      "evidence": [
+        "Integration and runtime gates produced no blocking output."
+      ]
+    }
+  ],
+  "finalAudit": {
+    "passed": false,
+    "entries": [
+      {
+        "id": "IC-01",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-02",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-03",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-04",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-05",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-06",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-07",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-08",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-09",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-10",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-11",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-12",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-13",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-14",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-15",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-16",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-17",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-18",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-19",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-20",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-21",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-22",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-23",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-24",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-25",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-26",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-27",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-28",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-29",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-30",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-31",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-32",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-33",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "AC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-004",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:540 (AC-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (AC-01)"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-004",
+          "T-007",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:541 (AC-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:75 (AC-02)"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:542 (AC-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:131 (AC-03)"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-007",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:543 (AC-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:202 (AC-04)"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:544 (AC-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (AC-05)"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:545 (AC-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (AC-06)"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:546 (AC-07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (AC-07)"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:547 (AC-08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (AC-08)"
+        ]
+      },
+      {
+        "id": "AC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:548 (AC-09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (AC-09)"
+        ]
+      },
+      {
+        "id": "AC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:549 (AC-10)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (AC-10)"
+        ]
+      },
+      {
+        "id": "AC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:550 (AC-11)",
+          "TASK_BREAKDOWN_ORIGINAL.md:360 (AC-11)"
+        ]
+      },
+      {
+        "id": "AC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-006",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:551 (AC-12)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (AC-12)"
+        ]
+      },
+      {
+        "id": "AC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:552 (AC-13)",
+          "TASK_BREAKDOWN_ORIGINAL.md:131 (AC-13)"
+        ]
+      },
+      {
+        "id": "AC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-013",
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:553 (AC-14)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-14)"
+        ]
+      },
+      {
+        "id": "AC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:554 (AC-15)",
+          "TASK_BREAKDOWN_ORIGINAL.md:326 (AC-15)"
+        ]
+      },
+      {
+        "id": "AC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:555 (AC-16)",
+          "TASK_BREAKDOWN_ORIGINAL.md:360 (AC-16)"
+        ]
+      },
+      {
+        "id": "AC-17",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:556 (AC-17)",
+          "TASK_BREAKDOWN_ORIGINAL.md:360 (AC-17)"
+        ]
+      },
+      {
+        "id": "AC-18",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:557 (AC-18)",
+          "TASK_BREAKDOWN_ORIGINAL.md:299 (AC-18)"
+        ]
+      },
+      {
+        "id": "AC-19",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:558 (AC-19)",
+          "TASK_BREAKDOWN_ORIGINAL.md:202 (AC-19)"
+        ]
+      },
+      {
+        "id": "FR-AU01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-003",
+          "T-004",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:32 (FR-AU01)",
+          "PRD_E2E_SPEC.json:57 (FR-AU01)",
+          "PRD_E2E_SPEC.md:17 (FR-AU01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (FR-AU01)"
+        ]
+      },
+      {
+        "id": "FR-AU02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-004",
+          "T-007",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:33 (FR-AU02)",
+          "PRD_E2E_SPEC.json:96 (FR-AU02)",
+          "PRD_E2E_SPEC.md:26 (FR-AU02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:75 (FR-AU02)"
+        ]
+      },
+      {
+        "id": "FR-AU03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:34 (FR-AU03)",
+          "PRD_E2E_SPEC.json:131 (FR-AU03)",
+          "PRD_E2E_SPEC.md:35 (FR-AU03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:131 (FR-AU03)"
+        ]
+      },
+      {
+        "id": "FR-AU04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:35 (FR-AU04)",
+          "PRD_E2E_SPEC.json:465 (FR-AU04)",
+          "PRD_E2E_SPEC.md:111 (FR-AU04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:131 (FR-AU04)"
+        ]
+      },
+      {
+        "id": "FR-DA01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-007",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:38 (FR-DA01)",
+          "PRD_E2E_SPEC.json:167 (FR-DA01)",
+          "PRD_E2E_SPEC.md:44 (FR-DA01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:202 (FR-DA01)"
+        ]
+      },
+      {
+        "id": "FR-DA02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:39 (FR-DA02)",
+          "PRD_E2E_SPEC.json:168 (FR-DA02)",
+          "PRD_E2E_SPEC.md:44 (FR-DA02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:202 (FR-DA02)"
+        ]
+      },
+      {
+        "id": "FR-NO01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-006",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:56 (FR-NO01)",
+          "PRD_E2E_SPEC.json:427 (FR-NO01)",
+          "PRD_E2E_SPEC.md:102 (FR-NO01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (FR-NO01)"
+        ]
+      },
+      {
+        "id": "FR-NO02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:57 (FR-NO02)",
+          "PRD_E2E_SPEC.json:428 (FR-NO02)",
+          "PRD_E2E_SPEC.md:102 (FR-NO02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:202 (FR-NO02)"
+        ]
+      },
+      {
+        "id": "FR-PJ01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-003",
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:42 (FR-PJ01)",
+          "PRD_E2E_SPEC.json:208 (FR-PJ01)",
+          "PRD_E2E_SPEC.md:54 (FR-PJ01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (FR-PJ01)"
+        ]
+      },
+      {
+        "id": "FR-PJ02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:43 (FR-PJ02)",
+          "PRD_E2E_SPEC.json:389 (FR-PJ02)",
+          "PRD_E2E_SPEC.md:93 (FR-PJ02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (FR-PJ02)"
+        ]
+      },
+      {
+        "id": "FR-PJ03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:44 (FR-PJ03)",
+          "PRD_E2E_SPEC.json:209 (FR-PJ03)",
+          "PRD_E2E_SPEC.md:54 (FR-PJ03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (FR-PJ03)"
+        ]
+      },
+      {
+        "id": "FR-PJ04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:45 (FR-PJ04)",
+          "PRD_E2E_SPEC.json:255 (FR-PJ04)",
+          "PRD_E2E_SPEC.md:64 (FR-PJ04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:326 (FR-PJ04)"
+        ]
+      },
+      {
+        "id": "FR-ST01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:60 (FR-ST01)",
+          "PRD_E2E_SPEC.json:463 (FR-ST01)",
+          "PRD_E2E_SPEC.md:111 (FR-ST01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:390 (FR-ST01)"
+        ]
+      },
+      {
+        "id": "FR-ST02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:61 (FR-ST02)",
+          "PRD_E2E_SPEC.json:464 (FR-ST02)",
+          "PRD_E2E_SPEC.md:111 (FR-ST02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:390 (FR-ST02)"
+        ]
+      },
+      {
+        "id": "FR-TS01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-003",
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:48 (FR-TS01)",
+          "PRD_E2E_SPEC.json:289 (FR-TS01)",
+          "PRD_E2E_SPEC.md:73 (FR-TS01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:46 (FR-TS01)"
+        ]
+      },
+      {
+        "id": "FR-TS02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:49 (FR-TS02)",
+          "PRD_E2E_SPEC.json:340 (FR-TS02)",
+          "PRD_E2E_SPEC.md:83 (FR-TS02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (FR-TS02)"
+        ]
+      },
+      {
+        "id": "FR-TS03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:50 (FR-TS03)",
+          "PRD_E2E_SPEC.json:290 (FR-TS03)",
+          "PRD_E2E_SPEC.md:73 (FR-TS03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (FR-TS03)"
+        ]
+      },
+      {
+        "id": "FR-TS04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:51 (FR-TS04)",
+          "PRD_E2E_SPEC.json:342 (FR-TS04)",
+          "PRD_E2E_SPEC.md:83 (FR-TS04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (FR-TS04)"
+        ]
+      },
+      {
+        "id": "FR-TS05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:52 (FR-TS05)",
+          "PRD_E2E_SPEC.json:291 (FR-TS05)",
+          "PRD_E2E_SPEC.md:73 (FR-TS05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:360 (FR-TS05)"
+        ]
+      },
+      {
+        "id": "FR-TS06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:53 (FR-TS06)",
+          "PRD_E2E_SPEC.json:292 (FR-TS06)",
+          "PRD_E2E_SPEC.md:73 (FR-TS06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:360 (FR-TS06)"
+        ]
+      },
+      {
+        "id": "US-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-008",
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:529 (US-01)",
+          "PRD_E2E_SPEC.json:58 (US-01)",
+          "PRD_E2E_SPEC.md:17 (US-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:131 (US-01)"
+        ]
+      },
+      {
+        "id": "US-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:530 (US-02)",
+          "PRD_E2E_SPEC.json:210 (US-02)",
+          "PRD_E2E_SPEC.md:54 (US-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (US-02)"
+        ]
+      },
+      {
+        "id": "US-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:531 (US-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (US-03)"
+        ]
+      },
+      {
+        "id": "US-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:532 (US-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:172 (US-04)"
+        ]
+      },
+      {
+        "id": "US-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:533 (US-05)",
+          "backend/src/api/modules/tasks/tasks.service.ts:193 (US-05)"
+        ]
+      },
+      {
+        "id": "US-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006"
+        ],
+        "evidence": [
+          "PRD.md:534 (US-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:202 (US-06)"
+        ]
+      }
+    ],
+    "uncovered": [
+      {
+        "id": "IC-01",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-02",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-03",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-04",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-05",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-06",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-07",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-08",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-09",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-10",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-11",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-12",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-13",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-14",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-15",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-16",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-17",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-18",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-19",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-20",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-21",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-22",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-23",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-24",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-25",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-26",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-27",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-28",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-29",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-30",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-31",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-32",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-33",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      }
+    ]
+  },
+  "suggestions": [
+    "Strengthen requirement coverage closure: improve task breakdown coverage and keep feature audit as a hard pass gate until uncovered ids reach zero.",
+    "Reduce context loss: improve section selection / budget allocation so critical PRD and implementation context is not truncated.",
+    "Tighten task-to-file planning: the worker should either write the planned files or immediately repair the missing file-plan deltas.",
+    "Improve final integration convergence: prioritize the highest-signal failing gate first and keep stagnation detection enabled to avoid read-only loops.",
+    "Optimize model spend: reduce repeated high-cost iterations by improving preflight checks, duplicate-file cleanup, and stricter early gates."
+  ]
+}

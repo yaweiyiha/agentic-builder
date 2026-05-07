@@ -1,0 +1,241 @@
+{
+  "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+  "savedAt": "2026-04-29T11:58:24.192Z",
+  "completedTaskIds": [
+    "T-001",
+    "T-002",
+    "T-E2E-001",
+    "T-003",
+    "T-004",
+    "T-E2E-002",
+    "T-005",
+    "T-006",
+    "T-007",
+    "T-008",
+    "T-009",
+    "T-010",
+    "T-011",
+    "T-012",
+    "T-013",
+    "T-014",
+    "T-015",
+    "T-016",
+    "T-017"
+  ],
+  "failedTaskIds": [],
+  "taskResults": {
+    "T-001": {
+      "status": "completed",
+      "generatedFiles": [
+        "backend/src/models/User.ts",
+        "backend/src/models/UserInterest.ts",
+        "backend/src/models/StyleAssessmentAnswer.ts",
+        "backend/src/models/TrendingTopic.ts",
+        "backend/src/models/CachedMarket.ts",
+        "backend/src/models/TopicMarketMatch.ts",
+        "backend/src/models/FeedItem.ts",
+        "backend/src/models/FeedAggregationRun.ts",
+        "backend/src/models/index.ts",
+        "backend/src/database/migrations/001-initial-schema.ts",
+        "backend/src/db.ts"
+      ]
+    },
+    "T-002": {
+      "status": "completed",
+      "generatedFiles": [
+        ".env.example",
+        ".env",
+        "backend/src/config/env.ts",
+        "docker-compose.yml"
+      ]
+    },
+    "T-E2E-001": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/e2e/fixtures.ts",
+        "frontend/e2e/utils.ts",
+        "frontend/playwright.config.ts",
+        "frontend/tests/e2e/fixtures.ts",
+        "frontend/tests/e2e/utils.ts",
+        "frontend/package.json"
+      ]
+    },
+    "T-003": {
+      "status": "completed",
+      "generatedFiles": [
+        "backend/src/types/responses.ts",
+        "frontend/src/types/models.ts",
+        "backend/src/types/api.ts",
+        "frontend/src/types/api.ts",
+        "backend/src/types/requests.ts",
+        "frontend/src/api/client.ts"
+      ]
+    },
+    "T-004": {
+      "status": "completed",
+      "generatedFiles": [
+        "backend/src/config/env.ts",
+        "backend/src/services/externalApis/hackerNews.ts",
+        "backend/src/services/externalApis/googleNews.ts",
+        "backend/src/services/externalApis/jinaReader.ts",
+        "backend/src/services/externalApis/twitterApi.ts",
+        "backend/src/services/externalApis/polymarket.ts",
+        "backend/src/services/externalApis/hyperLiquid.ts",
+        "backend/src/services/externalApis/deribit.ts",
+        "backend/src/services/externalApis/quotient.ts",
+        "backend/src/services/externalApis/index.ts"
+      ]
+    },
+    "T-E2E-002": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/tests/e2e/generated/e2e-001-landing-page-auth-entry-and-privy-provid.spec.ts",
+        "frontend/tests/e2e/generated/e2e-002-interests-onboarding-enforces-minimum-se.spec.ts",
+        "frontend/tests/e2e/generated/e2e-003-style-assessment-submits-6-answers-and-r.spec.ts",
+        "frontend/tests/e2e/generated/e2e-004-feed-auth-guard-and-cached-populated-ren.spec.ts",
+        "frontend/tests/e2e/generated/e2e-005-feed-refresh-enters-aggregating-mode-rat.spec.ts",
+        "frontend/tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts"
+      ]
+    },
+    "T-005": {
+      "status": "completed",
+      "generatedFiles": [
+        "backend/logs/.gitkeep",
+        "backend/src/utils/queue.ts",
+        "backend/src/services/feedAggregator.ts",
+        "backend/src/services/feedAggregation.service.ts",
+        "backend/src/services/llmService.ts",
+        "backend/src/workers/feedAggregationWorker.ts"
+      ]
+    },
+    "T-006": {
+      "status": "completed",
+      "generatedFiles": [
+        "backend/src/utils/tickerMapping.ts",
+        "backend/src/services/marketScanner.ts",
+        "backend/src/services/marketScanning.service.ts",
+        "backend/src/utils/inputClassifier.ts"
+      ]
+    },
+    "T-007": {
+      "status": "completed",
+      "generatedFiles": [
+        "backend/src/api/modules/feed/feed.controller.ts",
+        "backend/src/api/modules/feed/feed.routes.ts",
+        "backend/src/api/modules/markets/markets.controller.ts",
+        "backend/src/api/modules/markets/markets.routes.ts",
+        "backend/src/api/modules/stream/stream.controller.ts",
+        "backend/src/api/modules/stream/stream.routes.ts"
+      ]
+    },
+    "T-008": {
+      "status": "completed",
+      "generatedFiles": [
+        "backend/src/utils/styleAssessment.ts",
+        "backend/src/api/modules/auth/auth.controller.ts",
+        "backend/src/services/users.service.ts",
+        "backend/src/api/modules/users/users.controller.ts",
+        "backend/src/api/modules/users/users.routes.ts",
+        "backend/src/services/auth.service.ts",
+        "backend/src/api/modules/auth/auth.routes.ts"
+      ]
+    },
+    "T-009": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/hooks/useAuth.ts",
+        "frontend/src/App.tsx",
+        "frontend/src/components/layout/AppShell.tsx",
+        "frontend/src/components/layout/TopBar.tsx",
+        "frontend/src/components/layout/Sidebar.tsx",
+        "frontend/src/components/layout/StatusBar.tsx",
+        "frontend/src/components/common/Avatar.tsx",
+        "frontend/src/router.tsx"
+      ]
+    },
+    "T-010": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/components/auth/AuthGuard.tsx",
+        "frontend/src/providers/PrivyProvider.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/views/LandingPage.tsx",
+        "frontend/src/components/auth/LoginModal.tsx"
+      ]
+    },
+    "T-011": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/constants/interests.ts",
+        "frontend/src/components/onboarding/InterestCard.tsx",
+        "frontend/src/views/OnboardingInterestsPage.tsx"
+      ]
+    },
+    "T-012": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/constants/styleQuestions.ts",
+        "frontend/src/constants/styleTags.ts",
+        "frontend/src/components/onboarding/QuestionCard.tsx",
+        "frontend/src/components/onboarding/StyleResultCard.tsx",
+        "frontend/src/views/OnboardingStylePage.tsx",
+        "frontend/src/views/OnboardingStyleResultPage.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/views/OnboardingInterestsPage.tsx"
+      ]
+    },
+    "T-013": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/hooks/useSSEStream.ts",
+        "frontend/src/hooks/useFeedData.ts",
+        "frontend/src/components/feed/StatusStrip.tsx",
+        "frontend/src/components/feed/AgentLogPanel.tsx",
+        "frontend/src/components/feed/FeedCard.tsx",
+        "frontend/src/views/FeedPage.tsx",
+        "frontend/src/components/feed/MarketCard.tsx"
+      ]
+    },
+    "T-014": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/hooks/useMarketScanner.ts",
+        "frontend/src/components/markets/ScannerInput.tsx",
+        "frontend/src/components/markets/ScannerLog.tsx",
+        "frontend/src/components/markets/ResultMarketCard.tsx",
+        "frontend/src/components/markets/MarketSection.tsx",
+        "frontend/src/components/markets/ScanResults.tsx",
+        "frontend/src/views/MarketsPage.tsx",
+        "frontend/src/router.tsx"
+      ]
+    },
+    "T-015": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/hooks/useUserProfile.ts",
+        "frontend/src/components/profile/IdentitySection.tsx",
+        "frontend/src/components/profile/InterestsSection.tsx",
+        "frontend/src/components/profile/StyleSection.tsx",
+        "frontend/src/views/ProfilePage.tsx",
+        "frontend/src/views/SettingsPage.tsx"
+      ]
+    },
+    "T-016": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/components/markets/ChipBehaviorDocs.md",
+        "frontend/src/views/MarketsPage.tsx",
+        "frontend/src/hooks/useMarketScanner.ts",
+        "frontend/src/components/markets/ScannerInput.tsx"
+      ]
+    },
+    "T-017": {
+      "status": "completed",
+      "generatedFiles": [
+        "frontend/src/components/common/MarketDataDisclaimer.tsx",
+        "frontend/src/views/FeedPage.tsx",
+        "frontend/src/views/MarketsPage.tsx"
+      ]
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { parseKickoffTaskBreakdownFromMetadata } from "@/lib/pipeline/kickoff-ta
 import { useCodingStore } from "@/store/coding-store";
 import { usePipelineStore } from "@/store/pipeline-store";
 import type { KickoffWorkItem, StepResult } from "@/lib/pipeline/types";
+import type { SessionCheckpoint } from "@/lib/pipeline/session-checkpoint";
 
 type KickoffSubTab = "summary" | "tasks";
 
@@ -33,7 +34,9 @@ export default function KickoffStepPanel({
   const tasks = parseKickoffTaskBreakdownFromMetadata(result.metadata);
   const codingStatus = useCodingStore((s) => s.status);
   const startCoding = useCodingStore((s) => s.startCoding);
+  const retryFailedTasks = useCodingStore((s) => s.retryFailedTasks);
   const codeOutputDir = usePipelineStore((s) => s.codeOutputDir);
+  const [checkpoint, setCheckpoint] = useState<SessionCheckpoint | null>(null);
   const steps = usePipelineStore((s) => s.steps);
   const updateSteps = usePipelineStore((s) => s.updateSteps);
   const isRunning = usePipelineStore((s) => s.isRunning);
@@ -73,6 +76,16 @@ export default function KickoffStepPanel({
     setSelectedSuggestionIds(defaultSelected);
   }, [result.timestamp, reviewSuggestions.length]);
 
+  // Load last session checkpoint to enable "Retry Failed Tasks" button.
+  useEffect(() => {
+    fetch("/api/agents/coding/checkpoint")
+      .then((r) => r.json())
+      .then((data: { checkpoint: SessionCheckpoint | null }) => {
+        setCheckpoint(data.checkpoint);
+      })
+      .catch(() => setCheckpoint(null));
+  }, []);
+
   const handleConfirmAndCode = () => {
     if (!taskBreakdownConfirmed) return;
     const runId =
@@ -82,6 +95,36 @@ export default function KickoffStepPanel({
     startCoding(runId, tasks, codeOutputDir, undefined, steps.prd?.content);
     onStartCoding?.();
   };
+
+  const handleRetryFailed = () => {
+    if (matchingFailedIds.length === 0) return;
+    const runId =
+      typeof result.metadata?.runId === "string"
+        ? result.metadata.runId
+        : "run-" + Date.now();
+    retryFailedTasks(
+      runId,
+      tasks,
+      matchingFailedIds,     // only IDs that still exist in current task list
+      codeOutputDir,
+      undefined,
+      steps.prd?.content,
+    );
+    onStartCoding?.();
+  };
+
+  // Only show Retry when:
+  // 1. The last session actually ended (completed or failed) — not while running
+  //    and not in plain "idle" (which means no session has run yet this page load).
+  // 2. There are failed task IDs that still exist in the CURRENT task list
+  //    (guards against stale checkpoints from a previous PRD / task breakdown).
+  const currentTaskIds = new Set(tasks.map((t) => t.id));
+  const matchingFailedIds =
+    checkpoint?.failedTaskIds.filter((id) => currentTaskIds.has(id)) ?? [];
+  const hasFailedTasks =
+    checkpoint !== null &&
+    matchingFailedIds.length > 0 &&
+    (codingStatus === "completed" || codingStatus === "failed");
 
   const totalHours = tasks.reduce((s, t) => s + t.estimatedHours, 0);
   const aiHours = tasks
@@ -648,7 +691,7 @@ export default function KickoffStepPanel({
             </div>
           )}
           {tasks.length > 0 && codingStatus === "idle" && !commandBarStartsCoding && (
-            <div className="mt-6 flex items-center justify-center">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={handleConfirmAndCode}
@@ -660,6 +703,19 @@ export default function KickoffStepPanel({
                 </svg>
                 Confirm &amp; Start Coding ({tasks.length} tasks)
               </button>
+              {hasFailedTasks && (
+                <button
+                  type="button"
+                  onClick={handleRetryFailed}
+                  className="flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100"
+                  title={`Re-run only the ${matchingFailedIds.length} failed task(s) from the last session: ${matchingFailedIds.join(", ")}`}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 .49-3.5" />
+                  </svg>
+                  Retry Failed Tasks ({matchingFailedIds.length})
+                </button>
+              )}
             </div>
           )}
           {codingStatus !== "idle" && (

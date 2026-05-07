@@ -45,6 +45,15 @@ interface CodingState {
     projectTier?: string,
     prdContent?: string,
   ) => void;
+  /** Re-run only the tasks that failed in the last session. */
+  retryFailedTasks: (
+    runId: string,
+    tasks: KickoffWorkItem[],
+    failedTaskIds: string[],
+    codeOutputDir: string,
+    projectTier?: string,
+    prdContent?: string,
+  ) => void;
   retryIntegrationVerify: (
     runId: string,
     codeOutputDir: string,
@@ -88,6 +97,10 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       supervisorLogs: [],
     });
 
+    // Clear the last-session checkpoint so the "Retry Failed Tasks" button
+    // doesn't show stale data while a fresh full run is in progress.
+    fetch("/api/agents/coding/checkpoint", { method: "DELETE" }).catch(() => {});
+
     fetch("/api/agents/coding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -100,6 +113,89 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
             status: "failed",
             error:
               (errData as { error?: string }).error || "Coding request failed",
+          });
+          return;
+        }
+
+        const reader = resp.body?.getReader();
+        if (!reader) {
+          set({ status: "failed", error: "No response body" });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const payload = JSON.parse(line.slice(6));
+              handleCodingEvent(payload, set, get);
+            } catch {
+              /* skip */
+            }
+          }
+        }
+
+        if (buffer.startsWith("data: ")) {
+          try {
+            handleCodingEvent(JSON.parse(buffer.slice(6)), set, get);
+          } catch {
+            /* skip */
+          }
+        }
+
+        const state = get();
+        if (state.status === "running") set({ status: "completed" });
+      })
+      .catch((err) => {
+        set({
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      });
+  },
+
+  retryFailedTasks: (runId, tasks, failedTaskIds, codeOutputDir, projectTier, prdContent) => {
+    set({
+      status: "running",
+      error: null,
+      agents: [],
+      tasks: [],
+      selectedAgentId: null,
+      totalCostUsd: 0,
+      sessionId: null,
+      integrationVerify: null,
+      e2eVerify: null,
+      supervisorLogs: [],
+    });
+
+    fetch("/api/agents/coding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId,
+        tasks,
+        codeOutputDir,
+        projectTier,
+        prd: prdContent,
+        retryFailedTaskIds: failedTaskIds,
+      }),
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          set({
+            status: "failed",
+            error: (errData as { error?: string }).error || "Retry failed",
           });
           return;
         }

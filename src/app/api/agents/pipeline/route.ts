@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import { PipelineEngine } from "@/lib/pipeline/engine";
 import type { PipelineEvent } from "@/lib/pipeline/types";
+import { wrapPipelineEventHandler } from "@/lib/memory/event-bridge";
 
 export const maxDuration = 300;
 
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
     pauseAfterPrd,
     prdEditInstruction,
     existingPrd,
+    sessionId,
   } = body as {
     featureBrief?: string;
     codeOutputDir?: string;
@@ -22,6 +24,9 @@ export async function POST(request: NextRequest) {
     pauseAfterPrd?: boolean;
     prdEditInstruction?: string;
     existingPrd?: string;
+    /** Stable client-generated id linking this pipeline run with a
+     *  subsequent kickoff so memory records share the same kickoffId. */
+    sessionId?: string;
   };
 
   const featureBrief =
@@ -38,7 +43,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const engine = new PipelineEngine(send);
+      const projectRoot = process.cwd();
+      const memoryAwareSend = wrapPipelineEventHandler(send, {
+        projectRoot,
+        codeOutputDir:
+          typeof codeOutputDir === "string" ? codeOutputDir : undefined,
+        featureBrief,
+        kickoffIdOverride:
+          typeof sessionId === "string" && sessionId.length > 0
+            ? sessionId
+            : undefined,
+      });
+      const engine = new PipelineEngine(memoryAwareSend, projectRoot);
       const run = engine.createRun(featureBrief);
 
       try {

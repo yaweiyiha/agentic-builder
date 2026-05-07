@@ -26,11 +26,20 @@ import type {
 
 // ─── Scorecard markdown ───────────────────────────────────────────────────
 
+export interface RenderScorecardOptions {
+  /** Historical leaderboard buckets — used to render per-model score history. */
+  leaderboard?: LeaderboardBucket[];
+}
+
 /**
  * Render the per-session `model-scorecard.md`. Shows every (stage, model)
- * row along with its dimensional breakdown and driving reasons.
+ * row along with its dimensional breakdown and driving reasons,
+ * plus a historical score trend section when leaderboard data is available.
  */
-export function renderScorecardMarkdown(card: ModelScorecardFile): string {
+export function renderScorecardMarkdown(
+  card: ModelScorecardFile,
+  options: RenderScorecardOptions = {},
+): string {
   const lines: string[] = [];
   lines.push("# Model Scorecard — This Session");
   lines.push("");
@@ -130,6 +139,67 @@ export function renderScorecardMarkdown(card: ModelScorecardFile): string {
       `fallbacks=${g.fallbackTriggerCount}`,
   );
   lines.push("");
+
+  // ── Model history section (requires leaderboard data) ─────────────────
+  const leaderboard = options.leaderboard ?? [];
+  if (leaderboard.length > 0) {
+    lines.push("## Model Score History (cross-session)");
+    lines.push("");
+    lines.push(
+      "> Each row shows a model's full score history across sessions for that stage. " +
+        "Newest scores are on the right. ↑ = improving, ↓ = declining.",
+    );
+    lines.push("");
+
+    // Collect models that appear in this session's rows for focused view.
+    const sessionModels = new Set(card.rows.map((r) => r.model));
+    const relevantBuckets = leaderboard.filter((b) => sessionModels.has(b.model));
+
+    if (relevantBuckets.length === 0) {
+      lines.push("_No historical data available yet (first session for these models)._");
+      lines.push("");
+    } else {
+      const byStageHist = new Map<string, LeaderboardBucket[]>();
+      for (const b of relevantBuckets) {
+        const list = byStageHist.get(b.stage) ?? [];
+        list.push(b);
+        byStageHist.set(b.stage, list);
+      }
+      for (const [stage, buckets] of byStageHist.entries()) {
+        lines.push(`### Stage \`${stage}\``);
+        lines.push("");
+        lines.push("| Model | Runs | Avg score | Score history | Trend | Avg cost |");
+        lines.push("|---|---|---|---|---|---|");
+        for (const b of buckets) {
+          const trendArrow =
+            b.scoreTrend.length < 2
+              ? "—"
+              : b.scoreTrend[b.scoreTrend.length - 1] > b.scoreTrend[0]
+                ? "↑"
+                : b.scoreTrend[b.scoreTrend.length - 1] < b.scoreTrend[0]
+                  ? "↓"
+                  : "→";
+          const isCurrentSession = card.rows.some(
+            (r) => r.model === b.model && r.stage === stage,
+          );
+          const modelLabel = isCurrentSession ? `**\`${b.model}\`** ← this session` : `\`${b.model}\``;
+          lines.push(
+            [
+              "",
+              modelLabel,
+              String(b.runs),
+              `**${b.avgScore.toFixed(1)}**`,
+              renderTrend(b.scoreTrend),
+              trendArrow,
+              `$${b.avgCostUsd.toFixed(4)}`,
+              "",
+            ].join(" | "),
+          );
+        }
+        lines.push("");
+      }
+    }
+  }
 
   return lines.join("\n");
 }

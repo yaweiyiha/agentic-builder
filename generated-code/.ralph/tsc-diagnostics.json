@@ -1,0 +1,211 @@
+{
+  "generatedAt": "2026-04-29T11:51:38.574Z",
+  "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+  "ran": true,
+  "workspaces": [
+    {
+      "workspace": "backend",
+      "skipped": false,
+      "exitCode": 2,
+      "diagnosticCount": 19
+    },
+    {
+      "workspace": "frontend",
+      "skipped": false,
+      "exitCode": 0,
+      "diagnosticCount": 0
+    }
+  ],
+  "tasks": [
+    {
+      "id": "backend|src/services/externalApis/deribit.ts|72|TS2740",
+      "workspace": "backend",
+      "file": "src/services/externalApis/deribit.ts",
+      "line": 72,
+      "column": 11,
+      "code": "TS2740",
+      "message": "Type '{}' is missing the following properties from type 'DeribitBookSummaryResponse': jsonrpc, id, result, usIn, and 3 more.",
+      "directive": "tsc reported `TS2740`. Original: Type '{}' is missing the following properties from type 'DeribitBookSummaryResponse': jsonrpc, id, result, usIn, and 3 more."
+    },
+    {
+      "id": "backend|src/services/externalApis/hackerNews.ts|50|TS2739",
+      "workspace": "backend",
+      "file": "src/services/externalApis/hackerNews.ts",
+      "line": 50,
+      "column": 11,
+      "code": "TS2739",
+      "message": "Type '{}' is missing the following properties from type 'HnSearchResponse': hits, nbHits, page, nbPages, hitsPerPage",
+      "directive": "tsc reported `TS2739`. Original: Type '{}' is missing the following properties from type 'HnSearchResponse': hits, nbHits, page, nbPages, hitsPerPage"
+    },
+    {
+      "id": "backend|src/services/externalApis/hackerNews.ts|83|TS2739",
+      "workspace": "backend",
+      "file": "src/services/externalApis/hackerNews.ts",
+      "line": 83,
+      "column": 11,
+      "code": "TS2739",
+      "message": "Type '{}' is missing the following properties from type 'HnSearchResponse': hits, nbHits, page, nbPages, hitsPerPage",
+      "directive": "tsc reported `TS2739`. Original: Type '{}' is missing the following properties from type 'HnSearchResponse': hits, nbHits, page, nbPages, hitsPerPage"
+    },
+    {
+      "id": "backend|src/services/externalApis/hyperLiquid.ts|58|TS2739",
+      "workspace": "backend",
+      "file": "src/services/externalApis/hyperLiquid.ts",
+      "line": 58,
+      "column": 11,
+      "code": "TS2739",
+      "message": "Type '{}' is missing the following properties from type 'HyperLiquidInfoResponse': universe, assetCtxs",
+      "directive": "tsc reported `TS2739`. Original: Type '{}' is missing the following properties from type 'HyperLiquidInfoResponse': universe, assetCtxs"
+    },
+    {
+      "id": "backend|src/services/externalApis/polymarket.ts|64|TS2739",
+      "workspace": "backend",
+      "file": "src/services/externalApis/polymarket.ts",
+      "line": 64,
+      "column": 11,
+      "code": "TS2739",
+      "message": "Type '{}' is missing the following properties from type 'GammaSearchResponse': data, total",
+      "directive": "tsc reported `TS2739`. Original: Type '{}' is missing the following properties from type 'GammaSearchResponse': data, total"
+    },
+    {
+      "id": "backend|src/services/externalApis/polymarket.ts|106|TS2740",
+      "workspace": "backend",
+      "file": "src/services/externalApis/polymarket.ts",
+      "line": 106,
+      "column": 11,
+      "code": "TS2740",
+      "message": "Type '{}' is missing the following properties from type 'QuotientMispricedMarket[]': length, pop, push, concat, and 28 more.",
+      "directive": "tsc reported `TS2740`. Original: Type '{}' is missing the following properties from type 'QuotientMispricedMarket[]': length, pop, push, concat, and 28 more."
+    },
+    {
+      "id": "backend|src/services/externalApis/quotient.ts|41|TS2740",
+      "workspace": "backend",
+      "file": "src/services/externalApis/quotient.ts",
+      "line": 41,
+      "column": 11,
+      "code": "TS2740",
+      "message": "Type '{}' is missing the following properties from type 'QuotientMispricedMarket[]': length, pop, push, concat, and 28 more.",
+      "directive": "tsc reported `TS2740`. Original: Type '{}' is missing the following properties from type 'QuotientMispricedMarket[]': length, pop, push, concat, and 28 more."
+    },
+    {
+      "id": "backend|src/services/externalApis/twitterApi.ts|87|TS2741",
+      "workspace": "backend",
+      "file": "src/services/externalApis/twitterApi.ts",
+      "line": 87,
+      "column": 11,
+      "code": "TS2741",
+      "message": "Property 'data' is missing in type '{}' but required in type 'TwitterApiTweetResponse'.",
+      "directive": "Property required by the target type is missing on the source. Add the field to the source factory, using the canonical DTO in `types/api.ts` as the source of truth. Original: Property 'data' is missing in type '{}' but required in type 'TwitterApiTweetResponse'."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|384|TS2349",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 384,
+      "column": 353,
+      "code": "TS2349",
+      "message": "This expression is not callable.",
+      "directive": "tsc reported `TS2349`. Original: This expression is not callable."
+    },
+    {
+      "id": "backend|src/services/feedAggregator.ts|603|TS2339",
+      "workspace": "backend",
+      "file": "src/services/feedAggregator.ts",
+      "line": 603,
+      "column": 40,
+      "code": "TS2339",
+      "message": "Property 'external_id' does not exist on type '{ venue: string; id: string; conditionId: string; question: string; description: string; slug: string; outcomes: string; outcomePrices: string; volume: number; volume24Hr: number; active: boolean; ... 10 more ...; quotientRecommendation?: string; } | { ...; } | { ...; }'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'external_id' does not exist on type '{ venue: string; id: string; conditionId: string; question: string; description: string; slug: string; outcomes: string; outcomePrices: string; volume: number; volume24Hr: number; active: boolean; ... 10 more ...; quotientRecommendation?: string; } | { ...; } | { ...; }'."
+    },
+    {
+      "id": "backend|src/services/marketScanner.ts|192|TS2322",
+      "workspace": "backend",
+      "file": "src/services/marketScanner.ts",
+      "line": 192,
+      "column": 9,
+      "code": "TS2322",
+      "message": "Type 'unknown' is not assignable to type 'string'.",
+      "directive": "Type assignment mismatch. Walk through the source and target types field-by-field — most often a DTO factory built `{ a, b, c }` but the typed target requires `{ a, b, c, d }` (one missing field) or named the field differently (`expiration_date` vs `expiry`). Map field names against the canonical interface in `types/api.ts` (or the equivalent contract type) and patch the factory. Original: Type 'unknown' is not assignable to type 'string'."
+    },
+    {
+      "id": "backend|src/services/marketScanner.ts|202|TS2367",
+      "workspace": "backend",
+      "file": "src/services/marketScanner.ts",
+      "line": 202,
+      "column": 11,
+      "code": "TS2367",
+      "message": "This comparison appears to be unintentional because the types '\"url\" | \"tweet_url\"' and '\"tweet\"' have no overlap.",
+      "directive": "tsc reported `TS2367`. Original: This comparison appears to be unintentional because the types '\"url\" | \"tweet_url\"' and '\"tweet\"' have no overlap."
+    },
+    {
+      "id": "backend|src/services/marketScanner.ts|206|TS2345",
+      "workspace": "backend",
+      "file": "src/services/marketScanner.ts",
+      "line": 206,
+      "column": 50,
+      "code": "TS2345",
+      "message": "Argument of type 'unknown' is not assignable to parameter of type 'string'.",
+      "directive": "Argument type does not match the parameter type. Two common causes: (a) you passed an object where the API expects a sub-property of it (e.g. `getMetaAndAssetCtxs()` returns `{ universe }`, but `fuzzyMatchEntity` expects the bare array — pass `.universe`); (b) the function returns `Promise<T>` and you forgot `await`, so a promise lands where `T` was wanted. Inspect the call site. Original: Argument of type 'unknown' is not assignable to parameter of type 'string'."
+    },
+    {
+      "id": "backend|src/services/marketScanning.service.ts|40|TS2339",
+      "workspace": "backend",
+      "file": "src/services/marketScanning.service.ts",
+      "line": 40,
+      "column": 13,
+      "code": "TS2339",
+      "message": "Property 'result' does not exist on type '{ emitter: EventEmitter<DefaultEventMap>; promise: Promise<MarketScanResult>; completed: boolean; }'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'result' does not exist on type '{ emitter: EventEmitter<DefaultEventMap>; promise: Promise<MarketScanResult>; completed: boolean; }'."
+    },
+    {
+      "id": "backend|src/services/marketScanning.service.ts|50|TS2339",
+      "workspace": "backend",
+      "file": "src/services/marketScanning.service.ts",
+      "line": 50,
+      "column": 13,
+      "code": "TS2339",
+      "message": "Property 'error' does not exist on type '{ emitter: EventEmitter<DefaultEventMap>; promise: Promise<MarketScanResult>; completed: boolean; }'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'error' does not exist on type '{ emitter: EventEmitter<DefaultEventMap>; promise: Promise<MarketScanResult>; completed: boolean; }'."
+    },
+    {
+      "id": "backend|src/services/marketScanning.service.ts|54|TS2339",
+      "workspace": "backend",
+      "file": "src/services/marketScanning.service.ts",
+      "line": 54,
+      "column": 45,
+      "code": "TS2339",
+      "message": "Property 'error' does not exist on type '{ emitter: EventEmitter<DefaultEventMap>; promise: Promise<MarketScanResult>; completed: boolean; }'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'error' does not exist on type '{ emitter: EventEmitter<DefaultEventMap>; promise: Promise<MarketScanResult>; completed: boolean; }'."
+    },
+    {
+      "id": "backend|src/services/users.service.ts|137|TS2339",
+      "workspace": "backend",
+      "file": "src/services/users.service.ts",
+      "line": 137,
+      "column": 13,
+      "code": "TS2339",
+      "message": "Property 'enqueueFeedAggregation' does not exist on type 'typeof import(\"/Users/57block/code/AgenticBuilder/generated-code/backend/src/workers/feedAggregationWorker\")'.",
+      "directive": "Property does not exist on the type. Either fix the typo, or — if you see something like `result.length` on a `Promise<T[]>` — add the missing `await`. Original: Property 'enqueueFeedAggregation' does not exist on type 'typeof import(\"/Users/57block/code/AgenticBuilder/generated-code/backend/src/workers/feedAggregationWorker\")'."
+    },
+    {
+      "id": "backend|src/types/api.ts|1|TS2307",
+      "workspace": "backend",
+      "file": "src/types/api.ts",
+      "line": 1,
+      "column": 38,
+      "code": "TS2307",
+      "message": "Cannot find module './enums' or its corresponding type declarations.",
+      "directive": "tsc reported `TS2307`. Original: Cannot find module './enums' or its corresponding type declarations."
+    },
+    {
+      "id": "backend|src/types/api.ts|5|TS2307",
+      "workspace": "backend",
+      "file": "src/types/api.ts",
+      "line": 5,
+      "column": 38,
+      "code": "TS2307",
+      "message": "Cannot find module './enums' or its corresponding type declarations.",
+      "directive": "tsc reported `TS2307`. Original: Cannot find module './enums' or its corresponding type declarations."
+    }
+  ]
+}

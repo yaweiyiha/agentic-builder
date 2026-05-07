@@ -5,6 +5,7 @@ import path from "path";
 import { PipelineEngine } from "@/lib/pipeline/engine";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 import type { PipelineEvent, PipelineStepId, StepResult } from "@/lib/pipeline/types";
+import { wrapPipelineEventHandler } from "@/lib/memory/event-bridge";
 
 export const maxDuration = 300;
 
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
     implguide,
     design,
     pencil,
+    sessionId,
   } = body as {
     featureBrief: string;
     codeOutputDir?: string;
@@ -28,6 +30,9 @@ export async function POST(request: NextRequest) {
     implguide?: string;
     design?: string;
     pencil?: string;
+    /** Stable client-generated id that links memory records from the
+     *  originating pipeline run + this kickoff into one logical session. */
+    sessionId?: string;
   };
 
   if (!prd) {
@@ -48,7 +53,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const engine = new PipelineEngine(send);
+      const projectRoot = process.cwd();
+      const memoryAwareSend = wrapPipelineEventHandler(send, {
+        projectRoot,
+        codeOutputDir:
+          typeof codeOutputDir === "string" ? codeOutputDir : undefined,
+        featureBrief: featureBrief || "PRD-driven code generation.",
+        kickoffIdOverride:
+          typeof sessionId === "string" && sessionId.length > 0
+            ? sessionId
+            : undefined,
+      });
+      const engine = new PipelineEngine(memoryAwareSend, projectRoot);
       const run = engine.createRun(featureBrief || "PRD-driven code generation.");
 
       const now = new Date().toISOString();

@@ -1,68 +1,52 @@
 import {
   createContext,
-  useEffect,
+  useContext,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { usePrivy } from "@privy-io/react-auth";
 
 type AuthContextValue = {
   isAuthenticated: boolean;
   accessToken: string | null;
+  /** Persist a JWT token and mark the session as authenticated. */
+  login: (token: string) => void;
+  /** Clear the stored token and end the session. */
+  logout: () => void;
 };
+
+const TOKEN_KEY = "token";
 
 const AuthContext = createContext<AuthContextValue>({
   isAuthenticated: false,
   accessToken: null,
+  login: () => {},
+  logout: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { ready, authenticated, getAccessToken } = usePrivy();
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(
+    () => localStorage.getItem(TOKEN_KEY),
+  );
 
-  useEffect(() => {
-    let cancelled = false;
+  function login(token: string) {
+    localStorage.setItem(TOKEN_KEY, token);
+    setAccessToken(token);
+  }
 
-    async function syncToken() {
-      // Keep legacy API client behavior: it reads `localStorage.token` and
-      // injects `Authorization: Bearer <token>`.
-      if (!ready || !authenticated) {
-        localStorage.removeItem("token");
-        setAccessToken(null);
-        return;
-      }
+  function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    setAccessToken(null);
+  }
 
-      try {
-        const token = await getAccessToken();
-        if (cancelled) return;
-        if (token) {
-          localStorage.setItem("token", token);
-          setAccessToken(token);
-        } else {
-          localStorage.removeItem("token");
-          setAccessToken(null);
-        }
-      } catch {
-        if (cancelled) return;
-        localStorage.removeItem("token");
-        setAccessToken(null);
-      }
-    }
-
-    void syncToken();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, authenticated, getAccessToken]);
-
-  const value = useMemo<AuthContextValue>(() => {
-    return {
-      isAuthenticated: Boolean(ready && authenticated),
-      accessToken,
-    };
-  }, [ready, authenticated, accessToken]);
+  const value = useMemo<AuthContextValue>(
+    () => ({ isAuthenticated: Boolean(accessToken), accessToken, login, logout }),
+    [accessToken],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  return useContext(AuthContext);
 }

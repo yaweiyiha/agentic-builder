@@ -43,3 +43,38 @@ export type {
   AuditRepairDispatchInput,
   AuditRepairDispatchResult,
 } from "./audit-repair-dispatch";
+export { runContractUsageCoverage } from "./contract-usage-coverage";
+export type {
+  ContractUsageCoverageInput,
+  ContractUsageCoverageResult,
+  CoverageCaseId,
+  CoverageClassification,
+  CoverageRepairTask,
+  CoveragePolicy,
+} from "./contract-usage-coverage";
+export {
+  runRuntimeIntegrationAudit,
+  formatRuntimeAuditBlock,
+} from "./runtime-integration-audit";
+export type {
+  RuntimeIntegrationAuditInput,
+  RuntimeIntegrationAuditResult,
+  RuntimeAuditFinding,
+  RuntimeAuditRuleId,
+  RuntimeAuditScope,
+  RuntimeAuditSeverity,
+} from "./runtime-integration-audit";
+export { runRuntimeSmokeGate } from "./runtime-smoke-gate";
+export type {
+  RuntimeSmokeFailure,
+  RuntimeSmokeFailureCode,
+  RuntimeSmokeGateInput,
+  RuntimeSmokeGateResult,
+  RuntimeSmokeSuccess,
+} from "./runtime-smoke-gate";
+export { runTscDiagnosticsAsTasks } from "./tsc-diagnostics-as-tasks";
+export type {
+  TscDiagnosticTask,
+  TscDiagnosticsInput,
+  TscDiagnosticsResult,
+} from "./tsc-diagnostics-as-tasks";
