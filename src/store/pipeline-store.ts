@@ -211,6 +211,11 @@ interface PipelineState {
   runDesignDoc: (editInstruction?: string) => void;
   /** Generate (or re-generate) the Pencil wireframe from the PRD + chosen design style. */
   runPencilDoc: (styleId: string, styleReferenceImage?: string | null, editInstruction?: string) => void;
+  /**
+   * Generate Pencil design via the real Pencil MCP live session.
+   * Streams PencilLiveEvent SSE events and saves the result to steps.pencil.
+   */
+  runPencilWithMcp: (editInstruction?: string) => void;
   setActiveTab: (tab: PipelineStepId) => void;
   /** Batch-update step results (e.g. from parallel generation). */
   updateSteps: (updates: Partial<Record<PipelineStepId, StepResult>>) => void;
@@ -684,7 +689,18 @@ export const usePipelineStore = create<PipelineState>()(
       runPencilDoc: (styleId: string, styleReferenceImage?: string | null, editInstruction?: string) => {
         const { steps, featureBrief, codeOutputDir } = get();
         const prdContent = steps.prd?.content ?? featureBrief;
-        if (!prdContent.trim()) return;
+        console.log("[runPencilDoc] called", {
+          styleId,
+          prdContentLength: prdContent.length,
+          hasDesignContent: !!steps.design?.content,
+          designContentLength: steps.design?.content?.length ?? 0,
+          editInstruction,
+          codeOutputDir,
+        });
+        if (!prdContent.trim()) {
+          console.warn("[runPencilDoc] ⚠ No PRD content — aborting");
+          return;
+        }
 
         const updatedSteps = {
           ...steps,
@@ -704,6 +720,23 @@ export const usePipelineStore = create<PipelineState>()(
         });
         scheduleSync(get);
 
+        const pencilPayload = {
+            prdContent,
+            selectedDocs: ["pencil"],
+            sessionId: steps.intent?.timestamp ?? "session",
+            codeOutputDir,
+            tier: (
+              (steps.intent?.metadata as Record<string, unknown> | undefined)
+                ?.classification as { tier?: string } | undefined
+            )?.tier ?? "M",
+            designStyleId: styleId,
+            designSpecContent: steps.design?.content ?? "",
+          };
+        console.log("[runPencilDoc] → fetch /api/agents/parallel-generate", {
+          ...pencilPayload,
+          prdContent: pencilPayload.prdContent.slice(0, 200) + "…",
+          designSpecContent: pencilPayload.designSpecContent.slice(0, 200) + "…",
+        });
         fetch("/api/agents/parallel-generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -758,6 +791,7 @@ export const usePipelineStore = create<PipelineState>()(
 
             const handleEvent = (payload: Record<string, unknown>) => {
               const type = payload.type as string;
+              console.log("[runPencilDoc] SSE", type, payload.docId ?? "");
               if (type === "doc_stream") {
                 const chunk = payload.chunk as string | undefined;
                 if (chunk) {
@@ -765,6 +799,7 @@ export const usePipelineStore = create<PipelineState>()(
                   set({ streamingContent: pencilContent });
                 }
               } else if (type === "doc_complete" && payload.docId === "pencil") {
+                console.log("[runPencilDoc] ✓ doc_complete pencil", { contentLength: ((payload.content as string) || pencilContent).length });
                 pencilContent = (payload.content as string) || pencilContent;
                 pencilCost = (payload.costUsd as number) || 0;
                 pencilDuration = (payload.durationMs as number) || 0;
@@ -787,6 +822,165 @@ export const usePipelineStore = create<PipelineState>()(
               } else if (type === "generation_complete") {
                 set({ isRunning: false, currentStep: null });
                 scheduleSync(get);
+              }
+            };
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try { handleEvent(JSON.parse(line.slice(6))); } catch { /* skip */ }
+              }
+            }
+            if (buffer.startsWith("data: ")) {
+              try { handleEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
+            }
+            if (get().isRunning) set({ isRunning: false, currentStep: null });
+          })
+          .catch((err) => {
+            set({
+              isRunning: false,
+              currentStep: null,
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          });
+      },
+
+      runPencilWithMcp: (editInstruction?: string) => {
+        const { steps, featureBrief, codeOutputDir, selectedDesignStyleId } = get();
+        const prdContent = steps.prd?.content ?? featureBrief;
+        const designSpecContent = steps.design?.content ?? "";
+
+        console.log("[runPencilWithMcp] called", {
+          selectedDesignStyleId,
+          prdContentLength: prdContent.length,
+          designSpecContentLength: designSpecContent.length,
+          editInstruction,
+        });
+
+        if (!prdContent.trim()) {
+          console.warn("[runPencilWithMcp] ⚠ No PRD content — aborting");
+          return;
+        }
+        if (!designSpecContent.trim()) {
+          console.warn("[runPencilWithMcp] ⚠ No Design Spec content — aborting");
+          return;
+        }
+
+        set({
+          isRunning: true,
+          error: null,
+          currentStep: "pencil",
+          streamingContent: "",
+          streamingThinking: "",
+          steps: {
+            ...steps,
+            pencil: {
+              stepId: "pencil" as PipelineStepId,
+              status: "running" as const,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+        scheduleSync(get);
+
+        console.log("[runPencilWithMcp] → fetch /api/agents/pencil-generate");
+
+        fetch("/api/agents/pencil-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prdContent,
+            designSpecContent,
+            designStyleId: selectedDesignStyleId ?? undefined,
+            codeOutputDir,
+            sessionId: steps.intent?.timestamp ?? "session",
+            ...(editInstruction?.trim() ? { editInstruction: editInstruction.trim() } : {}),
+          }),
+        })
+          .then(async (resp) => {
+            console.log("[runPencilWithMcp] ← response status", resp.status);
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              set({
+                isRunning: false,
+                currentStep: null,
+                steps: {
+                  ...get().steps,
+                  pencil: {
+                    stepId: "pencil" as PipelineStepId,
+                    status: "failed" as const,
+                    error: (errData as { error?: string }).error || "Pencil MCP generation failed",
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              });
+              return;
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) {
+              set({ isRunning: false, currentStep: null });
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let progressLines: string[] = [];
+
+            const handleEvent = (payload: Record<string, unknown>) => {
+              const type = payload.type as string;
+              console.log("[runPencilWithMcp] SSE", type);
+
+              if (type === "session_start" || type === "assistant_message" || type === "tool_call_start" || type === "tool_call_result" || type === "session_complete") {
+                // Accumulate progress messages for live display
+                const msg = (payload.message as string) ?? (payload.toolName as string) ?? "";
+                if (msg) {
+                  progressLines = [...progressLines, msg];
+                  set({ streamingContent: progressLines.join("\n\n---\n\n") });
+                }
+              } else if (type === "done") {
+                const result = payload.result as { content?: string; costUsd?: number; durationMs?: number; tokens?: number } | undefined;
+                const content = result?.content ?? "";
+                console.log("[runPencilWithMcp] ✓ done", { contentLength: content.length });
+                const completedStep: StepResult = {
+                  stepId: "pencil",
+                  status: "completed",
+                  content,
+                  costUsd: result?.costUsd ?? 0,
+                  durationMs: result?.durationMs ?? 0,
+                  timestamp: new Date().toISOString(),
+                  metadata: { designStyleId: selectedDesignStyleId, source: "pencil-mcp" },
+                };
+                set({
+                  isRunning: false,
+                  currentStep: null,
+                  steps: { ...get().steps, pencil: completedStep },
+                  totalCostUsd: get().totalCostUsd + (result?.costUsd ?? 0),
+                  streamingContent: "",
+                });
+                scheduleSync(get);
+                saveSubStageSnapshot(get, "pencil");
+              } else if (type === "error") {
+                console.error("[runPencilWithMcp] ✗ error", payload.error);
+                set({
+                  isRunning: false,
+                  currentStep: null,
+                  steps: {
+                    ...get().steps,
+                    pencil: {
+                      stepId: "pencil" as PipelineStepId,
+                      status: "failed" as const,
+                      error: (payload.error as string) || "Pencil MCP failed",
+                      timestamp: new Date().toISOString(),
+                    },
+                  },
+                  streamingContent: "",
+                });
               }
             };
 
