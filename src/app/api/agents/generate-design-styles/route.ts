@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { chatCompletion, resolveModel } from "@/lib/openrouter";
+import { MODEL_CONFIG } from "@/lib/model-config";
 
 export interface DesignStyle {
   id: string;
@@ -31,179 +33,115 @@ export interface DesignStyle {
   };
 }
 
+const SYSTEM_PROMPT = `You are a senior UI/UX design director. Based on a PRD, you generate exactly 5 distinct design style options for a product.
+
+Each style must feel cohesive and purposeful — tailored to the product's domain, target users, and emotional tone described in the PRD.
+
+Return a JSON object with a "styles" array containing exactly 5 items. Each item MUST follow this exact shape:
+
+{
+  "id": "style-<N>",           // e.g. "style-1"
+  "name": "<2-4 word name>",   // e.g. "Modern Minimal"
+  "description": "<1 sentence describing the visual personality>",
+  "colors": {
+    "primary":   "<hex>",      // dominant brand color
+    "secondary": "<hex>",      // accent / call-to-action
+    "tertiary":  "<hex>",      // highlight / info color
+    "neutral":   "<hex>"       // text / surface gray
+  },
+  "typography": {
+    "headlineFont": "<Google Font or system font name>",
+    "bodyFont":     "<Google Font or system font name>",
+    "labelFont":    "<Google Font or system font name>"
+  },
+  "fontSizes": { "h1": <px int>, "h2": <px int>, "h3": <px int>, "body": <px int>, "label": <px int> },
+  "spacing":   { "xs": <px int>, "sm": <px int>, "md": <px int>, "lg": <px int>, "xl": <px int> }
+}
+
+Rules:
+- 5 styles must be clearly differentiated: vary the color palette personality (e.g. bold/dark, pastel/light, monochromatic, vibrant/gradient-ready, neutral/enterprise).
+- Colors must be valid 6-digit hex codes.
+- Font choices must be real, web-safe or Google Fonts names (Inter, Poppins, Space Grotesk, Lato, Nunito, etc.).
+- Font sizes: h1 28–40px, h2 22–32px, h3 18–26px, body 13–16px, label 11–13px.
+- Spacing: xs 4–8, sm 8–14, md 14–20, lg 20–32, xl 28–48.
+- Output ONLY the JSON object — no markdown fences, no explanation.`;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prdContent } = body;
+    const { prdContent } = body as { prdContent?: string };
 
-    if (!prdContent || !prdContent.trim()) {
+    if (!prdContent?.trim()) {
       return NextResponse.json(
         { error: "PRD content is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // For now, return mock design styles
-    // In production, this would call an LLM to generate styles based on PRD
-    const designStyles: DesignStyle[] = [
+    const model = resolveModel(MODEL_CONFIG.design);
+
+    const messages: { role: "system" | "user"; content: string }[] = [
+      { role: "system", content: SYSTEM_PROMPT },
       {
-        id: "style-1",
-        name: "Modern Minimal",
-        description: "Clean, minimalist design with modern aesthetics",
-        colors: {
-          primary: "#0F172A",
-          secondary: "#712AE2",
-          tertiary: "#0EA5E9",
-          neutral: "#64748B",
-        },
-        typography: {
-          headlineFont: "Inter",
-          bodyFont: "Inter",
-          labelFont: "Space Grotesk",
-        },
-        fontSizes: {
-          h1: 30,
-          h2: 24,
-          h3: 20,
-          body: 14,
-          label: 12,
-        },
-        spacing: {
-          xs: 4,
-          sm: 8,
-          md: 16,
-          lg: 24,
-          xl: 32,
-        },
-      },
-      {
-        id: "style-2",
-        name: "Bold & Vibrant",
-        description: "Eye-catching design with bold colors and typography",
-        colors: {
-          primary: "#1A1A2E",
-          secondary: "#E91E63",
-          tertiary: "#FF9800",
-          neutral: "#757575",
-        },
-        typography: {
-          headlineFont: "Poppins",
-          bodyFont: "Open Sans",
-          labelFont: "Roboto",
-        },
-        fontSizes: {
-          h1: 36,
-          h2: 28,
-          h3: 22,
-          body: 16,
-          label: 13,
-        },
-        spacing: {
-          xs: 6,
-          sm: 12,
-          md: 20,
-          lg: 28,
-          xl: 40,
-        },
-      },
-      {
-        id: "style-3",
-        name: "Elegant Professional",
-        description: "Sophisticated design suitable for enterprise applications",
-        colors: {
-          primary: "#1F2937",
-          secondary: "#7C3AED",
-          tertiary: "#06B6D4",
-          neutral: "#6B7280",
-        },
-        typography: {
-          headlineFont: "Georgia",
-          bodyFont: "Segoe UI",
-          labelFont: "Trebuchet MS",
-        },
-        fontSizes: {
-          h1: 32,
-          h2: 26,
-          h3: 21,
-          body: 15,
-          label: 12,
-        },
-        spacing: {
-          xs: 5,
-          sm: 10,
-          md: 18,
-          lg: 26,
-          xl: 36,
-        },
-      },
-      {
-        id: "style-4",
-        name: "Playful Creative",
-        description: "Fun and creative design for engaging user experiences",
-        colors: {
-          primary: "#000000",
-          secondary: "#FF6B6B",
-          tertiary: "#4ECDC4",
-          neutral: "#8E9BA8",
-        },
-        typography: {
-          headlineFont: "Montserrat",
-          bodyFont: "Raleway",
-          labelFont: "Quicksand",
-        },
-        fontSizes: {
-          h1: 34,
-          h2: 27,
-          h3: 22,
-          body: 16,
-          label: 13,
-        },
-        spacing: {
-          xs: 6,
-          sm: 12,
-          md: 18,
-          lg: 24,
-          xl: 32,
-        },
-      },
-      {
-        id: "style-5",
-        name: "Dark Mode Sleek",
-        description: "Modern dark theme perfect for tech products",
-        colors: {
-          primary: "#0F172A",
-          secondary: "#A78BFA",
-          tertiary: "#38BDF8",
-          neutral: "#94A3B8",
-        },
-        typography: {
-          headlineFont: "IBM Plex Sans",
-          bodyFont: "Fira Sans",
-          labelFont: "JetBrains Mono",
-        },
-        fontSizes: {
-          h1: 32,
-          h2: 26,
-          h3: 21,
-          body: 14,
-          label: 12,
-        },
-        spacing: {
-          xs: 4,
-          sm: 8,
-          md: 16,
-          lg: 24,
-          xl: 32,
-        },
+        role: "user",
+        content: `Generate 5 distinct design styles for the following product PRD:\n\n${prdContent.slice(0, 8000)}`,
       },
     ];
 
-    return NextResponse.json({ styles: designStyles });
+    const llmRes = await chatCompletion(messages, {
+      model,
+      temperature: 0.7,
+      max_tokens: 3000,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = llmRes.choices[0]?.message?.content ?? "";
+
+    // Extract JSON — the model may occasionally wrap in fences despite instructions
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("[generate-design-styles] No JSON in LLM response:", raw.slice(0, 500));
+      return NextResponse.json(
+        { error: "LLM returned no parseable JSON" },
+        { status: 502 },
+      );
+    }
+
+    let parsed: { styles?: unknown[] };
+    try {
+      parsed = JSON.parse(jsonMatch[0]) as { styles?: unknown[] };
+    } catch (e) {
+      console.error("[generate-design-styles] JSON parse error:", e);
+      return NextResponse.json(
+        { error: "Failed to parse LLM JSON response" },
+        { status: 502 },
+      );
+    }
+
+    const styles = parsed.styles;
+    if (!Array.isArray(styles) || styles.length === 0) {
+      console.error("[generate-design-styles] Unexpected shape:", JSON.stringify(parsed).slice(0, 500));
+      return NextResponse.json(
+        { error: "LLM response did not contain a styles array" },
+        { status: 502 },
+      );
+    }
+
+    // Ensure each style has a stable id
+    const normalised: DesignStyle[] = (styles as DesignStyle[]).map(
+      (s, i) => ({ ...s, id: s.id ?? `style-${i + 1}` }),
+    );
+
+    console.log(
+      `[generate-design-styles] Generated ${normalised.length} styles via ${llmRes.model}`,
+    );
+
+    return NextResponse.json({ styles: normalised });
   } catch (error) {
     console.error("[generate-design-styles] Error:", error);
     return NextResponse.json(
       { error: "Failed to generate design styles" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
