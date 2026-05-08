@@ -6,6 +6,7 @@ import { useStageStore } from "@/store/stage-store";
 import StageInputBar from "@/components/StageInputBar";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import DesignStyleCard from "@/components/DesignStyleCard";
+import Loading from "@/components/Loading";
 
 type DocTab = "prd" | "design" | "trd" | "qa";
 type InnerTab = "style" | "spec" | "pencil";
@@ -37,23 +38,6 @@ function CheckCircleIcon({ size = 15 }: { size?: number }) {
     >
       <circle cx="12" cy="12" r="10" />
       <polyline points="9 12 11 14 15 10" />
-    </svg>
-  );
-}
-
-function SpinnerIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg
-      className="animate-spin"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    >
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
     </svg>
   );
 }
@@ -292,7 +276,7 @@ export default function DesignSubStage() {
                   </span>
                 )}
                 {tab.id === "spec" && isDesignRunning && (
-                  <SpinnerIcon size={11} />
+                  <Loading size="sm" />
                 )}
                 {tab.id === "pencil" && isPencilDone && (
                   <span className="text-emerald-500">
@@ -300,7 +284,7 @@ export default function DesignSubStage() {
                   </span>
                 )}
                 {tab.id === "pencil" && isPencilRunning && (
-                  <SpinnerIcon size={11} />
+                  <Loading size="sm" />
                 )}
               </button>
             );
@@ -345,12 +329,7 @@ export default function DesignSubStage() {
           <>
             {designStylesLoading && (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center flex flex-col items-center gap-3">
-                  <SpinnerIcon size={32} />
-                  <p className="text-slate-600 font-medium">
-                    Analyzing PRD and generating design styles…
-                  </p>
-                </div>
+                <Loading size="lg" text="Analyzing PRD and generating design styles…" />
               </div>
             )}
 
@@ -392,7 +371,7 @@ export default function DesignSubStage() {
                     className="flex items-center gap-2 px-6 py-3 bg-[#712ae2] text-white text-[14px] font-bold rounded-lg hover:bg-[#6b24da] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isDesignRunning ? (
-                      <SpinnerIcon size={15} />
+                      <Loading size="sm" />
                     ) : (
                       <svg
                         width="15"
@@ -433,9 +412,8 @@ export default function DesignSubStage() {
                 <MarkdownRenderer content={designContent} />
               </div>
             ) : isDesignRunning ? (
-              <div className="flex items-center justify-center py-20 gap-2 text-[#712ae2] text-[13px]">
-                <SpinnerIcon size={14} />
-                Generating Design Spec…
+              <div className="flex items-center justify-center py-20">
+                <Loading size="md" text="Generating Design Spec…" />
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400">
@@ -451,11 +429,8 @@ export default function DesignSubStage() {
             {/* ── Stitch generating ── */}
             {stitchGenerating && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
-                <SpinnerIcon size={32} />
-                <div className="text-center">
-                  <p className="text-[14px] font-semibold text-slate-800">Generating with Stitch…</p>
-                  <p className="text-[12px] text-slate-400 mt-1">This may take a minute. Stitch is creating your UI design.</p>
-                </div>
+                <Loading size="lg" text="Generating with Stitch…" />
+                <p className="text-[12px] text-slate-400">This may take a minute. Stitch is creating your UI design.</p>
               </div>
             )}
 
@@ -596,10 +571,7 @@ export default function DesignSubStage() {
             ) : !stitchGenerating && !stitchResult && !stitchError && isPencilRunning ? (
               // Live MCP session: show progress feed
               <div className="p-6 max-w-2xl mx-auto flex flex-col gap-4">
-                <div className="flex items-center gap-2 text-[#712ae2] text-[13px] font-medium">
-                  <SpinnerIcon size={14} />
-                  Running Pencil MCP session…
-                </div>
+                <Loading size="sm" text="Running Pencil MCP session…" />
                 {pencilContent && (
                   <div className="flex flex-col gap-2">
                     {pencilContent.split("\n\n---\n\n").filter(Boolean).map((msg, i) => (
