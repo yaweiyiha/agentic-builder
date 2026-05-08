@@ -224,6 +224,8 @@ interface PipelineState {
   selectDesignStyle: (styleId: string) => void;
   /** Generate (or re-generate) the Design Document. Pass editInstruction to revise an existing draft. */
   runDesignDoc: (editInstruction?: string) => void;
+  /** Generate (or re-generate) the TRD document. Pass editInstruction to revise an existing draft. */
+  runTrd: (editInstruction?: string) => void;
   /** Generate (or re-generate) the Pencil wireframe from the PRD + chosen design style. */
   runPencilDoc: (styleId: string, styleReferenceImage?: string | null, editInstruction?: string) => void;
   /**
@@ -678,6 +680,138 @@ export const usePipelineStore = create<PipelineState>()(
                 });
                 scheduleSync(get);
                 saveSubStageSnapshot(get, "design");
+              } else if (type === "generation_complete") {
+                set({ isRunning: false, currentStep: null });
+                scheduleSync(get);
+              }
+            };
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try { handleParallelEvent(JSON.parse(line.slice(6))); } catch { /* skip */ }
+              }
+            }
+            if (buffer.startsWith("data: ")) {
+              try { handleParallelEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
+            }
+            if (get().isRunning) set({ isRunning: false, currentStep: null });
+          })
+          .catch((err) => {
+            set({
+              isRunning: false,
+              currentStep: null,
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          });
+      },
+
+      runTrd: (editInstruction?: string) => {
+        const { steps, featureBrief, codeOutputDir } = get();
+        const prdContent = steps.prd?.content ?? featureBrief;
+        if (!prdContent.trim()) return;
+
+        const updatedSteps = {
+          ...steps,
+          trd: {
+            stepId: "trd" as PipelineStepId,
+            status: "running" as const,
+            timestamp: new Date().toISOString(),
+          },
+        };
+        set({
+          isRunning: true,
+          error: null,
+          currentStep: "trd",
+          streamingContent: "",
+          streamingThinking: "",
+          steps: updatedSteps,
+        });
+        scheduleSync(get);
+
+        const requestPayload = {
+          prdContent,
+          selectedDocs: ["trd"],
+          sessionId: steps.intent?.timestamp ?? "session",
+          codeOutputDir,
+          tier: (
+            (steps.intent?.metadata as Record<string, unknown> | undefined)
+              ?.classification as { tier?: string } | undefined
+          )?.tier ?? "M",
+          ...(editInstruction?.trim() ? {
+            editInstruction: editInstruction.trim(),
+            existingTrd: steps.trd?.content ?? "",
+          } : {}),
+        };
+
+        fetch("/api/agents/parallel-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        })
+          .then(async (resp) => {
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              set({
+                isRunning: false,
+                currentStep: null,
+                steps: {
+                  ...get().steps,
+                  trd: {
+                    stepId: "trd" as PipelineStepId,
+                    status: "failed" as const,
+                    error: (errData as { error?: string }).error || "TRD generation failed",
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              });
+              return;
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) {
+              set({ isRunning: false, currentStep: null });
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let trdContent = "";
+            let trdCost = 0;
+            let trdDuration = 0;
+
+            const handleParallelEvent = (payload: Record<string, unknown>) => {
+              const type = payload.type as string;
+              if (type === "doc_stream") {
+                const chunk = payload.chunk as string | undefined;
+                if (chunk) {
+                  trdContent += chunk;
+                  set({ streamingContent: trdContent });
+                }
+              } else if (type === "doc_complete" && payload.docId === "trd") {
+                trdContent = (payload.content as string) || trdContent;
+                trdCost = (payload.costUsd as number) || 0;
+                trdDuration = (payload.durationMs as number) || 0;
+                const completedStep: StepResult = {
+                  stepId: "trd",
+                  status: "completed",
+                  content: trdContent,
+                  costUsd: trdCost,
+                  durationMs: trdDuration,
+                  timestamp: new Date().toISOString(),
+                };
+                set({
+                  steps: { ...get().steps, trd: completedStep },
+                  totalCostUsd: get().totalCostUsd + trdCost,
+                  streamingContent: "",
+                });
+                scheduleSync(get);
+                saveSubStageSnapshot(get, "trd");
               } else if (type === "generation_complete") {
                 set({ isRunning: false, currentStep: null });
                 scheduleSync(get);

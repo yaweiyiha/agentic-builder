@@ -83,6 +83,7 @@ export default function DesignSubStage() {
   const currentStep = usePipelineStore((s) => s.currentStep);
   const isRunning = usePipelineStore((s) => s.isRunning);
   const runDesignDoc = usePipelineStore((s) => s.runDesignDoc);
+  const runTrd = usePipelineStore((s) => s.runTrd);
   const runPencilWithMcp = usePipelineStore((s) => s.runPencilWithMcp);
   const runStitchGenerate = usePipelineStore((s) => s.runStitchGenerate);
   const stitchResult = usePipelineStore((s) => s.stitchResult);
@@ -672,28 +673,29 @@ export default function DesignSubStage() {
           disabled={isPencilRunning || isDesignRunning}
           actions={
             <button
-              onClick={() => handleGenerateWithStitch()}
-              disabled={!selectedDesignStyleId || isRunning}
+              onClick={() => {
+                runTrd();
+                goToSubStage("trd", "preparation");
+              }}
+              disabled={isRunning}
               className="flex items-center gap-2 shrink-0 px-4 py-2.5 bg-[#712ae2] text-white text-[13px] font-semibold rounded-full hover:bg-[#6b24da] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-              title="Regenerate Pencil Design"
+              title="Generate TRD and proceed to next step"
             >
               <svg
-                width="12"
-                height="12"
+                width="13"
+                height="13"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2.2"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
               >
-                <path d="M21 2v6h-6" />
-                <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-                <path d="M3 22v-6h6" />
-                <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                <path d="M5 12h14" />
+                <path d="M12 5l7 7-7 7" />
               </svg>
-              Regenerate
+              Next Step
             </button>
           }
         />
