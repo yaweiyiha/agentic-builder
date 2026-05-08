@@ -9,7 +9,6 @@ import TrdSubStage        from "./_sub/trd";
 import SysdesignSubStage  from "./_sub/sysdesign";
 import ImplguideSubStage  from "./_sub/implguide";
 import DesignSubStage     from "./_sub/design";
-import PencilSubStage     from "./_sub/pencil";
 import MockupSubStage     from "./_sub/mockup";
 import QaSubStage         from "./_sub/qa";
 import type React from "react";
@@ -22,7 +21,6 @@ const SUB_VIEWS: Record<PreparationSubStageId, React.ComponentType> = {
   sysdesign: SysdesignSubStage,
   implguide: ImplguideSubStage,
   design:    DesignSubStage,
-  pencil:    PencilSubStage,
   mockup:    MockupSubStage,
   qa:        QaSubStage,
 };

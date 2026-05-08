@@ -20,6 +20,8 @@
     "memory:list": "tsx scripts/memory-cli.ts list",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate-sql": "tsx src/lib/db/migrate.ts",
+    "db:setup": "tsx src/lib/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "memory:show": "tsx scripts/memory-cli.ts show",

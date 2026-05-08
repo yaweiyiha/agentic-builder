@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore } from "@/store/stage-store";
 import StageInputBar from "@/components/StageInputBar";
@@ -9,7 +9,7 @@ import DesignStyleCard from "@/components/DesignStyleCard";
 import Loading from "@/components/Loading";
 
 type DocTab = "prd" | "design" | "trd" | "qa";
-type InnerTab = "style" | "spec" | "pencil";
+type InnerTab = "style" | "spec" | "stitch";
 
 const DOC_TABS: { id: DocTab; label: string }[] = [
   { id: "prd", label: "PRD" },
@@ -21,7 +21,7 @@ const DOC_TABS: { id: DocTab; label: string }[] = [
 const INNER_TABS: { id: InnerTab; label: string }[] = [
   { id: "style", label: "Style" },
   { id: "spec", label: "Design Spec" },
-  { id: "pencil", label: "Design" },
+  { id: "stitch", label: "Design" },
 ];
 
 function CheckCircleIcon({ size = 15 }: { size?: number }) {
@@ -42,20 +42,171 @@ function CheckCircleIcon({ size = 15 }: { size?: number }) {
   );
 }
 
-function PencilIcon({ size = 14 }: { size?: number }) {
+
+// ─── Style Carousel ──────────────────────────────────────────────────────────
+
+import type { DesignStyle } from "@/components/DesignStyleCard";
+
+// Each slot: offset from center → visual properties
+const SLOTS: Record<number, { x: string; scale: number; opacity: number; z: number }> = {
+  [-2]: { x: "-148%", scale: 0.62, opacity: 0.28, z: 0 },
+  [-1]: { x:  "-88%", scale: 0.78, opacity: 0.58, z: 1 },
+  [  0]: { x:    "0%", scale: 1.00, opacity: 1.00, z: 3 },
+  [  1]: { x:   "88%", scale: 0.78, opacity: 0.58, z: 1 },
+  [  2]: { x:  "148%", scale: 0.62, opacity: 0.28, z: 0 },
+};
+
+/** Shortest circular distance from active to idx */
+function circOffset(idx: number, active: number, total: number) {
+  let d = idx - active;
+  if (d >  total / 2) d -= total;
+  if (d < -total / 2) d += total;
+  return d;
+}
+
+function StyleCarousel({
+  styles,
+  selectedId,
+  onSelect,
+}: {
+  styles: DesignStyle[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const total = styles.length;
+  const initIdx = Math.max(0, styles.findIndex((s) => s.id === selectedId));
+  const [active, setActive] = useState(initIdx);
+
+  useEffect(() => {
+    const idx = styles.findIndex((s) => s.id === selectedId);
+    if (idx >= 0 && idx !== active) setActive(idx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  const goTo = useCallback((idx: number) => {
+    setActive(idx);
+    onSelect(styles[idx].id);
+  }, [styles, onSelect]);
+
+  const prev = () => goTo((active - 1 + total) % total);
+  const next = () => goTo((active + 1) % total);
+
+  if (total === 0) return null;
+
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-    </svg>
+    <div className="flex flex-col items-center gap-4 select-none">
+      <div className="relative w-full flex items-center justify-center" style={{ height: 290 }}>
+        {/* Left arrow */}
+        <button
+          onClick={prev}
+          className="absolute left-2 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-md hover:bg-slate-50 hover:border-[#712ae2] transition-all"
+          aria-label="Previous style"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+
+        {/* Cards — keyed by data index for stable DOM + correct directional animation */}
+        <div className="relative w-44" style={{ height: 290 }}>
+          {styles.map((style, idx) => {
+            const offset = circOffset(idx, active, total);
+            const slot = SLOTS[offset];
+            const isCenter = offset === 0;
+
+            // Cards beyond ±2 are pushed fully off-screen (no visible jump)
+            const x     = slot ? slot.x     : offset < 0 ? "-260%" : "260%";
+            const scale = slot ? slot.scale  : 0.5;
+            const opacity = slot ? slot.opacity : 0;
+            const z     = slot ? slot.z      : 0;
+
+            return (
+              <div
+                key={idx}
+                onClick={() => { if (!isCenter && slot) goTo(idx); }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  transform: `translateX(${x}) scale(${scale})`,
+                  opacity,
+                  zIndex: z,
+                  transition: "transform 0.36s cubic-bezier(0.4,0,0.2,1), opacity 0.36s ease",
+                  cursor: isCenter ? "default" : slot ? "pointer" : "default",
+                  transformOrigin: "center center",
+                  pointerEvents: slot ? "auto" : "none",
+                }}
+              >
+                <div className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden w-full h-full shadow-sm">
+                  {/* Color swatches */}
+                  <div className="flex h-14 shrink-0">
+                    {(["primary","secondary","tertiary","neutral"] as const).map((key) => (
+                      <div key={key} className="flex-1" style={{ backgroundColor: style.colors[key] }} />
+                    ))}
+                  </div>
+                  {/* Body */}
+                  <div className="p-2.5 flex flex-col gap-1.5 flex-1 min-h-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <h3 className="text-[12px] font-bold text-slate-900 truncate">{style.name}</h3>
+                      {isCenter && (
+                        <span className="text-[8px] font-bold text-[#712ae2] bg-[rgba(113,42,226,0.08)] px-1.5 py-0.5 rounded-full shrink-0">
+                          Selected
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-2">{style.description}</p>
+                    <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100 mt-auto">
+                      <span
+                        className="text-[22px] font-bold leading-none shrink-0"
+                        style={{ color: style.colors.primary, fontFamily: style.typography.headlineFont }}
+                      >
+                        Aa
+                      </span>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[9px] text-slate-500 truncate">{style.typography.headlineFont}</span>
+                        <span className="text-[9px] text-slate-400 truncate">{style.typography.bodyFont}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-[9px] font-semibold text-white px-1.5 py-0.5 rounded" style={{ backgroundColor: style.colors.primary }}>
+                        Primary
+                      </div>
+                      <div className="text-[9px] font-semibold px-1.5 py-0.5 rounded border" style={{ color: style.colors.secondary, borderColor: style.colors.secondary }}>
+                        Outlined
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right arrow */}
+        <button
+          onClick={next}
+          className="absolute right-2 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-md hover:bg-slate-50 hover:border-[#712ae2] transition-all"
+          aria-label="Next style"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Dot indicators */}
+      <div className="flex items-center gap-2">
+        {styles.map((s, i) => (
+          <button
+            key={s.id}
+            onClick={() => goTo(i)}
+            className={`rounded-full transition-all duration-300 ${
+              i === active ? "w-5 h-2 bg-[#712ae2]" : "w-2 h-2 bg-slate-300 hover:bg-slate-400"
+            }`}
+            aria-label={s.name}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -68,7 +219,6 @@ export default function DesignSubStage() {
   const isRunning = usePipelineStore((s) => s.isRunning);
   const runDesignDoc = usePipelineStore((s) => s.runDesignDoc);
   const runTrd = usePipelineStore((s) => s.runTrd);
-  const runPencilWithMcp = usePipelineStore((s) => s.runPencilWithMcp);
   const runStitchGenerate = usePipelineStore((s) => s.runStitchGenerate);
   const stitchResult = usePipelineStore((s) => s.stitchResult);
   const stitchGenerating = usePipelineStore((s) => s.stitchGenerating);
@@ -84,42 +234,35 @@ export default function DesignSubStage() {
   const saveSubStageSnapshot = usePipelineStore(
     (s) => s.saveSubStageSnapshotForSubStage,
   );
+  const loadSubStageSnapshot = usePipelineStore(
+    (s) => s.loadSubStageSnapshot,
+  );
   const goToSubStage = useStageStore((s) => s.goToSubStage);
   const isStageHydrated = useStageStore((s) => s.isStageHydrated);
 
   // ── Derived step state ──
   const prdContent = steps.prd?.content ?? "";
   const isDesignRunning = isRunning && currentStep === "design";
-  const isPencilRunning = isRunning && currentStep === "pencil";
 
   const designContent = isDesignRunning
     ? streamingContent
     : (steps.design?.content ?? "");
-  const pencilContent = isPencilRunning
-    ? streamingContent
-    : (steps.pencil?.content ?? "");
 
   const isDesignDone = steps.design?.status === "completed";
-  const isPencilDone = steps.pencil?.status === "completed";
 
   const hasDesignContent = !!(designContent || isDesignRunning);
-  // NOTE: hasPencilContent is extended below after stitchPrompt state is declared
-  const hasPencilContentBase = !!(pencilContent || isPencilRunning || stitchGenerating);
 
   // ── Inner tab state ──
   const [innerTab, setInnerTab] = useState<InnerTab>("style");
 
-  // After hydration: always start at "style" so the user goes through the
-  // intended flow (Style → Design Spec → Design). Only restore to "spec" if
-  // design content already exists — never auto-jump to "pencil".
+  // After hydration: restore to "spec" if design content exists.
+  // Never auto-jump to "stitch" — the user must explicitly proceed.
   const didInitTab = useRef(false);
   useEffect(() => {
     if (!isStageHydrated) return;
     if (didInitTab.current) return;
     didInitTab.current = true;
     if (steps.design?.content) setInnerTab("spec");
-    // pencil tab is intentionally not auto-restored so the user always
-    // starts from style (or spec) and manually proceeds to Design.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStageHydrated]);
 
@@ -132,23 +275,20 @@ export default function DesignSubStage() {
     prevDesignRunning.current = isDesignRunning;
   }, [isDesignRunning, isDesignDone]);
 
-  // Auto-advance to pencil tab when pencil doc finishes
-  const prevPencilRunning = useRef(isPencilRunning);
-  useEffect(() => {
-    if (prevPencilRunning.current && !isPencilRunning && isPencilDone) {
-      setInnerTab("pencil");
-    }
-    prevPencilRunning.current = isPencilRunning;
-  }, [isPencilRunning, isPencilDone]);
-
-  // Eager snapshot on mount
+  // On mount: load the saved snapshot for this sub-stage first, so any
+  // previously generated stitchResult (or other state) is restored before
+  // anything else runs. Only save a fresh snapshot if no snapshot exists yet.
   const didEagerSave = useRef(false);
   useEffect(() => {
     if (!isStageHydrated) return;
     if (didEagerSave.current) return;
     if (!prdContent.trim()) return;
     didEagerSave.current = true;
-    saveSubStageSnapshot("preparation", "design");
+    loadSubStageSnapshot("preparation", "design").then((loaded) => {
+      if (!loaded) {
+        saveSubStageSnapshot("preparation", "design");
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStageHydrated, prdContent]);
 
@@ -169,14 +309,14 @@ export default function DesignSubStage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [steps.prd?.content, designStyles, designStylesPrdHash, designStylesLoading]);
 
-  // ── Stitch state (本地 UI 只保留 promptCopied) ──
+  // ── Stitch state ──
   const [promptCopied, setPromptCopied] = useState(false);
 
-  const hasPencilContent = hasPencilContentBase || !!stitchResult || !!stitchError;
+  const hasPencilContent = !!(stitchResult || stitchError || stitchGenerating);
 
   // ── Input state ──
   const [specInput, setSpecInput] = useState("");
-  const [pencilInput, setPencilInput] = useState("");
+  const [stitchInput, setStitchInput] = useState("");
 
   // ── Handlers ──
   const handleOuterTabChange = (tab: DocTab) => {
@@ -190,28 +330,13 @@ export default function DesignSubStage() {
     setInnerTab("spec");
   };
 
-  const handleGeneratePencilDesign = (instruction?: string) => {
-    console.log("[DesignSubStage] handleGeneratePencilDesign called", {
-      selectedDesignStyleId,
-      hasDesignContent: !!steps.design?.content,
-      isRunning,
-      instruction,
-    });
-    if (!selectedDesignStyleId) {
-      console.warn("[DesignSubStage] ⚠ No selectedDesignStyleId — aborting pencil generation");
-      return;
-    }
-    runPencilWithMcp(instruction);
-    setInnerTab("pencil");
-  };
-
   const handleGenerateWithStitch = (instruction?: string) => {
     if (!selectedDesignStyleId) {
       console.warn("[DesignSubStage] ⚠ No selectedDesignStyleId — aborting stitch generation");
       return;
     }
     runStitchGenerate(instruction);
-    setInnerTab("pencil");
+    setInnerTab("stitch");
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -253,7 +378,7 @@ export default function DesignSubStage() {
             const isActive = innerTab === tab.id;
             const isDisabled =
               (tab.id === "spec" && !hasDesignContent) ||
-              (tab.id === "pencil" && !hasPencilContent);
+              (tab.id === "stitch" && !hasPencilContent);
 
             return (
               <button
@@ -278,12 +403,7 @@ export default function DesignSubStage() {
                 {tab.id === "spec" && isDesignRunning && (
                   <Loading size="sm" />
                 )}
-                {tab.id === "pencil" && isPencilDone && (
-                  <span className="text-emerald-500">
-                    <CheckCircleIcon size={12} />
-                  </span>
-                )}
-                {tab.id === "pencil" && isPencilRunning && (
+                {tab.id === "stitch" && stitchGenerating && (
                   <Loading size="sm" />
                 )}
               </button>
@@ -345,18 +465,12 @@ export default function DesignSubStage() {
                   </p>
                 </div>
 
-                {/* Cards */}
-                <div className="flex gap-5 overflow-x-auto pb-2">
-                  {designStyles.map((style) => (
-                    <div key={style.id} className="shrink-0 w-60">
-                      <DesignStyleCard
-                        style={style}
-                        isSelected={selectedDesignStyleId === style.id}
-                        onSelect={selectDesignStyle}
-                      />
-                    </div>
-                  ))}
-                </div>
+                {/* Carousel */}
+                <StyleCarousel
+                  styles={designStyles}
+                  selectedId={selectedDesignStyleId}
+                  onSelect={selectDesignStyle}
+                />
 
                 {/* Generate Design Spec — below all cards */}
                 <div className="flex flex-col items-center gap-3 pt-4 border-t border-slate-100">
@@ -423,8 +537,8 @@ export default function DesignSubStage() {
           </>
         )}
 
-        {/* ══ Pencil Design Tab ══ */}
-        {innerTab === "pencil" && (
+        {/* ══ Stitch Design Tab ══ */}
+        {innerTab === "stitch" && (
           <>
             {/* ── Stitch generating ── */}
             {stitchGenerating && (
@@ -563,34 +677,12 @@ export default function DesignSubStage() {
               </div>
             )}
 
-            {/* ── Legacy pencil content ── */}
-            {!stitchGenerating && !stitchResult && !stitchError && !isPencilRunning && pencilContent ? (
-              <div className="p-6 max-w-4xl mx-auto">
-                <MarkdownRenderer content={pencilContent} />
-              </div>
-            ) : !stitchGenerating && !stitchResult && !stitchError && isPencilRunning ? (
-              // Live MCP session: show progress feed
-              <div className="p-6 max-w-2xl mx-auto flex flex-col gap-4">
-                <Loading size="sm" text="Running Pencil MCP session…" />
-                {pencilContent && (
-                  <div className="flex flex-col gap-2">
-                    {pencilContent.split("\n\n---\n\n").filter(Boolean).map((msg, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-2 text-[12px] text-slate-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2"
-                      >
-                        <span className="text-emerald-500 mt-0.5 shrink-0">▸</span>
-                        <span className="leading-relaxed">{msg}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : !stitchGenerating && !stitchResult && !stitchError && !isPencilRunning && !pencilContent ? (
+            {/* ── Empty state ── */}
+            {!stitchGenerating && !stitchResult && !stitchError && (
               <div className="flex items-center justify-center h-full text-slate-400">
                 <p className="text-sm">Waiting for design to generate…</p>
               </div>
-            ) : null}
+            )}
           </>
         )}
       </div>
@@ -607,7 +699,7 @@ export default function DesignSubStage() {
             runDesignDoc(instruction);
           }}
           placeholder="Ask AgenticBuilder to revise the design spec…"
-          disabled={isDesignRunning || isPencilRunning}
+          disabled={isDesignRunning}
           actions={
             <button
               onClick={() => {
@@ -630,19 +722,19 @@ export default function DesignSubStage() {
         />
       )}
 
-      {/* ── StageInputBar — Pencil Design tab ── */}
-      {innerTab === "pencil" && (
+      {/* ── StageInputBar — Stitch Design tab ── */}
+      {innerTab === "stitch" && (
         <StageInputBar
-          value={pencilInput}
-          onChange={setPencilInput}
+          value={stitchInput}
+          onChange={setStitchInput}
           onSubmit={() => {
-            const instruction = pencilInput.trim();
-            if (!instruction || isPencilRunning) return;
-            setPencilInput("");
+            const instruction = stitchInput.trim();
+            if (!instruction || isRunning) return;
+            setStitchInput("");
             handleGenerateWithStitch(instruction);
           }}
           placeholder="Describe changes — a new Stitch prompt will be built…"
-          disabled={isPencilRunning || isDesignRunning}
+          disabled={isRunning}
           actions={
             <button
               onClick={() => {

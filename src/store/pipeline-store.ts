@@ -1209,7 +1209,9 @@ export const usePipelineStore = create<PipelineState>()(
               },
             });
             // Persist the stitch result so it survives page refresh
+            // Save to both substages: the user may refresh while on either one
             saveSubStageSnapshot(get, "pencil");
+            saveSubStageSnapshot(get, "design");
           })
           .catch((err) => {
             set({
