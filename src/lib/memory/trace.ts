@@ -15,7 +15,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export type TraceOp = "save" | "update" | "recall" | "delete" | "bumpHit" | "cache-hit" | "cache-miss" | "inject";
+export type TraceOp =
+  | "save"
+  | "update"
+  | "recall"
+  | "delete"
+  | "bumpHit"
+  | "cache-hit"
+  | "cache-miss"
+  | "inject"
+  /** Second-pass recall fired mid-task in response to a fresh error signal. */
+  | "reinject";
 
 export interface TraceEvent {
   ts: number;

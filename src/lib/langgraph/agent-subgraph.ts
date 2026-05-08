@@ -23,6 +23,7 @@ import {
 import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
 import { recallAndPrepareInject } from "@/lib/memory/recall-context";
 import { getInjectTokenBudgetForRole } from "@/lib/memory/recall-config";
+import { classifyFailureMode } from "@/lib/memory/distill/failure-mode";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
@@ -660,11 +661,36 @@ async function executeWorkerReadonlyTool(
   }
 }
 
+/**
+ * Context required for the worker loop to trigger a second-pass memory
+ * recall mid-task when a fresh error signal appears in tool output or
+ * model content. When omitted, second-pass recall is silently disabled
+ * (loop behaves identically to before).
+ */
+interface SecondaryRecallContext {
+  agent: string;
+  role?: string;
+  task: {
+    id?: string;
+    title?: string;
+    description?: string;
+    files?: string[];
+  };
+  projectRoot?: string;
+  kickoffId?: string;
+  layers?: ("L1" | "L2")[];
+  /** Patterns already injected by the primary recall — excluded from
+   *  second-pass candidates so we don't re-inject the same blocks. */
+  primaryInjectedIds: string[];
+  tokenBudget?: number;
+}
+
 async function runCodegenWorkerLoop(
   messages: ChatMessage[],
   outputDir: string,
   sessionId?: string,
   workerLabel?: string,
+  recallCtx?: SecondaryRecallContext,
 ): Promise<{
   content: string;
   rawContent: string;
@@ -679,6 +705,11 @@ async function runCodegenWorkerLoop(
   let completionTokens = 0;
   let totalTokens = 0;
   let consecutiveReadRounds = 0;
+  // Track second-pass recall state so we fire it at most once per worker
+  // run — otherwise a chatty model that mentions errors in every round
+  // would burn through the L1 store with redundant injects.
+  let didSecondaryRecall = false;
+  const injectedIds = new Set(recallCtx?.primaryInjectedIds ?? []);
 
   for (let i = 0; i < MAX_WORKER_TOOL_ITERATIONS; i++) {
     // Anti-spiral: inject a nudge message after too many consecutive read rounds.
@@ -775,6 +806,7 @@ async function runCodegenWorkerLoop(
     // All tool calls in this round were read-only — increment the stall counter.
     consecutiveReadRounds++;
 
+    const toolResultTexts: string[] = [];
     for (const toolCall of toolCalls) {
       let args: Record<string, unknown>;
       try {
@@ -796,12 +828,77 @@ async function runCodegenWorkerLoop(
         name: toolCall.function.name,
         content: result,
       });
+      toolResultTexts.push(result);
+    }
+
+    // Second-pass memory recall: if the model's content or any tool result
+    // exposes a fresh error signal we haven't seen before, fetch memories
+    // tailored to that error and append them as a system message. Fired
+    // at most once per worker run — see didSecondaryRecall above.
+    if (recallCtx && !didSecondaryRecall) {
+      const errorSignal = detectErrorSignalForRecall(content, toolResultTexts);
+      if (errorSignal) {
+        didSecondaryRecall = true;
+        const recall = await recallAndPrepareInject({
+          agent: recallCtx.agent,
+          role: recallCtx.role,
+          task: {
+            ...recallCtx.task,
+            description:
+              `${recallCtx.task.description ?? ""}\n\n## Encountered error signal\n${errorSignal.snippet}`.trim(),
+          },
+          projectRoot: recallCtx.projectRoot,
+          kickoffId: recallCtx.kickoffId,
+          layers: recallCtx.layers,
+          tokenBudget: recallCtx.tokenBudget,
+          excludeIds: Array.from(injectedIds),
+          pass: "secondary",
+        });
+        if (recall.block) {
+          for (const r of recall.active) injectedIds.add(r.id);
+          messages.push({
+            role: "system",
+            content:
+              `## Memory · second-pass recall (failure-mode: ${errorSignal.mode})\n` +
+              recall.block,
+          });
+        }
+      }
     }
   }
 
   throw new Error(
     `Worker tool loop exceeded ${MAX_WORKER_TOOL_ITERATIONS} iterations without final code output.`,
   );
+}
+
+/**
+ * Scan model output and tool results for a fresh failure-mode signal. We
+ * use the existing failure-mode classifier so the trigger language stays
+ * consistent with the metric bucketing.
+ *
+ * Returns the first non-"unknown" mode + a short snippet for the prompt
+ * augmentation, or null when nothing suspicious is present.
+ */
+export function detectErrorSignalForRecall(
+  modelContent: string,
+  toolResultTexts: string[],
+): { mode: string; snippet: string } | null {
+  const candidates: { source: "model" | "tool"; text: string }[] = [];
+  if (modelContent) candidates.push({ source: "model", text: modelContent });
+  for (const t of toolResultTexts) {
+    if (t) candidates.push({ source: "tool", text: t });
+  }
+
+  for (const c of candidates) {
+    const mode = classifyFailureMode(c.text);
+    if (mode === "unknown") continue;
+    // Keep the snippet short — enough to disambiguate the error in the
+    // recall query but not so long it dominates the description.
+    const snippet = c.text.slice(0, 400);
+    return { mode, snippet };
+  }
+  return null;
 }
 
 interface MalformedFileBlock {
@@ -1706,6 +1803,25 @@ async function generateCode(state: WorkerState) {
     let rounds = 0;
     let lastModel = "unknown";
 
+    const secondaryRecallCtx: SecondaryRecallContext | undefined =
+      memoryRecall.active.length > 0 || memoryRecall.shadow.length > 0
+        ? {
+            agent: "worker_codegen",
+            role: state.role,
+            task: {
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              files: Array.isArray(task.files) ? task.files : undefined,
+            },
+            projectRoot: state.outputDir,
+            kickoffId: state.sessionId,
+            layers: ["L1", "L2"],
+            primaryInjectedIds: memoryRecall.active.map((r) => r.id),
+            tokenBudget: getInjectTokenBudgetForRole(state.role),
+          }
+        : undefined;
+
     while (rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS) {
       rounds += 1;
       const response = await runCodegenWorkerLoop(
@@ -1713,6 +1829,7 @@ async function generateCode(state: WorkerState) {
         state.outputDir,
         state.sessionId,
         state.workerLabel,
+        secondaryRecallCtx,
       );
       const content = response.content;
       validateCodegenFileOutput(content);

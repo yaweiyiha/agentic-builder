@@ -119,7 +119,9 @@ function readStatus(record: MemoryRecord): string | null {
 
 /**
  * Build a map from (kickoffId, taskId) → injected pattern ids.
- * Only counts events where injection actually happened (`injected: true`).
+ * Counts both primary `inject` and second-pass `reinject` events where
+ * injection actually happened (`injected: true`) — both are legitimate
+ * candidates for outcome attribution because the worker saw the patterns.
  */
 function buildInjectionIndex(
   events: TraceEvent[],
@@ -127,7 +129,7 @@ function buildInjectionIndex(
   const out = new Map<string, Set<string>>();
   let consideredCount = 0;
   for (const ev of events) {
-    if (ev.op !== "inject") continue;
+    if (ev.op !== "inject" && ev.op !== "reinject") continue;
     if (!ev.kickoffId || !ev.taskId) continue;
     const det = ev.details as
       | { injected?: boolean; activeIds?: unknown }
@@ -191,9 +193,9 @@ export function computeAttributions(input: AttributionInput): AttributionResult 
     bucketsTouched: 0,
   };
 
-  // Count inject events for stats
+  // Count inject events (primary + secondary) for stats
   for (const ev of input.traceEvents) {
-    if (ev.op === "inject") {
+    if (ev.op === "inject" || ev.op === "reinject") {
       const det = ev.details as { injected?: boolean } | undefined;
       if (det?.injected === true) stats.injectEventsConsidered++;
     }

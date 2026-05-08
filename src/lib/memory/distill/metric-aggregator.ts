@@ -84,7 +84,7 @@ function buildInjectLookup(events: TraceEvent[]): {
   const map = new Map<string, InjectInfo>();
   let considered = 0;
   for (const ev of events) {
-    if (ev.op !== "inject") continue;
+    if (ev.op !== "inject" && ev.op !== "reinject") continue;
     if (!ev.kickoffId || !ev.taskId) continue;
     considered++;
     const det = ev.details as

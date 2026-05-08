@@ -52,6 +52,17 @@ export interface RecallContextOptions {
   activeThreshold?: number;
   /** Token budget for the rendered block. */
   tokenBudget?: number;
+  /**
+   * Pattern ids to exclude from candidates — used by second-pass recall to
+   * avoid re-injecting records that were already injected this task.
+   */
+  excludeIds?: string[];
+  /**
+   * "primary" (default) is the worker-startup recall. "secondary" indicates
+   * a mid-task second pass triggered by a fresh error signal; trace is
+   * logged as op:"reinject" so downstream analytics can distinguish.
+   */
+  pass?: "primary" | "secondary";
 }
 
 export interface RecallContextResult {
@@ -98,9 +109,14 @@ export async function recallAndPrepareInject(
       projectRoot: opts.projectRoot,
     });
 
+    const exclude = new Set(opts.excludeIds ?? []);
+    const filtered = exclude.size
+      ? candidates.filter((r) => !exclude.has(r.id))
+      : candidates;
+
     const active: MemoryRecord[] = [];
     const shadow: MemoryRecord[] = [];
-    for (const r of candidates) {
+    for (const r of filtered) {
       const score = r.metrics.score ?? 0;
       const manualApproved = r.tags.includes("manual:approved");
       if (score < DEPRECATED_BELOW && !manualApproved) continue;
@@ -215,8 +231,9 @@ async function writeTrace(
   injectAllowed: boolean,
 ): Promise<void> {
   const traceRoot = opts.projectRoot ?? process.cwd();
+  const isSecondary = opts.pass === "secondary";
   await getTraceLogger(traceRoot).log({
-    op: "inject",
+    op: isSecondary ? "reinject" : "inject",
     layer: opts.layers?.includes("L2") ? "L2" : "L1",
     kickoffId: opts.kickoffId,
     taskId: opts.task?.id,
@@ -229,6 +246,10 @@ async function writeTrace(
       injectedTokens,
       injected: injectAllowed && active.length > 0,
       suppressedByFlag: !injectAllowed && active.length > 0,
+      ...(opts.excludeIds?.length
+        ? { excludeIdCount: opts.excludeIds.length }
+        : {}),
+      ...(isSecondary ? { pass: "secondary" } : {}),
     },
   });
 
