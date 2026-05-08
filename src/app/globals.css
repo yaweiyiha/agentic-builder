@@ -1,6 +1,12 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
 
 :root {
   /* Theme: LAB(55.0481 -49.9246 15.93) — sRGB fallback first for older engines */

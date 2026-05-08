@@ -76,6 +76,7 @@ Adapt nodes/edges to this product. Use \`flowchart\` or \`graph\`.
 (Browser support, performance targets, accessibility. 2–4 bullets.)
 
 ## Rules
+- **Output MUST be valid Markdown.** Use ATX headings (\`#\`, \`##\`, \`###\`), fenced code blocks (\`\`\`), and Markdown tables throughout. Do NOT output plain text, JSON, XML, or any other format.
 - This is a SIMPLE project. Do NOT invent backend services, databases, authentication, microservices, or deployment infrastructure unless the user explicitly asks for them.
 - Do NOT add enterprise-only sections (personas, RACI, etc.).
 - **Never omit** layout regions, on-screen inventory, the interactive-components table, or the Mermaid diagram — even for a single-page app.
@@ -180,6 +181,7 @@ Each row: one control; **User interaction** = trigger; **Effect** = UI feedback 
 (Key entities and their relationships, described briefly.)
 
 ## Rules
+- **Output MUST be valid Markdown.** Use ATX headings (\`#\`, \`##\`, \`###\`), fenced code blocks (\`\`\`), and Markdown tables throughout. Do NOT output plain text, JSON, XML, or any other format.
 - Be proportional to the project scope. Don't over-engineer.
 - Every feature gets a unique ID (FR-XX##).
 - The Pages & Screens section is CRITICAL — list every distinct page with layout regions, on-screen inventory, interactions, and states.
@@ -363,6 +365,7 @@ Rules: **User interaction** = exact trigger; **Effect** = immediate feedback + d
 (External systems, APIs, third-party services, or teams required.)
 
 ## Rules
+- **Output MUST be valid Markdown.** Use ATX headings (\`#\`, \`##\`, \`###\`), fenced code blocks (\`\`\`), and Markdown tables throughout. Do NOT output plain text, JSON, XML, or any other format.
 - Be specific and actionable — no vague hand-waving.
 - Every feature requirement gets a unique ID (FR-XX##).
 - Every user story gets a unique ID (US-##).
@@ -419,7 +422,7 @@ export class PMAgent extends BaseAgent {
           : "Generate a comprehensive, enterprise-grade PRD for the following feature brief";
 
     return this.run(
-      `${tierHint}:\n\n${featureBrief}`,
+      `${tierHint}. **Your entire response must be formatted as valid Markdown** — use ATX headings, Markdown tables, and fenced code blocks exactly as specified in the output format. Do not output plain prose without structure.\n\n${featureBrief}`,
       additionalContext,
       "step-prd",
       sessionId,
@@ -439,12 +442,37 @@ export class PMAgent extends BaseAgent {
           ? "Generate a practical PRD for this application"
           : "Generate a comprehensive, enterprise-grade PRD for the following feature brief";
 
-    return this.streamRun(
-      `${tierHint}:\n\n${featureBrief}`,
+    const userMsg = `${tierHint}. **Your entire response must be formatted as valid Markdown** — use ATX headings, Markdown tables, and fenced code blocks exactly as specified in the output format. Do not output plain prose without structure.\n\n${featureBrief}`;
+
+    const result = await this.streamRun(
+      userMsg,
       onChunk,
       additionalContext,
       "step-prd",
       sessionId,
     );
+    return result;
+  }
+
+  /**
+   * Edit an existing PRD based on a user instruction.
+   * Streams the updated PRD using the same format as generatePRDStreaming.
+   */
+  async generatePRDEditStreaming(
+    existingPrd: string,
+    editInstruction: string,
+    onChunk: (chunk: string, type: "thinking" | "content") => void,
+    sessionId?: string,
+  ) {
+    const userMsg = `You are editing an existing PRD based on the user's instruction. **Output the COMPLETE updated PRD as valid Markdown** — preserve all sections not affected by the edit, and apply the requested changes precisely.\n\n## Existing PRD\n\n${existingPrd}\n\n## Edit Instruction\n\n${editInstruction}\n\nRespond with the full updated PRD only. No preamble or explanation.`;
+
+    const result = await this.streamRun(
+      userMsg,
+      onChunk,
+      undefined,
+      "step-prd",
+      sessionId,
+    );
+    return result;
   }
 }

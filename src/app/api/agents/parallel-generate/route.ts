@@ -8,12 +8,8 @@ import {
   VerifierAgent,
 } from "@/lib/agents";
 import type { AgentResult } from "@/lib/agents";
-import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 import { getDesignStylePreset } from "@/lib/pipeline/design-style-presets";
-import {
-  runPencilLiveSession,
-  type PencilLiveEvent,
-} from "@/lib/pencil-host/live-runner";
+import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 
 /** Pencil step: LLM (up to 16k tokens) + many batch_design chunks can exceed 5 minutes. */
 export const maxDuration = 600;
@@ -83,6 +79,21 @@ function buildAgentMap(
       new QAAgent().generateAudit(prd, "", sid),
     verify: (prd, _trd, _sys, _ds, sid) =>
       new VerifierAgent().verifyAlignment(prd, "", sid),
+    pencil: (prd, _trd, _sys, ds, sid) => {
+      // Temporarily generate a Markdown wireframe spec via LLM instead of launching Pencil.app
+      const wireframeCtx = [
+        designAdditional.trim() ? designAdditional : "",
+        ds.trim() ? `## Confirmed Design Spec\n${ds}` : "",
+        `## Task\nGenerate a detailed **wireframe specification** in Markdown.\n` +
+          `For each screen / key page, produce:\n` +
+          `- ASCII or text-art layout sketch\n` +
+          `- List of UI components with placement notes\n` +
+          `- Key user interactions and state changes\n` +
+          `- Navigation flow between screens\n` +
+          `Use the design tokens and style direction from the Design Spec above. Do NOT output code.`,
+      ].filter(s => s.trim()).join("\n\n");
+      return new DesignAgent().generateDesign(prd, wireframeCtx, sid);
+    },
   };
 }
 
@@ -135,17 +146,22 @@ export async function POST(request: NextRequest) {
   };
 
   const effectiveTier = (tier ?? "M").toUpperCase() as "S" | "M" | "L";
+  const designVariants = (body as Record<string, unknown>).designVariants as
+    | Array<{ variantId: string; directionPrompt: string }>
+    | undefined;
 
-  if (!prdContent || !selectedDocs || selectedDocs.length === 0) {
+  if (!prdContent || (!designVariants?.length && (!selectedDocs || selectedDocs.length === 0))) {
     return Response.json(
-      { error: "prdContent and selectedDocs are required" },
+      { error: "prdContent and selectedDocs (or designVariants) are required" },
       { status: 400 },
     );
   }
 
   const hasPencilOnlyBatch =
     selectedDocs.includes("pencil") && !selectedDocs.includes("design");
-  if (hasPencilOnlyBatch && !designSpecContent?.trim()) {
+  // Allow pencil-only when a designStyleId is provided — the style preset's
+  // pencilPrompt carries enough design context without a full Design Spec doc.
+  if (hasPencilOnlyBatch && !designSpecContent?.trim() && !designStyleId?.trim()) {
     return Response.json(
       {
         error:
@@ -159,9 +175,13 @@ export async function POST(request: NextRequest) {
   const tierConstraint =
     TIER_STACK_CONSTRAINT[effectiveTier] ?? TIER_STACK_CONSTRAINT.M;
   const stylePreset = getDesignStylePreset(designStyleId);
+  // designDirectionPrompt overrides the preset's designSpecPrompt when provided
+  const designDirectionPrompt = typeof (body as Record<string, unknown>).designDirectionPrompt === "string"
+    ? (body as Record<string, unknown>).designDirectionPrompt as string
+    : undefined;
   const agentMap = buildAgentMap(
     tierConstraint,
-    stylePreset.designSpecPrompt,
+    designDirectionPrompt ?? stylePreset.designSpecPrompt,
     styleReferenceImageBase64,
   );
 
@@ -171,6 +191,43 @@ export async function POST(request: NextRequest) {
       function send(data: unknown) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       }
+
+      // ── Design-variants mode: single request, 5 parallel variants ──────────
+      if (designVariants && designVariants.length > 0) {
+        send({ type: "variants_start", total: designVariants.length });
+        await Promise.all(
+          designVariants.map(async ({ variantId, directionPrompt }) => {
+            send({ type: "variant_start", variantId });
+            const variantAgentMap = buildAgentMap(
+              tierConstraint,
+              directionPrompt,
+              styleReferenceImageBase64,
+            );
+            try {
+              const result = await variantAgentMap.design(
+                prdContent, "", "", "", sessionId,
+              );
+              send({
+                type: "variant_complete",
+                variantId,
+                content: result.content,
+                costUsd: result.costUsd,
+                durationMs: result.durationMs,
+              });
+            } catch (err) {
+              send({
+                type: "variant_error",
+                variantId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }),
+        );
+        send({ type: "variants_complete" });
+        controller.close();
+        return;
+      }
+      // ── End design-variants mode ──────────────────────────────────────────────
 
       send({
         type: "generation_start",
@@ -206,31 +263,9 @@ export async function POST(request: NextRequest) {
         send({ type: "doc_start", docId, label: DOC_LABELS[docId] ?? docId });
         try {
           let result: AgentResult;
-          if (docId === "pencil") {
-            const specForPencil =
-              ds.trim() ||
-              (typeof designSpecContent === "string" ? designSpecContent : "");
-            result = await runPencilLiveSession({
-              prdContent,
-              designSpec: specForPencil,
-              projectRoot: outputRoot,
-              sessionId,
-              augmentMarkdown: pencilAugmentMarkdown,
-              styleAugment: pencilStyleAugment,
-              onEvent: (event: PencilLiveEvent) => {
-                send({
-                  type: "doc_progress",
-                  docId,
-                  label: DOC_LABELS[docId] ?? docId,
-                  event,
-                });
-              },
-            });
-          } else {
-            const agentFn = agentMap[docId];
-            if (!agentFn) throw new Error(`Unknown doc: ${docId}`);
-            result = await agentFn(prdContent, trd, sys, ds, sessionId);
-          }
+          const agentFn = agentMap[docId];
+          if (!agentFn) throw new Error(`Unknown doc: ${docId}`);
+          result = await agentFn(prdContent, trd, sys, ds, sessionId);
           results[docId] = {
             content: result.content,
             costUsd: result.costUsd,

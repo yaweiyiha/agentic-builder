@@ -78,6 +78,13 @@ export interface ExecutePipelineOptions {
    * Defaults to disabled for backward compatibility.
    */
   ralph?: Partial<RalphConfig>;
+  /**
+   * When set, skip all other steps and only re-run the PRD step using this
+   * edit instruction applied to the existing PRD content.
+   */
+  prdEditInstruction?: string;
+  /** The existing PRD markdown to be edited. Required when prdEditInstruction is set. */
+  existingPrd?: string;
 }
 
 /**
@@ -99,7 +106,6 @@ function stepsForTier(tier: ProjectTier) {
   };
 }
 
-export const STATIC_PRD_RELATIVE_PATH = path.join(".blueprint", "PRD.md");
 const STATIC_DESIGN_RELATIVE_PATH = path.join(".blueprint", "DESIGN.md");
 
 const FAST_MODE_DESIGN_FALLBACK = `## Design specification (fast mode)
@@ -212,17 +218,14 @@ export class PipelineEngine {
     // ── PRD (tier-aware prompt) ──
     const pmAgent = new PMAgent(tier);
 
-    let staticPrd = await this.readStaticPrd();
-    if (staticPrd === null && fast) {
-      const outputDocs = await this.readExistingDocsFromOutput(outputRoot);
-      staticPrd = outputDocs.prd;
-    }
-    if (staticPrd !== null) {
-      run = this.applyStaticPrdStep(run, staticPrd);
-    } else {
+    // ── Edit-only mode: re-run only the PRD step using the edit instruction ──
+    if (options.prdEditInstruction && options.existingPrd) {
+      const editInstruction = options.prdEditInstruction;
+      const existingPrd = options.existingPrd;
       run = await this.executeStep(run, "prd", () =>
-        pmAgent.generatePRDStreaming(
-          run.featureBrief,
+        pmAgent.generatePRDEditStreaming(
+          existingPrd,
+          editInstruction,
           (chunk, chunkType) => {
             this.emit({
               type: "step_stream",
@@ -231,12 +234,43 @@ export class PipelineEngine {
               data: { chunk, chunkType },
             });
           },
-          undefined,
           run.sessionId,
         ),
       );
       if (run.status === "failed") return run;
+
+      run = this.attachPrdSpecGateToPrdStep(run);
+      run = await this.attachPrdStructuredSpec(run);
+      this.emitPrdStepCompleteRefresh(run);
+
+      this.emit({
+        type: "pipeline_complete",
+        runId: run.id,
+        stepId: "prd",
+        data: { status: "completed", metadata: { pausedAfterPrd: true } },
+      });
+      run.status = "completed";
+      run.currentStep = null;
+      run.updatedAt = new Date().toISOString();
+      return run;
     }
+
+    run = await this.executeStep(run, "prd", () =>
+      pmAgent.generatePRDStreaming(
+        run.featureBrief,
+        (chunk, chunkType) => {
+          this.emit({
+            type: "step_stream",
+            runId: run.id,
+            stepId: "prd",
+            data: { chunk, chunkType },
+          });
+        },
+        undefined,
+        run.sessionId,
+      ),
+    );
+    if (run.status === "failed") return run;
 
     run = this.attachPrdSpecGateToPrdStep(run);
     run = await this.attachPrdStructuredSpec(run);
@@ -1264,17 +1298,6 @@ export class PipelineEngine {
     this.onEvent?.(event);
   }
 
-  private async readStaticPrd(): Promise<string | null> {
-    const abs = path.join(this.projectRoot, STATIC_PRD_RELATIVE_PATH);
-    try {
-      const raw = await fs.readFile(abs, "utf-8");
-      const trimmed = raw.trim();
-      return trimmed.length > 0 ? raw : null;
-    } catch {
-      return null;
-    }
-  }
-
   private async readStaticDesign(): Promise<string> {
     const abs = path.join(this.projectRoot, STATIC_DESIGN_RELATIVE_PATH);
     try {
@@ -1329,40 +1352,5 @@ export class PipelineEngine {
     ]);
 
     return { prd, trd, sysDesign, implGuide, designSpec };
-  }
-
-  private applyStaticPrdStep(run: PipelineRun, content: string): PipelineRun {
-    run.currentStep = "prd";
-    this.emit({
-      type: "step_start",
-      runId: run.id,
-      stepId: "prd",
-      data: { status: "running" },
-    });
-
-    const stepResult = this.buildStepResult("prd", "completed", {
-      content,
-      model: "static:.blueprint/PRD.md",
-      costUsd: 0,
-      durationMs: 0,
-      tokenUsage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      },
-      metadata: { source: "static-prd-file", path: STATIC_PRD_RELATIVE_PATH },
-    });
-
-    run.steps.prd = stepResult;
-    run.updatedAt = new Date().toISOString();
-
-    this.emit({
-      type: "step_complete",
-      runId: run.id,
-      stepId: "prd",
-      data: stepResult,
-    });
-
-    return run;
   }
 }

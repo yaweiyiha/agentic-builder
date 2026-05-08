@@ -14,12 +14,16 @@ export async function POST(request: NextRequest) {
     codeOutputDir,
     fastFromPrd,
     pauseAfterPrd,
+    prdEditInstruction,
+    existingPrd,
     sessionId,
   } = body as {
     featureBrief?: string;
     codeOutputDir?: string;
     fastFromPrd?: boolean;
     pauseAfterPrd?: boolean;
+    prdEditInstruction?: string;
+    existingPrd?: string;
     /** Stable client-generated id linking this pipeline run with a
      *  subsequent kickoff so memory records share the same kickoffId. */
     sessionId?: string;
@@ -59,6 +63,14 @@ export async function POST(request: NextRequest) {
             typeof codeOutputDir === "string" ? codeOutputDir : undefined,
           fastFromPrd: fastFromPrd === true,
           pauseAfterPrd: pauseAfterPrd === true,
+          prdEditInstruction:
+            typeof prdEditInstruction === "string" && prdEditInstruction.trim()
+              ? prdEditInstruction.trim()
+              : undefined,
+          existingPrd:
+            typeof existingPrd === "string" && existingPrd.trim()
+              ? existingPrd.trim()
+              : undefined,
         });
 
         // Auto-save pipeline snapshot for debug reuse

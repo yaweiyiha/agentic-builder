@@ -214,26 +214,27 @@ export default function ImportPrdDialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-8 backdrop-blur-[2px]"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1c30]/30 p-8 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-2xl border-[1.5px] border-zinc-200 bg-white shadow-lg shadow-zinc-900/10"
+            initial={{ scale: 0.96, opacity: 0, y: 8 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.96, opacity: 0, y: 8 }}
+            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+            className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_20px_60px_-12px_rgba(11,28,48,0.14)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between border-b border-zinc-200 px-6 py-4">
+            {/* ── Header ── */}
+            <div className="flex items-start justify-between border-b border-[#e2e8f0] px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-zinc-900">
+                <h2 className="text-base font-semibold text-[#0b1c30]">
                   Import PRD
                 </h2>
-                <p className="mt-0.5 text-[12px] leading-snug text-zinc-500">
+                <p className="mt-0.5 text-xs leading-snug text-[#64748b]">
                   Provide an existing PRD (paste or upload) to skip the PRD
                   generation step. Stored at{" "}
-                  <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[11px] text-zinc-700">
+                  <code className="rounded bg-[#f1f5f9] px-1 py-0.5 font-mono text-[11px] text-[#475569]">
                     .blueprint/PRD.md
                   </code>{" "}
                   and reused by every run until cleared.
@@ -242,11 +243,11 @@ export default function ImportPrdDialog({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+                className="ml-4 shrink-0 rounded-lg p-1.5 text-[#94a3b8] transition-colors hover:bg-[#f1f5f9] hover:text-[#0b1c30]"
               >
                 <svg
-                  width="20"
-                  height="20"
+                  width="18"
+                  height="18"
                   viewBox="0 0 20 20"
                   fill="none"
                   stroke="currentColor"
@@ -257,8 +258,9 @@ export default function ImportPrdDialog({
               </button>
             </div>
 
+            {/* ── Active PRD status bar ── */}
             {statusLine && (
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 bg-emerald-50/60 px-6 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e2e8f0] bg-emerald-50/70 px-6 py-2.5">
                 <div className="flex items-center gap-2 text-[12px] text-emerald-800">
                   <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
                   <span>{statusLine}</span>
@@ -274,7 +276,9 @@ export default function ImportPrdDialog({
               </div>
             )}
 
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
+            {/* ── Body ── */}
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              {/* Drop zone */}
               <div
                 onDragEnter={(e) => {
                   e.preventDefault();
@@ -286,20 +290,21 @@ export default function ImportPrdDialog({
                 }}
                 onDragLeave={() => setDragActive(false)}
                 onDrop={(e) => void handleDrop(e)}
-                className={`flex items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3 transition-colors ${
+                className={`flex items-center justify-between gap-3 rounded-xl border border-dashed px-4 py-3 transition-colors ${
                   dragActive
-                    ? "border-indigo-400 bg-indigo-50/60"
-                    : "border-zinc-300 bg-zinc-50"
+                    ? "border-[#0f172a]/40 bg-[#0f172a]/3"
+                    : "border-[#e2e8f0] bg-[#f8f9ff]"
                 }`}
               >
-                <div className="flex items-center gap-2 text-[12px] text-zinc-600">
+                <div className="flex items-center gap-2 text-xs text-[#64748b]">
                   <svg
-                    width="16"
-                    height="16"
+                    width="15"
+                    height="15"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
+                    className={dragActive ? "text-[#0f172a]" : "text-[#94a3b8]"}
                   >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
@@ -331,10 +336,11 @@ export default function ImportPrdDialog({
                 </label>
               </div>
 
-              <div className="flex flex-col gap-1">
+              {/* Textarea */}
+              <div className="flex flex-col gap-1.5">
                 <label
                   htmlFor="prd-import-textarea"
-                  className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500"
+                  className="text-[10.5px] font-bold uppercase tracking-widest text-[#94a3b8]"
                 >
                   Paste PRD markdown
                 </label>
@@ -348,28 +354,31 @@ export default function ImportPrdDialog({
                   }}
                   placeholder="# PRD: ...\n\n## 1. Overview..."
                   spellCheck={false}
-                  className="min-h-[260px] resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-[12px] leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                  className="min-h-65 resize-y rounded-xl border border-[#e2e8f0] bg-white px-3.5 py-3 font-mono text-[12px] leading-relaxed text-[#0b1c30] placeholder:text-[#94a3b8] transition-colors focus:border-[#0f172a]/30 focus:outline-none focus:ring-2 focus:ring-[#0f172a]/8"
                 />
-                <p className="text-[10.5px] text-zinc-400">
-                  Max {formatBytes(MAX_BYTES)}. Next pipeline run will reuse
-                  this PRD verbatim and skip PM generation.
+                <p className="text-[10.5px] text-[#94a3b8]">
+                  Max {formatBytes(MAX_BYTES)} for text files, {formatBytes(MAX_PDF_BYTES)} for PDF.
+                  PDF text will be extracted automatically. The next pipeline run
+                  will reuse this PRD verbatim and skip PM generation.
                 </p>
               </div>
 
+              {/* Preview */}
               {importedPrd?.exists && previewHasContent && (
-                <details className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12px]">
-                  <summary className="cursor-pointer select-none font-medium text-zinc-700">
-                    Preview current imported PRD (first 400 chars)
+                <details className="rounded-xl border border-[#e2e8f0] bg-[#f8f9ff] px-4 py-2.5 text-xs">
+                  <summary className="cursor-pointer select-none font-semibold text-[#475569]">
+                    Preview current imported PRD <span className="font-normal text-[#94a3b8]">(first 400 chars)</span>
                   </summary>
-                  <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-zinc-700">
+                  <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap wrap-break-word font-mono text-[11px] leading-relaxed text-[#64748b]">
                     {importedPrd.preview}
                     {importedPrd.bytes > 400 ? "\n…" : ""}
                   </pre>
                 </details>
               )}
 
+              {/* Error */}
               {(localError || error) && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs text-red-600">
                   {localError || error}
                 </div>
               )}
@@ -389,7 +398,7 @@ export default function ImportPrdDialog({
                   type="button"
                   onClick={onClose}
                   disabled={isBusy}
-                  className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[12px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50"
+                  className="rounded-lg border border-[#e2e8f0] bg-white px-3.5 py-2 text-[12px] font-medium text-[#475569] transition-colors hover:bg-[#f8f9ff] hover:text-[#0b1c30] disabled:opacity-50"
                 >
                   Close
                 </button>
@@ -397,7 +406,7 @@ export default function ImportPrdDialog({
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={isBusy || draft.trim().length === 0}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-[#0f172a] px-4 py-2 text-[12px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading === "saving" ? "Saving…" : "Save and use"}
                 </button>

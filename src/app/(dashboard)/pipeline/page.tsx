@@ -314,22 +314,6 @@ export default function PipelinePage() {
     [updateSteps],
   );
 
-  // When the PRD step is populated from an imported `.blueprint/PRD.md` file,
-  // skip the review gate automatically — the user has already hand-authored
-  // this PRD and does not need to re-approve it. Without this, the pipeline
-  // appears "stuck" on the PRD review step after an imported run.
-  useEffect(() => {
-    const prd = steps.prd;
-    if (!prd || prd.status !== "completed") return;
-    if (prdConfirmed) return;
-    if (isRunning || prdRefining) return;
-    const source = (prd.metadata as { source?: string } | undefined)?.source;
-    if (source !== "static-prd-file") return;
-    const content = prd.content;
-    if (!content || content.trim().length === 0) return;
-    handlePrdConfirm(content);
-  }, [steps.prd, prdConfirmed, isRunning, prdRefining, handlePrdConfirm]);
-
   const handlePrdRegenerate = useCallback(() => {
     setPrdConfirmed(false);
     setGenPhase("idle");
