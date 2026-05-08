@@ -1,19 +1,6 @@
 import { NextRequest } from "next/server";
-import fs from "fs/promises";
-import path from "path";
 import { streamChatCompletion, resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG } from "@/lib/model-config";
-
-async function readImportedPrd(): Promise<string | null> {
-  try {
-    const filePath = path.resolve(process.cwd(), ".blueprint", "PRD.md");
-    const content = await fs.readFile(filePath, "utf-8");
-    const trimmed = content.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * POST /api/agents/intent-recheck
@@ -29,19 +16,19 @@ async function readImportedPrd(): Promise<string | null> {
 const INTENT_RECHECK_SYSTEM_PROMPT = `You are a senior product analyst in a multi-turn clarification loop. Your goal is to ensure all 6 required items are fully understood before engineering begins.
 
 ## Required items (same as before)
-  A. need_backend   — Whether a real backend is needed, or mock/static data is sufficient. This determines whether TRD and backend code will be generated. Ask this FIRST before all other items.
-  B. core_goal      — The specific problem or need this product solves.
-  C. target_users   — Who the primary users are.
-  D. pain_points    — Frustrations, inefficiencies, or gaps this product eliminates.
-  E. mobile_support — Deployment target: web-only / mobile-responsive / native mobile / both.
-  F. auth_method    — How users authenticate (or no login needed).
+  A. core_goal      — The specific problem or need this product solves.
+  B. target_users   — Who the primary users are.
+  C. pain_points    — Frustrations, inefficiencies, or gaps this product eliminates.
+  D. mobile_support — Deployment target: web-only / mobile-responsive.
+  E. auth_method    — How users authenticate (or no login needed).
+  F. need_backend   — Whether a real backend is needed, or mock/static data is sufficient. This determines whether TRD and backend code will be generated. Ask this LAST.
 
 ## Your task
 You will receive the original project brief and the full Q&A conversation so far.
 1. Re-evaluate ALL 6 items considering every piece of information provided (brief + all answers).
 2. Mark each item as KNOWN or MISSING/AMBIGUOUS.
 3. For any item still MISSING or where the answer was vague/contradictory, generate a follow-up question.
-4. IMPORTANT: Always ask about \`need_backend\` first if it is not yet known — its answer affects the entire downstream pipeline (TRD generation, backend scaffolding).
+4. IMPORTANT: Always ask about \`need_backend\` LAST — first gather core_goal, target_users, pain_points, mobile_support, and auth_method.
 5. If ALL 6 items are clearly covered, return an empty questions array and set \`all_clear: true\`.
 
 ## Question format (same types as before)
@@ -49,9 +36,9 @@ You will receive the original project brief and the full Q&A conversation so far
 - checkbox → one or more answers (best for F: auth_method providers)
 - text    → free-form (best for B, C, D when still unclear)
 
-For A: use radio with options ["Yes, need a real backend (API + database)", "No, mock data is sufficient (frontend only)"].
-For E: use radio with options ["Web only", "Mobile-responsive web", "Native mobile app", "Both web and native"].
-For F: use checkbox with options ["Email / Password", "Google", "GitHub", "Apple", "WeChat", "No login needed"].
+For D: use radio with options ["Web only", "Mobile-responsive web"].
+For E: use checkbox with options ["Email / Password", "GitHub", "No login needed"].
+For F: use radio with options ["Yes, need a real backend (API + database)", "No, mock data is sufficient (frontend only)"].
 
 ## Output format (STRICT — return ONLY valid JSON, no prose outside the object)
 
@@ -65,12 +52,12 @@ For F: use checkbox with options ["Email / Password", "Google", "GitHub", "Apple
   ],
   "questions": [
     {
-      "id": "need_backend" | "core_goal" | "target_users" | "pain_points" | "mobile_support" | "auth_method",
+      "id": "core_goal" | "target_users" | "pain_points" | "mobile_support" | "auth_method" | "need_backend",
       "type": "radio" | "checkbox" | "text",
       "label": "Concise follow-up question (≤ 15 words)",
       "options": ["..."]   // omit for type "text"
     },
-    ...only items still MISSING or ambiguous — max 6 total, need_backend always first if missing
+    ...only items still MISSING or ambiguous — max 6 total, need_backend always last if missing
   ]
 }
 
@@ -97,16 +84,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Read the imported PRD (e.g. uploaded PDF converted to text) if present.
-    const importedPrdContent = await readImportedPrd();
-
-    // Build the user-turn content: prepend the imported PRD so the LLM has full context.
+    // Build the user-turn content.
     const userTurnParts: string[] = [];
-    if (importedPrdContent) {
-      userTurnParts.push(
-        `Imported PRD document (user-provided — treat as the primary source of truth):\n\`\`\`\n${importedPrdContent}\n\`\`\`\n`,
-      );
-    }
     userTurnParts.push(`Original project brief:\n${brief}`);
     if (conversationHistory.length > 0) {
       userTurnParts.push(

@@ -83,8 +83,11 @@ function IntentFormCard({
   form,
   onSubmit,
   onTextQuestion,
+  onStartGeneration,
+  intentAllClear,
   disabled,
   isRechecking,
+  isLastMessage,
 }: {
   form: IntentFormData;
   onSubmit: (
@@ -99,8 +102,11 @@ function IntentFormCard({
       id: string;
     } | null,
   ) => void;
+  onStartGeneration?: (questions: IntentQuestion[], answers: Record<string, string | string[]>) => void;
+  intentAllClear?: boolean;
   disabled?: boolean;
   isRechecking?: boolean;
+  isLastMessage?: boolean;
 }) {
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   // Show one question at a time; advance after answering
@@ -209,13 +215,6 @@ function IntentFormCard({
       {/* One question at a time */}
       {currentQuestion && (
         <div className="space-y-4 border-t border-slate-200 pt-4">
-          {/* Progress indicator */}
-          {form.questions.length > 1 && (
-            <p className="text-xs text-muted-foreground">
-              Question {currentIdx + 1} of {form.questions.length}
-            </p>
-          )}
-
           <div className="space-y-3">
             <p className="text-sm font-semibold text-foreground leading-6">
               {currentQuestion.label}
@@ -313,9 +312,49 @@ function IntentFormCard({
                 )}
               </Button>
             )}
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Progress + Next Step (last message only) */}
+            {isLastMessage && (() => {
+              const isAllClear = form.all_clear || (form.gathered?.length ?? 0) >= 6;
+              return (
+                <>
+                  {form.questions.length > 0 && (
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Question {(form.gathered?.length ?? 0) + currentIdx + 1} / 6
+                    </span>
+                  )}
+                  <Button
+                    onClick={() => onStartGeneration?.(form.questions, answers)}
+                    disabled={disabled}
+                    className="text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-8 px-3 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
+                  >
+                    {isAllClear ? "Next Step" : "Skip to Next Step"} <ArrowRight size={14} />
+                  </Button>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
+
+      {/* Bottom row when all questions done: progress + Next Step (last message only) */}
+      {!currentQuestion && isLastMessage && (() => {
+        const isAllClear = form.all_clear || (form.gathered?.length ?? 0) >= 6;
+        return (
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
+            <Button
+              onClick={() => onStartGeneration?.(form.questions, answers)}
+              disabled={disabled}
+              className="text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-9 px-4 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
+            >
+              {isAllClear ? "Next Step" : "Skip to Next Step"} <ArrowRight size={15} />
+            </Button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -324,6 +363,8 @@ function AIMessage({
   intentForm,
   onFormSubmit,
   onTextQuestion,
+  onStartGeneration,
+  intentAllClear,
   isRechecking,
   isLastMessage,
 }: {
@@ -339,6 +380,8 @@ function AIMessage({
       id: string;
     } | null,
   ) => void;
+  onStartGeneration?: (questions: IntentQuestion[], answers: Record<string, string | string[]>) => void;
+  intentAllClear?: boolean;
   isRechecking?: boolean;
   isLastMessage?: boolean;
 }) {
@@ -356,8 +399,11 @@ function AIMessage({
               form={intentForm}
               onSubmit={onFormSubmit ?? (() => {})}
               onTextQuestion={isLastMessage ? onTextQuestion : undefined}
+              onStartGeneration={onStartGeneration}
+              intentAllClear={intentAllClear}
               disabled={isRechecking}
               isRechecking={isRechecking && isLastMessage}
+              isLastMessage={isLastMessage}
             />
           </div>
         ) : (
@@ -391,70 +437,6 @@ const TIER_COLOR: Record<string, string> = {
   M: "bg-amber-50 text-amber-700 border-amber-200",
   L: "bg-zinc-100 text-zinc-700 border-zinc-300",
 };
-
-function ClassificationCard({ cls }: { cls: Classification }) {
-  const tierStyle = TIER_COLOR[cls.tier] ?? TIER_COLOR.M;
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${tierStyle}`}
-        >
-          Tier {cls.tier} · {TIER_LABEL[cls.tier] ?? cls.tier}
-        </span>
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-input bg-background text-xs text-muted-foreground">
-          {cls.type}
-        </span>
-        {cls.needsBackend && (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-blue-200 bg-blue-50 text-xs text-blue-700">
-            Backend
-          </span>
-        )}
-        {cls.needsDatabase && (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-violet-200 bg-violet-50 text-xs text-violet-700">
-            Database
-          </span>
-        )}
-      </div>
-      <p className="text-sm text-foreground leading-6">{cls.reasoning}</p>
-    </div>
-  );
-}
-
-function MetaBadge({
-  step,
-}: {
-  step: { model?: string; costUsd?: number; durationMs?: number };
-}) {
-  return (
-    <div className="flex items-center gap-4 pl-12 mt-1">
-      {step.model && (
-        <span className="text-xs text-muted-foreground">
-          Model:{" "}
-          <span className="font-medium text-muted-foreground">
-            {step.model}
-          </span>
-        </span>
-      )}
-      {step.costUsd != null && (
-        <span className="text-xs text-muted-foreground">
-          Cost:{" "}
-          <span className="font-medium text-muted-foreground">
-            ${step.costUsd.toFixed(4)}
-          </span>
-        </span>
-      )}
-      {step.durationMs != null && (
-        <span className="text-xs text-muted-foreground">
-          Time:{" "}
-          <span className="font-medium text-muted-foreground">
-            {(step.durationMs / 1000).toFixed(1)}s
-          </span>
-        </span>
-      )}
-    </div>
-  );
-}
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
@@ -844,7 +826,15 @@ export default function IntentSubStage() {
     }
   }
 
-  function handleStartGeneration() {
+  async function handleStartGeneration(
+    questions: IntentQuestion[],
+    answers: Record<string, string | string[]>,
+  ) {
+    // If there are unanswered questions, submit them first before navigating
+    const hasAnswers = Object.keys(answers).length > 0;
+    if (hasAnswers && questions.length > 0) {
+      await handleFormSubmit(questions, answers);
+    }
     startPipeline(enrichedBriefRef.current);
     goToSubStage("prd", "preparation");
   }
@@ -1017,6 +1007,8 @@ export default function IntentSubStage() {
               onTextQuestion={(ctx) => {
                 pendingTextQuestionRef.current = ctx;
               }}
+              onStartGeneration={handleStartGeneration}
+              intentAllClear={intentAllClear}
               isRechecking={isRechecking}
               isLastMessage={idx === messages.length - 1}
             />
@@ -1055,16 +1047,6 @@ export default function IntentSubStage() {
         onSubmit={() => { void handleSend(); }}
         placeholder="Drop your script or tell me your story ideas…"
         disabled={isAgentActive}
-        actions={
-          <Button
-            onClick={handleStartGeneration}
-            disabled={isAgentActive}
-            className="text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
-            title="Next Step"
-          >
-            Next Step <ArrowRight size={16} />
-          </Button>
-        }
       />
     </div>
   );
