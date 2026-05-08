@@ -24,6 +24,7 @@ import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
 import { recallAndPrepareInject } from "@/lib/memory/recall-context";
 import { getInjectTokenBudgetForRole } from "@/lib/memory/recall-config";
 import { classifyFailureMode } from "@/lib/memory/distill/failure-mode";
+import { parseMemoryCites, recordMemoryCites } from "@/lib/memory/cite";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
@@ -699,6 +700,8 @@ async function runCodegenWorkerLoop(
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /** Pattern ids injected by the secondary recall (empty if not fired). */
+  secondaryInjectedIds: string[];
 }> {
   let totalCostUsd = 0;
   let promptTokens = 0;
@@ -709,7 +712,9 @@ async function runCodegenWorkerLoop(
   // run — otherwise a chatty model that mentions errors in every round
   // would burn through the L1 store with redundant injects.
   let didSecondaryRecall = false;
-  const injectedIds = new Set(recallCtx?.primaryInjectedIds ?? []);
+  const primaryIds = new Set(recallCtx?.primaryInjectedIds ?? []);
+  const injectedIds = new Set(primaryIds);
+  const secondaryInjectedIds: string[] = [];
 
   for (let i = 0; i < MAX_WORKER_TOOL_ITERATIONS; i++) {
     // Anti-spiral: inject a nudge message after too many consecutive read rounds.
@@ -800,6 +805,7 @@ async function runCodegenWorkerLoop(
         promptTokens,
         completionTokens,
         totalTokens,
+        secondaryInjectedIds,
       };
     }
 
@@ -855,7 +861,10 @@ async function runCodegenWorkerLoop(
           pass: "secondary",
         });
         if (recall.block) {
-          for (const r of recall.active) injectedIds.add(r.id);
+          for (const r of recall.active) {
+            injectedIds.add(r.id);
+            if (!primaryIds.has(r.id)) secondaryInjectedIds.push(r.id);
+          }
           messages.push({
             role: "system",
             content:
@@ -1772,6 +1781,13 @@ async function generateCode(state: WorkerState) {
     if (memoryRecall.block) {
       messages.push({ role: "system", content: memoryRecall.block });
     }
+    // Soft cite instruction — only when memory was actually injected so we
+    // don't spend tokens on instructions for an empty feature. Missing cites
+    // are fine; attribution falls back to "all injected" when none parse.
+    const citeHint =
+      memoryRecall.active.length > 0
+        ? `\n\nIf any record from the <memory-context> block above directly informed your code, declare it before the <plan> tag using:\n  <memory-cite ids="FP-xxx,FP-yyy" />\nList only ids you actually used. Citing is optional but helps the system credit useful patterns.`
+        : "";
     const subStepsHint =
       task.subSteps && task.subSteps.length > 0
         ? `\n\nPre-defined sub-steps:\n${task.subSteps.map((s) => `${s.step}. ${s.action}: ${s.detail}`).join("\n")}`
@@ -1783,7 +1799,7 @@ async function generateCode(state: WorkerState) {
 
     messages.push({
       role: "user",
-      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.\n7. [FRONTEND DATA RULE] If this task renders any list, table, card grid, or detail view that displays backend data: ALL data MUST be fetched from the real API endpoint via the API client. ZERO hardcoded arrays, ZERO mock objects, ZERO placeholder data. Use useEffect + loading/error state. Read \`frontend/src/api/client.ts\` with read_file before coding to get the correct method signatures.`,
+      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}${citeHint}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.\n7. [FRONTEND DATA RULE] If this task renders any list, table, card grid, or detail view that displays backend data: ALL data MUST be fetched from the real API endpoint via the API client. ZERO hardcoded arrays, ZERO mock objects, ZERO placeholder data. Use useEffect + loading/error state. Read \`frontend/src/api/client.ts\` with read_file before coding to get the correct method signatures.`,
     });
 
     const startMs = Date.now();
@@ -1843,6 +1859,28 @@ async function generateCode(state: WorkerState) {
         `\n\n<!-- round:${rounds} model:${response.model} -->\n` +
         response.rawContent;
       lastModel = response.model;
+
+      // Parse cite tags emitted by the worker so attribution can credit
+      // the specific patterns the model claims it used. Best-effort: never
+      // throws, validates ids against the actual injected set so a
+      // hallucinated id can't poison scoring.
+      if (memoryRecall.active.length > 0) {
+        const citedIds = parseMemoryCites(content);
+        if (citedIds.length > 0) {
+          const allInjected = [
+            ...memoryRecall.active.map((r) => r.id),
+            ...response.secondaryInjectedIds,
+          ];
+          await recordMemoryCites({
+            traceRoot: state.outputDir,
+            agent: "worker_codegen",
+            kickoffId: state.sessionId,
+            taskId: task.id,
+            citedIds,
+            injectedIds: allInjected,
+          });
+        }
+      }
 
       let roundWrites = 0;
       for (const [fp, fc] of Object.entries(parsedFiles)) {

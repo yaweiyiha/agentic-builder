@@ -319,3 +319,130 @@ describe("computeAttributions — multi-pattern injection", () => {
     }
   });
 });
+
+// ---------- cite-based attribution ----------
+
+function citeEvent(
+  kickoffId: string,
+  taskId: string,
+  validIds: string[],
+  invalidIds: string[] = [],
+): TraceEvent {
+  return {
+    ts: 0,
+    op: "cite",
+    layer: "L1",
+    kickoffId,
+    taskId,
+    agent: "worker_codegen",
+    details: { validIds, invalidIds, citedIds: [...validIds, ...invalidIds] },
+  };
+}
+
+describe("computeAttributions — cite-based attribution", () => {
+  it("when cite present, only cited patterns get credit (others get nothing)", () => {
+    const a = pattern("FP-A", 0);
+    const b = pattern("FP-B", 0);
+    const r = computeAttributions({
+      traceEvents: [
+        injectEvent("K1", "T1", ["FP-A", "FP-B"]),
+        citeEvent("K1", "T1", ["FP-A"]), // only A was useful
+      ],
+      taskHistory: [taskHistory("K1", "T1", "completed")],
+      patternsById: new Map([
+        ["FP-A", a],
+        ["FP-B", b],
+      ]),
+      alreadyAttributed: new Set(),
+      deltaSuccess: D_S,
+      deltaFailure: D_F,
+    });
+    const byId = new Map(r.attributions.map((x) => [x.patternId, x]));
+    expect(byId.get("FP-A")?.successes).toBe(1);
+    expect(byId.get("FP-A")?.source).toBe("cite");
+    expect(byId.has("FP-B")).toBe(false);
+  });
+
+  it("source='inject-fallback' when no cite present (existing behavior)", () => {
+    const a = pattern("FP-A", 0);
+    const r = computeAttributions({
+      traceEvents: [injectEvent("K1", "T1", ["FP-A"])],
+      taskHistory: [taskHistory("K1", "T1", "completed")],
+      patternsById: new Map([["FP-A", a]]),
+      alreadyAttributed: new Set(),
+      deltaSuccess: D_S,
+      deltaFailure: D_F,
+    });
+    expect(r.attributions[0]?.source).toBe("inject-fallback");
+  });
+
+  it("source='mixed' when same pattern earns credit via cite in one task and fallback in another", () => {
+    const a = pattern("FP-A", 0);
+    const r = computeAttributions({
+      traceEvents: [
+        injectEvent("K1", "T1", ["FP-A"]),
+        citeEvent("K1", "T1", ["FP-A"]),
+        injectEvent("K1", "T2", ["FP-A"]),
+        // T2 has no cite event → fallback
+      ],
+      taskHistory: [
+        taskHistory("K1", "T1", "completed"),
+        taskHistory("K1", "T2", "completed"),
+      ],
+      patternsById: new Map([["FP-A", a]]),
+      alreadyAttributed: new Set(),
+      deltaSuccess: D_S,
+      deltaFailure: D_F,
+    });
+    expect(r.attributions[0]?.successes).toBe(2);
+    expect(r.attributions[0]?.source).toBe("mixed");
+  });
+
+  it("hallucinated cited ids (not in injection set) are dropped", () => {
+    const a = pattern("FP-A", 0);
+    const fake = pattern("FP-FAKE", 0);
+    const r = computeAttributions({
+      traceEvents: [
+        injectEvent("K1", "T1", ["FP-A"]),
+        // citedIds includes FP-FAKE which was never injected
+        citeEvent("K1", "T1", [], ["FP-FAKE"]),
+      ],
+      taskHistory: [taskHistory("K1", "T1", "completed")],
+      patternsById: new Map([
+        ["FP-A", a],
+        ["FP-FAKE", fake],
+      ]),
+      alreadyAttributed: new Set(),
+      deltaSuccess: D_S,
+      deltaFailure: D_F,
+    });
+    // FP-FAKE was hallucinated → dropped → no attribution
+    expect(r.attributions.find((x) => x.patternId === "FP-FAKE")).toBeUndefined();
+    // No valid cites → falls back to "all injected" → FP-A still gets credit
+    expect(r.attributions.find((x) => x.patternId === "FP-A")?.successes).toBe(1);
+    expect(r.attributions.find((x) => x.patternId === "FP-A")?.source).toBe(
+      "inject-fallback",
+    );
+  });
+
+  it("cite events from non-task scope (no kickoffId/taskId) are ignored", () => {
+    const a = pattern("FP-A", 0);
+    const orphanCite: TraceEvent = {
+      ts: 0,
+      op: "cite",
+      layer: "L1",
+      agent: "worker_codegen",
+      details: { validIds: ["FP-A"] },
+    };
+    const r = computeAttributions({
+      traceEvents: [injectEvent("K1", "T1", ["FP-A"]), orphanCite],
+      taskHistory: [taskHistory("K1", "T1", "completed")],
+      patternsById: new Map([["FP-A", a]]),
+      alreadyAttributed: new Set(),
+      deltaSuccess: D_S,
+      deltaFailure: D_F,
+    });
+    // Orphan cite ignored → falls back to inject behavior
+    expect(r.attributions[0]?.source).toBe("inject-fallback");
+  });
+});
