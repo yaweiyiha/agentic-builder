@@ -57,6 +57,11 @@ export interface PatternAttribution {
   failures: number;
   /** True if `manual:approved` — score not changed. */
   immune: boolean;
+  /** How this pattern earned its credit:
+   *  - "cite": a worker explicitly cited it via <memory-cite>
+   *  - "inject-fallback": no cite present, fell back to "all injected"
+   *  - "mixed": tasks of both kinds contributed */
+  source: "cite" | "inject-fallback" | "mixed";
 }
 
 /**
@@ -151,6 +156,47 @@ function buildInjectionIndex(
   return out;
 }
 
+/**
+ * Build a map from (kickoffId, taskId) → cited pattern ids. Cites are the
+ * model's own claim about which injected patterns informed its output;
+ * when present they take precedence over the broader injection set in
+ * attribution. Only the validated subset (validIds) is honored — invalid
+ * (hallucinated) ids are dropped here, just as recordMemoryCites filtered
+ * them at write time, but we re-filter defensively in case external tools
+ * append raw cites without validation.
+ */
+function buildCitationIndex(
+  events: TraceEvent[],
+  injectionIndex: Map<string, Set<string>>,
+): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const ev of events) {
+    if (ev.op !== "cite") continue;
+    if (!ev.kickoffId || !ev.taskId) continue;
+    const det = ev.details as { validIds?: unknown; citedIds?: unknown } | undefined;
+    const ids = Array.isArray(det?.validIds)
+      ? det.validIds
+      : Array.isArray(det?.citedIds)
+        ? det.citedIds
+        : [];
+    if (ids.length === 0) continue;
+    const key = pairKey(ev.kickoffId, ev.taskId);
+    const allowed = injectionIndex.get(key);
+    let set = out.get(key);
+    if (!set) {
+      set = new Set();
+      out.set(key, set);
+    }
+    for (const id of ids) {
+      if (typeof id !== "string") continue;
+      // Defense in depth: only accept ids the worker actually saw.
+      if (allowed && !allowed.has(id)) continue;
+      set.add(id);
+    }
+  }
+  return out;
+}
+
 function defaultBucketResolver(th: MemoryRecord): string {
   let kind = "other";
   let mode = "none";
@@ -173,10 +219,15 @@ function defaultBucketResolver(th: MemoryRecord): string {
 
 export function computeAttributions(input: AttributionInput): AttributionResult {
   const injIndex = buildInjectionIndex(input.traceEvents);
-  const accum = new Map<
-    string,
-    { successes: number; failures: number; immune: boolean }
-  >();
+  const citeIndex = buildCitationIndex(input.traceEvents, injIndex);
+  type PatternAccum = {
+    successes: number;
+    failures: number;
+    immune: boolean;
+    sawCite: boolean;
+    sawFallback: boolean;
+  };
+  const accum = new Map<string, PatternAccum>();
   /** (bucket, patternId) → counts. Same accumulator shape, partitioned. */
   const bucketAccum = new Map<
     string,
@@ -219,6 +270,14 @@ export function computeAttributions(input: AttributionInput): AttributionResult 
     const injectedIds = injIndex.get(key);
     if (!injectedIds || injectedIds.size === 0) continue;
 
+    // Cite preference: if the worker explicitly cited some injected
+    // patterns, only those get credit/blame for this task. Non-cited
+    // injected patterns get nothing — the model said they didn't help.
+    // Without a cite we fall back to "all injected" (existing behavior).
+    const citedIds = citeIndex.get(key);
+    const useCites = citedIds !== undefined && citedIds.size > 0;
+    const creditedIds = useCites ? citedIds : injectedIds;
+
     // Mark this pair as attributed even if all patterns are immune —
     // we don't want to revisit it next time.
     newlyAttributed.push(key);
@@ -231,14 +290,22 @@ export function computeAttributions(input: AttributionInput): AttributionResult 
       bucketAccum.set(bucket, bucketMap);
     }
 
-    for (const id of injectedIds) {
+    for (const id of creditedIds) {
       const rec = input.patternsById.get(id);
       if (!rec) continue;
       const isImmune = rec.tags.includes("manual:approved");
-      const cur = accum.get(id) ?? { successes: 0, failures: 0, immune: isImmune };
+      const cur = accum.get(id) ?? {
+        successes: 0,
+        failures: 0,
+        immune: isImmune,
+        sawCite: false,
+        sawFallback: false,
+      };
       if (successful) cur.successes += 1;
       else cur.failures += 1;
       cur.immune = isImmune;
+      if (useCites) cur.sawCite = true;
+      else cur.sawFallback = true;
       accum.set(id, cur);
 
       const bcur = bucketMap.get(id) ?? { successes: 0, failures: 0 };
@@ -255,6 +322,8 @@ export function computeAttributions(input: AttributionInput): AttributionResult 
     const rawDelta =
       c.successes * input.deltaSuccess + c.failures * input.deltaFailure;
     const newScore = c.immune ? oldScore : clamp(oldScore + rawDelta, -1, 1);
+    const source: PatternAttribution["source"] =
+      c.sawCite && c.sawFallback ? "mixed" : c.sawCite ? "cite" : "inject-fallback";
     attributions.push({
       patternId: id,
       oldScore,
@@ -263,6 +332,7 @@ export function computeAttributions(input: AttributionInput): AttributionResult 
       successes: c.successes,
       failures: c.failures,
       immune: c.immune,
+      source,
     });
   }
   stats.patternsTouched = attributions.length;

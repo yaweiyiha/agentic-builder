@@ -25,7 +25,10 @@ export type TraceOp =
   | "cache-miss"
   | "inject"
   /** Second-pass recall fired mid-task in response to a fresh error signal. */
-  | "reinject";
+  | "reinject"
+  /** Worker-emitted citation: which injected patterns the model claimed
+   *  to actually use. Drives fine-grained attribution. */
+  | "cite";
 
 export interface TraceEvent {
   ts: number;
