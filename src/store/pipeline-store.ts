@@ -69,9 +69,11 @@ function saveSubStageSnapshot(getState: () => PipelineState, stepId: PipelineSte
     codeOutputDir: s.codeOutputDir,
     steps:         s.steps as Record<string, unknown>,
     designStyles:  s.designStyles,
-    designStylesLoading: s.designStylesLoading,
+    designStylesLoading: false,
     designStylesError: s.designStylesError,
+    designStylesPrdHash: s.designStylesPrdHash,
     selectedDesignStyleId: s.selectedDesignStyleId,
+    stitchResult:  s.stitchResult,
   };
 
   // For the intent substage, also persist the conversation from stage-store.
@@ -194,7 +196,20 @@ interface PipelineState {
   designStyles: Array<{ id: string; name: string; description: string; colors: { primary: string; secondary: string; tertiary: string; neutral: string }; typography: { headlineFont: string; bodyFont: string; labelFont: string }; fontSizes: { h1: number; h2: number; h3: number; body: number; label: number }; spacing: { xs: number; sm: number; md: number; lg: number; xl: number } }> | null;
   designStylesLoading: boolean;
   designStylesError: string | null;
+  /** Lightweight fingerprint of the PRD content when designStyles was last generated.
+   *  Used to detect PRD changes so styles are regenerated automatically. */
+  designStylesPrdHash: string | null;
   selectedDesignStyleId: string | null;
+  /** Result from a Stitch MCP generation run. */
+  stitchResult: {
+    projectId: string;
+    screenId: string;
+    projectUrl: string;
+    screenshotUrl: string | null;
+    htmlDownloadUrl: string | null;
+  } | null;
+  stitchGenerating: boolean;
+  stitchError: string | null;
 
   setCodeOutputDir: (value: string) => void;
   setFastFromPrd: (value: boolean) => void;
@@ -216,6 +231,8 @@ interface PipelineState {
    * Streams PencilLiveEvent SSE events and saves the result to steps.pencil.
    */
   runPencilWithMcp: (editInstruction?: string) => void;
+  /** Generate UI design via Google Stitch MCP, storing the result URL. */
+  runStitchGenerate: (editInstruction?: string) => void;
   setActiveTab: (tab: PipelineStepId) => void;
   /** Batch-update step results (e.g. from parallel generation). */
   updateSteps: (updates: Partial<Record<PipelineStepId, StepResult>>) => void;
@@ -297,7 +314,11 @@ export const usePipelineStore = create<PipelineState>()(
       designStyles: null,
       designStylesLoading: false,
       designStylesError: null,
+      designStylesPrdHash: null,
       selectedDesignStyleId: null,
+      stitchResult: null,
+      stitchGenerating: false,
+      stitchError: null,
 
       setCodeOutputDir: (value) => {
         const next = value.trim();
@@ -523,10 +544,12 @@ export const usePipelineStore = create<PipelineState>()(
           }
 
           const data = await response.json();
+          const prdHash = `${prdContent.length}:${prdContent.slice(0, 100)}`;
           set({
             designStyles: data.styles,
             designStylesLoading: false,
             designStylesError: null,
+            designStylesPrdHash: prdHash,
           });
         } catch (error) {
           set({
@@ -1009,6 +1032,59 @@ export const usePipelineStore = create<PipelineState>()(
           });
       },
 
+      runStitchGenerate: (editInstruction?: string) => {
+        const { steps, featureBrief, selectedDesignStyleId } = get();
+        const prdContent = steps.prd?.content ?? featureBrief;
+        const designSpecContent = steps.design?.content ?? "";
+
+        if (!prdContent.trim()) {
+          console.warn("[runStitchGenerate] ⚠ No PRD content — aborting");
+          return;
+        }
+
+        set({ stitchGenerating: true, stitchError: null, stitchResult: null });
+
+        fetch("/api/agents/stitch-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prdContent,
+            designStyleId: selectedDesignStyleId ?? undefined,
+            designSpecContent,
+            editInstruction: editInstruction?.trim() || undefined,
+          }),
+        })
+          .then(async (resp) => {
+            const data = await resp.json();
+            if (!resp.ok || data.error) {
+              set({
+                stitchGenerating: false,
+                stitchError: data.error || "Stitch generation failed",
+              });
+              return;
+            }
+            set({
+              stitchGenerating: false,
+              stitchError: null,
+              stitchResult: {
+                projectId: data.projectId,
+                screenId: data.screenId,
+                projectUrl: data.projectUrl,
+                screenshotUrl: data.screenshotUrl,
+                htmlDownloadUrl: data.htmlDownloadUrl,
+              },
+            });
+            // Persist the stitch result so it survives page refresh
+            saveSubStageSnapshot(get, "pencil");
+          })
+          .catch((err) => {
+            set({
+              stitchGenerating: false,
+              stitchError: err instanceof Error ? err.message : "Stitch request failed",
+            });
+          });
+      },
+
       startPipeline: (brief: string) => {
         const { codeOutputDir, fastFromPrd } = get();
         const sessionId = newSessionId();
@@ -1471,8 +1547,9 @@ export const usePipelineStore = create<PipelineState>()(
                   ? { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) }
                   : { ...EMPTY_STEPS },
                 designStyles:         snap.designStyles ?? null,
-                designStylesLoading:  snap.designStylesLoading ?? false,
+                designStylesLoading:  false,
                 designStylesError:    snap.designStylesError ?? null,
+                designStylesPrdHash:  (snap as { designStylesPrdHash?: string | null }).designStylesPrdHash ?? null,
                 selectedDesignStyleId: snap.selectedDesignStyleId ?? null,
               });
               // Push intent messages to stage-store if present in snapshot
@@ -1541,6 +1618,7 @@ export const usePipelineStore = create<PipelineState>()(
               designStylesLoading?: boolean;
               designStylesError?: string | null;
               selectedDesignStyleId?: string | null;
+              stitchResult?: { projectId: string; screenId: string; projectUrl: string; screenshotUrl: string | null; htmlDownloadUrl: string | null } | null;
               intentMessages?: unknown[];
               intentEnrichedBrief?: string;
             } | null;
@@ -1562,6 +1640,9 @@ export const usePipelineStore = create<PipelineState>()(
             designStylesLoading: snap.designStylesLoading ?? false,
             designStylesError: snap.designStylesError ?? null,
             selectedDesignStyleId: snap.selectedDesignStyleId ?? null,
+            stitchResult: snap.stitchResult ?? null,
+            stitchGenerating: false,
+            stitchError: null,
           });
           // Push intent fields back to stage-store if this is the intent substage
           if (subStageId === "intent" && snap.intentMessages?.length) {
@@ -1595,6 +1676,7 @@ export const usePipelineStore = create<PipelineState>()(
           designStylesLoading:  s.designStylesLoading,
           designStylesError:    s.designStylesError,
           selectedDesignStyleId: s.selectedDesignStyleId,
+          stitchResult:         s.stitchResult,
           intentMessages:       messages,
           intentEnrichedBrief:  enrichedBrief,
         };
@@ -1625,6 +1707,7 @@ export const usePipelineStore = create<PipelineState>()(
           designStylesLoading:  false,
           designStylesError:    s.designStylesError,
           selectedDesignStyleId: s.selectedDesignStyleId,
+          stitchResult:         s.stitchResult,
         };
         fetch(`/api/projects/${_currentProjectSlug}/substage-snapshot`, {
           method: "PUT",

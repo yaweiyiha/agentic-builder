@@ -6,14 +6,9 @@ import {
   Bot,
   User,
   Loader2,
-  Send,
   ArrowRight,
-  Plus,
-  Grid2X2,
-  ArrowUp,
   RefreshCw,
   MoreVertical,
-  Paperclip,
   Check,
   CheckCheck,
 } from "lucide-react";
@@ -40,18 +35,6 @@ type IntentFormData = {
   questions: IntentQuestion[];
 };
 
-function parseIntentForm(content: string): IntentFormData | undefined {
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return undefined;
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!parsed.summary || !Array.isArray(parsed.questions)) return undefined;
-    return parsed as IntentFormData;
-  } catch {
-    return undefined;
-  }
-}
-
 type UserConvMsg = { role: "user"; text: string; id: string };
 type AiConvMsg = {
   role: "ai";
@@ -62,17 +45,6 @@ type AiConvMsg = {
 type ConvMsg = UserConvMsg | AiConvMsg;
 
 // ── Icon aliases (lucide-react) ────────────────────────────────────────────
-const AgentIcon = () => <Sparkles size={14} className="text-white" />;
-const RobotIcon = () => <Bot size={16} className="text-white" />;
-const UserIcon = () => <User size={12} className="text-white" />;
-const SpinnerIcon = ({ size = 14 }: { size?: number }) => (
-  <Loader2 size={size} className="animate-spin" />
-);
-const SendIcon = () => <Send size={12} className="text-white" />;
-const ArrowRightIcon = () => <ArrowRight size={12} className="text-white" />;
-const RefreshIcon = () => <RefreshCw size={16} />;
-const MoreIcon = () => <MoreVertical size={16} />;
-const AttachIcon = () => <Paperclip size={16} />;
 const CheckSmallIcon = () => <Check size={10} className="text-white" />;
 const CheckGatheredIcon = () => (
   <CheckCheck size={11} className="text-emerald-500 shrink-0 mt-0.5" />
