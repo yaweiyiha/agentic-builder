@@ -18,6 +18,7 @@ import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 
 import { recordProjectCard, recordTaskHistory } from "./recorders";
 import { memoryEnabled } from "./env";
+import { inferTaskKind } from "./distill/task-kind";
 
 interface RunState {
   brief?: string;
@@ -105,6 +106,7 @@ function handle(
         attempts: 1,
         startedAt: state.startedAt.get(event.stepId),
         tags: [`step:${event.stepId}`],
+        taskKind: inferTaskKind(event.stepId),
       });
       break;
 
@@ -156,6 +158,7 @@ function handle(
         startedAt,
         endedAt,
         tags: [`step:${event.stepId}`],
+        taskKind: inferTaskKind(event.stepId),
       });
       break;
     }
@@ -175,6 +178,7 @@ function handle(
         startedAt,
         endedAt,
         tags: [`step:${event.stepId}`],
+        taskKind: inferTaskKind(event.stepId),
       });
       break;
     }

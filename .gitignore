@@ -5,14 +5,7 @@
 scaffolds/**/node_modules
 # generated-code: ignore bulk of output; allow pipeline/session dirs to be tracked
 generated-code/*
-!generated-code/.ralph/
-!generated-code/.ralph/**
-!generated-code/.agentic-snapshot/
-!generated-code/.agentic-snapshot/**
-generated-code 2
-generated-code/node_modules/
-generated-code/dist/
-generated-code/public/design/*.png
+generated-code/.ralph
 example
 /.pnp
 .pnp.*

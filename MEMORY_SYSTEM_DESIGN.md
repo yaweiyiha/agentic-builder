@@ -1,148 +1,151 @@
 # Memory System Design
 
-> Status: Draft v1.3
+> Status: **v2.0 (Phase A–C shipped)**
 > Owner: vicky@57blocks.com
-> Last updated: 2026-04-28
+> Last updated: 2026-04-29
 > Changelog:
-> - v1.3: §4 改为 per-record self-contained 文件布局 + metrics 分离 + git 共享策略
+> - v2.0: 全文重写以反映 Phase A–C 实际落地的代码；新增 Pattern 分类、三层注入、注入归因、UI；老的"待定问题"绝大多数已锁
+> - v1.3: §4 per-record self-contained 文件布局 + metrics 分离 + git 共享策略
 > - v1.2: §12.6 Phase B classification cache 的 5 个风险与设计决策
 > - v1.1: §7.5 与现有打分/持久化系统的集成；§12.5 影响、风险、回滚、灰度
 > - v1.0: 初稿
 
-AgenticBuilder 的记忆系统设计文档。涵盖 L1（系统级）与 L2（项目级）两层，统一抽象，分阶段交付。
+AgenticBuilder 的记忆系统。两层（L1 系统 / L2 项目）+ 三层注入（Active / Shadow / Deprecated）+ 自动归因 + 人工审批通道。本文档是当前**已实现**系统的事实记录，不是规划文档。
 
 ---
 
 ## 1. 目标与非目标
 
 ### 1.1 目标
+- **避免重复决策**：相同 brief 不该让 classifier 跑两次。
+- **避免重犯错误**：self-heal 修过的 bug，下次同类 task 应作为 prompt context 注入。
+- **跨 agent / 跨 run 的上下文连续**：kickoff 续跑、多 run 之间不"失忆"。
+- **跨项目的能力沉淀**：N 个项目的失败模式可在第 N+1 个项目启动时召回利用。
+- **可观测、可调试、可回放**：召回、注入、归因全程可追踪。
+- **人机协作的审批通道**：人类可以在 UI 上审批 mined patterns，机器通过归因自动调整 score。
 
-- **避免重复决策**：相同的 brief 不该让 classifier 跑两次；相同的 task 类型不该让 codegen 重新摸索。
-- **避免重犯错误**：self-heal 修过的 bug 类型，下次同类 task 启动时应作为 prompt context 注入。
-- **跨 agent / 跨 run 的上下文连续**：同一个 kickoff 续跑、同一个项目多 run 之间 agent 不应"失忆"。
-- **跨项目的能力沉淀**：N 个项目踩过的坑、用过的 scaffold 选择，能在第 N+1 个项目启动时被召回利用。
-- **可观测、可调试、可回放**：记忆的写入、召回、注入全程可追踪，可在 Dev UI 中检视。
-
-### 1.2 非目标（v1 不做）
-
-- 不做向量召回（FTS5 关键词 + tag 过滤足够覆盖前 200 条）。
+### 1.2 非目标（v2 仍不做）
+- 不做向量召回（FTS / 关键词 + tag 过滤足够覆盖前 200 条）。
 - 不做图查询 / 知识图谱（待 L1 失败模式 >200 条后再评估迁移到 Graphiti）。
-- 不做云端同步 / 多用户共享（本地单机优先）。
+- 不做云端同步 / 多用户共享（本地单机，git 同步）。
 - 不做记忆的"语义合并"（同主题多条手动整理，不自动合并）。
-- 不做实时 UI 编辑（先 CLI，UI 是只读 inspector）。
+- 不做 LLM-based 实时 distiller（rule-based mining + 人工审 + outcome attribution 已能覆盖；LLM distill 留 Phase D）。
 
 ---
 
 ## 2. 顶层架构
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  L1: System Memory                                           │
-│  Location: AgenticBuilder/.memory/                           │
-│  Scope:    跨所有 generated 项目                              │
-│  Consumers: Classifier / PM / Architect / SelfHeal / CodeGen │
-│  Producers: Classifier (cache) / Distiller (from L2)         │
-└──────────────────────────────────────────────────────────────┘
-         ▲ recall (read-only injection)        │ distill
-         │                                     ▼
-┌──────────────────────────────────────────────────────────────┐
-│  L2: Project Memory                                          │
-│  Location: generated-code/.memory/                           │
-│  Scope:    单个 generated 项目                                │
-│  Consumers: CodeGen / TaskBreakdown / Verifier / Orchestrator│
-│  Producers: Orchestrator (task lifecycle) / SelfHeal         │
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  L1: System Memory                                                 │
+│  Location: <repo>/.memory/                                         │
+│  Scope:    跨所有 generated 项目                                    │
+│  Kinds:    classification, failure-pattern, scaffold-fitness,      │
+│            agent-tuning, model-routing                             │
+│  Producers: classifier (cache), miner (rule-based), human (UI)     │
+└────────────────────────────────────────────────────────────────────┘
+        ▲ recall + inject (Layer 2)         │ outcome attribution
+        │                                   ▼
+┌────────────────────────────────────────────────────────────────────┐
+│  L2: Project Memory                                                │
+│  Location: <generated-project>/.memory/                            │
+│  Scope:    单个 generated 项目                                       │
+│  Kinds:    project-card, task-history, self-heal-log, decision,    │
+│            handoff-note, codebase-map, qa-verdict                  │
+│  Producers: PipelineEngine event-bridge, RepairEmitter sink        │
+└────────────────────────────────────────────────────────────────────┘
                             ▲
                             │ writes during kickoff
-                            │
-              ┌──────────────────────────┐
-              │  MemoryStore (interface) │
-              │  ────────────────────────│
-              │  FileStore (default)     │
-              │  GraphitiStore (future)  │
-              └──────────────────────────┘
+              ┌─────────────────────────────┐
+              │  MemoryStore (interface)    │
+              │  ───────────────────────────│
+              │  FileStore (per-record)     │  ← v2 实际实现
+              │  GraphitiStore (future)     │
+              └─────────────────────────────┘
 ```
 
-**关键边界**：
+### 三层注入架构（runtime 决定 LLM 是否真看到记忆）
 
-- L2 是"这个项目的事实"——任务历史、决策记录、当前 codebase map、self-heal log。
-- L1 是"跨项目提炼出的规律"——失败模式、scaffold 适配度、agent prompt 改进点、classification 缓存。
-- L2 → L1 通过 **distillation step**（项目结束 / 周期触发）。
-- L1 → L2 通过 **kickoff inject**（kickoff 启动时把相关 L1 内容预置到 PROJECT.md 中）。
-- 两层共用同一个 `MemoryStore` interface，只是 namespace 不同。
+每条 pattern 有 `metrics.score ∈ [-1, 1]`：
+
+| Score | Layer | 行为 |
+|---|---|---|
+| `score >= 0.3` | **Active (Layer 2)** | 真注入到 system prompt 的 `<memory-context>` 块 |
+| `0 <= score < 0.3` | **Shadow (Layer 3)** | 召回时仅写入 `trace.jsonl`，不动 prompt |
+| `score < 0` | **Deprecated** | 召回时直接跳过；不 trace、不注入 |
+
+**手动审批通道**（绕过 score）：tag 含 `manual:approved` → 强制 active，且**永久免疫归因调分**（score 仍记录，但不被自动改）。
 
 ---
 
 ## 3. 数据模型
 
-### 3.1 MemoryRecord
+### 3.1 MemoryRecord（共享 shape）
 
 ```ts
 type MemoryKind =
-  | 'classification'        // L1: brief → ProjectClassification 缓存
-  | 'failure-pattern'       // L1: 失败模式（distill 自 L2 self-heal / repair-log）
-  | 'scaffold-fitness'      // L1: scaffold 选择的统计成功率
-  | 'agent-tuning'          // L1: 某 agent 的 prompt 改进点
-  | 'model-routing'         // L1: 跨项目聚合的 model fitness（来自 model-leaderboard）
-  | 'project-card'          // L2: PROJECT.md 中的项目身份卡
-  | 'task-history'          // L2: 单个 task 的执行记录
-  | 'decision'              // L2: ADR 风格的架构决策
-  | 'self-heal-log'         // L2: 单次 self-heal 修复记录（≈ 现有 repair-log.jsonl 行）
-  | 'handoff-note'          // L2: agent 之间留言
-  | 'codebase-map'          // L2: 文件 → 职责映射
-  | 'model-scorecard'       // L2: 现有 ModelScorecardRow 的 memory 视图（适配，不重写）
-  | 'session-report'        // L2: 现有 coding-session-report.json 的 memory 视图
-  | 'qa-verdict';           // L2: QAAgent / VerifierAgent 对某次输出的打分
+  // L1
+  | "classification"      // brief → ProjectClassification 缓存（Phase B）
+  | "failure-pattern"     // 失败模式 / 经验性记忆（Phase C）
+  | "scaffold-fitness"    // scaffold 选择的统计成功率（未实装）
+  | "agent-tuning"        // 某 agent 的 prompt 改进点（未实装）
+  | "model-routing"       // 跨项目聚合的 model 适配度（未实装）
+  // L2
+  | "project-card"        // 项目身份卡（Phase A）
+  | "task-history"        // 单 task 执行记录（Phase A）
+  | "self-heal-log"       // 单次 self-heal 修复记录（Phase C-1）
+  | "decision"            // ADR 风格架构决策（未实装）
+  | "handoff-note"        // agent 间留言（未实装）
+  | "codebase-map"        // 文件 → 职责映射（未实装，Phase D）
+  | "model-scorecard"     // 现有 ModelScorecardRow 的 memory 视图（未实装）
+  | "session-report"      // 现有 coding-session-report 的 memory 视图（未实装）
+  | "qa-verdict";         // QAAgent / VerifierAgent 评分（未实装）
 
 interface MemoryRecord {
-  id: string;                        // 例：FP-2026-04-27-playwright-flaky
-  layer: 'L1' | 'L2';
+  id: string;
+  layer: "L1" | "L2";
   kind: MemoryKind;
-  title: string;                     // 一行人类可读标题
-  body: string;                      // 主体内容（markdown 或 JSON.stringify 的结构化数据）
-  tags: string[];                    // 例：['agent:codegen','stack:prisma','taskType:auth']
-  source: 'cache' | 'manual' | 'orchestrator' | 'self-heal' | 'distill';
-  refs: {                            // 溯源
-    kickoffId?: string;
-    taskId?: string;
-    parentRecordId?: string;         // distill 时指向源 L2 记录
-  };
-  metrics?: {                        // 可选治理元数据
-    hits?: number;                   // 被召回次数
-    lastHitAt?: number;
-    score?: number;                  // 人工/自动质量打分 [-1, 1]
-  };
-  createdAt: number;                 // unix ms
+  title: string;
+  body: string;                       // markdown 或 JSON.stringify (per kind format)
+  tags: string[];                     // ['mined','stage:foo','category:real-failure']
+  source: "cache" | "manual" | "orchestrator" | "self-heal" | "distill" | "adapter";
+  refs: { kickoffId?: string; taskId?: string; parentRecordId?: string };
+  metrics: { hits?: number; lastHitAt?: number; score?: number };
+  createdAt: number;
   updatedAt: number;
   schemaVersion: 1;
 }
 ```
 
-### 3.2 RecallQuery
+### 3.2 已落地的 kind 与 body 格式
 
-```ts
-interface RecallQuery {
-  layer?: 'L1' | 'L2' | 'both';
-  kinds?: MemoryKind[];
-  tags?: {                           // 标签匹配（and within group, or across groups）
-    all?: string[];                  // 必须全部命中
-    any?: string[];                  // 命中任一即可
-    none?: string[];                 // 排除
-  };
-  text?: string;                     // FTS5 全文检索关键词
-  limit?: number;                    // 默认 5
-  minScore?: number;                 // 过滤掉低分记忆（治理用）
-  kickoffId?: string;                // 限定某次 kickoff 的 L2
-}
-```
+| Kind | format | Schema 位置 | Producer |
+|---|---|---|---|
+| `classification` | json | `schemas/classification.ts` | `classifyProject()` cache wrapper |
+| `failure-pattern` | markdown | （markdown body, 无 schema） | `repair-log-miner.ts` / 人工编辑 |
+| `project-card` | markdown | `schemas/project-card.ts` (描述性) | `event-bridge.ts` 的 intent step_complete |
+| `task-history` | json | `schemas/task-history.ts` | `event-bridge.ts` 每个 step_complete/error |
+| `self-heal-log` | json | `schemas/self-heal-log.ts` | `self-heal-sink.ts`（订阅 RepairEmitter） |
+| `codebase-map` | markdown | `schemas/codebase-map.ts` (描述性) | （Phase D 启用） |
+
+### 3.3 Pattern 分类（仅 failure-pattern）
+
+mined pattern 在生成时由 `classifyPatternNature()` 分到 4 类，作为 `category:*` tag 写入：
+
+| Category | 何时分到 | UI banner | 推荐操作 |
+|---|---|---|---|
+| **success-metric** | `fixed/total >= 0.6 且 gave_up=0` | 🔴 红 | Disapprove or Delete |
+| **broadcast** | event 名包含 snapshot/audit_clean/dispatch_done/autorepaired/installed/applied/trimmed | 🔴 红 | Disapprove |
+| **real-failure** | event 名含 truncated/stagnation/unfulfilled/task_forced/fail/exhausted/abandon/missing 或 `gave_up>0` 或 `details.reason` 非空 | 🟢 绿 | Edit "How to avoid" → Approve |
+| **ambiguous** | 都不匹配 | 🟡 黄 | 手动判断 |
+
+实现：`src/lib/memory/distill/repair-log-miner.ts` 的 `classifyPatternNature()` + 4 个专用 markdown 模板。
 
 ---
 
 ## 4. 目录布局
 
-> **设计原则（v1.3）**：每条记忆是一个 self-contained 文件，按 kind 分目录。
-> Per-developer 数据（metrics、trace、lock）单独放，可被 .gitignore 排除，避免合并冲突。
-> 这样 `records/**` 全部可 commit，新人 clone 即拥有完整知识库。
+> 设计原则：每条记忆是 self-contained 的单文件，按 kind 分目录。Per-developer 数据（metrics、trace、lock）独立存储，可被 `.gitignore` 排除。`records/**` 全部可 commit，新人 clone 即拥有完整知识库。
 
 ### 4.1 通用布局（L1 / L2 同结构）
 
@@ -150,45 +153,35 @@ interface RecallQuery {
 .memory/
 ├── records/
 │   ├── classification/
-│   │   └── CL-<hash>.json          # JSON envelope
+│   │   └── CL-<briefHash>.json      JSON envelope
 │   ├── failure-pattern/
-│   │   └── FP-<slug>.md            # markdown w/ JSON-in-frontmatter
-│   ├── scaffold-fitness/
-│   │   └── SF-<slug>.json
-│   ├── agent-tuning/
-│   │   └── AT-<agent>.md
+│   │   └── FP-<slug>.md             markdown w/ JSON-in-frontmatter
 │   ├── project-card/                # L2 only
 │   │   └── PC-<kickoff>.md
 │   ├── task-history/                # L2 only
-│   │   └── TH-<id>.json
-│   ├── decision/
-│   │   └── DC-<slug>.md
+│   │   └── TH-<kickoff>-<task>.json
+│   ├── self-heal-log/               # L2 only
+│   │   └── SH-<kickoff>-<stage>-<attempt>-<task>.json
 │   └── ...
-├── metrics.json                     # { id: {hits, lastHitAt, score} }
-├── trace.jsonl                      # observability log
-└── .lock-target                     # proper-lockfile sentinel
+├── metrics.json                     # { id: {hits, lastHitAt, score} }（gitignored）
+├── trace.jsonl                      # 召回/注入/归因事件流（gitignored）
+├── .lock-target                     # proper-lockfile sentinel（gitignored）
+└── .attribution-cursor.json         # 已归因的 (kickoffId, taskId) pairs（gitignored）
 ```
 
 ### 4.2 文件格式
 
-**Markdown 类记录**（`failure-pattern` / `project-card` / `decision` / `agent-tuning` / etc.）：
+**Markdown 类**（`failure-pattern`, `project-card`, `decision`, `agent-tuning`）：
 
 ```markdown
 ---
-{"id":"FP-prisma-mig","layer":"L1","kind":"failure-pattern","title":"...","tags":[...],"source":"manual","refs":{},"createdAt":1714161600000,"updatedAt":1714161600000,"schemaVersion":1}
+{"id":"FP-...","layer":"L1","kind":"failure-pattern","title":"...","tags":["mined","category:real-failure",...],"source":"distill","refs":{},"createdAt":...,"updatedAt":...,"schemaVersion":1}
 ---
 
-## Symptoms
-...
-
-## Root cause
-...
-
-## Fix
-...
+# Body markdown content here
 ```
 
-**JSON 类记录**（`task-history` / `classification` / `scaffold-fitness` / etc.）：
+**JSON 类**（`task-history`, `classification`, `self-heal-log`, `scaffold-fitness`）：
 
 ```json
 {
@@ -199,29 +192,22 @@ interface RecallQuery {
   "tags": [...],
   "source": "orchestrator",
   "refs": { "kickoffId": "K42", "taskId": "T018" },
-  "createdAt": 1714161900000,
-  "updatedAt": 1714161948000,
+  "createdAt": ...,
+  "updatedAt": ...,
   "schemaVersion": 1,
   "body": { "status": "completed", "attempts": 2, ... }
 }
 ```
 
 **关键约束**：
-- record 文件**绝不**包含 `metrics` 字段（hits/score/lastHitAt 都在 `metrics.json` 里）
-- record 文件名 = `<id>.<ext>`，`id` 自带 kind 前缀（CL-/FP-/TH-/...），所以单看文件名就能定位 kind
-- markdown frontmatter 用 `---` 围栏 + JSON 内容（避免引入 YAML 依赖；解析就是 regex + JSON.parse）
+- record 文件**绝不**包含 `metrics` 字段（hits/score/lastHitAt 都在 `metrics.json`）。
+- 文件名 = `<id>.<ext>`；`id` 自带 kind 前缀（CL-/FP-/TH-/PC-/SH-/...）。
+- markdown frontmatter 用 `---` + JSON（不引入 YAML 依赖）。
 
-### 4.3 git 共享策略
+### 4.3 git 共享策略（实际 .gitignore）
 
-| 路径 | 进 git？ | 理由 |
-|---|---|---|
-| `records/**` | ✅ 全部 commit | 知识资产，新人 clone 即得 |
-| `metrics.json` | ❌ ignore | per-developer 计数器，每人不同 |
-| `trace.jsonl` | ❌ ignore | per-developer 调试日志，噪音大 |
-| `.lock-target` / `*.lock` | ❌ ignore | proper-lockfile 临时文件 |
-
-实际 `.gitignore`：
-```
+```gitignore
+# memory system L1 — only per-developer / cache files.
 .memory/metrics.json
 .memory/metrics.json.tmp
 .memory/.lock-target
@@ -230,657 +216,678 @@ interface RecallQuery {
 .memory/store.sqlite
 ```
 
-注意 `records/**` 不在 ignore 列表 = 默认进 git。这是 §1.1 "跨项目积累" 目标的物理实现。
+`records/**` 不在 ignore 列表 → 默认进 git。这是 §1.1 "跨项目积累" 的物理实现。
 
 ### 4.4 L1 vs L2 路径
 
-- **L1**：`<AgenticBuilder>/.memory/` —— 跨所有 generated 项目共享，进仓库 git
-- **L2**：`<generated-project>/.memory/` —— 单项目本地。注意：本仓库的 `generated-code/` 目录在 .gitignore 里被忽略，所以本仓库内的 L2 不进 git。但生成的项目被推到独立仓库时，`.memory/records/**` 会随之携带，成为该项目自己的"长期记忆"。
+- **L1**：`<AgenticBuilder>/.memory/` —— 跨所有 generated 项目共享，进仓库 git。
+- **L2**：`<generated-project>/.memory/` —— 单项目本地。当前 `generated-code/` 在 .gitignore 顶层只 ignore `node_modules/dist/public/design/*.png`，不再忽略 `.memory/`，所以 L2 records 会随生成的项目一起被 git 跟踪（如果你 commit 它）。
 
-### 4.5 恢复语义（"新人 clone" 场景）
+### 4.5 "新人 clone" 恢复语义
 
-新开发者执行 `git clone` + `npm install` 后：
-1. `.memory/records/**` 已经从 git 同步过来（所有 classification、failure-pattern 等知识就位）
-2. `metrics.json` 不存在 → FileStore 启动时按 0 hits 起步
-3. 第一次访问任何记忆，FileStore walk `records/` 重建 in-memory cache
-4. 后续读写正常
+```
+git clone + npm install
+  ↓
+.memory/records/** 同步到位（所有 classification、failure-pattern 立即可用）
+  ↓
+metrics.json 不存在 → FileStore 启动按 0 hits 起步
+  ↓
+首次访问任意 kind → FileStore.ensureCache() walk records/ 重建 in-memory cache
+```
 
-→ **历史经验完整继承，个人计数器从零开始**。这是设计中"长期记忆 + 个人化使用统计"分层的物理体现。
+→ **历史经验完整继承，个人计数器从零开始**。
 
 ---
 
 ## 5. 核心接口
 
-### 5.1 MemoryStore
-
 ```ts
 // src/lib/memory/types.ts
 export interface MemoryStore {
-  save(record: Omit<MemoryRecord, 'createdAt' | 'updatedAt' | 'schemaVersion'>): Promise<MemoryRecord>;
-  update(id: string, patch: Partial<Pick<MemoryRecord, 'body' | 'tags' | 'metrics'>>): Promise<MemoryRecord>;
+  save(input: SaveInput): Promise<MemoryRecord>;
+  update(id: string, patch: Partial<Pick<MemoryRecord,"body"|"tags"|"metrics">>): Promise<MemoryRecord>;
   get(id: string): Promise<MemoryRecord | null>;
   recall(query: RecallQuery): Promise<MemoryRecord[]>;
   delete(id: string): Promise<void>;
-  list(opts?: { layer?: 'L1' | 'L2'; kind?: MemoryKind; limit?: number }): Promise<MemoryRecord[]>;
+  list(opts?: ListOptions): Promise<MemoryRecord[]>;
 
-  // 治理
-  bumpHit(id: string): Promise<void>;     // 召回时计数 + 1
+  bumpHit(id: string): Promise<void>;
   setScore(id: string, score: number): Promise<void>;
 }
+
+// src/lib/memory/index.ts
+export function getSystemMemory(): MemoryStore;        // L1，root = MEMORY_L1_ROOT 或 process.cwd()
+export function getProjectMemory(projectRoot: string): MemoryStore;  // L2
 ```
 
-### 5.2 命名空间
+实现：`FileStore`（`src/lib/memory/file-store.ts`）—— per-record 文件 + 进程内 Promise 队列 + `proper-lockfile` 跨进程锁。
+
+---
+
+## 6. 写入路径（实际实现）
+
+### 6.1 L2 写入（per-kickoff data）
+
+| Kind | Producer | Trigger | 实现位置 |
+|---|---|---|---|
+| `project-card` | event-bridge | intent step_complete（带 classification metadata） | `src/lib/memory/event-bridge.ts` |
+| `task-history` | event-bridge | 每个 step_start/complete/error；同 (runId, stepId) 重复 step_complete 去重 | 同上 |
+| `self-heal-log` | self-heal-sink | RepairEvent 中有学习信号（repairedIds / stillMissing / files / details） | `src/lib/memory/self-heal-sink.ts` |
+
+接入点：
+- `src/app/api/agents/pipeline/route.ts` 和 `kickoff/route.ts` 用 `wrapPipelineEventHandler(send, {projectRoot, codeOutputDir, kickoffSessionId})` 包 SSE callback。
+- `src/app/api/agents/coding/route.ts` 在 `createRepairEmitter([...])` 列表里加 `createMemorySelfHealSink({outputDir, kickoffSessionId})`。
+- `src/store/pipeline-store.ts` 的 `startPipeline()` 用 `crypto.randomUUID()` 生成 `kickoffSessionId`，两端 fetch 共享，确保跨路由 records 关联。
+
+### 6.2 L1 写入
+
+| Kind | Producer | Trigger | 实现位置 |
+|---|---|---|---|
+| `classification` | classifier cache | `classifyProject()` LLM 成功 + JSON parse 成功（fallback 不缓存）| `src/lib/agents/shared/project-classifier.ts` |
+| `failure-pattern` | mining script | 用户跑 `npm run memory:mine-patterns` | `scripts/memory-mine-patterns.ts` + `src/lib/memory/distill/repair-log-miner.ts` |
+| `failure-pattern` (edits) | UI / CLI | 用户在 `/memory` 编辑 body 或 `npm run memory:approve` | `src/components/memory/MemoryRecordDetail.tsx` |
+
+### 6.3 写入纪律（强制）
+
+- 所有从 orchestrator / self-heal 进来的 memory 写入必须 **fire-and-forget + try/catch swallow**——不能让 task 因为记忆写入失败而崩。
+- recorder 函数（`recordProjectCard`/`recordTaskHistory`/`recordSelfHealLog`）内部 try/catch + console.warn，对外不抛异常。
+- bridge / sink 也包一层 try/catch，确保 emitter 链不被打断。
+
+---
+
+## 7. 读取路径（recall + inject）
+
+### 7.1 入口：`recallAndPrepareInject()`
+
+实现：`src/lib/memory/recall-context.ts`
 
 ```ts
-// src/lib/memory/index.ts
-export function getSystemMemory(): MemoryStore;        // L1 单例
-export function getProjectMemory(projectRoot: string): MemoryStore;  // L2 按项目根创建
+const result = await recallAndPrepareInject({
+  agent: "worker_codegen",
+  role: state.role,                 // 'frontend'|'backend'|'architect'|'test'
+  task: { id, title, description, files },
+  projectRoot: state.outputDir,
+  kickoffId: state.sessionId,
+  layers: ["L1", "L2"],             // 默认 ['L1']
+  kinds: ["failure-pattern"],       // 默认
+});
+// result: { block, active, shadow, estimatedTokens, suppressed }
 ```
 
-### 5.3 实现：FileStore（v1 默认）
+### 7.2 三层分流（核心运行时）
 
-- markdown / json 文件落盘 + SQLite FTS5 索引（fts5 表只放 `id, title, body, tags_csv, kind, layer`）。
-- 写入：先写文件 → 再写索引（事务保证一致性，索引坏了用 `npm run memory:reindex` 重建）。
-- 读取：FTS5 找候选 id → 按 id 读文件 → tag 过滤 → 排序（hits desc, recency desc）→ limit。
-- 并发：`proper-lockfile` 在写索引前抢锁；读不加锁。
+```
+recall via MemoryStore.recall()  →  candidates
+    ↓
+对每条 candidate 看 score + manual:approved tag：
+    score < 0 且 !approved      → drop（deprecated）
+    score >= 0.3 或 approved    → active.push
+    其他                        → shadow.push
+    ↓
+若 MEMORY_INJECT=true 且 active 非空：
+    渲染 <memory-context> 块（renderMemoryContext，token 预算 1500 默认）
+    bumpHit on each active record
+    ↓
+trace.jsonl 写一条 op:"inject"，含 activeIds / shadowIds / injected / suppressedByFlag
+    ↓
+返回 { block, active, shadow, ... } 给调用方
+```
 
----
+### 7.3 何时召回
 
-## 6. 写入路径（谁、何时、写什么）
+| 调用点 | 实现 | RecallQuery |
+|---|---|---|
+| Worker codegen prompt 构建前 | `src/lib/langgraph/agent-subgraph.ts` 在 ROLE_PROMPTS 之后插一个 system message | `kinds:['failure-pattern']`, `text=task.title+desc`, tags 软匹配 file ext |
+| 计划中 / 未实装 | self-heal LLM prompt、PM/Architect/QA agent | （Phase C 范围已画线，留待证明 inject 价值后扩） |
 
-### 6.1 L1
-
-| Kind | Producer | Trigger | Body |
-|---|---|---|---|
-| `classification` | `classifyProject()` | 每次调用前查 cache，未命中调 LLM 后写 | 完整 `ProjectClassification` JSON |
-| `failure-pattern` | Distiller | L2 `self-heal-log` 累计达阈值 + 通过 LLM 提炼 | 症状 / 根因 / 修法（markdown） |
-| `failure-pattern` | Manual seed | v1 上线时人工填 ~20 条 | 同上 |
-| `scaffold-fitness` | Orchestrator | 项目最终 build / e2e 状态确定时 | `{tier, type, scaffold, builds: n_ok/n_total, e2ePass: n_ok/n_total}` |
-| `agent-tuning` | QAAgent / VerifierAgent | 给某个 agent 输出打负分 + 触发反思 | "下次写 X 时记得 Y"（markdown） |
-
-### 6.2 L2
-
-| Kind | Producer | Trigger | Body |
-|---|---|---|---|
-| `project-card` | Kickoff start | kickoff 启动时一次 | tier / type / stack / brief 摘要 / L1 注入的相关 patterns |
-| `task-history` | Orchestrator | 每个 task 完成 / 失败 / retry 时 append | `{taskId, status, attempts, costUsd, durationMs, files_changed[]}` |
-| `decision` | Architect / TaskBreakdown | agent 在 prompt 中显式声明 ADR 时 | 标题 / 上下文 / 决策 / 后果（ADR 模板） |
-| `self-heal-log` | SelfHeal loop | 每次成功修复一个 bug 时 | 症状 / 尝试过的修法 / 最终成功的修法 / 涉及文件 |
-| `handoff-note` | 任意 agent | agent 在输出 schema 中写 `handoff` 字段时 | 自由 markdown |
-| `codebase-map` | CodeGen | 每次写文件后 patch | 文件 → 职责的 map（增量更新） |
-
-### 6.3 写入约束
-
-- **所有写入幂等**：同一 `id` 重复 save 等价于 update。
-- **schema 校验**：`save` 内部用 zod 校验 body 结构（per-kind schema）。
-- **大对象拆分**：body > 16KB 时拒绝写入，强制要求拆条或外链文件。
-
----
-
-## 7. 读取路径（召回与注入）
-
-### 7.1 何时召回
-
-| 时机 | 调用方 | RecallQuery 示例 | 注入位置 |
-|---|---|---|---|
-| Kickoff 启动 | Orchestrator | `{layer:'L1', kinds:['classification'], text: briefHash}` | 跳过 LLM 直接用结果 |
-| Kickoff 启动 | Orchestrator | `{layer:'L1', kinds:['failure-pattern','scaffold-fitness'], tags:{any:[`tier:${tier}`,`type:${type}`]}, limit:10}` | 写入 L2 `PROJECT.md` |
-| CodeGen 启动单 task | CodeGenAgent | `{layer:'both', kinds:['failure-pattern','handoff-note','codebase-map'], tags:{all:[`taskType:${t.type}`]}, limit:5}` | system prompt 末尾 |
-| Verifier 跑前 | VerifierAgent | `{layer:'L2', kinds:['handoff-note'], tags:{all:['to:verifier']}}` | system prompt |
-| SelfHeal 启动 | SelfHeal | `{layer:'L1', kinds:['failure-pattern'], text: errorMessage}` | 修复 prompt |
-
-### 7.2 注入格式（统一 wrapper）
+### 7.4 注入格式（统一 wrapper）
 
 ```
 <memory-context source="L1+L2" recalled-at="<ts>" count="<n>">
   <record id="FP-..." kind="failure-pattern" hits="14">
-    <title>Prisma migration conflicts on parallel branches</title>
+    <title>...</title>
     <body>...</body>
   </record>
   ...
 </memory-context>
 ```
 
-agent prompt 模板里加一段固定指令："读取 `<memory-context>` 中的相关教训，行动前评估每条是否适用当前 task。"
-
-### 7.3 召回排序
-
-`score = w1*tag_match + w2*fts_relevance + w3*log(hits+1) + w4*recency_decay - w5*negative_score_penalty`
-
-权重写在 `src/lib/memory/recall-config.ts`，可调。v1 用 `[3, 2, 1, 1, 5]`。
+`renderMemoryContext()` 实现 token 预算：第一条 record 永远进，后续 record 按 score 排序顺序加入直到超预算。
 
 ---
 
-## 7.5 与现有打分 / 持久化系统的集成（关键）
+## 8. 与现有打分 / 持久化系统的集成
 
-> 项目里**已经存在多套事实上的"记忆"**，本节说明 memory 系统如何**适配**它们（不重写、不迁移、不复制）。
+### 8.1 已有持久化盘点（不重写，仅适配）
 
-### 7.5.1 已有持久化盘点
-
-| 现有产物 | 位置 | 已经持久化的内容 | 角色 |
-|---|---|---|---|
-| `model-leaderboard.jsonl` | `generated-code/.ralph/` | `ModelScorecardRow[]` 跨 session append-only | 模型性能账本 |
-| `coding-session-report.{json,md}` | `generated-code/.ralph/` | 单 session 完整报告（gate / cost / events） | 会话事实 |
-| `report-history/` | `generated-code/.ralph/` | 历史报告归档 | 时间序列 |
-| `repair-log.jsonl` | `generated-code/.ralph/` | self-heal 每次修复尝试 | 失败修复账本 |
-| `e2e-triage.md` / `uncovered.md` | `generated-code/.ralph/` | e2e 诊断与未覆盖项 | 诊断快照 |
-| `QAAgent` / `VerifierAgent` 输出 | runtime（未持久化） | 对 PRD / 代码 / 测试的打分 | 质量评估 |
-| `src/lib/pipeline/model-scoring/` | 模块 | 6 维度评分 + 加权 + A-F grade | 评分逻辑 |
-
-### 7.5.2 集成原则
-
-1. **不复制数据**：JSONL / report 文件保持唯一权威源，memory 系统通过 adapter 读取，不在 `.memory/` 重写一份。
-2. **不重写评分逻辑**：`model-scoring/` 6 维度的算法、权重、grade 阈值原封不动，memory 只调用现有 API。
-3. **统一召回入口**：agent 想问"这个 stage 用哪个 model 性价比高？"时只调 `memory.recall()`，不需要知道答案是来自 leaderboard.jsonl 还是 .memory/。
-4. **跨项目聚合靠 memory**：单项目数据留在 `.ralph/`；要做"全局最优 model"判断时由 memory 的 distillation 跨项目扫所有 `.ralph/` 写出 L1 `model-routing` 记录。
-
-### 7.5.3 Adapter 设计
-
-```ts
-// src/lib/memory/adapters/scoring-adapter.ts
-export interface ScoringAdapter {
-  // 读：把现有 JSONL/report 转成 MemoryRecord 视图（lazy，不落盘）
-  scorecardRowsAsRecords(projectRoot: string): Promise<MemoryRecord[]>;  // kind: model-scorecard
-  sessionReportsAsRecords(projectRoot: string): Promise<MemoryRecord[]>; // kind: session-report
-  repairLogAsRecords(projectRoot: string): Promise<MemoryRecord[]>;      // kind: self-heal-log
-
-  // 写：当 agent 触发新评分时，仍走原有写入路径（appendScorecardToLeaderboard 等），
-  //     adapter 只负责"通知 memory 索引新增"以便后续 recall 命中
-  notifyScorecardAppended(projectRoot: string, row: ModelScorecardRow): Promise<void>;
-}
-```
-
-`FileStore` 在 `recall()` 时：
-- 命中 `kind ∈ {model-scorecard, session-report, self-heal-log}` → 走 adapter 现读现转
-- 命中其他 kind → 读自己的 `.memory/` 文件
-
-这样**双向兼容**：现有 `model-leaderboard.jsonl` 旧代码继续用得好好的，memory 系统纯增量。
-
-### 7.5.4 新增 / 改动的接入点
-
-| 现有模块 | 改动 | 影响 |
+| 现有产物 | 位置 | 我们的做法 |
 |---|---|---|
-| `model-scoring/model-leaderboard.ts` `appendScorecardToLeaderboard()` | 写完 JSONL 后**触发** `scoringAdapter.notifyScorecardAppended()`（fire-and-forget） | 加 1 个 await 调用，失败不影响主流程 |
-| `qa-agent.ts` / `verifier-agent.ts` | 评分输出**额外写一条** `kind: qa-verdict` 到 memory（当前是 in-memory 无持久化） | 纯新增，零影响现有逻辑 |
-| `coding-session-report.ts` | 不动；session report 写完后由 orchestrator 通知 memory 索引一次 | 1 行 hook |
-| `repair-log.jsonl` 写入处 | 同上，写完通知 memory 索引 | 1 行 hook |
+| `model-leaderboard.jsonl` | `<project>/.ralph/` | **保留唯一权威**——未来通过 adapter 暴露为 `model-scorecard` kind 的 read-only view |
+| `coding-session-report.{json,md}` | `<project>/.ralph/` | A/B 比较 (`memory:ab-compare`) 直接读这个文件 |
+| `repair-log.jsonl` | `<project>/.ralph/` | mining 输入；C-1 的 self-heal-sink 旁路写一份 L2 self-heal-log |
+| `src/lib/pipeline/model-scoring/` | 模块 | 评分逻辑零改动 |
 
-### 7.5.5 新增的召回能力
-
-| 召回需求 | RecallQuery | 数据来源 |
-|---|---|---|
-| "M-tier + auth task 用什么 model 最稳？" | `{layer:'L1', kinds:['model-routing'], tags:{all:['tier:M','taskType:auth']}}` | distill 自所有项目的 `model-leaderboard.jsonl` |
-| "本项目过去这个 stage 哪个 model 翻车多？" | `{layer:'L2', kinds:['model-scorecard'], tags:{all:['stage:worker_codegen']}}` | adapter 直读 `.ralph/model-leaderboard.jsonl` |
-| "类似 error 之前怎么修好的？" | `{layer:'L2', kinds:['self-heal-log'], text: errorMessage}` | adapter 直读 `repair-log.jsonl` |
-| "QA 上次给这个 agent 打了什么分？" | `{layer:'L2', kinds:['qa-verdict'], tags:{all:['agent:codegen']}}` | memory 自己存（QA 之前未持久化，新增） |
-
-### 7.5.6 Distillation 扩展（详细见 §8）
-
-新增一个 distill job：**Model fitness aggregation**（L2 model-scorecard → L1 model-routing）。
-
-```
-扫所有 generated-code/.ralph/model-leaderboard.jsonl
-  → 按 (tier, taskType, stage) 分桶
-  → 每桶聚合：mean(score), grade 分布, 主流 model 的 win rate
-  → 写 L1 model-routing 记录
-```
-
-频率：与 failure-pattern distill 同一个 cron。
+### 8.2 集成原则
+1. **不复制数据**：JSONL / report 文件保持唯一权威源。
+2. **不重写评分逻辑**：`model-scoring/` 6 维度算法不动。
+3. **统一召回入口**：agent 想问"这个 stage 用哪个 model 性价比高？"未来只调 `memory.recall()`。
+4. **跨项目聚合靠 memory**：单项目数据在 `.ralph/`；跨项目聚合通过 mining 写出 L1 record。
 
 ---
 
-## 8. Distillation：L2 → L1
+## 9. Pattern 生命周期与归因
 
-### 8.1 触发
-
-- **手动**：`npm run memory:distill` CLI（每周跑一次）。
-- **自动**（v2）：项目结束信号 + L2 `self-heal-log` 数 >= 3 时排队。
-
-### 8.2 流程
+### 9.1 生命周期总览
 
 ```
-1. 扫 L2 self-heal-log，按 (errorPattern, fixPattern) 聚类
-2. 对每个 cluster > 2 条记录的，调 LLM 提炼一条 failure-pattern：
-   - 输入：cluster 内的所有 self-heal-log body
-   - 输出：标准化的 {symptoms, rootCause, fix, applicableWhen} markdown
-3. 查 L1 是否已有 title 高度相似的 failure-pattern：
-   - 有 → 提示人工 review 是否合并（v1 不自动合并）
-   - 无 → 创建新 L1 record，refs.parentRecordId 指向源 L2 record
-4. 同步更新 scaffold-fitness（聚合 L2 的 task-history）
+[1] 数据源
+    repair-log.jsonl 累积 (orchestrator 自然产生)
+    self-heal-log L2 records 累积 (Phase C-1 旁路写入)
+        ↓
+[2] Mining (rule-based, npm run memory:mine-patterns)
+    按 (stage, event) 聚类 → 22 条 mined patterns
+    classifyPatternNature 给每条打 category:*  tag
+    score = 0 (Layer 3 shadow)
+        ↓
+[3] 人类审批 (Memory UI + memory:approve CLI)
+    UI SuggestionBanner 给"Disapprove or Delete / Edit then Approve / 手动审"建议
+    用户编辑 markdown body 补 "How to avoid" 段
+    Approve → +manual:approved tag + score=0.5 → Layer 2 active
+        ↓
+[4] Inject (recallAndPrepareInject in agent-subgraph)
+    active 进 prompt; shadow 仅 trace
+    bumpHit on injected records
+        ↓
+[5] Outcome attribution (npm run memory:attribute / UI button)
+    任务 completed → 注入过的 active patterns +0.05
+    任务 failed → 注入过的 active patterns -0.10
+    manual:approved 永久免疫
+    score 钉到 [-1, 1]
+    cursor 持久化 (kickoffId, taskId) 防双倍计数
+        ↓
+[6] 自动汰换 / 自动晋升
+    shadow 命中多次成功 → 累计到 0.3 → 自动 active
+    active 多次失败 → 累计到 < 0 → deprecated, 不再召回
 ```
 
-### 8.3 distillation prompt
+### 9.2 归因数学
 
-放在 `src/lib/memory/distiller-prompts.ts`。要求 LLM 输出严格 JSON，schema 用 zod 校验。
+```
+每个终态 task (completed | failed) 找出注入过的 active patterns
+  对每条非 manual:approved 的 pattern：
+    delta = successes * δ_s + failures * δ_f
+    new_score = clamp(old_score + delta, -1, 1)
+  对 manual:approved 的：仍计入 successes/failures（用于 UI 显示），但 delta = 0
+  
+默认: δ_s = +0.05  δ_f = -0.10  (失败惩罚 = 奖励 × 2)
+```
+
+**关键设计决策**：
+- **Cursor**：`(kickoffId, taskId)` 写入 `.attribution-cursor.json`，重复跑同一项目不会双倍计数。
+- **shadow 不参与归因**：只有 `injected: true` 的 trace 事件参与（即真注入到 prompt 的）。
+- **失败惩罚 > 奖励**：单条 pattern 注入后让 task 失败比促成成功的代价更大。倾向"宁可关掉，不要乱注入"。
+- **手动审批通道独立于归因**：人类 vouch 过的不被自动改 score。
+
+实现：`src/lib/memory/distill/attribution.ts`（pure function）+ `scripts/memory-attribute.ts` CLI + `src/app/api/memory/attribute/route.ts` HTTP。
 
 ---
 
-## 9. CLI 设计
+## 10. CLI 命令清单
 
 ```bash
-# 只读
-npm run memory:list [--layer=L1|L2] [--kind=...] [--limit=20]
-npm run memory:show <id>
+# 浏览
+npm run memory:list                  # 列记录（按 updatedAt desc）
+npm run memory:list -- --kind=failure-pattern --limit=30
+npm run memory:show <id>             # 单条详情
 npm run memory:search "<keyword>"
-npm run memory:recall --tags="agent:codegen,taskType:auth" [--layer=both]
-npm run memory:trace <kickoffId>           # 这次 kickoff 召回了哪些
-npm run memory:stats                        # 总数 / 按 kind 分布 / 命中率 / 最近写入
-
-# 写
-npm run memory:add --kind=failure-pattern --file=./pattern.md --tags=...
-npm run memory:edit <id>                    # 用 $EDITOR 打开
-npm run memory:score <id> <-1..1>           # 人工打分
-
-# 治理
-npm run memory:reindex                      # 重建 SQLite 索引
-npm run memory:gc --dry-run                 # 清理过期 / 低分记忆
-npm run memory:distill [--since=7d]         # 触发 L2→L1
-npm run memory:replay <kickoffId> [--snapshot=<isoDate>]
-```
-
-实现：`src/lib/memory/cli.ts`，挂在 `package.json` 的 `scripts` 下。
-
----
-
-## 10. 可观测性
-
-### 10.1 Trace log（每次 recall / save 必打）
-
-```
-[memory] op=recall layer=L1 kickoff=K-42 agent=codegen taskId=T-018
-  query={kinds:['failure-pattern'],tags:{all:['stack:prisma']}}
-  hits=3 ids=[FP-012,FP-031,FP-044] latencyMs=4 injectedTokens=812
-
-[memory] op=save layer=L2 kickoff=K-42 kind=self-heal-log
-  id=SH-2026-04-27-pwfly bytes=1247
-```
-
-logger 走现有 `src/lib/observability/`。日志可按 kickoff 聚合查询。
-
-### 10.2 Dev UI 面板
-
-复用现有 observability 页：
-
-- 时间线视图：每个 agent step 旁边挂 "🧠 N recalled"，点开看注入的全文。
-- 记忆浏览器：按 kind / tag 筛选，看 hits / score / lastUsed。
-- "如果没有这条会怎样"按钮：临时 evict 一条，本 session 内不再召回，方便对照实验。
-
-v1 实现"时间线 + 浏览器"，evict 是 v2。
-
----
-
-## 11. 验证策略
-
-### 11.1 单元测试（Phase A 必跑）
-
-- FileStore CRUD：save/get/update/delete/list 全覆盖。
-- 并发写入：10 个 worker 并发 save，零丢失零脏读。
-- FTS 召回精度：固定 fixture，断言 top-k 顺序。
-- Tag 过滤：`all` / `any` / `none` 组合断言。
-
-### 11.2 缓存命中（Phase B 必跑）
-
-- **黄金集**：20 个固定 brief。
-- **流程**：
-  1. cold cache 跑一遍，记录每个 brief 的 (cost, latency, classification)。
-  2. warm cache 跑一遍，断言：classification 阶段 LLM 调用 = 0；结果与 cold 100% 一致；总 kickoff cost 降幅 ≥ 5%。
-- 失败即 fail CI。
-
-### 11.3 召回质量（Phase C 跑）
-
-- **标注集**：`tests/memory/recall-eval.json`，~20 个场景，每个标注 `should_recall` 和 `should_not_recall` 的 record id。
-- **指标**：precision@5、recall@5。
-- **门槛**：v1 要求 precision@5 ≥ 0.6。
-
-### 11.4 端到端（Phase C 末尾跑）
-
-- **A/B 对照**：5 个 brief，分别在 `MEMORY_ENABLED=false` / `true` 跑。
-- **观察指标**：
-  - self-heal 触发次数（带 memory 应该更少）
-  - 总 cost（USD）
-  - 总 duration
-  - 最终 e2e pass rate
-- **门槛**：5 个 brief 平均 self-heal 次数下降 ≥ 20%。
-
-### 11.5 Replay 回归（Phase D）
-
-- 历史 kickoff 用当时的 memory snapshot 重跑，断言关键 task 输出一致。
-- 防止某条新 distill 出来的 pattern 污染下游。
-
----
-
-## 12. 分阶段交付
-
-| Phase | 范围 | 时长 | 交付物 | 验收 |
-|---|---|---|---|---|
-| **A** | MemoryStore 抽象 + FileStore + SQLite + CLI 四件套（list/show/search/recall/stats）+ L2 `project-card` / `task-history` / `codebase-map` 接入 orchestrator | ~7 天 | `src/lib/memory/*` + L2 落盘 | 单元测试 100% pass；orchestrator 中断续跑能从 L2 恢复 |
-| **B** | L1 `classification` cache 接入 `classifyProject()` | ~3 天 | classifier 内嵌 cache | §11.2 黄金集通过 |
-| **C** | L1 `failure-pattern`（手动种子 20 条）+ L2 `self-heal-log` + 注入到 CodeGen / SelfHeal prompt + 简易 distiller | ~7 天 | 注入 wrapper + distiller CLI | §11.3 + §11.4 通过 |
-| **D** | `scaffold-fitness` + `agent-tuning` + Replay mode + Dev UI 时间线/浏览器 | ~5 天 | UI panel + replay CLI | UI 可用；replay 一致性测试通过 |
-
-总计：~3.5 周，可单人推进。
-
----
-
-## 12.5 对现有逻辑的影响 / 风险 / 回滚
-
-### 12.5.1 影响分档
-
-**A. 完全无影响**
-- `PRD.md` / `API_CONTRACTS.json` / `SCAFFOLD_SPEC.md` / `TASK_BREAKDOWN_ORIGINAL.md` 等产物：保留不变。
-- PRD / Architect / Design / QA 等 agent 的 prompt 与输出 schema：不变。
-- `generated-code/` 项目结构（backend / frontend / packages）：不变。
-- pipeline 的 gates、scaffold-copy、push-kickoff-repo 等核心流程：不变。
-- **现有 `.ralph/` 持久化（model-leaderboard / coding-session-report / repair-log）**：只读适配，写入路径不动。
-
-**B. 行为不变，纯加旁路**
-| 改动点 | 改动方式 | 可关停 |
-|---|---|---|
-| `coding-orchestrator.ts` task 生命周期 | 加 `memory.save(...)`，**fire-and-forget + try/catch** | `MEMORY_ENABLED=false` |
-| `self-heal/` 修复成功后 | 加 1 行 save + adapter notify | 同上 |
-| `appendScorecardToLeaderboard()` | 末尾加 1 行 `notifyScorecardAppended()` | 同上 |
-| `qa-agent.ts` / `verifier-agent.ts` | 评分输出多写一条 memory record | 同上 |
-| 新增 `src/lib/memory/*` | 全新目录 | 删目录即可 |
-
-**写入纪律（强制）**：所有 memory 写入失败必须 swallow + log，**绝不能让 task / session 因为记忆写入失败而崩**。code review checklist 必查项。
-
-**C. 行为微变（需 A/B 守门）**
-| 改动点 | 行为变化 | 风险 | 缓解 |
-|---|---|---|---|
-| `classifyProject()` 加 cache | 同 brief 第二次直接返回缓存 | brief 微调命中旧 hash | normalize hash + `--no-cache` flag + `MEMORY_ENABLED=false` |
-| `code-gen-agent.ts` prompt 注入 `<memory-context>` | system prompt 末尾加 patterns | (1) token 超限 (2) 模型被无关 pattern 干扰 | (1) §14 Q5 限定 1500 token (2) §11.4 A/B 黄金集守门 |
-| `SelfHeal` prompt 注入历史失败模式 | 同上 | 同上 | 同上 |
-
-**D. 基础设施层影响**
-| 影响 | 说明 | 工作量 |
-|---|---|---|
-| 新增依赖 `better-sqlite3` | native，要 `electron-rebuild` | 中 |
-| 新增依赖 `proper-lockfile` | 纯 JS | 低 |
-| `electron-builder.yml` | `.memory/` 标为 user data，`.node` 文件正确打包 | 低但易遗漏 |
-| `.gitignore` | 新增 `.memory/store.sqlite` 等 | 低 |
-| 磁盘占用 | 长期累积可能几十 MB | 低，§9 `memory:gc` |
-
-**降级方案**：v1 可先用纯 JSON 索引避开 SQLite 原生依赖；记忆 >200 条再切 SQLite。
-
-### 12.5.2 三层 env 开关
-
-```bash
-MEMORY_ENABLED=false        # 总闸：所有 recall 返回 []，所有 save 短路
-MEMORY_INJECT=false         # 半关：保留写入观察，但不注入 prompt（最安全的试运行）
-MEMORY_CACHE=false          # 单关：禁用 classification cache，其他正常
-```
-
-**Phase A 上线时默认 `MEMORY_INJECT=false`**——先只写不读，跑 1-2 周确认数据健康，再开 inject。这是最重要的灰度纪律。
-
-### 12.5.3 风险等级矩阵
-
-| 风险 | 等级 | 触发条件 | 兜底 |
-|---|---|---|---|
-| memory 写入失败拖崩 task | 🔴 | 写盘 / 锁超时 | try/catch + fire-and-forget（强制） |
-| classification cache 返回过期结果 | 🟡 | brief 微调命中旧 hash | normalize + flag |
-| 注入 pattern 劣化 codegen 质量 | 🟡 | 召回 pattern 与 task 不匹配 | A/B 黄金集守门 |
-| Electron 打包遗漏 native 模块 | 🟡 | 桌面包跑不起来 | electron-rebuild + smoke test |
-| Adapter 与原始 JSONL schema 漂移 | 🟡 | `ModelScorecardRow` 字段变更 | adapter 用 zod 校验，schema 不匹配跳过该行 |
-| 多 kickoff 并发损坏索引 | 🟢 | 罕见 | lockfile + `memory:reindex` |
-| 磁盘膨胀 | 🟢 | 长期 | `memory:gc` |
-
-### 12.5.4 回滚路径
-
-任何阶段出问题，三档退路：
-
-1. **软关闭**：`MEMORY_ENABLED=false` —— recall 返回空、save 短路。退化到接入前。
-2. **硬关闭**：`rm -rf .memory/` + `git revert <memory-pr>` —— 彻底回到 0。
-3. **半关闭**：`MEMORY_INJECT=false` —— 只写不读，纯观察模式。
-
-回滚不需要触碰 `.ralph/` 任何文件——memory 系统对 `.ralph/` 是只读的，回滚后现有持久化继续工作。
-
-### 12.5.5 灰度计划（Phase A → C 默认配置）
-
-| 阶段 | MEMORY_ENABLED | MEMORY_INJECT | 说明 |
-|---|---|---|---|
-| Phase A 上线 | true | **false** | 只写 L2，不注入。观察数据健康度 |
-| Phase A + 1 周 | true | false | 跑黄金集 §11.2 确认 cache 命中率 |
-| Phase B 上线 | true | false | classification cache 启用（cache 不算 inject） |
-| Phase C 上线 | true | **true** | A/B §11.4 通过后才开 inject |
-
----
-
-## 12.6 Phase B（classification cache）的风险与设计决策
-
-> Phase B 引入第一条**真正改变 pipeline 行为**的 memory 路径——同 brief 第二次跳过 LLM 调用直接返回缓存。
-> Phase A 是 "只写不读"，最坏只是浪费磁盘；Phase B 是 "读了就用"，错了会污染下游决策。
-> 本节锁死 Phase B 的 5 个关键设计决策，避免上线翻车。
-
-### 12.6.1 风险与对应决策
-
-| # | 风险 | 决策 |
-|---|---|---|
-| **R1** | **缓存污染最难逆转**：一条 buggy 的 classification 缓存会一直命中后续所有同 brief 的 kickoff，直到手动清。L2 错了 `rm -rf <project>/.memory/`，L1 错了影响全局。 | 治理工具齐全 + 灰度纪律：(a) `npm run memory:invalidate-classification [--all\|--brief-hash=...]` (b) Phase B 上线时 `MEMORY_CACHE=false` 灰度（见 §12.6.5） (c) cache 命中时 trace log 必打 `cache-hit` 事件 |
-| **R2** | **Hash key 归一化不明确**：`"Build a clock app"` 和 `"build a clock app."` 应该命中同一缓存吗？ | **保守归一化**：仅去首尾空白 + 折叠中间多空白为单空格。**不**做 lowercase / 不去标点 / 不脱中英文标点差异。理由：classifier 是 LLM 调用，对小变化敏感程度比 hash 强；归一化太激进反而误命中。 |
-| **R3** | **Prompt / model 升级时旧 cache 静默失效**：`CLASSIFIER_PROMPT` 改了，旧 cache 仍命中，返回与新逻辑不一致的结果。 | Cache key = `sha256(normalize(brief) + "::" + PROMPT_VERSION + "::" + model)`。`PROMPT_VERSION` 是 `classifier.ts` 里的常量字符串，每次改 prompt 必须 bump（review checklist 必查项）。 |
-| **R4** | **Fallback 路径不该缓存**：`fallbackClassification()` 是 LLM 输出 JSON parse 失败的降级，缓存它就把降级结果钉死了。 | `classifyProject()` 加 cache wrapper 时，**仅当 LLM 调用 + JSON parse 都成功时写入 cache**。fallback 路径直接返回，不写。 |
-| **R5** | **`MEMORY_CACHE` flag 默认值的两难**：默认 true → 用户升级 AgenticBuilder 后立刻就有行为变化；默认 false → 永远没人用上 cache。 | Phase B 合并时**默认 false**（灰度）；跑完 §11.2 黄金集 + 1 周观察期 + 1 次实际项目验证 → 一个独立 PR 把默认改 true（让"开启 cache"变成可独立 review/回滚的事件）。 |
-
-### 12.6.2 Cache key 规范（精确定义）
-
-```ts
-// src/lib/agents/shared/project-classifier.ts
-const PROMPT_VERSION = "v1-2026-04-28";  // BUMP whenever CLASSIFIER_PROMPT changes
-
-function normalizeBrief(brief: string): string {
-  return brief.trim().replace(/\s+/g, " ");
-}
-
-function classificationCacheKey(brief: string, model: string): string {
-  const payload = `${normalizeBrief(brief)}::${PROMPT_VERSION}::${model}`;
-  return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 16);
-}
-```
-
-写入 cache 的 record `id = "CL-" + key`、`tags = ["classifier", "promptVersion:" + PROMPT_VERSION]`，便于 `memory:list --kind=classification` 浏览，便于按 promptVersion 批量清。
-
-### 12.6.3 Cache 写入 / 读取流程
-
-```
-classifyProject(brief):
-  if (!memoryCacheEnabled()) → 走原逻辑（直接 LLM）
-
-  key = classificationCacheKey(brief, model)
-  cached = await getSystemMemory().get("CL-" + key)
-  if (cached):
-    trace(cache-hit, key)
-    return JSON.parse(cached.body) + bumpHit(cached.id)
-
-  trace(cache-miss, key)
-  result = await callLLM(...)
-  if (jsonParseFailed):
-    return fallbackClassification(...)  // 不写 cache (R4)
-
-  void getSystemMemory().save({
-    id: "CL-" + key,
-    layer: "L1", kind: "classification", source: "cache",
-    title: `Classification · ${result.tier} · ${result.type}`,
-    body: JSON.stringify({...result, briefHash: key, promptVersion: PROMPT_VERSION}),
-    tags: ["classifier", `tier:${result.tier}`, `type:${result.type}`, `promptVersion:${PROMPT_VERSION}`],
-    refs: {},
-  })
-  return result
-```
-
-### 12.6.4 失效与治理 CLI（Phase B 必交付）
-
-新增子命令（在现有 `memory:*` 之外）：
-
-```bash
-# 列出所有 classification cache（按 promptVersion 分组）
-npm run memory:list -- --kind=classification
-
-# 单条清除
-npm run memory:invalidate-classification -- --brief-hash=<key>
-npm run memory:invalidate-classification -- --id=CL-<key>
-
-# 批量清除某个旧 promptVersion 的所有 cache
-npm run memory:invalidate-classification -- --prompt-version=v1-2026-04-28
-
-# 清空所有 classification cache（保留其他记忆）
+npm run memory:recall --tags=...     # 模拟 agent 召回
+npm run memory:stats                 # 总数 / 按 kind 分布 / 命中率
+npm run memory:trace <kickoffId>     # 这次 kickoff 召回了哪些
+
+# 审批与维护
+npm run memory:approve <id>          # 加 manual:approved + score=0.5
+npm run memory:approve <id> -- --score=0.9
+npm run memory:disapprove <id>       # 移除 tag + score=0
+npm run memory:disapprove <id> -- --score=-0.5
+
+# 缓存治理
 npm run memory:invalidate-classification -- --all
+npm run memory:invalidate-classification -- --prompt-version=v1-...
+npm run memory:invalidate-classification -- --brief-hash=<hex>
+
+# 数据流入
+npm run memory:mine-patterns         # repair-log.jsonl → 22 条 L1 failure-patterns
+npm run memory:mine-patterns -- --dry-run
+
+# 反馈循环
+npm run memory:attribute             # 默认 project=generated-code
+npm run memory:attribute -- --project=out-treatment-clock --dry-run
+npm run memory:attribute -- --reset-cursor
+
+# A/B 验证（Phase C-6）
+npm run memory:ab-compare -- --baseline=out-baseline --treatment=out-treatment
 ```
 
-实现：复用 `MemoryStore.list()` + `delete()`，CLI 只是个组合。
-
-### 12.6.5 灰度计划（Phase B）
-
-| 时点 | MEMORY_ENABLED | MEMORY_INJECT | MEMORY_CACHE | 说明 |
-|---|---|---|---|---|
-| Phase B PR 合并 | true | false | **false** | 代码就位，但 cache 不读不写。零行为变化，仅黄金集测试可手动开 |
-| Phase B + 黄金集通过 | true | false | false | §11.2 通过，仍不打开 |
-| Phase B + 1 周 + 1 真实项目验证 | true | false | false | 观察 cache key 规范、PROMPT_VERSION 实际表现 |
-| Phase B 默认开启 PR | true | false | **true** | 独立 PR，单独 review，单独可回滚 |
-
-**关键纪律**：Phase B 默认 false 期间，验证流程是**手动设 `MEMORY_CACHE=true` 跑黄金集**，不是合并就开。这与 Phase A 的"默认 inject=false 灰度"对称。
-
-### 12.6.6 Phase B 验证清单（覆盖到 R1-R5）
-
-在 §11.2 黄金集基础上额外加：
-
-- [ ] **R1**：注入一条 buggy classification cache（`type: "WRONG"`），跑同 brief 应命中并返回 WRONG → `memory:invalidate-classification` 后再跑应回到 LLM 路径并写入正确结果
-- [ ] **R2**：`brief = "Build a clock app"` 和 `brief = "  Build  a  clock  app  "` 必须命中同 cache；和 `"build a clock app."` 必须 **不**命中（保守归一化）
-- [ ] **R3**：bump `PROMPT_VERSION` 后，相同 brief cache miss、写入新 record；旧 record 保留
-- [ ] **R4**：mock LLM 返回非法 JSON → fallback 触发 → `memory:list --kind=classification` 应**无**新增记录
-- [ ] **R5**：`MEMORY_CACHE=false` 时 `recall` 永不命中、`save` 永不写入；切回 true 立即恢复
-
-### 12.6.7 与现有 model-leaderboard 的关系
-
-Phase B 的 classification cache 只关心**输入 → 输出**，不关心 model 性能。它和 `model-leaderboard.jsonl` / `model-routing` 是两件事：
-
-- **Classification cache (L1)** = "这个 brief 该归哪一类" 的缓存（避免 LLM 重复调用）
-- **Model routing (L1)** = "这一类项目某个 stage 用哪个 model 性价比最高"（来自跨项目聚合，详见 §7.5.6）
-
-两者都属于 L1，但 cache key、写入触发、失效机制完全独立。Phase B 只做前者，model-routing 是 Phase D。
+实现：
+- `scripts/memory-cli.ts` + `src/lib/memory/cli.ts`（list/show/search/recall/stats/trace/approve/disapprove/invalidate-classification）
+- `scripts/memory-mine-patterns.ts`
+- `scripts/memory-attribute.ts`
+- `scripts/memory-ab-compare.ts`
 
 ---
 
-## 13. 演进路径
+## 11. UI 入口（Phase C-7 + C-8）
 
-### 13.1 何时考虑切换到 Graphiti
+### 11.1 路由与导航
+- 路径：`/memory`
+- 导航：`AppNav` 左到右是 `Pipeline | Reports | Memory | [Launch Pipeline]`
 
-触发条件（任一满足）：
+### 11.2 页面布局
 
-- L1 `failure-pattern` 数量 > 200，关键词召回精度跌破 0.5。
-- 出现明确的图查询需求（"playwright 相关的所有 → 路由到 → vite-config 的所有失败"）。
-- 多用户场景出现，需要时序去重 / 实体合并。
+```
+┌──── /memory ──────────────────────────────────────────────────────────┐
+│ [All] [Active] [Shadow] [Deprecated] [Approved]                       │
+│   [Run Attribution] [reset cursor □]   ⚙ kind ▾   🔍 search           │
+│ ┌──── attribution result banner (绿/红，可关) ─────────────────────┐ │
+│ ├────── List Sidebar (1/3) ──────┬──── Detail (2/3) ───────────────┤ │
+│ │ ● FP-mined-...                  │  # title                         │ │
+│ │   "stagnation_warning"          │  metadata: id / layer / kind /  │ │
+│ │   41× │ shadow │ hits 0         │            source / hits / lastHit│ │
+│ │   ─────────────────             │                                  │ │
+│ │ ● FP-mined-...                  │  💡 SuggestionBanner            │ │
+│ │   ...                           │  (red/yellow/green per category) │ │
+│ │                                  │                                  │ │
+│ │                                  │  Score: ━━━━●━━━━ 0.5 [shadow]   │ │
+│ │                                  │  Tags: [mined][category:...]    │ │
+│ │                                  │  [Approve] [Disapprove] [Edit]  │ │
+│ │                                  │  [Delete]                       │ │
+│ │                                  │                                  │ │
+│ │                                  │  Body: markdown 渲染 / JSON pretty│ │
+│ └─────────────────────────────────┴──────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.3 SuggestionBanner 启发式（render-time）
+读 `category:*` tag → 给四档建议（与 §3.3 表对应）：
+- success-metric / broadcast → 红色「Disapprove or Delete」
+- real-failure → 绿色「Edit then Approve」
+- ambiguous → 黄色「Review manually」
+- 已 approved → 不显示 banner
+
+### 11.4 后端 API
+
+| Method | Route | 用途 |
+|---|---|---|
+| GET | `/api/memory` | list（按 kind/status/search 过滤） |
+| GET | `/api/memory/[id]` | 单条详情 |
+| PATCH | `/api/memory/[id]` | 编辑 body / tags / score |
+| DELETE | `/api/memory/[id]` | 删除 |
+| POST | `/api/memory/[id]/approve` | 加 manual:approved + score |
+| POST | `/api/memory/[id]/disapprove` | 移除 tag + score |
+| POST | `/api/memory/attribute` | 跑一次归因（C-8） |
+
+---
+
+## 12. 可观测性
+
+### 12.1 trace.jsonl 事件流
+
+每条 inject / save / update / cache-hit / cache-miss 都打一行 JSON 到 `<project>/.memory/trace.jsonl`：
+
+```json
+{"ts":1777364298357,"op":"inject","layer":"L1","kickoffId":"...","taskId":"T-x","agent":"worker_codegen","details":{"activeIds":["FP-..."],"shadowIds":["FP-..."],"activeCount":2,"shadowCount":6,"injectedTokens":352,"injected":true,"suppressedByFlag":false}}
+```
+
+CLI: `npm run memory:trace <kickoffId>` 过滤回放。
+
+### 12.2 关键 op 字段
+
+| op | 何时发出 |
+|---|---|
+| `save` | record 写入 |
+| `update` | tags/body/score 改动 |
+| `recall` | （未启用） |
+| `inject` | recallAndPrepareInject 每次执行 |
+| `cache-hit` / `cache-miss` | classification 缓存查询（Phase B） |
+| `bumpHit` | （未启用作为独立 op） |
+
+实现：`src/lib/memory/trace.ts`（FileTraceLogger）。
+
+---
+
+## 13. 验证策略与实测状态
+
+### 13.1 单元测试覆盖
+
+```
+8 test files, 91 tests passing:
+  file-store.test.ts          16 tests  CRUD / recall / 并发 / per-record fs / metrics 分离
+  event-bridge.test.ts         9 tests  step_complete dedup / token usage / kickoffId override
+  recall-context.test.ts      12 tests  3-layer split / token budget / hits accounting / approved bypass
+  classifier-cache.test.ts     8 tests  R1-R5（污染、归一化、prompt 版本、fallback 不缓存、flag）
+  approve-cli.test.ts          9 tests  approve / disapprove / round-trip / idempotent
+  self-heal-sink.test.ts      10 tests  4 outcome 分类 / 3 过滤 / id 稳定性
+  repair-log-miner.test.ts    13 tests  4 category / 聚类 / outcome 计数 / 限制
+  attribution.test.ts         12 tests  success / failure / clamp / immune / cursor / multi-pattern
+```
+
+### 13.2 黄金集 / 端到端验证
+
+| 名称 | 状态 | 位置 |
+|---|---|---|
+| Classification cache 黄金集（§14.6.6 R1-R5） | ✅ 单测覆盖；活体黄金集留待 Phase B 默认开启时跑 | `classifier-cache.test.ts` |
+| Phase A smoke (event-bridge 真实数据) | ✅ 之前做过，22 条 mined patterns 落盘正确 | `tests/memory/ab-golden-set.json` |
+| C-1 sink smoke (486 → 32 self-heal-log) | ✅ 历史记录 | — |
+| C-3 inject smoke（mined seeds + score 调动 → 真注入）| ✅ 历史记录 | — |
+| **C-4 attribution smoke**（6 task / 4 完 / 2 败）| ✅ 数学正确、cursor 短路验证 | — |
+| **C-6 A/B harness** 真实跑 | ⏳ 需要花真实 LLM 钱才能跑；recipe 在 `tests/memory/ab-golden-set.json` | — |
+
+### 13.3 Phase D 才做的验证
+- L1 失败模式数量 >100 时跑召回 precision@5 / recall@5
+- inject 注入后 codegen 输出质量评估（A/B 5+ briefs）
+- 长期统计：hit rate, score 分布漂移
+
+---
+
+## 14. Phase 交付状态（已 ship 部分）
+
+| Phase | 范围 | 状态 |
+|---|---|---|
+| **A** | MemoryStore + FileStore (per-record) + CLI 四件套 + L2 project-card / task-history 接入 orchestrator | ✅ |
+| **A 修复** | per-record self-contained 文件 + metrics 分离 + git 共享 | ✅ |
+| **B** | classification cache 接入 classifyProject() + invalidate CLI | ✅ |
+| **C-1** | RepairEmitter memory sink → L2 self-heal-log | ✅ |
+| **C-2** | repair-log mining + 22 patterns（带 category 分类） | ✅ |
+| **C-3** | recall + 三层 inject 接入 worker codegen | ✅ |
+| **C-4** | 注入归因（success/fail → score 自动调） | ✅ |
+| **C-5** | approve / disapprove CLI（manual:approved 通道） | ✅ |
+| **C-6** | A/B 比较 harness + golden-set 文档 | ✅（手动跑） |
+| **C-7** | Memory UI + SuggestionBanner | ✅ |
+| **C-8** | UI 归因按钮 + result banner | ✅ |
+| **D（未启动）** | LLM-based distiller / scaffold-fitness / agent-tuning / model-routing / Replay mode / 向量召回 | ⏸️ |
+
+---
+
+## 15. 风险与回滚
+
+### 15.1 三层 env 开关
+
+```bash
+MEMORY_ENABLED=true   # 总闸：所有 recall/save 开关
+MEMORY_INJECT=false   # 注入开关：false = active 也不进 prompt（仅 trace）
+MEMORY_CACHE=true     # classification cache 读写
+```
+
+**当前默认配置**（保守）：
+- `MEMORY_ENABLED=true`：写入和召回都跑
+- `MEMORY_INJECT=false`：默认不真注入。即使 approve 了 patterns，prompt 也不会变
+- `MEMORY_CACHE=true`：classification cache 默认开（已通过 R1-R5 测试）
+
+**想真灰度试 inject**：`.env.local` 写 `MEMORY_INJECT=true`，跑 kickoff，回 `/memory` 看 hits 列变化。
+
+### 15.2 回滚路径
+
+| 档级 | 操作 | 影响 |
+|---|---|---|
+| 软关闭 | `MEMORY_ENABLED=false` | recall 返回空、save 短路。退化到接入前 |
+| 半关闭 | `MEMORY_INJECT=false` | 只写不读，纯观察模式 |
+| 单关 | `MEMORY_CACHE=false` | classifier 不查 cache 但其他正常 |
+| 硬关闭 | `rm -rf .memory/` + `git revert <pr>` | 彻底回到 0 |
+
+回滚不动 `.ralph/` —— memory 系统对 `.ralph/` 是只读 + 旁路。
+
+### 15.3 风险等级矩阵（实测后）
+
+| 风险 | 等级 | 当前缓解 |
+|---|---|---|
+| memory 写入失败拖崩 task | 🟢 → 已缓解 | 全部 try/catch + fire-and-forget；91 tests pass |
+| classification cache 返回过期结果 | 🟡 | normalize hash + PROMPT_VERSION + invalidate CLI |
+| 注入 pattern 劣化 codegen 质量 | 🟡 | (a) 默认 MEMORY_INJECT=false (b) score 阈值 (c) attribution 自动汰换 |
+| Electron 打包遗漏 native 模块 | 🟢 → N/A | 没引入 native（用纯文件，不用 better-sqlite3）|
+| Adapter 与原始 JSONL schema 漂移 | 🟢 → N/A | 暂未实装 model-scorecard adapter |
+| 多 kickoff 并发损坏索引 | 🟢 | proper-lockfile + 进程内 Promise 队列；并发测试通过 |
+| 磁盘膨胀 | 🟢 | per-record 文件平均 ~2KB；可手动 rm |
+| **Mining 出 noise pattern 误注入** | 🟡（实测有） | C-2 加 category 分流 + UI banner + score=0 默认 |
+
+---
+
+## 16. 演进路径
+
+### 16.1 何时考虑切换到 Graphiti
+触发条件（任一）：
+- L1 `failure-pattern` 数 > 200，关键词召回 precision 跌破 0.5
+- 出现明确的图查询需求（"playwright 相关 → 路由到 → vite-config 的所有失败"）
+- 多用户场景，需要时序去重 / 实体合并
 
 切换路径：
+1. 实现 `GraphitiStore implements MemoryStore`
+2. 写 `npm run memory:export` 把 FileStore records 灌入 Graphiti（保留 id）
+3. 通过 env 切 `MEMORY_BACKEND=graphiti`
+4. 业务代码零改动
 
-1. 实现 `GraphitiStore implements MemoryStore`。
-2. 写一个 `npm run memory:export` 把 FileStore 的所有 record 灌入 Graphiti（保留 id）。
-3. 通过 env 切换 `MEMORY_BACKEND=graphiti`。
-4. 业务代码零改动。
-
-### 13.2 v2 待办
-
-- 自动 distill（不依赖人工触发）
-- 向量召回（sqlite-vec）
-- 跨用户云端同步
-- 记忆质量自动评分（用召回后的 task 成败率反向打分）
-- 记忆"过期"机制（stack/version 升级时自动 deprecate）
-
----
-
-## 14. 待定问题（需 owner 决策）
-
-| Q | 选项 | 倾向 |
-|---|---|---|
-| Q1: L1 `.memory/` 是否进 git？ | (a) 全 commit (b) 只 commit markdown，索引 ignore (c) 全 ignore | **(b)**——markdown 是知识资产，索引是缓存 |
-| Q2: L2 `.memory/` 是否进 generated 项目的 git？ | (a) 进 (b) 不进 | **(a)**——让生成的项目带着记忆走，二次开发也受益 |
-| Q3: failure-pattern distill 用哪个 model？ | Haiku 4.5 / Sonnet 4.6 | **Sonnet 4.6**——distill 质量决定上限 |
-| Q4: L2 `api-contracts.snapshot.json` 与现有 `generated-code/API_CONTRACTS.json` 关系 | (a) 替代 (b) 共存（snapshot 是历史版本） | **(b)**——避免破坏现有 pipeline |
-| Q5: 召回的 token 预算上限？ | 无限 / 800 / 1500 | **1500**——超过截断，按 score 取 top |
-| Q6: distillation 触发频率 | 手动 / 项目结束自动 / cron | v1 **手动**，v2 自动 |
+### 16.2 Phase D 路线（未启动，按 ROI 排序）
+1. **LLM-based distiller**（增强 mining）—— 把 self-heal-log 的 reason 文本 → 提炼"症状/根因/修法"三段式 markdown，比 rule-based 更高质量
+2. **scaffold-fitness 自动写入**（kickoff 完成时记 tier+type+scaffold→build/e2e 通过率）
+3. **agent-tuning 自动写入**（QAAgent / VerifierAgent 给某个 agent 打负分时沉淀）
+4. **codebase-map 接 codegen**（每次写文件后 patch L2 codebase-map）
+5. **Replay mode CLI**（用某时间点的 memory snapshot 重跑历史 kickoff，做 regression）
+6. **跨用户云端同步**（多机共享 L1 知识）
+7. **向量召回**（sqlite-vec，>200 条记忆时启用）
 
 ---
 
-## 15. 文件清单（Phase A 实现时落地）
+## 17. 文件清单（实际落地）
 
 ```
 src/lib/memory/
-├── types.ts                          # MemoryRecord / MemoryStore / RecallQuery
-├── index.ts                          # getSystemMemory / getProjectMemory
-├── file-store.ts                     # FileStore implementation
-├── sqlite-index.ts                   # FTS5 索引层
-├── recall-config.ts                  # 排序权重
-├── schemas/                          # zod schemas per kind
+├── types.ts                                MemoryRecord / MemoryStore / RecallQuery
+├── env.ts                                  3 个 env flag 解析
+├── recall-config.ts                        召回排序权重 + token 预算
+├── index.ts                                getSystemMemory / getProjectMemory factory + cache
+├── file-store.ts                           ★ 主实现：per-record + metrics 分离 + 锁
+├── inject.ts                               <memory-context> 渲染 + token 预算
+├── recall-context.ts                       ★ Phase C-3 三层入口
+├── recorders.ts                            recordProjectCard / recordTaskHistory / recordSelfHealLog
+├── event-bridge.ts                         wrapPipelineEventHandler（订阅 PipelineEvent）
+├── self-heal-sink.ts                       订阅 RepairEvent → L2
+├── trace.ts                                FileTraceLogger
+├── cli.ts                                  list/show/search/recall/stats/trace/approve/disapprove/invalidate
+├── distill/
+│   ├── repair-log-miner.ts                 ★ Phase C-2 mining + classifyPatternNature
+│   └── attribution.ts                      ★ Phase C-4 computeAttributions
+├── schemas/
+│   ├── index.ts                            kind → format/schema 注册表
 │   ├── classification.ts
-│   ├── failure-pattern.ts
 │   ├── task-history.ts
-│   └── ...
-├── inject.ts                         # <memory-context> wrapper
-├── trace.ts                          # observability hook
-├── cli.ts                            # 所有 npm run memory:* 入口
-├── distiller.ts                      # L2 → L1
-├── distiller-prompts.ts
-└── __tests__/
-    ├── file-store.test.ts
-    ├── recall.test.ts
-    └── concurrency.test.ts
+│   ├── project-card.ts
+│   ├── codebase-map.ts
+│   └── self-heal-log.ts                    Phase C-1
+└── __tests__/                              91 个测试
+
+scripts/
+├── memory-cli.ts                           入口 dispatcher
+├── memory-mine-patterns.ts                 Phase C-2 CLI
+├── memory-attribute.ts                     Phase C-4 CLI
+└── memory-ab-compare.ts                    Phase C-6 CLI
+
+src/app/api/memory/
+├── route.ts                                GET list
+├── [id]/route.ts                           GET / PATCH / DELETE
+├── [id]/approve/route.ts                   POST
+├── [id]/disapprove/route.ts                POST
+└── attribute/route.ts                      POST（C-8）
+
+src/app/(dashboard)/memory/
+└── page.tsx                                /memory 路由
+
+src/components/memory/
+├── MemoryFilterBar.tsx                     tabs + search + Run Attribution 按钮
+├── MemoryListSidebar.tsx                   左栏列表
+├── MemoryRecordDetail.tsx                  右栏详情 + 编辑 + actions + score slider
+└── SuggestionBanner.tsx                    UI 启发式建议横幅
+
+src/store/
+└── memory-store.ts                         zustand state
+
+tests/memory/
+└── ab-golden-set.json                      Phase C-6 5 条 brief
+
+修改的现有文件:
+├── src/components/AppNav.tsx               + Memory link
+├── src/store/pipeline-store.ts             + kickoffSessionId
+├── src/app/api/agents/pipeline/route.ts    + wrapPipelineEventHandler
+├── src/app/api/agents/kickoff/route.ts     + wrapPipelineEventHandler
+├── src/app/api/agents/coding/route.ts      + createMemorySelfHealSink
+├── src/lib/agents/shared/project-classifier.ts  + cache wrapper
+└── src/lib/langgraph/agent-subgraph.ts     + recallAndPrepareInject 注入
 ```
-
-orchestrator / agent 改动点：
-
-- `src/lib/agents/shared/project-classifier.ts`：加 cache 包装。
-- `src/lib/pipeline/coding-orchestrator.ts`：task 生命周期事件写 L2。
-- `src/lib/agents/kickoff/code-gen-agent.ts`：prompt 拼装时 recall + inject。
-- `src/lib/pipeline/self-heal/`：成功修复时写 L2 self-heal-log。
 
 ---
 
-## 附录 A：MemoryRecord 示例
+## 18. 待定问题（v2 状态）
 
-### A.1 failure-pattern（L1，手写种子）
+| Q | 决策 | 落地 |
+|---|---|---|
+| Q1: L1 `.memory/` 进 git？ | (b) markdown 进、metrics/trace/lock 不进 | ✅ .gitignore 落实 |
+| Q2: L2 进 generated 项目 git？ | (a) 进——让生成的项目带着记忆走 | ✅ generated-code/.memory 当前未被 ignore |
+| Q3: distillation 用哪个 model？ | rule-based mining 起步；LLM distill 留 Phase D | ✅ |
+| Q4: api-contracts 与现有 API_CONTRACTS.json 关系 | (b) 共存 | ✅ memory 不动 .ralph/ |
+| Q5: 召回 token 预算上限？ | 1500（INJECT_TOKEN_BUDGET）| ✅ recall-config.ts |
+| Q6: distill 触发频率 | 手动（`npm run memory:mine-patterns` / `memory:attribute`）；UI 按钮触发 attribution | ✅ |
+| **Q7（新）**: Approve 应该 score 设多少？ | 默认 0.5；UI 滑条可改；CLI `--score=` flag | ✅ |
+| **Q8（新）**: 失败惩罚 / 成功奖励比？ | 失败：奖励 = 2:1（δf=-0.10, δs=+0.05） | ✅ DEFAULT_DELTA_* |
+| **Q9（新）**: manual:approved 是否可被归因降级？ | 永久免疫——人类 vouch 比机器统计更可信 | ✅ attribution.ts |
+
+---
+
+## 附录 A: MemoryRecord 示例
+
+### A.1 failure-pattern (mined, real-failure category)
+
+文件: `.memory/records/failure-pattern/FP-mined-architect-triage-task-forced-to-llm.md`
 
 ```markdown
 ---
-id: FP-prisma-migration-parallel
-layer: L1
-kind: failure-pattern
-title: Prisma migration conflicts on parallel branch generation
-tags: [stack:prisma, agent:codegen, severity:high]
-source: manual
-createdAt: 1714161600000
-schemaVersion: 1
+{"id":"FP-mined-architect-triage-task-forced-to-llm","layer":"L1","kind":"failure-pattern","title":"architect-triage · Task references 10 file(s) outside the scaffold's protected…","tags":["mined","stage:architect-triage","event:task_forced_to_llm","category:real-failure","ext:ts","ext:env"],"source":"distill","refs":{},"createdAt":...,"updatedAt":...,"schemaVersion":1}
 ---
 
+# architect-triage — task_forced_to_llm
+
+## What this records
+Stage `architect-triage` triggered `task_forced_to_llm` **20** times across 0 session(s).
+
 ## Symptoms
-- `prisma migrate dev` fails with "P3009: migrate found failed migrations"
-- Multiple agents generated migrations with overlapping timestamps
+Top reasons captured in past events:
+- (×3) Task references 10 file(s) outside the scaffold's protected paths — real work must be generated.
+- (×3) Task references 15 file(s) outside the scaffold's protected paths — real work must be generated.
 
-## Root cause
-并行 task 各自 codegen 出 migration 时未锁 schema 版本。
+## How to avoid (FILL IN)
+> ⚠️ This section is the actual content the LLM will see. Write specific, actionable guidance:
+> - Describe the trigger condition
+> - Give the prevention rule
+> - Mention any task-type / stack signals
 
-## Fix
-- codegen 前 acquire schema lock
-- migration 文件名加入 task id 前缀
-- 失败时回退到 `prisma migrate reset` + 重新 apply
+## Recommended action
+🟢 **Edit "How to avoid" with project-specific guidance, then Approve.** 20 occurrences indicate this is a real recurring problem.
 
-## Applicable when
-任何使用 Prisma + 并行 task 的 M-tier 以上项目。
+## Sample task titles
+- Setup database schema and Sequelize models for records
+- Setup database models and validation schemas
+
+## Raw stats
+- Stage: `architect-triage` · Event: `task_forced_to_llm`
+- 20 occurrences across 0 session(s)
+- Outcomes: fixed=0, progress=0, gave_up=0, other=20
+- File types touched: `.ts`, `.env`, `.yml`, `.js`, `.sql`
 ```
 
-### A.2 task-history（L2）
+### A.2 task-history (L2)
 
 ```json
 {
   "id": "TH-K42-T018",
   "layer": "L2",
   "kind": "task-history",
-  "title": "Add JWT auth middleware",
-  "tags": ["taskType:auth", "agent:codegen"],
+  "title": "Add JWT auth (completed)",
+  "tags": ["kickoff:K42", "taskId:T018", "status:completed", "step:kickoff"],
   "source": "orchestrator",
-  "refs": { "kickoffId": "K-42", "taskId": "T-018" },
-  "body": "{\"status\":\"completed\",\"attempts\":2,\"costUsd\":0.34,\"durationMs\":48211,\"files\":[\"backend/src/middleware/auth.ts\",\"backend/src/routes/auth.ts\"],\"selfHealTriggered\":true,\"selfHealLogId\":\"SH-K42-001\"}",
-  "metrics": { "hits": 0 },
+  "refs": { "kickoffId": "K42", "taskId": "T018" },
   "createdAt": 1714161900000,
   "updatedAt": 1714161948000,
-  "schemaVersion": 1
+  "schemaVersion": 1,
+  "body": {
+    "status": "completed",
+    "attempts": 2,
+    "costUsd": 0.34,
+    "durationMs": 48211,
+    "totalTokens": 12340,
+    "files": ["backend/src/middleware/auth.ts"],
+    "selfHealTriggered": true,
+    "selfHealLogId": "SH-K42-001"
+  }
 }
 ```
+
+### A.3 self-heal-log (L2)
+
+```json
+{
+  "id": "SH-K-smoke-architect-triage-x-T-001",
+  "layer": "L2",
+  "kind": "self-heal-log",
+  "title": "architect-triage · other",
+  "tags": ["kickoff:K-smoke","stage:architect-triage","outcome:other","taskId:T-001","ext:ts","ext:env"],
+  "source": "self-heal",
+  "refs": { "kickoffId": "K-smoke", "taskId": "T-001" },
+  "schemaVersion": 1,
+  "body": {
+    "stage": "architect-triage",
+    "event": "task_forced_to_llm",
+    "outcome": "other",
+    "taskId": "T-001",
+    "files": ["backend/src/models/Task.ts","..."],
+    "details": {
+      "reason": "Task references 8 file(s) outside the scaffold's protected paths — real work must be generated.",
+      "title": "Setup database models and migrations for Task entity",
+      "phase": "Data Layer"
+    },
+    "occurredAt": "2026-04-24T10:04:20.449Z"
+  }
+}
+```
+
+---
+
+## 附录 B: A/B 实测 recipe (Phase C-6)
+
+```bash
+# 前提：先 mine + approve 至少 3-5 条 patterns（score ≥ 0.3 或 manual:approved）
+
+# 选一条 brief（如 BRIEF-1-clock from tests/memory/ab-golden-set.json）
+
+# 1. baseline run (memory 不注入)
+MEMORY_ENABLED=true MEMORY_INJECT=false \
+  npm run electron:dev
+# 在 UI 输入 brief，codeOutputDir = "out-baseline-clock"
+# kickoff 完整跑完
+
+# 2. treatment run (memory 注入)
+MEMORY_ENABLED=true MEMORY_INJECT=true \
+  npm run electron:dev
+# 输入相同 brief，codeOutputDir = "out-treatment-clock"
+
+# 3. 比较
+npm run memory:ab-compare -- \
+  --baseline=out-baseline-clock \
+  --treatment=out-treatment-clock
+
+# 4. 把 treatment 的归因数据吸收进 score
+npm run memory:attribute -- --project=out-treatment-clock
+
+# 5. 重复 5+ 个 brief。Verdict 阈值：
+#    - self-heal triggers ↓ ≥20%
+#    - cost regression ≤ 5%
+#    - 无 session score 下降
+```
+
+数据沉淀点：每跑一次 treatment，对应的 patterns 的 score 通过归因自动调整。良性循环。

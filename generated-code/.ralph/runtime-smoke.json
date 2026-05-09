@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-29T11:52:40.351Z",
-  "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+  "generatedAt": "2026-05-07T08:14:03.111Z",
+  "sessionId": "77db6cd6-d801-4b91-9526-4092d5c61532",
   "pass": false,
   "bootFailed": true,
   "failures": [
@@ -8,7 +8,7 @@
       "code": "backend_did_not_start",
       "target": "_boot",
       "directive": "Backend `pnpm dev` did not reach a listening state. Inspect the stderr tail in `evidence` — common causes: missing PORT/DATABASE_URL/PRIVY_APP_ID in `backend/.env`, Sequelize model init throwing, or a TS error that crashed `tsx`.",
-      "evidence": "Backend did not become ready within 30000ms. tail=ode/AgenticBuilder/generated-code/backend/\u001b[39msrc/config/env.ts:12:11\u001b[90m)\u001b[39m\n    at crypto \u001b[90m(/Users/57block/code/AgenticBuilder/generated-code/backend/\u001b[39msrc/config/env.ts:38:3\u001b[90m)\u001b[39m\n    at Object.<anonymous> \u001b[90m(/Users/57block/code/AgenticBuilder/generated-code/backend/\u001b[39msrc/config/env.ts:78:71\u001b[90m)\u001b[39m\n\u001b[90m    at Module._compile (node:internal/modules/cjs/loader:1730:14)\u001b[39m\n    at Object.transformer \u001b[90m(/Users/57block/code/AgenticBuilder/generated-code/backend/\u001b[39mnode_modules/\u001b[4m.pnpm\u001b[24m/tsx@4.21.0/node_modules/\u001b[4mtsx\u001b[24m/dist/register-D46fvsV_.cjs:3:1104\u001b[90m)\u001b[39m\n\u001b[90m    at Module.load (node:internal/modules/cjs/loader:1465:32)\u001b[39m\n\u001b[90m    at Function._load (node:internal/modules/cjs/loader:1282:12)\u001b[39m\n\u001b[90m    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\u001b[39m\n\u001b[90m    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\u001b[39m\n\u001b[90m    at Module.require (node:internal/modules/cjs/loader:1487:12)\u001b[39m\n\nNode.js v22.16.0\n"
+      "evidence": "Backend did not become ready within 30000ms. tail=al/streams/readable:392:5)\u001b[39m\n  \u001b[90m    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)\u001b[39m {\n    length: \u001b[33m198\u001b[39m,\n    severity: \u001b[32m'ERROR'\u001b[39m,\n    code: \u001b[32m'0A000'\u001b[39m,\n    detail: \u001b[90mundefined\u001b[39m,\n    hint: \u001b[32m'The extension must first be installed on the system where PostgreSQL is running.'\u001b[39m,\n    position: \u001b[90mundefined\u001b[39m,\n    internalPosition: \u001b[90mundefined\u001b[39m,\n    internalQuery: \u001b[90mundefined\u001b[39m,\n    where: \u001b[90mundefined\u001b[39m,\n    schema: \u001b[90mundefined\u001b[39m,\n    table: \u001b[90mundefined\u001b[39m,\n    column: \u001b[90mundefined\u001b[39m,\n    dataType: \u001b[90mundefined\u001b[39m,\n    constraint: \u001b[90mundefined\u001b[39m,\n    file: \u001b[32m'extension.c'\u001b[39m,\n    line: \u001b[32m'673'\u001b[39m,\n    routine: \u001b[32m'parse_extension_control_file'\u001b[39m,\n    sql: \u001b[32m'CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;'\u001b[39m,\n    parameters: \u001b[90mundefined\u001b[39m\n  },\n  sql: \u001b[32m'CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;'\u001b[39m,\n  parameters: {}\n}\n\nNode.js v22.16.0\n"
     }
   ],
   "successes": [],

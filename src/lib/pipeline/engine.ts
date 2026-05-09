@@ -26,6 +26,7 @@ import {
   classifyProject,
   normalizeProjectTier,
 } from "@/lib/agents";
+import { persistTrdArtifactsFromContent } from "@/lib/agents/architect/persist-trd-artifacts";
 import type { AgentResult } from "@/lib/agents";
 import type { ProjectTier, ProjectClassification } from "@/lib/agents";
 import type {
@@ -394,6 +395,7 @@ export class PipelineEngine {
           this.trdAgent.generateTRD(prdContent, undefined, run.sessionId),
         );
         if (run.status === "failed") return run;
+        await this.persistTrdArtifacts(run);
       } else {
         run = this.emitStubCompleted(
           run,
@@ -1051,6 +1053,68 @@ export class PipelineEngine {
    * LLM-based structured PRD extraction. Attaches `prdSpec` to `steps.prd.metadata`.
    * Non-blocking — errors are logged but never fail the pipeline.
    */
+  /**
+   * After TRD generation succeeds, parse the response for fenced code
+   * blocks emitted under §6 / §7 and persist them. Delegates the I/O to
+   * persistTrdArtifactsFromContent (shared with the parallel-generate
+   * route) and just enriches step.metadata so the UI can surface the
+   * outcome.
+   *
+   * Best-effort: a missing/malformed block degrades to "no shared schema"
+   * (downstream codegen falls back to per-worker types) rather than
+   * failing the step.
+   */
+  private async persistTrdArtifacts(run: PipelineRun): Promise<void> {
+    const trd = run.steps.trd;
+    if (!trd?.content || trd.status !== "completed") return;
+    if (trd.metadata?.skipped) return;
+
+    const blueprintDir = path.resolve(process.cwd(), ".blueprint");
+
+    let result;
+    try {
+      result = await persistTrdArtifactsFromContent(trd.content, blueprintDir);
+    } catch (err) {
+      console.warn(
+        "[Pipeline] TRD artifact persistence failed:",
+        err instanceof Error ? err.message : err,
+      );
+      return;
+    }
+
+    const writtenRel: { schemaTs?: string; rulesYaml?: string } = {};
+    if (result.written.schemaTs) {
+      writtenRel.schemaTs = path.relative(process.cwd(), result.written.schemaTs);
+    }
+    if (result.written.rulesYaml) {
+      writtenRel.rulesYaml = path.relative(process.cwd(), result.written.rulesYaml);
+    }
+
+    if (result.rulesValidation && !result.rulesValidation.ok) {
+      console.warn(
+        `[Pipeline] business-rules.dsl.yaml has ${result.rulesValidation.warnings.length} warning(s):`,
+        result.rulesValidation.warnings
+          .map((w) => `${w.code}: ${w.message}`)
+          .join("; "),
+      );
+    }
+
+    run.steps.trd = {
+      ...trd,
+      metadata: {
+        ...trd.metadata,
+        artifacts: {
+          ...writtenRel,
+          unknownPaths: result.artifacts.unknown.map((u) => u.path),
+          malformed: result.artifacts.malformed,
+          ...(result.rulesValidation
+            ? { rulesValidation: result.rulesValidation }
+            : {}),
+        },
+      },
+    };
+  }
+
   private async attachPrdStructuredSpec(
     run: PipelineRun,
   ): Promise<PipelineRun> {

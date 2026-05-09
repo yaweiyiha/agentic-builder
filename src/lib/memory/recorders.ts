@@ -9,6 +9,7 @@
 import { getProjectMemory } from "./index";
 import { memoryEnabled } from "./env";
 import { getTraceLogger } from "./trace";
+import { classifyFailureMode } from "./distill/failure-mode";
 import type { MemoryRecord, SaveInput } from "./types";
 
 export interface SelfHealLogInput {
@@ -139,6 +140,11 @@ export interface TaskHistoryInput {
   tags?: string[];
   /** Human title; defaults to `${taskId} (${status})`. */
   title?: string;
+  /** Coarse bucket label; if omitted, callers can derive via inferTaskKind. */
+  taskKind?: string;
+  /** Failure category. Auto-derived from errorMessage when omitted and the
+   *  task is in a failed state. */
+  failureMode?: string;
 }
 
 export async function recordProjectCard(
@@ -184,6 +190,13 @@ export async function recordTaskHistory(
   try {
     const store = getProjectMemory(input.outputDir);
     const id = `TH-${input.kickoffId}-${input.taskId}`;
+    // Auto-derive failure mode for terminal failures so callers don't need
+    // to classify themselves; explicit input still wins.
+    const failureMode =
+      input.failureMode ??
+      (input.status === "failed"
+        ? classifyFailureMode(input.errorMessage)
+        : undefined);
     const bodyObj = {
       status: input.status,
       attempts: input.attempts ?? 1,
@@ -194,6 +207,8 @@ export async function recordTaskHistory(
       errorMessage: input.errorMessage,
       startedAt: input.startedAt,
       endedAt: input.endedAt,
+      taskKind: input.taskKind,
+      failureMode,
     };
     const saveInput: SaveInput = {
       id,
@@ -205,6 +220,8 @@ export async function recordTaskHistory(
         `kickoff:${input.kickoffId}`,
         `taskId:${input.taskId}`,
         `status:${input.status}`,
+        ...(input.taskKind ? [`task-kind:${input.taskKind}`] : []),
+        ...(failureMode ? [`failure-mode:${failureMode}`] : []),
         ...(input.tags ?? []),
       ],
       source: "orchestrator",
@@ -216,7 +233,13 @@ export async function recordTaskHistory(
       layer: "L2",
       kickoffId: input.kickoffId,
       taskId: input.taskId,
-      details: { kind: "task-history", id: saved.id, status: input.status },
+      details: {
+        kind: "task-history",
+        id: saved.id,
+        status: input.status,
+        ...(input.taskKind ? { taskKind: input.taskKind } : {}),
+        ...(failureMode ? { failureMode } : {}),
+      },
     });
     return saved;
   } catch (err) {

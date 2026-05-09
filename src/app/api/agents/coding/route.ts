@@ -13,6 +13,7 @@ import {
   listScaffoldTemplateRelativePaths,
   type ScaffoldTier,
 } from "@/lib/pipeline/scaffold-copy";
+import { distributeSharedSchema } from "@/lib/pipeline/shared-schema-distributor";
 import {
   getTierScaffoldSpecForCodingContext,
   writeScaffoldSpecFile,
@@ -824,6 +825,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Replicate the TRD-confirmed shared schema (.blueprint/shared-schema.ts)
+  // into the per-tier consumer roots so workers see a single source of
+  // truth for cross-boundary types. No-op when the TRD step did not emit
+  // a schema (S-tier projects often skip TRD entirely).
+  let distributedSharedSchemaPaths: string[] = [];
+  try {
+    const dist = await distributeSharedSchema(tier, outputRoot);
+    distributedSharedSchemaPaths = dist.written;
+    if (dist.found) {
+      console.log(
+        `[CodingAPI] Shared schema distributed: ${dist.written.length} location(s) — ${dist.written.join(", ")}`,
+      );
+    } else {
+      console.log(
+        `[CodingAPI] Shared schema not distributed: source ${dist.sourcePath} missing or empty (TRD likely skipped).`,
+      );
+    }
+  } catch (e) {
+    console.warn(
+      `[CodingAPI] distributeSharedSchema warning: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
   const resolvedDbUrl = resolveBlueprintGeneratedDatabaseUrl(databaseUrlBody);
   if (resolvedDbUrl) {
     try {
@@ -900,6 +924,12 @@ export async function POST(request: NextRequest) {
   }
 
   const scaffoldProtectedPaths = await listScaffoldTemplateRelativePaths(tier);
+  // Distributed shared-schema files are written outside the scaffold
+  // template walker, so merge them in explicitly. Workers must not
+  // overwrite the canonical TRD-frozen schema.
+  for (const p of distributedSharedSchemaPaths) {
+    if (!scaffoldProtectedPaths.includes(p)) scaffoldProtectedPaths.push(p);
+  }
 
   // Run installs for every package root present in the scaffold.
   const installTargets = tier === "M" ? ["frontend", "backend"] : [""];

@@ -7,7 +7,6 @@ import PipelineNav from "@/components/PipelineNav";
 import { useStageStore, type StageId } from "@/store/stage-store";
 import { usePipelineStore } from "@/store/pipeline-store";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import PreparationStage from "./_stages/preparation";
 import KickoffStage     from "./_stages/kickoff";
 import CodingStage      from "./_stages/coding";
@@ -29,6 +28,7 @@ export default function ProjectPage() {
   const projectId   = params.projectId;
 
   const activeStage            = useStageStore((s) => s.activeStage);
+  const goToStage              = useStageStore((s) => s.goToStage);
   const stageLoadFromServer    = useStageStore((s) => s.loadFromServer);
   const pipelineLoadFromServer = usePipelineStore((s) => s.loadFromServer);
   const setProjectSlugForSync  = usePipelineStore((s) => s.setProjectSlugForSync);
@@ -53,7 +53,7 @@ export default function ProjectPage() {
       {/* ── Header ── */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white/90 backdrop-blur-sm px-6 relative z-10">
         <div className="flex items-center gap-6">
-          <PipelineNav />
+          <PipelineNav activeStage={activeStage} onStageChange={goToStage} />
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-[#64748b]">

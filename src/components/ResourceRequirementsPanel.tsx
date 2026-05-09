@@ -60,6 +60,10 @@ export default function ResourceRequirementsPanel({
   const [detectError, setDetectError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [addManualOpen, setAddManualOpen] = useState(false);
+  const [manualEnvDraft, setManualEnvDraft] = useState("MY_API_KEY");
+  const [manualFormError, setManualFormError] = useState<string | null>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,28 +161,28 @@ export default function ResourceRequirementsPanel({
     });
   };
 
-  const handleClear = async () => {
-    const ok = window.confirm(
-      "Clear all detected resources? Saved values will be lost.",
-    );
-    if (!ok) return;
-    setItems([]);
-    void persistItems([]);
+  const openAddManual = () => {
+    setManualEnvDraft("MY_API_KEY");
+    setManualFormError(null);
+    setAddManualOpen(true);
   };
 
-  const handleAddBlank = () => {
-    const envKey = window.prompt(
-      "Env var name (UPPER_SNAKE_CASE):",
-      "MY_API_KEY",
-    );
-    if (!envKey) return;
-    const cleaned = envKey
+  const closeAddManual = () => {
+    setAddManualOpen(false);
+    setManualFormError(null);
+  };
+
+  const submitAddManual = () => {
+    const cleaned = manualEnvDraft
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9_]/g, "_");
-    if (!cleaned) return;
+    if (!cleaned) {
+      setManualFormError("Enter a variable name.");
+      return;
+    }
     if (items.some((it) => it.envKey === cleaned)) {
-      window.alert(`${cleaned} already exists.`);
+      setManualFormError(`${cleaned} already exists.`);
       return;
     }
     const next: ResourceRequirement[] = [
@@ -194,6 +198,13 @@ export default function ResourceRequirementsPanel({
     ];
     setItems(next);
     void persistItems(next);
+    closeAddManual();
+  };
+
+  const confirmClearAll = () => {
+    setItems([]);
+    void persistItems([]);
+    setClearConfirmOpen(false);
   };
 
   const stats = useMemo(() => {
@@ -206,6 +217,7 @@ export default function ResourceRequirementsPanel({
   }, [items]);
 
   return (
+    <>
     <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.06)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -242,14 +254,14 @@ export default function ResourceRequirementsPanel({
             <>
               <button
                 type="button"
-                onClick={handleAddBlank}
+                onClick={openAddManual}
                 className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
               >
                 Add manually
               </button>
               <button
                 type="button"
-                onClick={handleClear}
+                onClick={() => setClearConfirmOpen(true)}
                 className="rounded-md border border-red-200 bg-white px-3 py-2 text-[12px] font-semibold text-red-700 transition-colors hover:bg-red-50"
               >
                 Clear all
@@ -409,5 +421,131 @@ export default function ResourceRequirementsPanel({
         </>
       )}
     </div>
+
+    <AnimatePresence>
+      {addManualOpen && (
+        <motion.div
+          role="presentation"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6 backdrop-blur-[2px]"
+          onClick={closeAddManual}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-env-title"
+            initial={{ scale: 0.96, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.96, opacity: 0 }}
+            transition={{ type: "spring", damping: 26, stiffness: 320 }}
+            className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="add-env-title"
+              className="text-[15px] font-semibold text-zinc-900"
+            >
+              Add environment variable
+            </h2>
+            <p className="mt-1 text-[12px] text-zinc-500">
+              Use UPPER_SNAKE_CASE. Invalid characters become underscores.
+            </p>
+            <label htmlFor="manual-env-key" className="mt-4 block">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                Name
+              </span>
+              <input
+                id="manual-env-key"
+                type="text"
+                value={manualEnvDraft}
+                onChange={(e) => {
+                  setManualEnvDraft(e.target.value);
+                  if (manualFormError) setManualFormError(null);
+                }}
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+                className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="MY_API_KEY"
+              />
+            </label>
+            {manualFormError && (
+              <p className="mt-2 text-[12px] text-red-600">{manualFormError}</p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeAddManual}
+                className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitAddManual}
+                className="rounded-md bg-zinc-900 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-zinc-800"
+              >
+                Add
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    <AnimatePresence>
+      {clearConfirmOpen && (
+        <motion.div
+          role="presentation"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6 backdrop-blur-[2px]"
+          onClick={() => setClearConfirmOpen(false)}
+        >
+          <motion.div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="clear-env-title"
+            initial={{ scale: 0.96, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.96, opacity: 0 }}
+            transition={{ type: "spring", damping: 26, stiffness: 320 }}
+            className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-5 shadow-xl shadow-red-900/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="clear-env-title"
+              className="text-[15px] font-semibold text-red-900"
+            >
+              Clear all resources?
+            </h2>
+            <p className="mt-2 text-[12px] leading-relaxed text-zinc-600">
+              This removes every detected resource and clears saved credential
+              values. You can detect again from the PRD afterward.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setClearConfirmOpen(false)}
+                className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmClearAll}
+                className="rounded-md bg-red-600 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Clear all
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

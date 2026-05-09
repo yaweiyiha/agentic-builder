@@ -22,6 +22,9 @@ import {
 } from "@/lib/openrouter";
 import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
 import { recallAndPrepareInject } from "@/lib/memory/recall-context";
+import { getInjectTokenBudgetForRole } from "@/lib/memory/recall-config";
+import { classifyFailureMode } from "@/lib/memory/distill/failure-mode";
+import { parseMemoryCites, recordMemoryCites } from "@/lib/memory/cite";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
@@ -581,6 +584,32 @@ export async function buildProjectConventionCard(
     lines.push("- **JWT**: use `signJwt`/`verifyJwt` from `backend/src/utils/jwt.ts`. Never call `jsonwebtoken` directly in feature code.");
   }
 
+  // ── Shared schema (TRD §6 product) ───────────────────────────────────────
+  // Detect either side: distributor writes both for M-tier; for S/L only one
+  // location applies. If found, instruct workers to import from it rather
+  // than re-declare any type whose name appears there.
+  const sharedSchemaCandidates = [
+    "frontend/src/shared/schema.ts",
+    "backend/src/shared/schema.ts",
+    "src/shared/schema.ts",
+    "packages/shared/src/schema.ts",
+  ];
+  const presentSchemas: string[] = [];
+  for (const p of sharedSchemaCandidates) {
+    const content = await fsRead(p, outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      presentSchemas.push(p);
+    }
+  }
+  if (presentSchemas.length > 0) {
+    lines.push(
+      `- **Shared schema (CANONICAL)**: ${presentSchemas.map((p) => `\`${p}\``).join(", ")} — TRD-frozen single source of truth for every type that crosses the API boundary. **Read it first.** Import the types you need; do NOT redefine any type whose name already appears there. The file is scaffold-protected — do NOT rewrite it.`,
+    );
+  }
+
   // ── Playwright webServer & health route (E2E infra contract) ──────────────
   const playwrightCfg = await fsRead("frontend/playwright.config.ts", outputDir);
   if (!playwrightCfg.startsWith("FILE_NOT_FOUND") && !backendPkg.startsWith("FILE_NOT_FOUND")) {
@@ -659,11 +688,36 @@ async function executeWorkerReadonlyTool(
   }
 }
 
+/**
+ * Context required for the worker loop to trigger a second-pass memory
+ * recall mid-task when a fresh error signal appears in tool output or
+ * model content. When omitted, second-pass recall is silently disabled
+ * (loop behaves identically to before).
+ */
+interface SecondaryRecallContext {
+  agent: string;
+  role?: string;
+  task: {
+    id?: string;
+    title?: string;
+    description?: string;
+    files?: string[];
+  };
+  projectRoot?: string;
+  kickoffId?: string;
+  layers?: ("L1" | "L2")[];
+  /** Patterns already injected by the primary recall — excluded from
+   *  second-pass candidates so we don't re-inject the same blocks. */
+  primaryInjectedIds: string[];
+  tokenBudget?: number;
+}
+
 async function runCodegenWorkerLoop(
   messages: ChatMessage[],
   outputDir: string,
   sessionId?: string,
   workerLabel?: string,
+  recallCtx?: SecondaryRecallContext,
 ): Promise<{
   content: string;
   rawContent: string;
@@ -672,12 +726,21 @@ async function runCodegenWorkerLoop(
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /** Pattern ids injected by the secondary recall (empty if not fired). */
+  secondaryInjectedIds: string[];
 }> {
   let totalCostUsd = 0;
   let promptTokens = 0;
   let completionTokens = 0;
   let totalTokens = 0;
   let consecutiveReadRounds = 0;
+  // Track second-pass recall state so we fire it at most once per worker
+  // run — otherwise a chatty model that mentions errors in every round
+  // would burn through the L1 store with redundant injects.
+  let didSecondaryRecall = false;
+  const primaryIds = new Set(recallCtx?.primaryInjectedIds ?? []);
+  const injectedIds = new Set(primaryIds);
+  const secondaryInjectedIds: string[] = [];
 
   for (let i = 0; i < MAX_WORKER_TOOL_ITERATIONS; i++) {
     // Anti-spiral: inject a nudge message after too many consecutive read rounds.
@@ -768,12 +831,14 @@ async function runCodegenWorkerLoop(
         promptTokens,
         completionTokens,
         totalTokens,
+        secondaryInjectedIds,
       };
     }
 
     // All tool calls in this round were read-only — increment the stall counter.
     consecutiveReadRounds++;
 
+    const toolResultTexts: string[] = [];
     for (const toolCall of toolCalls) {
       let args: Record<string, unknown>;
       try {
@@ -795,12 +860,80 @@ async function runCodegenWorkerLoop(
         name: toolCall.function.name,
         content: result,
       });
+      toolResultTexts.push(result);
+    }
+
+    // Second-pass memory recall: if the model's content or any tool result
+    // exposes a fresh error signal we haven't seen before, fetch memories
+    // tailored to that error and append them as a system message. Fired
+    // at most once per worker run — see didSecondaryRecall above.
+    if (recallCtx && !didSecondaryRecall) {
+      const errorSignal = detectErrorSignalForRecall(content, toolResultTexts);
+      if (errorSignal) {
+        didSecondaryRecall = true;
+        const recall = await recallAndPrepareInject({
+          agent: recallCtx.agent,
+          role: recallCtx.role,
+          task: {
+            ...recallCtx.task,
+            description:
+              `${recallCtx.task.description ?? ""}\n\n## Encountered error signal\n${errorSignal.snippet}`.trim(),
+          },
+          projectRoot: recallCtx.projectRoot,
+          kickoffId: recallCtx.kickoffId,
+          layers: recallCtx.layers,
+          tokenBudget: recallCtx.tokenBudget,
+          excludeIds: Array.from(injectedIds),
+          pass: "secondary",
+        });
+        if (recall.block) {
+          for (const r of recall.active) {
+            injectedIds.add(r.id);
+            if (!primaryIds.has(r.id)) secondaryInjectedIds.push(r.id);
+          }
+          messages.push({
+            role: "system",
+            content:
+              `## Memory · second-pass recall (failure-mode: ${errorSignal.mode})\n` +
+              recall.block,
+          });
+        }
+      }
     }
   }
 
   throw new Error(
     `Worker tool loop exceeded ${MAX_WORKER_TOOL_ITERATIONS} iterations without final code output.`,
   );
+}
+
+/**
+ * Scan model output and tool results for a fresh failure-mode signal. We
+ * use the existing failure-mode classifier so the trigger language stays
+ * consistent with the metric bucketing.
+ *
+ * Returns the first non-"unknown" mode + a short snippet for the prompt
+ * augmentation, or null when nothing suspicious is present.
+ */
+export function detectErrorSignalForRecall(
+  modelContent: string,
+  toolResultTexts: string[],
+): { mode: string; snippet: string } | null {
+  const candidates: { source: "model" | "tool"; text: string }[] = [];
+  if (modelContent) candidates.push({ source: "model", text: modelContent });
+  for (const t of toolResultTexts) {
+    if (t) candidates.push({ source: "tool", text: t });
+  }
+
+  for (const c of candidates) {
+    const mode = classifyFailureMode(c.text);
+    if (mode === "unknown") continue;
+    // Keep the snippet short — enough to disambiguate the error in the
+    // recall query but not so long it dominates the description.
+    const snippet = c.text.slice(0, 400);
+    return { mode, snippet };
+  }
+  return null;
 }
 
 interface MalformedFileBlock {
@@ -1669,10 +1802,18 @@ async function generateCode(state: WorkerState) {
       projectRoot: state.outputDir,
       kickoffId: state.sessionId,
       layers: ["L1", "L2"],
+      tokenBudget: getInjectTokenBudgetForRole(state.role),
     });
     if (memoryRecall.block) {
       messages.push({ role: "system", content: memoryRecall.block });
     }
+    // Soft cite instruction — only when memory was actually injected so we
+    // don't spend tokens on instructions for an empty feature. Missing cites
+    // are fine; attribution falls back to "all injected" when none parse.
+    const citeHint =
+      memoryRecall.active.length > 0
+        ? `\n\nIf any record from the <memory-context> block above directly informed your code, declare it before the <plan> tag using:\n  <memory-cite ids="FP-xxx,FP-yyy" />\nList only ids you actually used. Citing is optional but helps the system credit useful patterns.`
+        : "";
     const subStepsHint =
       task.subSteps && task.subSteps.length > 0
         ? `\n\nPre-defined sub-steps:\n${task.subSteps.map((s) => `${s.step}. ${s.action}: ${s.detail}`).join("\n")}`
@@ -1684,7 +1825,7 @@ async function generateCode(state: WorkerState) {
 
     messages.push({
       role: "user",
-      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.\n7. [FRONTEND DATA RULE] If this task renders any list, table, card grid, or detail view that displays backend data: ALL data MUST be fetched from the real API endpoint via the API client. ZERO hardcoded arrays, ZERO mock objects, ZERO placeholder data. Use useEffect + loading/error state. Read \`frontend/src/api/client.ts\` with read_file before coding to get the correct method signatures.`,
+      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}${citeHint}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.\n7. [FRONTEND DATA RULE] If this task renders any list, table, card grid, or detail view that displays backend data: ALL data MUST be fetched from the real API endpoint via the API client. ZERO hardcoded arrays, ZERO mock objects, ZERO placeholder data. Use useEffect + loading/error state. Read \`frontend/src/api/client.ts\` with read_file before coding to get the correct method signatures.`,
     });
 
     const startMs = Date.now();
@@ -1704,6 +1845,25 @@ async function generateCode(state: WorkerState) {
     let rounds = 0;
     let lastModel = "unknown";
 
+    const secondaryRecallCtx: SecondaryRecallContext | undefined =
+      memoryRecall.active.length > 0 || memoryRecall.shadow.length > 0
+        ? {
+            agent: "worker_codegen",
+            role: state.role,
+            task: {
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              files: Array.isArray(task.files) ? task.files : undefined,
+            },
+            projectRoot: state.outputDir,
+            kickoffId: state.sessionId,
+            layers: ["L1", "L2"],
+            primaryInjectedIds: memoryRecall.active.map((r) => r.id),
+            tokenBudget: getInjectTokenBudgetForRole(state.role),
+          }
+        : undefined;
+
     while (rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS) {
       rounds += 1;
       const response = await runCodegenWorkerLoop(
@@ -1711,6 +1871,7 @@ async function generateCode(state: WorkerState) {
         state.outputDir,
         state.sessionId,
         state.workerLabel,
+        secondaryRecallCtx,
       );
       const content = response.content;
       validateCodegenFileOutput(content);
@@ -1724,6 +1885,28 @@ async function generateCode(state: WorkerState) {
         `\n\n<!-- round:${rounds} model:${response.model} -->\n` +
         response.rawContent;
       lastModel = response.model;
+
+      // Parse cite tags emitted by the worker so attribution can credit
+      // the specific patterns the model claims it used. Best-effort: never
+      // throws, validates ids against the actual injected set so a
+      // hallucinated id can't poison scoring.
+      if (memoryRecall.active.length > 0) {
+        const citedIds = parseMemoryCites(content);
+        if (citedIds.length > 0) {
+          const allInjected = [
+            ...memoryRecall.active.map((r) => r.id),
+            ...response.secondaryInjectedIds,
+          ];
+          await recordMemoryCites({
+            traceRoot: state.outputDir,
+            agent: "worker_codegen",
+            kickoffId: state.sessionId,
+            taskId: task.id,
+            citedIds,
+            injectedIds: allInjected,
+          });
+        }
+      }
 
       let roundWrites = 0;
       for (const [fp, fc] of Object.entries(parsedFiles)) {

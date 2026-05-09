@@ -53,12 +53,101 @@ for a Series-B startup shipping to thousands of users.
 |----------|--------|--------|
 (Performance, scalability, availability, browser support.)
 
+## 6. Shared Schema (REQUIRED)
+
+After the five sections above, output a single TypeScript file as a fenced
+code block in this **exact** format (the language tag and \`file:\` header
+are how downstream tooling extracts it):
+
+\`\`\`typescript file:shared/schema.ts
+// Source of truth for every type that crosses the API boundary or that
+// frontend AND backend code both touch. Both sides MUST import from this
+// module rather than redefine. No \`any\`. ISO 8601 strings for timestamps.
+
+export type ProjectId = string;
+
+export interface Project {
+  id: ProjectId;
+  name: string;
+  status: "active" | "archived";
+  createdAt: string;
+}
+
+export interface CreateProjectRequest { name: string; }
+export interface CreateProjectResponse { project: Project; }
+\`\`\`
+
+### Rules for the schema block
+- **Cover every entity** from §3.2 with an interface or type alias. No \`any\`.
+- **Cover every endpoint** from §3.3 with a Request and Response interface
+  named after the operation, e.g. \`CreateTaskRequest\` / \`CreateTaskResponse\`.
+  GET endpoints with no body still get a Response interface.
+- Use **string literal unions** for enum-like fields (\`status: "todo" | "in_progress" | "done"\`).
+- Timestamps are **ISO 8601 strings** (\`createdAt: string\`), not \`Date\`.
+- Optional fields: \`field?: T\`. Nullable fields: \`field: T | null\`. Distinct concepts.
+- Cross-reference ids by branded alias (\`UserId\`, \`ProjectId\`) where it aids readability.
+- Keep names PascalCase for types, camelCase for fields. Match exactly the field names
+  used in the API responses described in §3.3.
+- The block should be self-contained — no imports from external modules.
+
+## 7. Business Rules DSL (CONDITIONAL)
+
+If — and only if — the PRD describes rule-heavy domain logic such as scoring,
+pricing, eligibility / qualification gates, risk grading, leveling, tax or
+discount tiers, or other piecewise-deterministic numeric/categorical
+computations, output a YAML block in this **exact** format:
+
+\`\`\`yaml file:business-rules.dsl.yaml
+version: 1
+rules:
+  - id: SCORE-1
+    name: "Quality score from satisfaction rating"
+    description: "Maps 1-5 customer rating to a 0-100 quality score."
+    type: piecewise-linear
+    inputUnit: "rating"
+    outputRange: [0, 100]
+    segments:
+      - { from: 1.0, to: 2.0, outputFrom: 0,  outputTo: 25 }
+      - { from: 2.0, to: 3.5, outputFrom: 25, outputTo: 60 }
+      - { from: 3.5, to: 5.0, outputFrom: 60, outputTo: 100 }
+  - id: ELIG-1
+    name: "Loan tier eligibility"
+    description: "Top-down decision table picking premium / standard / basic."
+    type: decision-table
+    inputs:
+      - { name: creditScore, type: number }
+      - { name: incomeUsd,   type: number }
+    output: { name: tier, type: string }
+    cases:
+      - when: { creditScore: ">=750", incomeUsd: ">=80000" }
+        then: "premium"
+      - when: { creditScore: ">=650" }
+        then: "standard"
+      - when: { }
+        then: "basic"
+\`\`\`
+
+### DSL rules
+- Supported \`type\` values for the MVP are **only** \`piecewise-linear\` and
+  \`decision-table\`. State machines, composite formulas, and other shapes
+  remain in worker codegen for now.
+- For \`piecewise-linear\`: segments must be **contiguous** (each segment's
+  \`from\` equals the previous segment's \`to\`) and ordered. \`outputFrom\` /
+  \`outputTo\` may be monotonic increasing or decreasing.
+- For \`decision-table\`: cases evaluate top-to-bottom; first match wins. An
+  empty \`when: { }\` is the default fallback and **must be last** if present.
+- If the project has no rule-heavy logic (CRUD app, dashboard, content site,
+  generic chat UI, etc.), **omit §7 entirely**. Do not emit an empty rules
+  block, and do not include a heading without a body.
+
 ## Rules
 - Be specific: name exact libraries, versions, rationale.
 - Every table row must have a clear "why".
 - Reference the PRD feature IDs (FR-xxx, US-xxx) where decisions stem from a requirement.
 - Include at least one architecture diagram as an ASCII box diagram.
-- Keep total length 2000–5000 words.`;
+- Keep the human-readable Markdown (§1-5) in the 2000–5000 word range.
+- The §6 schema block and §7 DSL (when present) are **not** counted in that
+  word budget — emit them in full no matter how large.`;
 
 export class TRDAgent extends BaseAgent {
   constructor() {
@@ -68,7 +157,9 @@ export class TRDAgent extends BaseAgent {
       systemPrompt: SYSTEM_PROMPT,
       defaultModel: MODEL_CONFIG.trd,
       temperature: 0.5,
-      maxTokens: 16384,
+      // Bumped from 16384 to fit the §6 schema block (often 300-800 lines
+      // of TS for non-trivial projects) plus the human-readable doc.
+      maxTokens: 24576,
     });
   }
 

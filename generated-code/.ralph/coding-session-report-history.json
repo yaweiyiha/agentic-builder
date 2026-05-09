@@ -1,5 +1,43 @@
 [
   {
+    "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+    "startedAt": "2026-05-09T08:05:00.085Z",
+    "endedAt": "2026-05-09T08:11:03.039Z",
+    "status": "aborted",
+    "score": 56,
+    "grade": "F",
+    "durationMs": 362954,
+    "totalCalls": 15,
+    "totalTokens": 393336,
+    "totalCostUsd": 0.030590000000000003,
+    "primaryModel": "deepseek-v4-pro",
+    "primaryModelScore": 100,
+    "primaryModelGrade": "A",
+    "archiveJsonFile": "coding-session-report.2026-05-09T08-11-03-039Z.03c00a1d-0d78-4b82-8de1-6ed4cea6e926.json",
+    "archiveMdFile": "coding-session-report.2026-05-09T08-11-03-039Z.03c00a1d-0d78-4b82-8de1-6ed4cea6e926.md",
+    "runtimeReadinessFindings": 1,
+    "runtimeReadinessErrors": 0,
+    "runtimeReadinessWarnings": 1,
+    "runtimeReadinessHasError": false
+  },
+  {
+    "sessionId": "95b01ba1-a282-46de-a7d0-cc27a08246d1",
+    "startedAt": "2026-04-29T09:42:05.681Z",
+    "endedAt": "2026-04-29T12:09:22.007Z",
+    "status": "fail",
+    "score": 38,
+    "grade": "F",
+    "durationMs": 8836326,
+    "totalCalls": 345,
+    "totalTokens": 10952879,
+    "totalCostUsd": 4.444279,
+    "primaryModel": "deepseek-v4-pro",
+    "primaryModelScore": 100,
+    "primaryModelGrade": "A",
+    "archiveJsonFile": "coding-session-report.2026-04-29T12-09-22-007Z.95b01ba1-a282-46de-a7d0-cc27a08246d1.json",
+    "archiveMdFile": "coding-session-report.2026-04-29T12-09-22-007Z.95b01ba1-a282-46de-a7d0-cc27a08246d1.md"
+  },
+  {
     "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
     "startedAt": "2026-04-29T09:55:57.821Z",
     "endedAt": "2026-04-29T11:58:24.061Z",
@@ -14,11 +52,7 @@
     "primaryModelScore": 100,
     "primaryModelGrade": "A",
     "archiveJsonFile": "coding-session-report.2026-04-29T11-58-24-061Z.44fb392e-79c5-4cb3-9fc2-14362d8584ba.json",
-    "archiveMdFile": "coding-session-report.2026-04-29T11-58-24-061Z.44fb392e-79c5-4cb3-9fc2-14362d8584ba.md",
-    "runtimeReadinessFindings": 3,
-    "runtimeReadinessErrors": 1,
-    "runtimeReadinessWarnings": 2,
-    "runtimeReadinessHasError": true
+    "archiveMdFile": "coding-session-report.2026-04-29T11-58-24-061Z.44fb392e-79c5-4cb3-9fc2-14362d8584ba.md"
   },
   {
     "sessionId": "dfdf2753-a3eb-428e-9e78-d08982d8163f",

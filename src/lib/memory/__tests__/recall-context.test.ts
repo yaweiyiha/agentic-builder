@@ -209,6 +209,60 @@ describe("recallAndPrepareInject — query construction", () => {
   });
 });
 
+describe("recallAndPrepareInject — excludeIds + secondary pass", () => {
+  it("excludeIds removes matching records from candidates pre-split", async () => {
+    await seedL1([
+      fp({ id: "FP-A", title: "kept", metrics: { score: 0.5 } }),
+      fp({ id: "FP-B", title: "excluded", metrics: { score: 0.5 } }),
+      fp({ id: "FP-C", title: "kept2", metrics: { score: 0.5 } }),
+    ]);
+    const r = await recallAndPrepareInject({
+      agent: "worker_codegen",
+      excludeIds: ["FP-B"],
+    });
+    const ids = r.active.map((x) => x.id);
+    expect(ids).toContain("FP-A");
+    expect(ids).toContain("FP-C");
+    expect(ids).not.toContain("FP-B");
+  });
+
+  it("pass='secondary' logs op:reinject in trace.jsonl", async () => {
+    await seedL1([fp({ id: "FP-A", metrics: { score: 0.5 } })]);
+    await recallAndPrepareInject({
+      agent: "worker_codegen",
+      kickoffId: "k-test",
+      task: { id: "T-test" },
+      projectRoot: tmp,
+      pass: "secondary",
+    });
+    const tracePath = path.join(tmp, ".memory", "trace.jsonl");
+    const traceContent = await fs.readFile(tracePath, "utf8");
+    const lines = traceContent.trim().split("\n").filter(Boolean);
+    const reinjectEvents = lines
+      .map((l) => JSON.parse(l))
+      .filter((e) => e.op === "reinject");
+    expect(reinjectEvents.length).toBe(1);
+    const det = reinjectEvents[0]?.details ?? {};
+    expect(det.pass).toBe("secondary");
+  });
+
+  it("pass='primary' (default) still logs op:inject, not reinject", async () => {
+    await seedL1([fp({ id: "FP-A", metrics: { score: 0.5 } })]);
+    await recallAndPrepareInject({
+      agent: "worker_codegen",
+      kickoffId: "k-test",
+      task: { id: "T-test" },
+      projectRoot: tmp,
+    });
+    const tracePath = path.join(tmp, ".memory", "trace.jsonl");
+    const traceContent = await fs.readFile(tracePath, "utf8");
+    const lines = traceContent.trim().split("\n").filter(Boolean);
+    const ops = lines.map((l) => JSON.parse(l).op);
+    expect(ops).toContain("inject");
+    expect(ops).not.toContain("reinject");
+  });
+});
+
 describe("recallAndPrepareInject — hits accounting", () => {
   it("bumps hits on active records when injection happens", async () => {
     await seedL1([
