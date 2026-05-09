@@ -270,6 +270,193 @@ function StyleCarousel({
   );
 }
 
+// ─── Screenshot Carousel ─────────────────────────────────────────────────────
+
+interface ScreenshotItem { screenId: string; title: string; screenshotUrl: string; }
+
+function ScreenshotCarousel({
+  screenshots,
+  activeIdx,
+  onPrev,
+  onNext,
+  onDot,
+  projectUrl,
+  projectId,
+}: {
+  screenshots: ScreenshotItem[];
+  activeIdx: number;
+  onPrev: () => void;
+  onNext: () => void;
+  onDot: (i: number) => void;
+  projectUrl: string;
+  projectId: string;
+}) {
+  const [zoom, setZoom] = useState(1);
+  const [imgUrlCopied, setImgUrlCopied] = useState(false);
+  useEffect(() => { setZoom(1); }, [activeIdx]);
+
+  // ── Drag-to-pan ──
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ x: number; y: number; scrollX: number; scrollY: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    dragState.current = { x: e.clientX, y: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop };
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragState.current || !scrollRef.current) return;
+      const dx = e.clientX - dragState.current.x;
+      const dy = e.clientY - dragState.current.y;
+      scrollRef.current.scrollLeft = dragState.current.scrollX - dx;
+      scrollRef.current.scrollTop  = dragState.current.scrollY - dy;
+    };
+    const onUp = () => {
+      dragState.current = null;
+      setIsDragging(false);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom((z) => Math.min(4, Math.max(0.25, z - e.deltaY * 0.001)));
+  };
+
+  const cur = screenshots[activeIdx];
+
+  const cursor = isDragging ? "grabbing" : zoom > 1 ? "grab" : "zoom-in";
+
+  return (
+    <div className="relative w-full h-full">
+      {/* Scrollable image area */}
+      <div
+        ref={scrollRef}
+        className="w-full h-full overflow-auto flex items-start justify-center p-6"
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        style={{ cursor, userSelect: "none" }}
+      >
+        <img
+          key={cur?.screenshotUrl}
+          src={cur?.screenshotUrl}
+          alt={cur?.title}
+          draggable={false}
+          className="rounded-xl shadow-2xl transition-transform duration-100"
+          style={{ transform: `scale(${zoom})`, transformOrigin: "top center", maxWidth: "100%" }}
+        />
+      </div>
+
+      {/* Top toolbar */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+        <button
+          onClick={() => {
+            // lh3.googleusercontent.com URLs are publicly accessible CDN links
+            const rawUrl = cur?.screenshotUrl ?? "";
+            navigator.clipboard.writeText(rawUrl).then(() => {
+              setImgUrlCopied(true);
+              setTimeout(() => setImgUrlCopied(false), 2000);
+            });
+          }}
+          title="复制截图链接（任何人可访问）"
+          className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white text-[11px] font-medium transition-colors"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          {imgUrlCopied ? "已复制!" : "复制图片链接"}
+        </button>
+        {cur?.screenId && (
+          <a
+            href={`/api/stitch-html?projectId=${encodeURIComponent(projectId)}&screenId=${encodeURIComponent(cur.screenId)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="在新标签页打开交互式 HTML 预览"
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white text-[11px] font-medium transition-colors"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            打开 HTML 预览
+          </a>
+        )}
+      </div>
+
+      {/* Zoom badge */}
+      {zoom !== 1 && (
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-[11px] font-medium select-none">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            {zoom > 1
+              ? <line x1="8" y1="11" x2="14" y2="11" />
+              : <><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></>}
+          </svg>
+          {Math.round(zoom * 100)}%
+          <button onClick={() => setZoom(1)} className="ml-1 opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {/* Left arrow */}
+      {screenshots.length > 1 && (
+        <button
+          onClick={onPrev}
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 backdrop-blur-sm text-white transition-all shadow-lg"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+      )}
+
+      {/* Right arrow */}
+      {screenshots.length > 1 && (
+        <button
+          onClick={onNext}
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 backdrop-blur-sm text-white transition-all shadow-lg"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      )}
+
+      {/* Dots + counter */}
+      {screenshots.length > 1 && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 px-4 py-2 rounded-full bg-black/50 backdrop-blur-sm">
+          <div className="flex items-center gap-1.5">
+            {screenshots.map((s, i) => (
+              <button
+                key={s.screenId}
+                onClick={() => onDot(i)}
+                title={s.title}
+                className={`rounded-full transition-all duration-200 ${
+                  i === activeIdx ? "w-5 h-2 bg-white" : "w-2 h-2 bg-white/40 hover:bg-white/70"
+                }`}
+              />
+            ))}
+          </div>
+          <span className="text-[11px] text-white/70 font-medium whitespace-nowrap">
+            {activeIdx + 1} / {screenshots.length}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DesignSubStage() {
@@ -313,16 +500,9 @@ export default function DesignSubStage() {
   // ── Inner tab state ──
   const [innerTab, setInnerTab] = useState<InnerTab>("style");
 
-  // After hydration: restore to "spec" if design content exists.
+  // Always land on "style" tab when entering this sub-stage.
+  // "spec" is only shown automatically after a new generation completes (see below).
   // Never auto-jump to "stitch" — the user must explicitly proceed.
-  const didInitTab = useRef(false);
-  useEffect(() => {
-    if (!isStageHydrated) return;
-    if (didInitTab.current) return;
-    didInitTab.current = true;
-    if (steps.design?.content) setInnerTab("spec");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStageHydrated]);
 
   // Auto-advance to spec tab when design doc finishes
   const prevDesignRunning = useRef(isDesignRunning);
@@ -374,26 +554,39 @@ export default function DesignSubStage() {
 
   // ── Stitch state ──
   const [promptCopied, setPromptCopied] = useState(false);
-  const [stitchHtml, setStitchHtml] = useState<string | null>(null);
-  const [stitchHtmlLoading, setStitchHtmlLoading] = useState(false);
+  const [stitchScreenshots, setStitchScreenshots] = useState<{ screenId: string; title: string; screenshotUrl: string }[]>([]);
+  const [stitchScreensLoading, setStitchScreensLoading] = useState(false);
+  const [screenshotIdx, setScreenshotIdx] = useState(0);
 
-  // Fetch HTML for iframe preview whenever stitchResult changes
+  // Fetch all screen screenshots whenever stitchResult changes
   useEffect(() => {
-    if (!stitchResult?.htmlDownloadUrl) {
-      setStitchHtml(null);
+    if (!stitchResult?.projectId) {
+      setStitchScreenshots([]);
+      setScreenshotIdx(0);
       return;
     }
-    setStitchHtmlLoading(true);
-    const proxyUrl = `/api/stitch-proxy?url=${encodeURIComponent(stitchResult.htmlDownloadUrl)}`;
-    fetch(proxyUrl)
-      .then((r) => (r.ok ? r.text() : Promise.reject(r.statusText)))
-      .then((html) => setStitchHtml(html))
-      .catch((e) => {
-        console.warn("[DesignSubStage] Failed to load stitch HTML preview:", e);
-        setStitchHtml(null);
+    setStitchScreensLoading(true);
+    setStitchScreenshots([]);
+    setScreenshotIdx(0);
+    fetch(`/api/stitch-screens?projectId=${encodeURIComponent(stitchResult.projectId)}`)
+      .then((r) => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then((data) => {
+        const list = (data.screenshots ?? []) as { screenId: string; title: string; screenshotUrl: string }[];
+        // If API returned nothing but we have a screenshotUrl from generation, use that
+        if (list.length === 0 && stitchResult.screenshotUrl) {
+          setStitchScreenshots([{ screenId: stitchResult.screenId, title: "Screen 1", screenshotUrl: stitchResult.screenshotUrl }]);
+        } else {
+          setStitchScreenshots(list);
+        }
       })
-      .finally(() => setStitchHtmlLoading(false));
-  }, [stitchResult?.htmlDownloadUrl]);
+      .catch(() => {
+        // Fallback to generation-time screenshot
+        if (stitchResult.screenshotUrl) {
+          setStitchScreenshots([{ screenId: stitchResult.screenId, title: "Screen 1", screenshotUrl: stitchResult.screenshotUrl }]);
+        }
+      })
+      .finally(() => setStitchScreensLoading(false));
+  }, [stitchResult?.projectId]);
 
   const hasPencilContent = !!(stitchResult || stitchError || stitchGenerating);
 
@@ -732,148 +925,53 @@ export default function DesignSubStage() {
                   </div>
                 </div>
 
-                {/* iframe / screenshot preview */}
-                <div className="flex-1 overflow-hidden bg-slate-100">
-                  {stitchHtmlLoading && (
+                {/* Screenshots carousel */}
+                <div className="flex-1 overflow-hidden bg-slate-950 relative">
+                  {stitchScreensLoading && (
                     <div className="flex items-center justify-center h-full">
-                      <Loading size="lg" text="Loading preview…" />
+                      <Loading size="lg" text="Loading design screenshots…" />
                     </div>
                   )}
 
-                  {!stitchHtmlLoading && stitchHtml && (
-                    <iframe
-                      srcDoc={stitchHtml}
-                      title="Stitch Design Preview"
-                      sandbox="allow-scripts allow-same-origin"
-                      className="w-full h-full border-0"
-                      style={{ minHeight: 0 }}
+                  {!stitchScreensLoading && stitchScreenshots.length > 0 && (
+                    <ScreenshotCarousel
+                      screenshots={stitchScreenshots}
+                      activeIdx={screenshotIdx}
+                      onPrev={() => setScreenshotIdx((i) => (i - 1 + stitchScreenshots.length) % stitchScreenshots.length)}
+                      onNext={() => setScreenshotIdx((i) => (i + 1) % stitchScreenshots.length)}
+                      onDot={setScreenshotIdx}
+                      projectUrl={stitchResult.projectUrl}
+                      projectId={stitchResult.projectId}
                     />
                   )}
 
-                  {!stitchHtmlLoading &&
-                    !stitchHtml &&
-                    stitchResult.screenshotUrl && (
-                      <div className="flex items-start justify-center h-full overflow-auto p-6">
-                        <div className="flex flex-col items-center gap-4 max-w-4xl w-full">
-                          <img
-                            src={stitchResult.screenshotUrl}
-                            alt="Stitch generated UI design"
-                            className="w-full rounded-xl border border-slate-200 shadow-lg"
-                          />
-                          <div className="flex items-center gap-3 text-[12px] text-slate-500">
-                            <span>
-                              Project ID:{" "}
-                              <code className="font-mono text-violet-700">
-                                {stitchResult.projectId}
-                              </code>
-                            </span>
-                            <span>·</span>
-                            <span>
-                              Screen ID:{" "}
-                              <code className="font-mono text-violet-700">
-                                {stitchResult.screenId}
-                              </code>
-                            </span>
-                          </div>
-                        </div>
+                  {!stitchScreensLoading && stitchScreenshots.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <path d="M3 9h18M9 21V9" />
+                        </svg>
                       </div>
-                    )}
-
-                  {!stitchHtmlLoading &&
-                    !stitchHtml &&
-                    !stitchResult.screenshotUrl && (
-                      <div className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto py-8">
-                        {/* Card */}
-                        <div className="w-full rounded-2xl border border-slate-200 bg-linear-to-br from-violet-50 to-slate-50 shadow-md overflow-hidden">
-                          {/* Header bar */}
-                          <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-slate-100">
-                            <div className="flex gap-1.5">
-                              <span className="w-3 h-3 rounded-full bg-red-400" />
-                              <span className="w-3 h-3 rounded-full bg-yellow-400" />
-                              <span className="w-3 h-3 rounded-full bg-green-400" />
-                            </div>
-                            <span className="text-[11px] text-slate-400 font-mono truncate flex-1 text-center pr-6">
-                              stitch.withgoogle.com/projects/
-                              {stitchResult.projectId}
-                            </span>
-                          </div>
-                          {/* Body */}
-                          <div className="flex flex-col items-center gap-5 px-8 py-10">
-                            <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center shadow-inner">
-                              <svg
-                                width="32"
-                                height="32"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="#7c3aed"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <rect
-                                  x="3"
-                                  y="3"
-                                  width="18"
-                                  height="18"
-                                  rx="2"
-                                />
-                                <path d="M3 9h18M9 21V9" />
-                              </svg>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-[15px] font-semibold text-slate-800">
-                                设计已生成
-                              </p>
-                              <p className="text-[12px] text-slate-500 mt-1">
-                                Stitch
-                                不允许嵌入预览，请在新标签页中查看完整设计
-                              </p>
-                            </div>
-                            <a
-                              href={stitchResult.projectUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium transition-colors shadow"
-                            >
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                <polyline points="15 3 21 3 21 9" />
-                                <line x1="10" y1="14" x2="21" y2="3" />
-                              </svg>
-                              在 Stitch 中打开
-                            </a>
-                            <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                              <span>
-                                Project:{" "}
-                                <code className="font-mono text-violet-600">
-                                  {stitchResult.projectId}
-                                </code>
-                              </span>
-                              {stitchResult.screenId && (
-                                <>
-                                  <span>·</span>
-                                  <span>
-                                    Screen:{" "}
-                                    <code className="font-mono text-violet-600">
-                                      {stitchResult.screenId}
-                                    </code>
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                      <div className="text-center">
+                        <p className="text-[14px] font-semibold text-slate-700">设计已生成</p>
+                        <p className="text-[12px] text-slate-400 mt-1">截图暂时不可用，请在 Stitch 中查看</p>
                       </div>
-                    )}
+                      <a
+                        href={stitchResult.projectUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium transition-colors"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                        在 Stitch 中打开
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

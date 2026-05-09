@@ -15,6 +15,8 @@ const ALLOWED_ORIGINS = [
   "https://storage.googleapis.com",
   "https://stitch.googleapis.com",
   "https://stitch.withgoogle.com",
+  "https://contribution.usercontent.google.com",
+  "https://lh3.googleusercontent.com",
 ];
 
 export async function GET(request: NextRequest) {
@@ -37,8 +39,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const upstream = await fetch(targetUrl.href, {
-      headers: { Accept: "text/html,*/*" },
-      // GCS signed URLs are self-authenticating — no auth header needed
+      headers: { Accept: "text/html,text/plain,*/*" },
+      // Signed URLs (GCS / usercontent.google.com) are self-authenticating.
+      // Do NOT pass an Authorization header — it causes 400/empty responses.
     });
 
     if (!upstream.ok) {
@@ -50,6 +53,16 @@ export async function GET(request: NextRequest) {
     }
 
     const html = await upstream.text();
+
+    // Reject non-HTML content (e.g. Stitch sometimes stores the input PRD
+    // markdown as the htmlCode for older generations).
+    const looksLikeHtml = /^\s*(<(!DOCTYPE|html|head|body|div|<!--))/i.test(html);
+    if (!looksLikeHtml) {
+      return NextResponse.json(
+        { error: "upstream content is not HTML" },
+        { status: 422 },
+      );
+    }
 
     return new NextResponse(html, {
       status: 200,
