@@ -17,7 +17,7 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // ── Auth gate is disabled ─────────────────────────────────────────
   if (!AUTH_ENABLED) return NextResponse.next();
 

@@ -13,7 +13,10 @@ import path from "path";
 import { Pool } from "pg";
 import { pool } from "./client";
 
-const migrationsDir = path.join(__dirname, "migrations");
+// Use process.cwd() rather than __dirname — Next.js webpack bundling
+// rewrites __dirname to a `/ROOT/...` placeholder that doesn't exist on
+// disk, so resolving from the project root is the only stable path.
+const migrationsDir = path.resolve(process.cwd(), "src/lib/db/migrations");
 
 /**
  * Parse the DATABASE_URL and return connection options pointing to the
