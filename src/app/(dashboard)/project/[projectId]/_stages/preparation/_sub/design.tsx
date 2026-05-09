@@ -292,8 +292,30 @@ function ScreenshotCarousel({
   projectId: string;
 }) {
   const [zoom, setZoom] = useState(1);
-  const [imgUrlCopied, setImgUrlCopied] = useState(false);
+  const [htmlDownloading, setHtmlDownloading] = useState(false);
   useEffect(() => { setZoom(1); }, [activeIdx]);
+
+  const handleDownloadHtml = async () => {
+    if (!cur?.screenId || htmlDownloading) return;
+    setHtmlDownloading(true);
+    try {
+      const res = await fetch(
+        `/api/stitch-html?projectId=${encodeURIComponent(projectId)}&screenId=${encodeURIComponent(cur.screenId)}`
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${cur.title || "screen"}.html`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      console.error("Download failed", e);
+    } finally {
+      setHtmlDownloading(false);
+    }
+  };
 
   // ── Drag-to-pan ──
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -359,39 +381,36 @@ function ScreenshotCarousel({
 
       {/* Top toolbar */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
-        <button
-          onClick={() => {
-            // lh3.googleusercontent.com URLs are publicly accessible CDN links
-            const rawUrl = cur?.screenshotUrl ?? "";
-            navigator.clipboard.writeText(rawUrl).then(() => {
-              setImgUrlCopied(true);
-              setTimeout(() => setImgUrlCopied(false), 2000);
-            });
-          }}
-          title="复制截图链接（任何人可访问）"
-          className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white text-[11px] font-medium transition-colors"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          {imgUrlCopied ? "已复制!" : "复制图片链接"}
-        </button>
         {cur?.screenId && (
-          <a
-            href={`/api/stitch-html?projectId=${encodeURIComponent(projectId)}&screenId=${encodeURIComponent(cur.screenId)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="在新标签页打开交互式 HTML 预览"
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white text-[11px] font-medium transition-colors"
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-            打开 HTML 预览
-          </a>
+          <>
+            <a
+              href={`/api/stitch-html?projectId=${encodeURIComponent(projectId)}&screenId=${encodeURIComponent(cur.screenId)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="在新标签页预览 HTML"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white text-[11px] font-medium transition-colors"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              预览
+            </a>
+            <button
+              onClick={handleDownloadHtml}
+              disabled={htmlDownloading}
+              title="下载 HTML 文件（可上传到任意静态托管分享给他人）"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white text-[11px] font-medium transition-colors disabled:opacity-50"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {htmlDownloading ? "下载中…" : "下载 HTML"}
+            </button>
+          </>
         )}
       </div>
 
@@ -797,14 +816,72 @@ export default function DesignSubStage() {
         {/* ══ Design Spec Tab ══ */}
         {innerTab === "spec" && (
           <>
-            {designContent ? (
-              <div className="p-6 max-w-4xl mx-auto">
-                <MarkdownRenderer content={designContent} />
+            {isDesignRunning ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <Loading size="lg" text="Generating Design System Spec…" />
+                <p className="text-[12px] text-slate-400">Building your HTML design system document…</p>
               </div>
-            ) : isDesignRunning ? (
-              <div className="flex items-center justify-center py-20">
-                <Loading size="md" text="Generating Design Spec…" />
-              </div>
+            ) : designContent ? (
+              (() => {
+                const trimmed = designContent.trimStart();
+                const isHtml = trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<!");
+                if (isHtml) {
+                  return (
+                    <div className="relative h-full">
+                      {/* Floating action buttons */}
+                      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([designContent], { type: "text/html" });
+                            const a = document.createElement("a");
+                            a.href = URL.createObjectURL(blob);
+                            a.download = "design-system.html";
+                            a.click();
+                            URL.revokeObjectURL(a.href);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-white bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-md transition-all"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                          </svg>
+                          Download HTML
+                        </button>
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([designContent], { type: "text/html" });
+                            const url = URL.createObjectURL(blob);
+                            window.open(url, "_blank");
+                            setTimeout(() => URL.revokeObjectURL(url), 5000);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-white bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-md transition-all"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                          Open in Tab
+                        </button>
+                      </div>
+                      {/* iframe — full area */}
+                      <iframe
+                        srcDoc={designContent}
+                        sandbox="allow-scripts allow-same-origin"
+                        className="w-full h-full border-0"
+                        title="Design System Spec"
+                      />
+                    </div>
+                  );
+                }
+                // Legacy markdown fallback
+                return (
+                  <div className="p-6 max-w-4xl mx-auto">
+                    <MarkdownRenderer content={designContent} />
+                  </div>
+                );
+              })()
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400">
                 <p className="text-sm">Waiting for design spec to generate…</p>

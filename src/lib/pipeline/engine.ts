@@ -106,7 +106,7 @@ function stepsForTier(tier: ProjectTier) {
   };
 }
 
-const STATIC_DESIGN_RELATIVE_PATH = path.join(".blueprint", "DESIGN.md");
+const STATIC_DESIGN_RELATIVE_PATH = path.join(".blueprint", "DESIGN.html");
 
 const FAST_MODE_DESIGN_FALLBACK = `## Design specification (fast mode)
 

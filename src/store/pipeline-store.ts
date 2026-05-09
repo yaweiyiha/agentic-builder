@@ -566,7 +566,7 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       runDesignDoc: (editInstruction?: string) => {
-        const { steps, featureBrief, codeOutputDir } = get();
+        const { steps, featureBrief, codeOutputDir, selectedDesignStyleId } = get();
         const prdContent = steps.prd?.content ?? featureBrief;
         if (!prdContent.trim()) return;
 
@@ -598,6 +598,7 @@ export const usePipelineStore = create<PipelineState>()(
               (steps.intent?.metadata as Record<string, unknown> | undefined)
                 ?.classification as { tier?: string } | undefined
             )?.tier ?? "M",
+            designStyleId: selectedDesignStyleId ?? undefined,
             ...(editInstruction?.trim() ? {
               editInstruction: editInstruction.trim(),
               existingDesign: steps.design?.content ?? "",

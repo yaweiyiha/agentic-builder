@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPRI Monitor — Design System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ─── Design Tokens（直接从 index_risk.html 提炼）─── */
+    :root {
+      /* Backgrounds */
+      --bg:              #F0F2F5;
+      --surface:         #FFFFFF;
+      --border:          #E4E7EE;
+
+      /* Brand / Primary */
+      --teal:            #0BBFB2;
+      --teal-light:      #E6FAF8;
+      --teal-dark:       #089C91;
+
+      /* Semantic Status */
+      --amber:           #F59E0B;
+      --amber-light:     #FEF3C7;
+      --red:             #EF4444;
+      --red-light:       #FEE2E2;
+      --green:           #10B981;
+      --green-light:     #D1FAE5;
+      --blue:            #3B82F6;
+      --blue-light:      #DBEAFE;
+      --purple:          #8B5CF6;
+      --purple-light:    #EDE9FE;
+      --orange:          #F97316;
+      --orange-light:    #FFEDD5;
+
+      /* Risk Level Semantic Colors */
+      --risk-normal:        #10B981;
+      --risk-normal-light:  #D1FAE5;
+      --risk-normal-dark:   #065F46;
+      --risk-elevated:      #F59E0B;
+      --risk-elevated-light:#FEF3C7;
+      --risk-elevated-dark: #92400E;
+      --risk-high:          #F97316;
+      --risk-high-light:    #FFEDD5;
+      --risk-high-dark:     #7C2D12;
+      --risk-critical:      #EF4444;
+      --risk-critical-light:#FEE2E2;
+      --risk-critical-dark: #991B1B;
+      --risk-mover:         #8B5CF6;
+      --risk-mover-light:   #EDE9FE;
+      --risk-mover-dark:    #5B21B6;
+
+      /* Text */
+      --text-primary:    #111827;
+      --text-secondary:  #6B7280;
+      --text-muted:      #9CA3AF;
+
+      /* Shadows */
+      --shadow-sm:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md:  0 4px 12px rgba(0,0,0,.08);
+
+      /* Radius */
+      --radius-sm:  8px;
+      --radius-md:  12px;
+      --radius-lg:  16px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ─── DS Page Layout ─── */
+    .ds-nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: 56px; background: var(--surface);
+      border-bottom: 2px solid var(--teal);
+      display: flex; align-items: center;
+      padding: 0 32px; z-index: 100;
+      gap: 12px;
+    }
+    .ds-nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 15px;
+    }
+    .ds-nav-logo-icon {
+      width: 28px; height: 28px;
+      background: var(--teal); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ds-nav-badge {
+      background: var(--teal-light); color: var(--teal-dark);
+      font-size: 10px; font-weight: 700; padding: 2px 8px;
+      border-radius: 20px; letter-spacing: .5px; text-transform: uppercase;
+    }
+    .ds-nav-links {
+      margin-left: auto; display: flex; gap: 4px;
+    }
+    .ds-nav-link {
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all .15s;
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+    .ds-nav-link:hover { background: var(--bg); color: var(--text-primary); }
+    .ds-nav-link.active { background: var(--teal); color: #fff; }
+
+    .ds-container {
+      max-width: 1200px; margin: 0 auto;
+      padding: 80px 32px 64px;
+    }
+
+    /* ─── Sections ─── */
+    .ds-section {
+      margin-bottom: 64px;
+    }
+    .ds-section-title {
+      font-size: 22px; font-weight: 700;
+      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .ds-section-title::before {
+      content: '';
+      width: 4px; height: 22px;
+      background: var(--teal);
+      border-radius: 2px;
+      display: inline-block;
+    }
+    .ds-section-desc {
+      font-size: 13px; color: var(--text-secondary);
+      margin-bottom: 24px; padding-left: 14px;
+    }
+    .ds-subsection-title {
+      font-size: 12px; font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .8px;
+      margin: 24px 0 12px;
+    }
+
+    /* ─── Token display card ─── */
+    .token-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .token-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    .token-swatch {
+      height: 56px;
+    }
+    .token-info {
+      padding: 10px 12px;
+    }
+    .token-name { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+    .token-var  { font-family: 'Fira Code', monospace; font-size: 10px; color: var(--teal-dark); margin-top: 1px; }
+    .token-hex  { font-family: 'Fira Code', monospace; font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* Risk color row */
+    .risk-row-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+    .risk-token-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    .risk-swatch-group {
+      display: flex;
+      height: 48px;
+    }
+    .risk-swatch-main  { flex: 2; }
+    .risk-swatch-light { flex: 1; }
+    .risk-swatch-dark  { flex: 1; }
+    .risk-token-info {
+      padding: 10px 12px;
+    }
+    .risk-level-label {
+      font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 4px;
+    }
+    .risk-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .risk-vars { font-family: 'Fira Code', monospace; font-size: 10px; color: var(--text-muted); }
+
+    /* ─── Typography showcase ─── */
+    .type-sample-grid {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 28px 32px;
+      box-shadow: var(--shadow-sm);
+    }
+    .type-row {
+      display: flex; align-items: baseline; gap: 24px;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .type-row:last-child { border-bottom: none; }
+    .type-meta {
+      width: 160px; flex-shrink: 0;
+    }
+    .type-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .type-spec  { font-size: 10px; font-family: 'Fira Code', monospace; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+    .type-sample { color: var(--text-primary); }
+
+    /* ─── Spacing ─── */
+    .spacing-grid {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .spacing-row {
+      display: flex; align-items: center; gap: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+    }
+    .spacing-bar {
+      background: var(--teal-light);
+      border: 1px solid var(--teal);
+      border-radius: 2px; height: 16px;
+      flex-shrink: 0;
+    }
+    .spacing-token { font-family: 'Fira Code', monospace; font-size: 11px; color: var(--teal-dark); width: 100px; }
+    .spacing-value { font-size: 12px; color: var(--text-secondary); }
+    .spacing-use   { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+    /* ─── Radius ─── */
+    .radius-grid {
+      display: flex; gap: 16px;
+    }
+    .radius-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      padding: 24px 28px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .radius-sample {
+      width: 60px; height: 60px;
+      background: var(--teal-light);
+      border: 2px solid var(--teal);
+    }
+    .radius-token { font-family: 'Fira Code', monospace; font-size: 11px; color: var(--teal-dark); }
+    .radius-value { font-size: 12px; color: var(--text-secondary); }
+    .radius-use   { font-size: 11px; color: var(--text-muted); text-align: center; }
+
+    /* ─── Shadow ─── */
+    .shadow-grid {
+      display: flex; gap: 20px;
+    }
+    .shadow-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 28px 32px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      flex: 1;
+    }
+    .shadow-sample {
+      width: 80px; height: 48px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .shadow-token { font-family: 'Fira Code', monospace; font-size: 11px; color: var(--teal-dark); }
+    .shadow-value { font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.5; }
+
+    /* ─── Component showcase cards ─── */
+    .comp-showcase {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: 28px 32px;
+      margin-bottom: 16px;
+    }
+    .comp-showcase-label {
+      font-size: 11px; font-weight: 700;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: .8px; margin-bottom: 20px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .comp-row {
+      display: flex; align-items: center; gap: 12px;
+      flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .comp-row:last-child { margin-bottom: 0; }
+    .comp-state-label {
+      font-size: 11px; color: var(--text-muted);
+      width: 80px; flex-shrink: 0; text-align: right;
+    }
+
+    /* Buttons (from index_risk.html) */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; outline: none;
+      transition: all .15s; font-family: inherit;
+    }
+    .btn-primary   { background: var(--teal); color: #fff; }
+    .btn-primary:hover { background: var(--teal-dark); }
+    .btn-secondary { background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-danger    { background: var(--red-light); color: var(--risk-critical-dark); border: 1px solid #FCA5A5; }
+    .btn-danger:hover { background: #FCA5A5; }
+    .btn-sm        { padding: 5px 12px; font-size: 12px; }
+    .btn:disabled, .btn.disabled {
+      opacity: 0.45; cursor: not-allowed; pointer-events: none;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: .3px; text-transform: uppercase;
+    }
+    .badge-dot::before {
+      content: ''; width: 6px; height: 6px;
+      border-radius: 50%; background: currentColor;
+      margin-right: 5px; display: inline-block;
+    }
+    .badge-teal   { background: var(--teal-light); color: var(--teal-dark); }
+    .badge-green  { background: var(--risk-normal-light); color: var(--risk-normal-dark); }
+    .badge-amber  { background: var(--risk-elevated-light); color: var(--risk-elevated-dark); }
+    .badge-orange { background: var(--risk-high-light); color: var(--risk-high-dark); }
+    .badge-red    { background: var(--risk-critical-light); color: var(--risk-critical-dark); }
+    .badge-purple { background: var(--risk-mover-light); color: var(--risk-mover-dark); }
+    .badge-gray   { background: #F3F4F6; color: #374151; }
+
+    /* Nav badge (notification count) */
+    .nav-badge-count {
+      background: var(--red); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 10px;
+    }
+
+    /* Input / Select */
+    .input-field {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px; font-size: 13px;
+      font-family: inherit; color: var(--text-primary);
+      outline: none; transition: border-color .15s;
+      width: 240px;
+    }
+    .input-field:focus { border-color: var(--teal); }
+    .input-field::placeholder { color: var(--text-muted); }
+    .input-field.error { border-color: var(--red); }
+    .input-field.disabled-field { opacity: .45; cursor: not-allowed; background: var(--bg); }
+
+    .select-wrap {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 6px 10px;
+      font-size: 12px; font-weight: 500; color: var(--text-secondary);
+      cursor: pointer;
+    }
+    select {
+      border: none; background: none; outline: none;
+      font-size: 12px; color: var(--text-primary); font-family: inherit;
+      cursor: pointer;
+    }
+
+    /* Icon btn */
+    .icon-btn {
+      width: 36px; height: 36px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all .15s; color: var(--text-secondary);
+    }
+    .icon-btn:hover { background: var(--border); }
+
+    /* Tabs (pill style) */
+    .tabs { display: flex; gap: 4px; }
+    .tab {
+      padding: 5px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all .15s;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+    }
+    .tab:hover { background: var(--bg); }
+    .tab.active { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+    /* Filter tabs (segment style) */
+    .filter-tabs {
+      display: flex; gap: 0;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      overflow: hidden; width: fit-content;
+    }
+    .filter-tab {
+      padding: 6px 14px; font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all .15s;
+      color: var(--text-secondary); border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .filter-tab:last-child { border-right: none; }
+    .filter-tab:hover { background: var(--bg); }
+    .filter-tab.active { background: var(--teal); color: #fff; }
+
+    /* Monitor filter tabs */
+    .mf-tab {
+      padding: 5px 12px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--text-secondary);
+      cursor: pointer; transition: all .15s;
+    }
+    .mf-tab:hover { background: var(--bg); }
+    .mf-tab.active { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+    .card-header {
+      padding: 16px 20px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title { font-size: 14px; font-weight: 700; }
+    .card-body { padding: 16px 20px; }
+
+    /* KPI Card */
+    .kpi-demo {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: 18px 20px;
+      display: flex; align-items: flex-start; justify-content: space-between;
+    }
+    .kpi-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; margin-bottom: 6px; }
+    .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; font-family: 'Fira Code', monospace; }
+    .kpi-sub   { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+    .kpi-icon  {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Table */
+    .table-demo { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    .spri-table { width: 100%; border-collapse: collapse; }
+    .spri-table thead th {
+      padding: 10px 14px;
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .5px;
+      border-bottom: 2px solid var(--border);
+      text-align: left; background: var(--surface);
+    }
+    .spri-table thead th.th-sorted { color: var(--teal); }
+    .spri-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background .1s;
+      background: var(--surface);
+    }
+    .spri-table tbody tr:hover { background: #F9FAFB; }
+    .spri-table tbody tr:last-child { border-bottom: none; }
+    .spri-table tbody td { padding: 12px 14px; font-size: 13px; }
+    .spri-symbol { font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .spri-coin-name { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .spri-score-num { font-family: 'Fira Code', monospace; font-size: 16px; font-weight: 700; }
+    .risk-level-cell { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+    .risk-level-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Alert feed */
+    .alert-list { display: flex; flex-direction: column; }
+    .alert-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background .1s;
+    }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-indicator { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+    .alert-body { flex: 1; min-width: 0; }
+    .alert-title { font-size: 12px; font-weight: 600; }
+    .alert-meta  { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .alert-time  { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+
+    /* Sidebar demo */
+    .sidebar-demo {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      width: 220px; overflow: hidden;
+    }
+    .sidebar-demo-logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-mark { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: var(--teal); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-text { font-weight: 700; font-size: 15px; }
+    .logo-sub  { font-size: 10px; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; margin-top: 1px; }
+    .sidebar-role-chip {
+      margin: 12px 16px 0;
+      padding: 8px 10px;
+      background: var(--teal-light);
+      border-radius: var(--radius-sm);
+      font-size: 11px; color: var(--teal-dark); font-weight: 600;
+    }
+    .nav-section { padding: 14px 16px 4px; font-size: 10px; color: var(--text-muted); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px;
+      color: var(--text-secondary);
+      cursor: pointer; transition: all .15s;
+      font-size: 13px; font-weight: 500;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: var(--bg); color: var(--text-primary); }
+    .nav-item.active { background: var(--teal-light); color: var(--teal-dark); border-left-color: var(--teal); }
+    .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto;
+      background: var(--red); color: #fff;
+      font-size: 10px; font-weight: 600;
+      padding: 1px 6px; border-radius: 10px; line-height: 1.6;
+    }
+
+    /* Topbar demo */
+    .topbar-demo {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: 0 24px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar-title { font-size: 16px; font-weight: 700; }
+    .topbar-sub   { font-size: 12px; color: var(--text-muted); }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .refresh-time { font-size: 12px; color: var(--text-muted); }
+    .notif-dot { position: relative; }
+    .notif-dot::after {
+      content: '';
+      position: absolute; top: 6px; right: 6px;
+      width: 7px; height: 7px;
+      background: var(--red); border-radius: 50%;
+      border: 1px solid var(--surface);
+    }
+
+    /* Dimension score card */
+    .dim-cards-demo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .dim-card {
+      text-align: center; padding: 16px 12px;
+      background: var(--bg); border-radius: var(--radius-sm);
+    }
+    .dim-card-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+    .dim-card-name  { font-size: 10px; color: var(--text-muted); margin-bottom: 10px; }
+    .dim-card-score { font-size: 28px; font-weight: 700; line-height: 1; font-family: 'Fira Code', monospace; }
+    .dim-card-gauge { height: 4px; background: var(--border); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+    .dim-card-gauge-fill { height: 100%; border-radius: 2px; }
+
+    /* Score ring */
+    .score-ring {
+      width: 72px; height: 72px; border-radius: 50%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: 'Fira Code', monospace;
+    }
+    .score-ring-num { font-size: 22px; font-weight: 700; line-height: 1; }
+    .score-ring-label { font-size: 9px; text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+
+    /* Timeline */
+    .timeline { display: flex; flex-direction: column; }
+    .timeline-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-dot-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; margin-top: 4px; }
+    .timeline-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .timeline-line { width: 1px; background: var(--border); flex: 1; min-height: 16px; margin-top: 4px; }
+    .timeline-content { flex: 1; }
+    .timeline-title { font-size: 12px; font-weight: 600; }
+    .timeline-desc  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .timeline-time  { font-size: 11px; color: var(--text-muted); flex-shrink: 0; margin-top: 4px; }
+
+    /* Rapid mover tag */
+    .rapid-tag {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+      background: var(--risk-mover-light); color: var(--risk-mover-dark);
+      padding: 2px 6px; border-radius: 10px;
+    }
+
+    /* Confidence bar */
+    .confidence-bar-wrap { display: flex; align-items: center; gap: 10px; }
+    .confidence-bar { flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+    .confidence-fill { height: 100%; border-radius: 4px; }
+
+    /* Chips */
+    .freshenesss-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--green-light); color: #065F46;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .stale-chip { background: var(--amber-light); color: var(--risk-elevated-dark); }
+
+    /* Score color helpers */
+    .score-normal   { color: var(--risk-normal); }
+    .score-elevated { color: var(--risk-elevated); }
+    .score-high     { color: var(--risk-high); }
+    .score-critical { color: var(--risk-critical); }
+
+    /* Mono */
+    .mono { font-family: 'Fira Code', monospace; font-size: 12px; color: var(--teal-dark); }
+
+    /* ─── Utility classes ─── */
+    .flex { display: flex; }
+    .flex-center { display: flex; align-items: center; }
+    .gap-6 { gap: 6px; }
+    .gap-8 { gap: 8px; }
+    .gap-12 { gap: 12px; }
+    .gap-16 { gap: 16px; }
+
+    /* ─── TOC sidebar ─── */
+    .ds-toc {
+      position: fixed; left: 0; top: 56px;
+      width: 220px; height: calc(100vh - 56px);
+      background: var(--surface); border-right: 1px solid var(--border);
+      overflow-y: auto; padding: 24px 0;
+    }
+    .toc-title { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; padding: 0 20px 8px; }
+    .toc-item {
+      display: block; padding: 7px 20px;
+      font-size: 12px; color: var(--text-secondary);
+      cursor: pointer; transition: all .15s;
+      text-decoration: none;
+    }
+    .toc-item:hover { background: var(--bg); color: var(--text-primary); }
+    .toc-item.active { color: var(--teal); font-weight: 600; background: var(--teal-light); border-right: 2px solid var(--teal); }
+
+    .ds-body-with-toc { margin-left: 220px; }
+
+    /* Monospace code snippet */
+    .code-snippet {
+      background: #1E293B; color: #94A3B8;
+      border-radius: var(--radius-sm);
+      padding: 12px 16px; font-family: 'Fira Code', monospace;
+      font-size: 12px; line-height: 1.6; overflow-x: auto;
+    }
+    .code-snippet .c-key { color: #7DD3FC; }
+    .code-snippet .c-val { color: #86EFAC; }
+    .code-snippet .c-comment { color: #475569; font-style: italic; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<nav class="ds-nav">
+  <div class="ds-nav-logo">
+    <div class="ds-nav-logo-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+    SPRI Monitor
+  </div>
+  <span class="ds-nav-badge">Design System v1.0</span>
+  <div class="ds-nav-links">
+    <a class="ds-nav-link active" href="#colors">颜色</a>
+    <a class="ds-nav-link" href="#typography">字体</a>
+    <a class="ds-nav-link" href="#spacing">间距</a>
+    <a class="ds-nav-link" href="#components">组件</a>
+    <a class="ds-nav-link" href="#patterns">页面模式</a>
+  </div>
+</nav>
+
+<!-- TOC -->
+<aside class="ds-toc">
+  <div class="toc-title">目录</div>
+  <a class="toc-item active" href="#colors">🎨 颜色系统</a>
+  <a class="toc-item" href="#risk-colors">— 风险等级语义色</a>
+  <a class="toc-item" href="#typography">📐 字体系统</a>
+  <a class="toc-item" href="#spacing">📏 间距系统</a>
+  <a class="toc-item" href="#radius">⬜ 圆角</a>
+  <a class="toc-item" href="#shadows">🌫 阴影</a>
+  <a class="toc-item" href="#components">🧩 组件规范</a>
+  <a class="toc-item" href="#buttons">— 按钮</a>
+  <a class="toc-item" href="#badges">— 徽章</a>
+  <a class="toc-item" href="#inputs">— 输入框</a>
+  <a class="toc-item" href="#tabs">— 标签页</a>
+  <a class="toc-item" href="#cards">— 卡片</a>
+  <a class="toc-item" href="#kpi">— KPI 卡片</a>
+  <a class="toc-item" href="#table">— 数据表格</a>
+  <a class="toc-item" href="#alerts">— 告警动态</a>
+  <a class="toc-item" href="#patterns">📐 页面模式</a>
+  <a class="toc-item" href="#sidebar">— 侧边导航</a>
+  <a class="toc-item" href="#topbar">— 顶部栏</a>
+  <a class="toc-item" href="#dim-cards">— 维度得分卡</a>
+  <a class="toc-item" href="#timeline">— 时间线</a>
+  <a class="toc-item" href="#score-ring">— 风险评分环</a>
+  <a class="toc-item" href="#tokens">📋 Token 速查</a>
+</aside>
+
+<div class="ds-body-with-toc">
+<div class="ds-container">
+
+  <!-- ══════ HERO ══════ -->
+  <div style="margin-bottom:48px">
+    <div style="font-size:32px;font-weight:700;margin-bottom:8px">SPRI Monitor<span style="color:var(--teal)">.</span></div>
+    <div style="font-size:14px;color:var(--text-secondary);max-width:560px;line-height:1.7">
+      Stablecoin Peg Risk Index 监控平台的设计系统文档。基于 <code style="font-family:'Fira Code',monospace;font-size:12px;background:var(--bg);padding:1px 6px;border-radius:4px">index_risk.html</code> 原型提炼，供开发交接与实现参考。
+    </div>
+    <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap">
+      <span class="badge badge-teal badge-dot">Light Mode</span>
+      <span class="badge badge-gray badge-dot">Professional</span>
+      <span class="badge badge-gray badge-dot">Data-Dense</span>
+      <span class="badge badge-purple badge-dot">Fintech / Risk</span>
+    </div>
+  </div>
+
+  <!-- ══════ 1. COLORS ══════ -->
+  <section class="ds-section" id="colors">
+    <div class="ds-section-title">颜色系统</div>
+    <div class="ds-section-desc">所有颜色均通过 CSS 变量定义，直接从 <code style="font-family:'Fira Code',monospace;font-size:12px">:root</code> 中取用。</div>
+
+    <div class="ds-subsection-title">基础背景与边框</div>
+    <div class="token-grid">
+      <div class="token-card">
+        <div class="token-swatch" style="background:#F0F2F5;border-bottom:1px solid #E4E7EE"></div>
+        <div class="token-info">
+          <div class="token-name">页面背景</div>
+          <div class="token-var">--bg</div>
+          <div class="token-hex">#F0F2F5</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#FFFFFF;border-bottom:1px solid #E4E7EE"></div>
+        <div class="token-info">
+          <div class="token-name">表面 / 卡片</div>
+          <div class="token-var">--surface</div>
+          <div class="token-hex">#FFFFFF</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#E4E7EE"></div>
+        <div class="token-info">
+          <div class="token-name">边框 / 分隔线</div>
+          <div class="token-var">--border</div>
+          <div class="token-hex">#E4E7EE</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ds-subsection-title">品牌主色 — Teal</div>
+    <div class="token-grid">
+      <div class="token-card">
+        <div class="token-swatch" style="background:#0BBFB2"></div>
+        <div class="token-info">
+          <div class="token-name">主色</div>
+          <div class="token-var">--teal</div>
+          <div class="token-hex">#0BBFB2</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#E6FAF8"></div>
+        <div class="token-info">
+          <div class="token-name">主色浅色背景</div>
+          <div class="token-var">--teal-light</div>
+          <div class="token-hex">#E6FAF8</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#089C91"></div>
+        <div class="token-info">
+          <div class="token-name">主色 Hover / Dark</div>
+          <div class="token-var">--teal-dark</div>
+          <div class="token-hex">#089C91</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ds-subsection-title">文字色阶</div>
+    <div class="token-grid">
+      <div class="token-card">
+        <div class="token-swatch" style="background:#111827"></div>
+        <div class="token-info">
+          <div class="token-name">主文字</div>
+          <div class="token-var">--text-primary</div>
+          <div class="token-hex">#111827</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#6B7280"></div>
+        <div class="token-info">
+          <div class="token-name">次要文字</div>
+          <div class="token-var">--text-secondary</div>
+          <div class="token-hex">#6B7280</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#9CA3AF"></div>
+        <div class="token-info">
+          <div class="token-name">辅助 / 占位文字</div>
+          <div class="token-var">--text-muted</div>
+          <div class="token-hex">#9CA3AF</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ds-subsection-title">辅助状态色</div>
+    <div class="token-grid">
+      <div class="token-card">
+        <div class="token-swatch" style="background:#10B981"></div>
+        <div class="token-info">
+          <div class="token-name">成功 / Normal</div>
+          <div class="token-var">--green</div>
+          <div class="token-hex">#10B981</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#F59E0B"></div>
+        <div class="token-info">
+          <div class="token-name">警告 / Elevated</div>
+          <div class="token-var">--amber</div>
+          <div class="token-hex">#F59E0B</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#F97316"></div>
+        <div class="token-info">
+          <div class="token-name">高风险 / High</div>
+          <div class="token-var">--orange</div>
+          <div class="token-hex">#F97316</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#EF4444"></div>
+        <div class="token-info">
+          <div class="token-name">危险 / Critical</div>
+          <div class="token-var">--red</div>
+          <div class="token-hex">#EF4444</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#3B82F6"></div>
+        <div class="token-info">
+          <div class="token-name">信息 / Blue</div>
+          <div class="token-var">--blue</div>
+          <div class="token-hex">#3B82F6</div>
+        </div>
+      </div>
+      <div class="token-card">
+        <div class="token-swatch" style="background:#8B5CF6"></div>
+        <div class="token-info">
+          <div class="token-name">Rapid Mover</div>
+          <div class="token-var">--purple</div>
+          <div class="token-hex">#8B5CF6</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk colors -->
+    <div class="ds-subsection-title" id="risk-colors">风险等级语义色（Risk Level Semantic Colors）</div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">每个风险等级对应三色：主色（标记）、浅色（背景/Badge）、深色（文字/Icon）</div>
+    <div class="risk-row-grid">
+      <!-- Normal -->
+      <div class="risk-token-card">
+        <div class="risk-swatch-group">
+          <div class="risk-swatch-main" style="background:#10B981"></div>
+          <div class="risk-swatch-light" style="background:#D1FAE5"></div>
+          <div class="risk-swatch-dark" style="background:#065F46"></div>
+        </div>
+        <div class="risk-token-info">
+          <div class="risk-level-label">
+            <span class="risk-dot" style="background:#10B981"></span>
+            <span class="badge badge-green" style="font-size:10px;padding:2px 8px">Normal</span>
+          </div>
+          <div class="risk-vars">--risk-normal: #10B981<br>--risk-normal-light: #D1FAE5<br>--risk-normal-dark: #065F46</div>
+        </div>
+      </div>
+      <!-- Elevated -->
+      <div class="risk-token-card">
+        <div class="risk-swatch-group">
+          <div class="risk-swatch-main" style="background:#F59E0B"></div>
+          <div class="risk-swatch-light" style="background:#FEF3C7"></div>
+          <div class="risk-swatch-dark" style="background:#92400E"></div>
+        </div>
+        <div class="risk-token-info">
+          <div class="risk-level-label">
+            <span class="risk-dot" style="background:#F59E0B"></span>
+            <span class="badge badge-amber" style="font-size:10px;padding:2px 8px">Elevated</span>
+          </div>
+          <div class="risk-vars">--risk-elevated: #F59E0B<br>--risk-elevated-light: #FEF3C7<br>--risk-elevated-dark: #92400E</div>
+        </div>
+      </div>
+      <!-- High -->
+      <div class="risk-token-card">
+        <div class="risk-swatch-group">
+          <div class="risk-swatch-main" style="background:#F97316"></div>
+          <div class="risk-swatch-light" style="background:#FFEDD5"></div>
+          <div class="risk-swatch-dark" style="background:#7C2D12"></div>
+        </div>
+        <div class="risk-token-info">
+          <div class="risk-level-label">
+            <span class="risk-dot" style="background:#F97316"></span>
+            <span class="badge badge-orange" style="font-size:10px;padding:2px 8px">High</span>
+          </div>
+          <div class="risk-vars">--risk-high: #F97316<br>--risk-high-light: #FFEDD5<br>--risk-high-dark: #7C2D12</div>
+        </div>
+      </div>
+      <!-- Critical -->
+      <div class="risk-token-card">
+        <div class="risk-swatch-group">
+          <div class="risk-swatch-main" style="background:#EF4444"></div>
+          <div class="risk-swatch-light" style="background:#FEE2E2"></div>
+          <div class="risk-swatch-dark" style="background:#991B1B"></div>
+        </div>
+        <div class="risk-token-info">
+          <div class="risk-level-label">
+            <span class="risk-dot" style="background:#EF4444"></span>
+            <span class="badge badge-red" style="font-size:10px;padding:2px 8px">Critical</span>
+          </div>
+          <div class="risk-vars">--risk-critical: #EF4444<br>--risk-critical-light: #FEE2E2<br>--risk-critical-dark: #991B1B</div>
+        </div>
+      </div>
+      <!-- Rapid Mover -->
+      <div class="risk-token-card">
+        <div class="risk-swatch-group">
+          <div class="risk-swatch-main" style="background:#8B5CF6"></div>
+          <div class="risk-swatch-light" style="background:#EDE9FE"></div>
+          <div class="risk-swatch-dark" style="background:#5B21B6"></div>
+        </div>
+        <div class="risk-token-info">
+          <div class="risk-level-label">
+            <span class="risk-dot" style="background:#8B5CF6"></span>
+            <span class="badge badge-purple" style="font-size:10px;padding:2px 8px">Mover</span>
+          </div>
+          <div class="risk-vars">--risk-mover: #8B5CF6<br>--risk-mover-light: #EDE9FE<br>--risk-mover-dark: #5B21B6</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ 2. TYPOGRAPHY ══════ -->
+  <section class="ds-section" id="typography">
+    <div class="ds-section-title">字体系统</div>
+    <div class="ds-section-desc">使用两种字体：数据与代码场景用 Fira Code，正文 UI 用 Inter。</div>
+
+    <div style="margin-bottom:16px;display:flex;gap:12px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;flex:1">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">UI 正文字体</div>
+        <div style="font-size:22px;font-weight:600;font-family:'Inter',sans-serif">Inter</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">weights: 300, 400, 500, 600, 700</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;flex:1">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">数据 / 代码字体</div>
+        <div style="font-size:22px;font-weight:600;font-family:'Fira Code',monospace">Fira Code</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">weights: 400, 500, 600, 700</div>
+      </div>
+    </div>
+
+    <div class="type-sample-grid">
+      <!-- Page Title -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">页面标题</div>
+          <div class="type-spec">Inter 700<br>16px / 1.4</div>
+        </div>
+        <div class="type-sample" style="font-size:16px;font-weight:700">SPRI Monitor Dashboard</div>
+      </div>
+      <!-- Section Title -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">区块标题</div>
+          <div class="type-spec">Inter 700<br>15px / 1.4</div>
+        </div>
+        <div class="type-sample" style="font-size:15px;font-weight:700">Stablecoin Risk Monitor</div>
+      </div>
+      <!-- Card Title -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">卡片标题</div>
+          <div class="type-spec">Inter 700<br>14px / 1.5</div>
+        </div>
+        <div class="type-sample" style="font-size:14px;font-weight:700">USDT — Reserve Health Score</div>
+      </div>
+      <!-- Body -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">正文</div>
+          <div class="type-spec">Inter 400<br>14px / 1.6</div>
+        </div>
+        <div class="type-sample" style="font-size:14px;font-weight:400">A composite risk score computed from 4 weighted dimensions: Peg Deviation, Reserve Health, Market Depth, and On-chain Flow.</div>
+      </div>
+      <!-- Table body -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">表格内容</div>
+          <div class="type-spec">Inter 400<br>13px / 1.5</div>
+        </div>
+        <div class="type-sample" style="font-size:13px">Reserve Attestation Submitted — Awaiting Review</div>
+      </div>
+      <!-- Small / Label -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">标签 / 辅助</div>
+          <div class="type-spec">Inter 500<br>12px / 1.5</div>
+        </div>
+        <div class="type-sample" style="font-size:12px;font-weight:500;color:var(--text-secondary)">Updated 2 minutes ago · Source: Tether Ltd</div>
+      </div>
+      <!-- Micro -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">微型 / 元信息</div>
+          <div class="type-spec">Inter 600<br>11px / 1.5<br>uppercase</div>
+        </div>
+        <div class="type-sample" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Risk Level · Score · Alerts</div>
+      </div>
+      <!-- KPI value (mono) -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">KPI 数值</div>
+          <div class="type-spec">Fira Code 700<br>28px / 1.0</div>
+        </div>
+        <div class="type-sample" style="font-size:28px;font-weight:700;font-family:'Fira Code',monospace">72.4</div>
+      </div>
+      <!-- Detail Score -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">详情页评分</div>
+          <div class="type-spec">Fira Code 700<br>48px / 1.0</div>
+        </div>
+        <div class="type-sample" style="font-size:48px;font-weight:700;font-family:'Fira Code',monospace;color:var(--risk-high)">68</div>
+      </div>
+      <!-- Coin symbol (mono) -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">代币符号</div>
+          <div class="type-spec">Fira Code 700<br>14px</div>
+        </div>
+        <div class="type-sample" style="font-size:14px;font-weight:700;font-family:'Fira Code',monospace">USDT · USDC · DAI</div>
+      </div>
+      <!-- Detail coin name (mono) -->
+      <div class="type-row">
+        <div class="type-meta">
+          <div class="type-label">详情页代币名</div>
+          <div class="type-spec">Fira Code 700<br>22px</div>
+        </div>
+        <div class="type-sample" style="font-size:22px;font-weight:700;font-family:'Fira Code',monospace">USDT</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ 3. SPACING ══════ -->
+  <section class="ds-section" id="spacing">
+    <div class="ds-section-title">间距系统</div>
+    <div class="ds-section-desc">基础单位为 4px，常见使用 4, 6, 8, 10, 12, 16, 20, 24px 的间距序列。</div>
+    <div class="spacing-grid">
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:4px"></div>
+        <div class="spacing-token">4px</div>
+        <div class="spacing-value">--spacing-1</div>
+        <div class="spacing-use">图标与文字微间距（gap-4）</div>
+      </div>
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:6px"></div>
+        <div class="spacing-token">6px</div>
+        <div class="spacing-value">--spacing-1.5</div>
+        <div class="spacing-use">徽章内图标间距、按钮图标 gap</div>
+      </div>
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:8px"></div>
+        <div class="spacing-token">8px</div>
+        <div class="spacing-value">--spacing-2</div>
+        <div class="spacing-use">Logo 内部、小型卡片内边距</div>
+      </div>
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:10px"></div>
+        <div class="spacing-token">10px</div>
+        <div class="spacing-value">--spacing-2.5</div>
+        <div class="spacing-use">侧边栏导航项内边距、告警条目间距</div>
+      </div>
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:12px"></div>
+        <div class="spacing-token">12px</div>
+        <div class="spacing-value">--spacing-3</div>
+        <div class="spacing-use">按钮 sm 横向内边距、表格行间距</div>
+      </div>
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:16px"></div>
+        <div class="spacing-token">16px</div>
+        <div class="spacing-value">--spacing-4</div>
+        <div class="spacing-use">卡片内边距、Grid gap、内容区块间距</div>
+      </div>
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:20px"></div>
+        <div class="spacing-token">20px</div>
+        <div class="spacing-value">--spacing-5</div>
+        <div class="spacing-use">KPI 卡片内边距、区块纵向间距</div>
+      </div>
+      <div class="spacing-row">
+        <div class="spacing-bar" style="width:24px"></div>
+        <div class="spacing-token">24px</div>
+        <div class="spacing-value">--spacing-6</div>
+        <div class="spacing-use">内容区域内边距（content padding）、详情页 Hero</div>
+      </div>
+    </div>
+
+    <div class="ds-subsection-title">布局尺寸</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">侧边栏宽度</div>
+        <div style="font-family:'Fira Code',monospace;font-size:18px;font-weight:700;color:var(--teal)">220px</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">顶部栏高度</div>
+        <div style="font-family:'Fira Code',monospace;font-size:18px;font-weight:700;color:var(--teal)">56px</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">内容区内边距</div>
+        <div style="font-family:'Fira Code',monospace;font-size:18px;font-weight:700;color:var(--teal)">24px</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">图标按钮尺寸</div>
+        <div style="font-family:'Fira Code',monospace;font-size:18px;font-weight:700;color:var(--teal)">36×36px</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">KPI 图标尺寸</div>
+        <div style="font-family:'Fira Code',monospace;font-size:18px;font-weight:700;color:var(--teal)">40×40px</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">评分环尺寸</div>
+        <div style="font-family:'Fira Code',monospace;font-size:18px;font-weight:700;color:var(--teal)">72×72px</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ 4. RADIUS ══════ -->
+  <section class="ds-section" id="radius">
+    <div class="ds-section-title">圆角系统</div>
+    <div class="ds-section-desc">三档圆角，从小组件到大容器依次递增。</div>
+    <div class="radius-grid">
+      <div class="radius-card" style="border-radius:var(--radius-sm)">
+        <div class="radius-sample" style="border-radius:8px"></div>
+        <div class="radius-token">--radius-sm</div>
+        <div class="radius-value">8px</div>
+        <div class="radius-use">按钮、输入框、图标按钮<br>徽章底层容器、Chip<br>小型维度卡片</div>
+      </div>
+      <div class="radius-card" style="border-radius:var(--radius-md)">
+        <div class="radius-sample" style="border-radius:12px"></div>
+        <div class="radius-token">--radius-md</div>
+        <div class="radius-value">12px</div>
+        <div class="radius-use">标准卡片（Card）<br>KPI 卡片、数据面板<br>图表容器</div>
+      </div>
+      <div class="radius-card" style="border-radius:var(--radius-lg)">
+        <div class="radius-sample" style="border-radius:16px"></div>
+        <div class="radius-token">--radius-lg</div>
+        <div class="radius-value">16px</div>
+        <div class="radius-use">弹窗 / Modal<br>大型 Hero 区块</div>
+      </div>
+      <div class="radius-card" style="border-radius:20px">
+        <div class="radius-sample" style="border-radius:20px"></div>
+        <div class="radius-token">20px (pill)</div>
+        <div class="radius-value">pill</div>
+        <div class="radius-use">Tabs（pill 样式）<br>Badges<br>通知计数芯片</div>
+      </div>
+      <div class="radius-card" style="border-radius:50%">
+        <div class="radius-sample" style="border-radius:50%;width:60px;height:60px"></div>
+        <div class="radius-token">50% (circle)</div>
+        <div class="radius-value">circle</div>
+        <div class="radius-use">用户头像<br>风险等级圆点<br>告警指示器</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ 5. SHADOWS ══════ -->
+  <section class="ds-section" id="shadows">
+    <div class="ds-section-title">阴影系统</div>
+    <div class="ds-section-desc">轻量阴影设计，强调层次感而不抢占数据焦点。</div>
+    <div class="shadow-grid">
+      <div class="shadow-card">
+        <div class="shadow-sample" style="box-shadow:0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05)"></div>
+        <div class="shadow-token">--shadow-sm</div>
+        <div class="shadow-value">0 1px 3px rgba(0,0,0,.08)<br>0 1px 2px rgba(0,0,0,.05)</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center">默认卡片阴影<br>KPI 卡片、标准卡片</div>
+      </div>
+      <div class="shadow-card">
+        <div class="shadow-sample" style="box-shadow:0 4px 12px rgba(0,0,0,.08)"></div>
+        <div class="shadow-token">--shadow-md</div>
+        <div class="shadow-value">0 4px 12px rgba(0,0,0,.08)</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center">悬浮卡片<br>Dropdown / Tooltip</div>
+      </div>
+      <div class="shadow-card">
+        <div class="shadow-sample" style="box-shadow:none;border:2px dashed var(--border)"></div>
+        <div class="shadow-token">none</div>
+        <div class="shadow-value">无阴影</div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center">背景色块<br>内嵌容器（.dim-card）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ 6. COMPONENTS ══════ -->
+  <section class="ds-section" id="components">
+    <div class="ds-section-title">组件规范</div>
+    <div class="ds-section-desc">以下所有组件均已在原型中验证。开发时请以此为准，不得随意改变视觉结构。</div>
+
+    <!-- Buttons -->
+    <div id="buttons" class="ds-subsection-title">按钮（Button）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">Button Variants</div>
+      <div class="comp-row">
+        <div class="comp-state-label">Primary</div>
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Run Analysis
+        </button>
+        <button class="btn btn-primary" style="background:var(--teal-dark)">Hover State</button>
+        <button class="btn btn-primary disabled" disabled>Disabled</button>
+      </div>
+      <div class="comp-row">
+        <div class="comp-state-label">Secondary</div>
+        <button class="btn btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Export Report
+        </button>
+        <button class="btn btn-secondary disabled" disabled>Disabled</button>
+      </div>
+      <div class="comp-row">
+        <div class="comp-state-label">Danger</div>
+        <button class="btn btn-danger">Reject Submission</button>
+        <button class="btn btn-danger disabled" disabled>Disabled</button>
+      </div>
+      <div class="comp-row">
+        <div class="comp-state-label">Small (sm)</div>
+        <button class="btn btn-primary btn-sm">Approve</button>
+        <button class="btn btn-secondary btn-sm">View Details</button>
+        <button class="btn btn-danger btn-sm">Reject</button>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div id="badges" class="ds-subsection-title">徽章（Badge）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">Risk Level Badges（带状态点）</div>
+      <div class="comp-row">
+        <span class="badge badge-green badge-dot">Normal</span>
+        <span class="badge badge-amber badge-dot">Elevated</span>
+        <span class="badge badge-orange badge-dot">High</span>
+        <span class="badge badge-red badge-dot">Critical</span>
+        <span class="badge badge-purple badge-dot">Rapid Mover</span>
+      </div>
+      <div class="comp-showcase-label" style="margin-top:16px">系统徽章</div>
+      <div class="comp-row">
+        <span class="badge badge-teal">Active</span>
+        <span class="badge badge-teal badge-dot">Live</span>
+        <span class="badge badge-gray">Pending</span>
+        <span class="badge badge-gray badge-dot">Inactive</span>
+        <span class="rapid-tag">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+          Rapid
+        </span>
+        <span class="freshenesss-chip">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Fresh
+        </span>
+        <span class="freshenesss-chip stale-chip">Stale</span>
+      </div>
+    </div>
+
+    <!-- Inputs -->
+    <div id="inputs" class="ds-subsection-title">输入框 &amp; 选择器（Input / Select）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">Input States</div>
+      <div class="comp-row">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Default</div>
+          <input class="input-field" type="text" placeholder="Search stablecoin..." />
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Focus（边框变 teal）</div>
+          <input class="input-field" type="text" value="USDT" style="border-color:var(--teal)" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Error</div>
+          <input class="input-field error" type="text" value="Invalid range" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Disabled</div>
+          <input class="input-field disabled-field" type="text" value="Read only" disabled />
+        </div>
+      </div>
+      <div class="comp-showcase-label" style="margin-top:16px">Select Wrap</div>
+      <div class="comp-row">
+        <div class="select-wrap">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <select>
+            <option>Last 7 days</option>
+            <option>Last 30 days</option>
+            <option>Last 90 days</option>
+          </select>
+        </div>
+        <div class="icon-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="icon-btn notif-dot">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div id="tabs" class="ds-subsection-title">标签页（Tabs）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">Pill Tabs（圆形胶囊标签）</div>
+      <div class="tabs">
+        <div class="tab active">All</div>
+        <div class="tab">24h Change</div>
+        <div class="tab">Alerts</div>
+        <div class="tab">Watchlist</div>
+      </div>
+
+      <div class="comp-showcase-label" style="margin-top:20px">Segment Tabs（分段式）</div>
+      <div class="filter-tabs">
+        <div class="filter-tab active">7D</div>
+        <div class="filter-tab">30D</div>
+        <div class="filter-tab">90D</div>
+        <div class="filter-tab">1Y</div>
+      </div>
+
+      <div class="comp-showcase-label" style="margin-top:20px">Monitor Filter Tabs（独立边框）</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <div class="mf-tab active">All</div>
+        <div class="mf-tab">Normal</div>
+        <div class="mf-tab">Elevated</div>
+        <div class="mf-tab">High</div>
+        <div class="mf-tab">Critical</div>
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div id="cards" class="ds-subsection-title">基础卡片（Card）</div>
+    <div class="comp-showcase" style="padding:0">
+      <div class="card" style="margin:28px 32px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Reserve Health Score
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="badge badge-green badge-dot">Normal</span>
+            <div class="icon-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="card-body" style="font-size:13px;color:var(--text-secondary)">
+          卡片内容区。标准内边距 16px 20px，标题栏与内容之间有分隔线。
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div id="kpi" class="ds-subsection-title">KPI 卡片（4列 Grid）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">KPI Card Grid — 4 columns, gap 16px</div>
+      <div class="kpi-demo">
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">Monitored Coins</div>
+            <div class="kpi-value" style="color:var(--teal)">12</div>
+            <div class="kpi-sub">8 active · 4 pending</div>
+          </div>
+          <div class="kpi-icon" style="background:var(--teal-light)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">Critical Alerts</div>
+            <div class="kpi-value" style="color:var(--risk-critical)">3</div>
+            <div class="kpi-sub">↑ 2 since last hour</div>
+          </div>
+          <div class="kpi-icon" style="background:var(--risk-critical-light)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--risk-critical)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">Avg SPRI Score</div>
+            <div class="kpi-value score-elevated">58.4</div>
+            <div class="kpi-sub">↑ 4.2 from yesterday</div>
+          </div>
+          <div class="kpi-icon" style="background:var(--risk-elevated-light)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--risk-elevated)" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">Pending Reviews</div>
+            <div class="kpi-value" style="color:var(--purple)">7</div>
+            <div class="kpi-sub">Reserve attestations</div>
+          </div>
+          <div class="kpi-icon" style="background:var(--purple-light)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div id="table" class="ds-subsection-title">数据表格（SPRI Table）</div>
+    <div class="comp-showcase" style="padding:0;overflow:hidden">
+      <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+          SPRI Monitor Table
+        </div>
+        <div style="display:flex;gap:4px">
+          <div class="mf-tab active">All</div>
+          <div class="mf-tab">High</div>
+          <div class="mf-tab">Critical</div>
+        </div>
+      </div>
+      <div style="padding:0 20px">
+        <table class="spri-table">
+          <thead>
+            <tr>
+              <th>Stablecoin</th>
+              <th class="th-sorted">SPRI Score ↑</th>
+              <th>Risk Level</th>
+              <th>Peg Dev</th>
+              <th>Reserve</th>
+              <th>Alerts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="spri-symbol">USDT</div>
+                <div class="spri-coin-name">Tether USD</div>
+              </td>
+              <td><span class="spri-score-num score-high">72</span></td>
+              <td>
+                <div class="risk-level-cell">
+                  <div class="risk-level-dot" style="background:var(--risk-high)"></div>
+                  <span style="color:var(--risk-high)">High</span>
+                </div>
+              </td>
+              <td><span class="mono">0.42%</span></td>
+              <td><span class="mono">61.2</span></td>
+              <td><span class="alert-yes">2 alerts</span></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="spri-symbol">DAI <span class="rapid-tag">Rapid</span></div>
+                <div class="spri-coin-name">MakerDAO DAI</div>
+              </td>
+              <td><span class="spri-score-num score-elevated">58</span></td>
+              <td>
+                <div class="risk-level-cell">
+                  <div class="risk-level-dot" style="background:var(--risk-elevated)"></div>
+                  <span style="color:var(--risk-elevated)">Elevated</span>
+                </div>
+              </td>
+              <td><span class="mono">0.11%</span></td>
+              <td><span class="mono">74.8</span></td>
+              <td><span style="font-size:11px;color:var(--text-muted)">—</span></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="spri-symbol">USDC</div>
+                <div class="spri-coin-name">USD Coin</div>
+              </td>
+              <td><span class="spri-score-num score-normal">28</span></td>
+              <td>
+                <div class="risk-level-cell">
+                  <div class="risk-level-dot" style="background:var(--risk-normal)"></div>
+                  <span style="color:var(--risk-normal)">Normal</span>
+                </div>
+              </td>
+              <td><span class="mono">0.02%</span></td>
+              <td><span class="mono">91.5</span></td>
+              <td><span style="font-size:11px;color:var(--text-muted)">—</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Alert Feed -->
+    <div id="alerts" class="ds-subsection-title">告警动态（Alert Feed）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">Alert List</div>
+      <div class="alert-list">
+        <div class="alert-item">
+          <div class="alert-indicator" style="background:var(--risk-critical)"></div>
+          <div class="alert-body">
+            <div class="alert-title">USDT Critical — Peg deviation exceeded 0.5%</div>
+            <div class="alert-meta">Triggered: PD-01 × RH-03 · SPRI Score 72 → 81</div>
+          </div>
+          <div class="alert-time">2m ago</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-indicator" style="background:var(--risk-elevated)"></div>
+          <div class="alert-body">
+            <div class="alert-title">DAI Elevated — On-chain flow anomaly detected</div>
+            <div class="alert-meta">Triggered: OF-02 · Market Depth dropped 18%</div>
+          </div>
+          <div class="alert-time">14m ago</div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-indicator" style="background:var(--risk-normal)"></div>
+          <div class="alert-body">
+            <div class="alert-title">USDC returned to Normal risk level</div>
+            <div class="alert-meta">SPRI Score 34 → 28 · All dimensions stable</div>
+          </div>
+          <div class="alert-time">1h ago</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ 7. PAGE PATTERNS ══════ -->
+  <section class="ds-section" id="patterns">
+    <div class="ds-section-title">页面模式</div>
+    <div class="ds-section-desc">以下展示原型中实际使用的页面级组件结构，供开发还原参考。</div>
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="ds-subsection-title">侧边导航（Sidebar）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">220px fixed left sidebar · z-index 100</div>
+      <div style="display:flex;gap:24px;align-items:flex-start">
+        <div class="sidebar-demo">
+          <div class="sidebar-demo-logo">
+            <div class="logo-mark">
+              <div class="logo-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </div>
+              <div>
+                <div class="logo-text">SPRI</div>
+                <div class="logo-sub">Risk Monitor</div>
+              </div>
+            </div>
+          </div>
+          <div class="sidebar-role-chip">Risk Analyst · Alex Chen</div>
+          <div class="nav-section">Monitor</div>
+          <div class="nav-item active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Dashboard
+          </div>
+          <div class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+            Alerts
+            <span class="nav-badge">3</span>
+          </div>
+          <div class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            SPRI Trends
+          </div>
+          <div class="nav-section">Reviews</div>
+          <div class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+            Reserve Review
+            <span class="nav-badge" style="background:var(--amber)">7</span>
+          </div>
+          <div class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            Settings
+          </div>
+        </div>
+        <div style="flex:1;font-size:12px;color:var(--text-secondary);line-height:1.8">
+          <div style="font-weight:700;color:var(--text-primary);margin-bottom:8px">规范说明</div>
+          <div>• 固定宽度 <code class="mono">220px</code>，高度 <code class="mono">100vh</code></div>
+          <div>• Logo 区高度 ~72px，含 20px 内边距</div>
+          <div>• Role Chip：背景 <code class="mono">--teal-light</code>，字色 <code class="mono">--teal-dark</code></div>
+          <div>• Nav Section Label：10px uppercase，颜色 <code class="mono">--text-muted</code></div>
+          <div>• Nav Item 默认：颜色 <code class="mono">--text-secondary</code></div>
+          <div>• Nav Item Active：背景 <code class="mono">--teal-light</code>，左边框 3px <code class="mono">--teal</code></div>
+          <div>• Nav Badge（Critical）：背景 <code class="mono">--red</code></div>
+          <div>• Nav Badge（Warning）：背景 <code class="mono">--amber</code></div>
+          <div>• z-index: 100</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Topbar -->
+    <div id="topbar" class="ds-subsection-title">顶部栏（Topbar）</div>
+    <div class="comp-showcase" style="padding:0;overflow:hidden">
+      <div class="comp-showcase-label" style="padding:14px 20px 0">56px sticky topbar · z-index 50</div>
+      <div style="margin:16px 20px 20px">
+        <div class="topbar-demo">
+          <div class="topbar-left">
+            <div>
+              <div class="topbar-title">SPRI Dashboard</div>
+              <div class="topbar-sub">12 stablecoins monitored</div>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <span class="refresh-time">Updated 2m ago</span>
+            <div class="select-wrap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <select><option>Last 7 days</option><option>Last 30 days</option></select>
+            </div>
+            <div class="icon-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+            </div>
+            <div class="icon-btn notif-dot">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dimension Score Cards -->
+    <div id="dim-cards" class="ds-subsection-title">维度得分卡（Dimension Score Cards）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">4列 Grid，背景色 --bg，4维度显示在 Detail Page</div>
+      <div class="dim-cards-demo">
+        <div class="dim-card">
+          <div class="dim-card-label">PD</div>
+          <div class="dim-card-name">Peg Deviation</div>
+          <div class="dim-card-score score-high">82</div>
+          <div class="dim-card-gauge">
+            <div class="dim-card-gauge-fill" style="width:82%;background:var(--risk-high)"></div>
+          </div>
+        </div>
+        <div class="dim-card">
+          <div class="dim-card-label">RH</div>
+          <div class="dim-card-name">Reserve Health</div>
+          <div class="dim-card-score score-elevated">61</div>
+          <div class="dim-card-gauge">
+            <div class="dim-card-gauge-fill" style="width:61%;background:var(--risk-elevated)"></div>
+          </div>
+        </div>
+        <div class="dim-card">
+          <div class="dim-card-label">MD</div>
+          <div class="dim-card-name">Market Depth</div>
+          <div class="dim-card-score score-elevated">54</div>
+          <div class="dim-card-gauge">
+            <div class="dim-card-gauge-fill" style="width:54%;background:var(--risk-elevated)"></div>
+          </div>
+        </div>
+        <div class="dim-card">
+          <div class="dim-card-label">OF</div>
+          <div class="dim-card-name">On-chain Flow</div>
+          <div class="dim-card-score score-normal">31</div>
+          <div class="dim-card-gauge">
+            <div class="dim-card-gauge-fill" style="width:31%;background:var(--risk-normal)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div id="timeline" class="ds-subsection-title">告警时间线（Alert Timeline）</div>
+    <div class="comp-showcase" style="max-width:480px">
+      <div class="comp-showcase-label">Detail Page 告警历史</div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot-wrap">
+            <div class="timeline-dot" style="background:var(--risk-critical)"></div>
+            <div class="timeline-line"></div>
+          </div>
+          <div class="timeline-content">
+            <div class="timeline-title">SPRI Score escalated to Critical (81)</div>
+            <div class="timeline-desc">Peg deviation crossed 0.5% threshold</div>
+          </div>
+          <div class="timeline-time">14:32</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot-wrap">
+            <div class="timeline-dot" style="background:var(--risk-high)"></div>
+            <div class="timeline-line"></div>
+          </div>
+          <div class="timeline-content">
+            <div class="timeline-title">Reserve Health Score dropped to 61.2</div>
+            <div class="timeline-desc">Field RH-03 flagged by analyst review</div>
+          </div>
+          <div class="timeline-time">12:18</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot-wrap">
+            <div class="timeline-dot" style="background:var(--risk-normal)"></div>
+          </div>
+          <div class="timeline-content">
+            <div class="timeline-title">All dimensions within normal range</div>
+            <div class="timeline-desc">System status green</div>
+          </div>
+          <div class="timeline-time">09:00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Score Ring -->
+    <div id="score-ring" class="ds-subsection-title">风险评分环（Score Ring）</div>
+    <div class="comp-showcase">
+      <div class="comp-showcase-label">Detail Page Header — 72×72px 评分展示</div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:8px">Normal (≤40)</div>
+          <div class="score-ring" style="border:3px solid var(--risk-normal);background:var(--risk-normal-light)">
+            <div class="score-ring-num" style="color:var(--risk-normal)">28</div>
+            <div class="score-ring-label" style="color:var(--risk-normal-dark)">Normal</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:8px">Elevated (41–65)</div>
+          <div class="score-ring" style="border:3px solid var(--risk-elevated);background:var(--risk-elevated-light)">
+            <div class="score-ring-num" style="color:var(--risk-elevated)">58</div>
+            <div class="score-ring-label" style="color:var(--risk-elevated-dark)">Elevated</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:8px">High (66–80)</div>
+          <div class="score-ring" style="border:3px solid var(--risk-high);background:var(--risk-high-light)">
+            <div class="score-ring-num" style="color:var(--risk-high)">72</div>
+            <div class="score-ring-label" style="color:var(--risk-high-dark)">High</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:8px">Critical (&gt;80)</div>
+          <div class="score-ring" style="border:3px solid var(--risk-critical);background:var(--risk-critical-light)">
+            <div class="score-ring-num" style="color:var(--risk-critical)">88</div>
+            <div class="score-ring-label" style="color:var(--risk-critical-dark)">Critical</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:8px">Rapid Mover</div>
+          <div class="score-ring" style="border:3px solid var(--risk-mover);background:var(--risk-mover-light)">
+            <div class="score-ring-num" style="color:var(--risk-mover)">64</div>
+            <div class="score-ring-label" style="color:var(--risk-mover-dark)">Mover</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:var(--text-secondary)">
+        评分区间：Normal 0–40 / Elevated 41–65 / High 66–80 / Critical &gt;80 / Rapid Mover（叠加标签）
+      </div>
+    </div>
+
+    <!-- Confidence Bar -->
+    <div class="ds-subsection-title">置信度条（Confidence Bar）</div>
+    <div class="comp-showcase" style="max-width:480px">
+      <div class="comp-showcase-label">Reserve Review Page — 字段置信度展示</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">High Confidence (92%)</div>
+          <div class="confidence-bar-wrap">
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width:92%;background:var(--risk-normal)"></div>
+            </div>
+            <div class="confidence-label" style="color:var(--risk-normal)">92%</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Medium Confidence (67%)</div>
+          <div class="confidence-bar-wrap">
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width:67%;background:var(--risk-elevated)"></div>
+            </div>
+            <div class="confidence-label" style="color:var(--risk-elevated)">67%</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Low Confidence (31%)</div>
+          <div class="confidence-bar-wrap">
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width:31%;background:var(--risk-critical)"></div>
+            </div>
+            <div class="confidence-label" style="color:var(--risk-critical)">31%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ 8. TOKENS 速查 ══════ -->
+  <section class="ds-section" id="tokens">
+    <div class="ds-section-title">CSS Token 速查表</div>
+    <div class="ds-section-desc">开发时直接复制以下 :root 变量块，确保与原型保持一致。</div>
+    <div class="code-snippet">
+<span class="c-comment">/* SPRI Monitor Design Tokens — from index_risk.html */</span>
+<span class="c-key">:root</span> {
+  <span class="c-comment">/* ─ Backgrounds ─ */</span>
+  <span class="c-key">--bg</span>:             <span class="c-val">#F0F2F5</span>;    <span class="c-comment">/* page background */</span>
+  <span class="c-key">--surface</span>:        <span class="c-val">#FFFFFF</span>;    <span class="c-comment">/* cards / panels */</span>
+  <span class="c-key">--border</span>:         <span class="c-val">#E4E7EE</span>;    <span class="c-comment">/* borders / dividers */</span>
+
+  <span class="c-comment">/* ─ Brand / Primary ─ */</span>
+  <span class="c-key">--teal</span>:           <span class="c-val">#0BBFB2</span>;    <span class="c-comment">/* primary CTA, active states */</span>
+  <span class="c-key">--teal-light</span>:     <span class="c-val">#E6FAF8</span>;    <span class="c-comment">/* active nav bg, badge bg */</span>
+  <span class="c-key">--teal-dark</span>:      <span class="c-val">#089C91</span>;    <span class="c-comment">/* hover state, mono text */</span>
+
+  <span class="c-comment">/* ─ Risk Semantic ─ */</span>
+  <span class="c-key">--risk-normal</span>:        <span class="c-val">#10B981</span>; <span class="c-key">--risk-normal-light</span>: <span class="c-val">#D1FAE5</span>; <span class="c-key">--risk-normal-dark</span>: <span class="c-val">#065F46</span>;
+  <span class="c-key">--risk-elevated</span>:      <span class="c-val">#F59E0B</span>; <span class="c-key">--risk-elevated-light</span>: <span class="c-val">#FEF3C7</span>; <span class="c-key">--risk-elevated-dark</span>: <span class="c-val">#92400E</span>;
+  <span class="c-key">--risk-high</span>:          <span class="c-val">#F97316</span>; <span class="c-key">--risk-high-light</span>: <span class="c-val">#FFEDD5</span>; <span class="c-key">--risk-high-dark</span>: <span class="c-val">#7C2D12</span>;
+  <span class="c-key">--risk-critical</span>:      <span class="c-val">#EF4444</span>; <span class="c-key">--risk-critical-light</span>: <span class="c-val">#FEE2E2</span>; <span class="c-key">--risk-critical-dark</span>: <span class="c-val">#991B1B</span>;
+  <span class="c-key">--risk-mover</span>:         <span class="c-val">#8B5CF6</span>; <span class="c-key">--risk-mover-light</span>: <span class="c-val">#EDE9FE</span>; <span class="c-key">--risk-mover-dark</span>: <span class="c-val">#5B21B6</span>;
+
+  <span class="c-comment">/* ─ Text ─ */</span>
+  <span class="c-key">--text-primary</span>:   <span class="c-val">#111827</span>;
+  <span class="c-key">--text-secondary</span>: <span class="c-val">#6B7280</span>;
+  <span class="c-key">--text-muted</span>:     <span class="c-val">#9CA3AF</span>;
+
+  <span class="c-comment">/* ─ Shadows ─ */</span>
+  <span class="c-key">--shadow-sm</span>:  <span class="c-val">0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05)</span>;
+  <span class="c-key">--shadow-md</span>:  <span class="c-val">0 4px 12px rgba(0,0,0,.08)</span>;
+
+  <span class="c-comment">/* ─ Radius ─ */</span>
+  <span class="c-key">--radius-sm</span>:  <span class="c-val">8px</span>;    <span class="c-comment">/* buttons, inputs, small cards */</span>
+  <span class="c-key">--radius-md</span>:  <span class="c-val">12px</span>;   <span class="c-comment">/* standard cards */</span>
+  <span class="c-key">--radius-lg</span>:  <span class="c-val">16px</span>;   <span class="c-comment">/* modal, large hero */</span>
+}
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <div style="border-top:1px solid var(--border);padding:24px 0;display:flex;justify-content:space-between;align-items:center;color:var(--text-muted);font-size:12px">
+    <div>SPRI Monitor Design System · 基于 <code style="font-family:'Fira Code',monospace;font-size:11px">index_risk.html</code> 提炼 · 2026-05-09</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="badge badge-teal">v1.0</span>
+      <span class="badge badge-gray">Light Mode Only</span>
+    </div>
+  </div>
+
+</div><!-- end ds-container -->
+</div><!-- end ds-body-with-toc -->
+
+<script>
+  // Smooth scroll + active TOC
+  const tocItems = document.querySelectorAll('.toc-item');
+  const sections = document.querySelectorAll('[id]');
+
+  tocItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      const href = item.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        e.preventDefault();
+        const target = document.querySelector(href);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    });
+  });
+
+  // Highlight active TOC on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        tocItems.forEach(item => {
+          item.classList.remove('active');
+          if (item.getAttribute('href') === '#' + entry.target.id) {
+            item.classList.add('active');
+          }
+        });
+      }
+    });
+  }, { rootMargin: '-56px 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+
+  // Nav link scroll
+  document.querySelectorAll('.ds-nav-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const href = link.getAttribute('href');
+      const target = document.querySelector(href);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('.ds-nav-link').forEach(l => l.classList.remove('active'));
+      link.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
