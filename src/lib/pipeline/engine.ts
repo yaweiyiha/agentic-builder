@@ -500,14 +500,12 @@ export class PipelineEngine {
     const designSpecContent = run.steps.design?.content ?? "";
 
     // ── QA ──
-    if (fast || !plan.needsQa) {
+    if (!plan.needsQa) {
       run = this.emitStubCompleted(
         run,
         "qa",
-        fast
-          ? "QA skipped in quick start (assumed passed)."
-          : `QA not required for Tier ${tier} project.`,
-        { skipped: true, ...(fast ? {} : { reason: "tier_skip", tier }) },
+        `QA not required for Tier ${tier} project.`,
+        { skipped: true, reason: "tier_skip", tier },
       );
     } else {
       run = await this.executeStep(run, "qa", () =>
@@ -522,14 +520,12 @@ export class PipelineEngine {
     }
 
     // ── Verify ──
-    if (fast || !plan.needsVerify) {
+    if (!plan.needsVerify) {
       run = this.emitStubCompleted(
         run,
         "verify",
-        fast
-          ? "Verification skipped in quick start (assumed passed)."
-          : `Verification not required for Tier ${tier} project.`,
-        { skipped: true, ...(fast ? {} : { reason: "tier_skip", tier }) },
+        `Verification not required for Tier ${tier} project.`,
+        { skipped: true, reason: "tier_skip", tier },
       );
     } else {
       run = await this.executeStep(run, "verify", () =>

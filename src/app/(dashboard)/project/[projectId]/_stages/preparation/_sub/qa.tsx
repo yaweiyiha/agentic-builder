@@ -9,7 +9,7 @@ export default function QaSubStage() {
   const streamingContent = usePipelineStore((s) => s.streamingContent);
   const currentStep      = usePipelineStore((s) => s.currentStep);
   const isRunning        = usePipelineStore((s) => s.isRunning);
-  const goToStage        = useStageStore((s) => s.goToStage);
+  const goToSubStage     = useStageStore((s) => s.goToSubStage);
 
   const isThisRunning = isRunning && currentStep === "qa";
   const content = isThisRunning ? streamingContent : (step?.content ?? "");
@@ -25,8 +25,8 @@ export default function QaSubStage() {
       isDone={isDone}
       step={step}
       content={content}
-      confirmLabel="Proceed to Kick-off"
-      onConfirm={() => goToStage("kickoff")}
+      confirmLabel="Proceed to Verify"
+      onConfirm={() => goToSubStage("verify", "preparation")}
     />
   );
 }

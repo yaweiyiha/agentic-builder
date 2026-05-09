@@ -1771,7 +1771,18 @@ export const usePipelineStore = create<PipelineState>()(
             fastFromPrd:   snap.fastFromPrd   ?? true,
             codeOutputDir: snap.codeOutputDir ?? "generated-code",
             steps:         snap.steps
-              ? { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) }
+              ? (() => {
+                  const restored = { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) };
+                  // Clear any steps that were previously skipped (quick-start stub) so they
+                  // show as "not generated" rather than displaying the skip placeholder text.
+                  for (const key of Object.keys(restored) as PipelineStepId[]) {
+                    const step = restored[key];
+                    if (step?.metadata && (step.metadata as Record<string, unknown>)["skipped"] === true) {
+                      restored[key] = null;
+                    }
+                  }
+                  return restored;
+                })()
               : { ...EMPTY_STEPS },
             designStyles: snap.designStyles ?? null,
             designStylesLoading: snap.designStylesLoading ?? false,

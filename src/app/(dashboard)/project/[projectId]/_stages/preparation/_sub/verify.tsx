@@ -4,30 +4,29 @@ import { usePipelineStore } from "@/store/pipeline-store";
 import { useStageStore } from "@/store/stage-store";
 import DocViewerSubStage from "./_DocViewerSubStage";
 
-export default function TrdSubStage() {
-  const step             = usePipelineStore((s) => s.steps.trd);
+export default function VerifySubStage() {
+  const step             = usePipelineStore((s) => s.steps.verify);
   const streamingContent = usePipelineStore((s) => s.streamingContent);
   const currentStep      = usePipelineStore((s) => s.currentStep);
   const isRunning        = usePipelineStore((s) => s.isRunning);
-  const goToSubStage     = useStageStore((s) => s.goToSubStage);
+  const goToStage        = useStageStore((s) => s.goToStage);
 
-  const isThisRunning = isRunning && currentStep === "trd";
+  const isThisRunning = isRunning && currentStep === "verify";
   const content = isThisRunning ? streamingContent : (step?.content ?? "");
   const isDone  = step?.status === "completed";
 
   return (
     <DocViewerSubStage
-      activeTabId="trd"
-      title="Technical Requirements Document"
-      subtitle="API contracts, data models, service boundaries, and non-functional constraints"
-      editPlaceholder="Ask AgenticBuilder to edit this TRD..."
+      activeTabId="verify"
+      title="Pre-Kickoff Verification"
+      subtitle="Final review checklist — confirm all documents are ready before starting code generation"
+      editPlaceholder="Ask AgenticBuilder to refine the verification checklist..."
       isRunning={isThisRunning}
       isDone={isDone}
       step={step}
       content={content}
-      confirmLabel="Confirm TRD"
-      onConfirm={() => goToSubStage("qa", "preparation")}
-      showDownload
+      confirmLabel="Proceed to Kick-off"
+      onConfirm={() => goToStage("kickoff")}
     />
   );
 }
