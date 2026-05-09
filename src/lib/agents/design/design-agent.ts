@@ -82,7 +82,7 @@ export class DesignAgent extends BaseAgent {
     sessionId?: string,
   ) {
     return this.run(
-      `Based on the following PRD, generate a complete self-contained HTML Design System document as described in your instructions.\n\nYou MUST generate ALL 9 sections in order:\n1. Top Nav + Left TOC sidebar\n2. Hero\n3. Color System (backgrounds, brand, text, status, semantic)\n4. Typography (font pairs, scale table)\n5. Spacing (visual bar scale)\n6. Radius + Shadows\n7. Components (buttons, badges, inputs, tabs, cards, KPI grid, data table, alert feed)\n8. Page Patterns (sidebar nav, topbar, domain-specific patterns)\n9. CSS Token Quick Reference\n\nDo NOT stop early. Output ONLY the HTML — start with <!DOCTYPE html> and end with </html>.\n\nPRD:\n\n${prdContent}`,
+      `Based on the following PRD, generate a complete self-contained HTML Design System document as described in your instructions.\n\nYou MUST generate ALL sections in order:\n1. Left TOC sidebar\n2. Hero\n3. Color System (backgrounds, brand, text, status, semantic)\n4. Typography (font pairs, scale table)\n5. Spacing (visual bar scale)\n6. Radius + Shadows\n7. Components (buttons, badges, inputs, tabs, cards, KPI grid, data table, alert feed)\n8. Page Patterns (sidebar nav, topbar, domain-specific patterns)\n9. CSS Token Quick Reference\n\nDo NOT stop early. Output ONLY the HTML — start with <!DOCTYPE html> and end with </html>.\n\nPRD:\n\n${prdContent}`,
       additionalContext,
       "step-2-design",
       sessionId,
