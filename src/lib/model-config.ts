@@ -18,7 +18,7 @@
 export const MODEL_CONFIG = {
   // ── Preparation phase ──────────────────────────────────────────────────────
 
-  intent: "gpt-4o-mini",
+  intent: "openai/gpt-5.4",
   prd: "openai/gpt-5.4",
   prdInteractionImage: "alibaba/wan-2.6",
   prdSpecExtract: "gpt-4o",

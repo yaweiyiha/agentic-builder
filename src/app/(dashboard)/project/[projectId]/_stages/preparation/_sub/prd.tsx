@@ -639,11 +639,14 @@ export default function PrdSubStage() {
                     {prdHistoryRef.current.length} versions
                   </button>
                 )}
-                <button className="p-2 rounded hover:bg-[#f1f5f9] transition-colors" title="Share">
-                  <ShareIcon />
-                </button>
-                <button className="p-2 rounded hover:bg-[#f1f5f9] transition-colors" title="More">
-                  <MoreVertIcon />
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={!isDone || isPrinting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download PDF"
+                >
+                  {isPrinting ? <SpinnerIcon /> : <DownloadIcon />}
+                  {isPrinting ? "Preparing…" : "Download PDF"}
                 </button>
               </div>
             </div>
@@ -683,14 +686,6 @@ export default function PrdSubStage() {
         disabled={isThisRunning}
         actions={
           <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={handleDownloadPdf}
-              disabled={!isDone || isPrinting}
-              className="flex items-center gap-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              {isPrinting ? <SpinnerIcon /> : <DownloadIcon />}
-              {isPrinting ? "Preparing…" : "Download PDF"}
-            </button>
             <button
               onClick={() => goToSubStage("design", "preparation")}
               className="flex items-center gap-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
