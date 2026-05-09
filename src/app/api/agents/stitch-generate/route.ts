@@ -34,8 +34,24 @@ export async function POST(request: NextRequest) {
       .slice(0, 40)
       .join("\n");
 
-    const specBlock = designSpecContent?.trim()
-      ? `\n\nDesign Specification Summary:\n${designSpecContent.slice(0, 800)}`
+    // If designSpecContent is an HTML design system doc, extract meaningful
+    // design context — stripping all CSS/JS/tags to get plain readable text.
+    function extractTextFromHtml(html: string): string {
+      return html
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&[a-z]+;/gi, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+    }
+
+    const rawSpec = designSpecContent?.trim() ?? "";
+    const isHtmlSpec = /^<!DOCTYPE|^<html/i.test(rawSpec);
+    const specText = isHtmlSpec ? extractTextFromHtml(rawSpec) : rawSpec;
+
+    const specBlock = specText
+      ? `\n\nDesign System Specification (follow these component designs exactly):\n${specText}`
       : "";
 
     const styleBlock =
