@@ -78,3 +78,12 @@ export type {
   TscDiagnosticsInput,
   TscDiagnosticsResult,
 } from "./tsc-diagnostics-as-tasks";
+export {
+  checkMigrationCoverage,
+  formatMigrationGapInstruction,
+} from "./migration-coverage";
+export type {
+  MigrationCoverageInput,
+  MigrationCoverageResult,
+  MigrationCoverageGap,
+} from "./migration-coverage";

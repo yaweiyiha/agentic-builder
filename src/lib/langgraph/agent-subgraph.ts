@@ -1,4 +1,5 @@
 import path from "path";
+import * as nodeFs from "fs/promises";
 import { StateGraph, START, END } from "@langchain/langgraph";
 import {
   WorkerStateAnnotation,
@@ -25,6 +26,10 @@ import { recallAndPrepareInject } from "@/lib/memory/recall-context";
 import { getInjectTokenBudgetForRole } from "@/lib/memory/recall-config";
 import { classifyFailureMode } from "@/lib/memory/distill/failure-mode";
 import { parseMemoryCites, recordMemoryCites } from "@/lib/memory/cite";
+import {
+  checkMigrationCoverage,
+  formatMigrationGapInstruction,
+} from "@/lib/pipeline/self-heal/migration-coverage";
 import { resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
 import type {
@@ -566,7 +571,21 @@ export async function buildProjectConventionCard(
     const hasSequelize = backendPkg.includes('"sequelize"');
     if (hasKoa)  lines.push("- **Backend framework**: Koa — use `ctx.request.body`, `AppKoaContext`, Joi validation");
     if (hasExpress) lines.push("- **Backend framework**: Express — use `req.body`, `req.params`, `req.headers`");
-    if (hasSequelize) lines.push("- **ORM**: Sequelize — model field declarations MUST use `declare`. System fields (id, createdAt, updatedAt) must NOT be in request DTOs.");
+    if (hasSequelize) {
+      lines.push("- **ORM**: Sequelize — model field declarations MUST use `declare`. System fields (id, createdAt, updatedAt) must NOT be in request DTOs.");
+      lines.push(
+        "- **Sequelize migration RULE (CRITICAL)**: If your task modifies any " +
+          "file under `backend/src/models/` (add/remove column, change type, " +
+          "change association, change index), you MUST also write a NEW " +
+          "migration under `backend/src/migrations/NNNN_<short-desc>.ts`. " +
+          "NNNN is one greater than the highest existing migration number. " +
+          "Export both `async up({ context: queryInterface })` and " +
+          "`async down({ context: queryInterface })` covering every change. " +
+          "Do NOT modify existing migrations — always add a new file. The " +
+          "post-task migration-coverage check will flag missing migrations " +
+          "and create a repair task.",
+      );
+    }
   }
 
   // ── Route registrar convention ────────────────────────────────────────────
@@ -1993,6 +2012,69 @@ async function generateCode(state: WorkerState) {
     console.log(
       `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (rounds=${rounds}, model=${lastModel}, cost: $${totalCostUsd.toFixed(4)})`,
     );
+
+    // Migration-coverage check — fires per-task immediately after writes.
+    // If the worker touched a Sequelize model without a migration, log a
+    // warning and persist the gap to .ralph/migration-coverage.json so
+    // downstream self-heal can convert it into a repair task.
+    try {
+      const coverage = checkMigrationCoverage({ writtenFiles });
+      if (coverage.modelFilesTouched.length > 0 || coverage.migrationFilesTouched.length > 0) {
+        const ralphDir = path.join(state.outputDir, ".ralph");
+        await nodeFs.mkdir(ralphDir, { recursive: true });
+        const reportPath = path.join(ralphDir, "migration-coverage.json");
+        let report: {
+          version: number;
+          updatedAt: string;
+          tasks: Record<
+            string,
+            {
+              taskId: string;
+              taskTitle: string;
+              ok: boolean;
+              modelFilesTouched: string[];
+              migrationFilesTouched: string[];
+              gaps: { modelPath: string; modelName: string; instruction: string }[];
+              checkedAt: string;
+            }
+          >;
+        };
+        try {
+          const raw = await nodeFs.readFile(reportPath, "utf8");
+          report = JSON.parse(raw);
+          if (typeof report?.tasks !== "object" || report?.tasks === null) {
+            throw new Error("malformed");
+          }
+        } catch {
+          report = { version: 1, updatedAt: "", tasks: {} };
+        }
+        const checkedAt = new Date().toISOString();
+        report.tasks[task.id] = {
+          taskId: task.id,
+          taskTitle: task.title,
+          ok: coverage.ok,
+          modelFilesTouched: coverage.modelFilesTouched,
+          migrationFilesTouched: coverage.migrationFilesTouched,
+          gaps: coverage.gaps.map((g) => ({
+            ...g,
+            instruction: formatMigrationGapInstruction(g, task.id),
+          })),
+          checkedAt,
+        };
+        report.updatedAt = checkedAt;
+        await nodeFs.writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", "utf8");
+
+        if (!coverage.ok) {
+          console.warn(
+            `[Worker:${state.workerLabel}] Migration coverage gap: task "${task.id}" touched ${coverage.modelFilesTouched.length} model file(s) without writing a migration. ${coverage.gaps.length} gap(s) recorded in .ralph/migration-coverage.json.`,
+          );
+        }
+      }
+    } catch (e) {
+      console.warn(
+        `[Worker:${state.workerLabel}] Migration coverage check failed (continuing): ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
 
     // RALPH: check for missing promise and log a warning (enforcement happens in routeAfterGenerate)
     if (state.ralphConfig.enabled) {
