@@ -26,14 +26,7 @@ import {
   classifyProject,
   normalizeProjectTier,
 } from "@/lib/agents";
-import {
-  extractTrdArtifacts,
-  type TrdArtifacts,
-} from "@/lib/agents/architect/trd-artifacts";
-import {
-  validateRulesDsl,
-  type RulesDslValidation,
-} from "@/lib/agents/architect/trd-rules-validator";
+import { persistTrdArtifactsFromContent } from "@/lib/agents/architect/persist-trd-artifacts";
 import type { AgentResult } from "@/lib/agents";
 import type { ProjectTier, ProjectClassification } from "@/lib/agents";
 import type {
@@ -1066,49 +1059,48 @@ export class PipelineEngine {
    */
   /**
    * After TRD generation succeeds, parse the response for fenced code
-   * blocks emitted under §6 (`shared/schema.ts`) and write them to disk.
+   * blocks emitted under §6 / §7 and persist them. Delegates the I/O to
+   * persistTrdArtifactsFromContent (shared with the parallel-generate
+   * route) and just enriches step.metadata so the UI can surface the
+   * outcome.
+   *
    * Best-effort: a missing/malformed block degrades to "no shared schema"
    * (downstream codegen falls back to per-worker types) rather than
-   * failing the step. The artifact paths and any malformed warnings are
-   * surfaced via step.metadata.artifacts so the UI can flag them.
+   * failing the step.
    */
   private async persistTrdArtifacts(run: PipelineRun): Promise<void> {
     const trd = run.steps.trd;
     if (!trd?.content || trd.status !== "completed") return;
     if (trd.metadata?.skipped) return;
 
-    let artifacts: TrdArtifacts;
+    const blueprintDir = path.resolve(process.cwd(), ".blueprint");
+
+    let result;
     try {
-      artifacts = extractTrdArtifacts(trd.content);
+      result = await persistTrdArtifactsFromContent(trd.content, blueprintDir);
     } catch (err) {
       console.warn(
-        "[Pipeline] TRD artifact extraction failed:",
+        "[Pipeline] TRD artifact persistence failed:",
         err instanceof Error ? err.message : err,
       );
       return;
     }
 
-    const blueprintDir = path.resolve(process.cwd(), ".blueprint");
-    await fs.mkdir(blueprintDir, { recursive: true });
-
-    const written: { schemaTs?: string; rulesYaml?: string } = {};
-    if (artifacts.schemaTs) {
-      const p = path.join(blueprintDir, "shared-schema.ts");
-      await fs.writeFile(p, artifacts.schemaTs, "utf8");
-      written.schemaTs = path.relative(process.cwd(), p);
+    const writtenRel: { schemaTs?: string; rulesYaml?: string } = {};
+    if (result.written.schemaTs) {
+      writtenRel.schemaTs = path.relative(process.cwd(), result.written.schemaTs);
     }
-    let rulesValidation: RulesDslValidation | undefined;
-    if (artifacts.rulesYaml) {
-      const p = path.join(blueprintDir, "business-rules.dsl.yaml");
-      await fs.writeFile(p, artifacts.rulesYaml, "utf8");
-      written.rulesYaml = path.relative(process.cwd(), p);
-      rulesValidation = validateRulesDsl(artifacts.rulesYaml);
-      if (!rulesValidation.ok) {
-        console.warn(
-          `[Pipeline] business-rules.dsl.yaml has ${rulesValidation.warnings.length} warning(s):`,
-          rulesValidation.warnings.map((w) => `${w.code}: ${w.message}`).join("; "),
-        );
-      }
+    if (result.written.rulesYaml) {
+      writtenRel.rulesYaml = path.relative(process.cwd(), result.written.rulesYaml);
+    }
+
+    if (result.rulesValidation && !result.rulesValidation.ok) {
+      console.warn(
+        `[Pipeline] business-rules.dsl.yaml has ${result.rulesValidation.warnings.length} warning(s):`,
+        result.rulesValidation.warnings
+          .map((w) => `${w.code}: ${w.message}`)
+          .join("; "),
+      );
     }
 
     run.steps.trd = {
@@ -1116,10 +1108,12 @@ export class PipelineEngine {
       metadata: {
         ...trd.metadata,
         artifacts: {
-          ...written,
-          unknownPaths: artifacts.unknown.map((u) => u.path),
-          malformed: artifacts.malformed,
-          ...(rulesValidation ? { rulesValidation } : {}),
+          ...writtenRel,
+          unknownPaths: result.artifacts.unknown.map((u) => u.path),
+          malformed: result.artifacts.malformed,
+          ...(result.rulesValidation
+            ? { rulesValidation: result.rulesValidation }
+            : {}),
         },
       },
     };

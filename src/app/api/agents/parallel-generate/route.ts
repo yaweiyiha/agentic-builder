@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import path from "path";
 import {
   TRDAgent,
   SysDesignAgent,
@@ -10,6 +11,7 @@ import {
 import type { AgentResult } from "@/lib/agents";
 import { getDesignStylePreset } from "@/lib/pipeline/design-style-presets";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
+import { persistTrdArtifactsFromContent } from "@/lib/agents/architect/persist-trd-artifacts";
 
 /** Pencil step: LLM (up to 16k tokens) + many batch_design chunks can exceed 5 minutes. */
 export const maxDuration = 600;
@@ -272,6 +274,55 @@ export async function POST(request: NextRequest) {
             durationMs: result.durationMs,
             tokens: result.usage.total_tokens,
           };
+
+          // TRD-only side effect: persist §6 schema + §7 rules DSL into
+          // .blueprint/ so kickoff's distributor can fan them out to
+          // workers. Mirrors PipelineEngine.persistTrdArtifacts but for
+          // the parallel-generate flow used by pipeline-ui.
+          let trdArtifactsSummary:
+            | { schemaTs?: string; rulesYaml?: string }
+            | undefined;
+          if (docId === "trd") {
+            try {
+              const blueprintDir = path.resolve(process.cwd(), ".blueprint");
+              const persisted = await persistTrdArtifactsFromContent(
+                result.content,
+                blueprintDir,
+              );
+              trdArtifactsSummary = {};
+              if (persisted.written.schemaTs) {
+                trdArtifactsSummary.schemaTs = path.relative(
+                  process.cwd(),
+                  persisted.written.schemaTs,
+                );
+              }
+              if (persisted.written.rulesYaml) {
+                trdArtifactsSummary.rulesYaml = path.relative(
+                  process.cwd(),
+                  persisted.written.rulesYaml,
+                );
+              }
+              if (
+                persisted.rulesValidation &&
+                !persisted.rulesValidation.ok
+              ) {
+                console.warn(
+                  `[parallel-generate] business-rules.dsl.yaml has ${persisted.rulesValidation.warnings.length} warning(s):`,
+                  persisted.rulesValidation.warnings
+                    .map((w) => `${w.code}: ${w.message}`)
+                    .join("; "),
+                );
+              }
+              console.log(
+                `[parallel-generate] TRD artifacts persisted: schema=${trdArtifactsSummary.schemaTs ?? "(none)"} rules=${trdArtifactsSummary.rulesYaml ?? "(none)"}`,
+              );
+            } catch (e) {
+              console.warn(
+                `[parallel-generate] persistTrdArtifacts warning: ${e instanceof Error ? e.message : String(e)}`,
+              );
+            }
+          }
+
           send({
             type: "doc_complete",
             docId,
@@ -280,6 +331,9 @@ export async function POST(request: NextRequest) {
             costUsd: result.costUsd,
             durationMs: result.durationMs,
             tokens: result.usage.total_tokens,
+            ...(trdArtifactsSummary
+              ? { trdArtifacts: trdArtifactsSummary }
+              : {}),
           });
         } catch (error) {
           const msg =
