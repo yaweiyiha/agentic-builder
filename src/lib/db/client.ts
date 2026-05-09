@@ -22,6 +22,7 @@ function getPool(): Pool {
     process.env.DATABASE_URL ??
     "postgresql://postgres@localhost/agentic_builder?host=/tmp";
 
+
   // Recreate pool if connection string changed (hot-reload).
   if (globalForPg.__pgPool && globalForPg.__pgConnStr !== connStr) {
     void globalForPg.__pgPool.end().catch(() => {});

@@ -10,11 +10,113 @@
 
 import fs from "fs";
 import path from "path";
+import { Pool } from "pg";
 import { pool } from "./client";
 
 const migrationsDir = path.join(__dirname, "migrations");
 
+/**
+ * Parse the DATABASE_URL and return connection options pointing to the
+ * *maintenance* database ("postgres") so we can CREATE the target database
+ * if it doesn't exist yet.
+ * Always connects as the OS superuser (omit user/password so libpq uses
+ * peer/ident auth), regardless of what's in DATABASE_URL.
+ */
+function maintenancePoolOpts(): ConstructorParameters<typeof Pool>[0] {
+  const connStr =
+    process.env.DATABASE_URL ??
+    "postgresql://postgres@localhost/agentic_builder?host=/tmp";
+  try {
+    const u = new URL(connStr);
+    const socketHost = u.searchParams.get("host");
+    return {
+      // No user/password — connect as the OS user (superuser on dev machines)
+      host:     socketHost ?? (u.hostname || "localhost"),
+      port:     u.port ? Number(u.port) : 5432,
+      database: "postgres", // maintenance DB — always exists
+      connectionTimeoutMillis: 5_000,
+    };
+  } catch {
+    return { database: "postgres", connectionTimeoutMillis: 5_000 };
+  }
+}
+
+/**
+ * Derive the target database name from DATABASE_URL.
+ */
+function targetDbName(): string {
+  const connStr =
+    process.env.DATABASE_URL ??
+    "postgresql://postgres@localhost/agentic_builder?host=/tmp";
+  try {
+    const u = new URL(connStr);
+    return u.pathname.replace(/^\//, "") || "agentic_builder";
+  } catch {
+    return "agentic_builder";
+  }
+}
+
+/**
+ * Ensure the target role and database exist. Creates them if they don't.
+ * Connects to the maintenance "postgres" DB as the current OS superuser.
+ */
+export async function ensureDatabase(): Promise<void> {
+  const dbName = targetDbName();
+
+  // Extract target role & password directly from DATABASE_URL
+  const connStr =
+    process.env.DATABASE_URL ??
+    "postgresql://postgres@localhost/agentic_builder?host=/tmp";
+  let roleUser = "postgres";
+  let rolePass: string | undefined;
+  try {
+    const u = new URL(connStr);
+    if (u.username) roleUser = u.username;
+    if (u.password) rolePass = u.password;
+  } catch { /* ignore */ }
+
+  const mainPool = new Pool(maintenancePoolOpts());
+  try {
+    // 1. Ensure the role exists
+    const { rows: roleRows } = await mainPool.query(
+      "SELECT 1 FROM pg_roles WHERE rolname = $1",
+      [roleUser],
+    );
+    if (roleRows.length === 0) {
+      console.log(`[migrate] Role "${roleUser}" not found — creating…`);
+      const pwClause = rolePass
+        ? ` PASSWORD '${rolePass.replace(/'/g, "''")}'`
+        : "";
+      await mainPool.query(
+        `CREATE ROLE "${roleUser}" WITH LOGIN${pwClause}`,
+      );
+      console.log(`[migrate] ✓ Role "${roleUser}" created.`);
+    } else {
+      console.log(`[migrate] Role "${roleUser}" already exists.`);
+    }
+
+    // 2. Ensure the database exists
+    const { rows: dbRows } = await mainPool.query(
+      "SELECT 1 FROM pg_database WHERE datname = $1",
+      [dbName],
+    );
+    if (dbRows.length === 0) {
+      console.log(`[migrate] Database "${dbName}" not found — creating…`);
+      await mainPool.query(
+        `CREATE DATABASE "${dbName}" OWNER "${roleUser}"`,
+      );
+      console.log(`[migrate] ✓ Database "${dbName}" created.`);
+    } else {
+      console.log(`[migrate] Database "${dbName}" already exists.`);
+    }
+  } finally {
+    await mainPool.end();
+  }
+}
+
 export async function runMigrations(): Promise<void> {
+  // Ensure the database exists before attempting to connect / migrate.
+  await ensureDatabase();
   // Nothing to do if the migrations directory doesn't exist yet.
   if (!fs.existsSync(migrationsDir)) {
     console.warn("[migrate] Migrations directory not found, skipping:", migrationsDir);
