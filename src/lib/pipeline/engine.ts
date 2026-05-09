@@ -30,6 +30,10 @@ import {
   extractTrdArtifacts,
   type TrdArtifacts,
 } from "@/lib/agents/architect/trd-artifacts";
+import {
+  validateRulesDsl,
+  type RulesDslValidation,
+} from "@/lib/agents/architect/trd-rules-validator";
 import type { AgentResult } from "@/lib/agents";
 import type { ProjectTier, ProjectClassification } from "@/lib/agents";
 import type {
@@ -1093,10 +1097,18 @@ export class PipelineEngine {
       await fs.writeFile(p, artifacts.schemaTs, "utf8");
       written.schemaTs = path.relative(process.cwd(), p);
     }
+    let rulesValidation: RulesDslValidation | undefined;
     if (artifacts.rulesYaml) {
       const p = path.join(blueprintDir, "business-rules.dsl.yaml");
       await fs.writeFile(p, artifacts.rulesYaml, "utf8");
       written.rulesYaml = path.relative(process.cwd(), p);
+      rulesValidation = validateRulesDsl(artifacts.rulesYaml);
+      if (!rulesValidation.ok) {
+        console.warn(
+          `[Pipeline] business-rules.dsl.yaml has ${rulesValidation.warnings.length} warning(s):`,
+          rulesValidation.warnings.map((w) => `${w.code}: ${w.message}`).join("; "),
+        );
+      }
     }
 
     run.steps.trd = {
@@ -1107,6 +1119,7 @@ export class PipelineEngine {
           ...written,
           unknownPaths: artifacts.unknown.map((u) => u.path),
           malformed: artifacts.malformed,
+          ...(rulesValidation ? { rulesValidation } : {}),
         },
       },
     };
