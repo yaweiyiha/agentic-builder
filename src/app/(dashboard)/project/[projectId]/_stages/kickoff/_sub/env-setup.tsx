@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, ArrowRight } from "lucide-react";
+import { Clock, ArrowRight, Zap, Loader2 } from "lucide-react";
+import { motion } from "motion/react";
 
 import KickoffSummaryView from "@/components/kickoff/KickoffSummaryView";
 import { useKickoffStepData } from "@/components/kickoff/useKickoffStepData";
@@ -19,27 +20,57 @@ import { useStageStore } from "@/store/stage-store";
  * task-breakdown sub-stage.
  */
 export default function EnvSetupSubStage() {
-  const isRunning = usePipelineStore((s) => s.isRunning);
-  const currentStep = usePipelineStore((s) => s.currentStep);
+  const isRunning     = usePipelineStore((s) => s.isRunning);
+  const currentStep   = usePipelineStore((s) => s.currentStep);
   const kickoffResult = usePipelineStore((s) => s.steps.kickoff);
-  const goToSubStage = useStageStore((s) => s.goToSubStage);
+  const runKickoff    = usePipelineStore((s) => s.runKickoff);
+  const featureBrief  = usePipelineStore((s) => s.featureBrief);
+  const goToSubStage  = useStageStore((s) => s.goToSubStage);
 
   const isThisRunning = isRunning && currentStep === "kickoff";
-  const isCompleted = kickoffResult?.status === "completed";
+  const isCompleted   = kickoffResult?.status === "completed";
+  const canRun        = !isRunning && !!featureBrief.trim();
 
   if (!kickoffResult || !isCompleted) {
     return (
       <div className="flex flex-1 items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
-          <div className="w-10 h-10 rounded-full border-2 border-[#e2e8f0] flex items-center justify-center">
-            <Clock size={16} className="text-[#cbd5e1]" />
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-col items-center gap-5 text-center max-w-sm"
+        >
+          {/* Icon */}
+          <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
+            isThisRunning ? "border-[#712ae2]/30 bg-[#712ae2]/5" : "border-[#e2e8f0]"
+          }`}>
+            {isThisRunning
+              ? <Loader2 size={18} className="text-[#712ae2] animate-spin" />
+              : <Clock size={18} className="text-[#cbd5e1]" />
+            }
           </div>
-          <p className="text-[14px] text-[#94a3b8]">
+
+          {/* Message */}
+          <p className="text-[14px] text-[#94a3b8] leading-6">
             {isThisRunning
               ? "Kick-off is running — environment requirements will appear here when it completes."
-              : "Kick-off has not run yet. Complete the preparation stage first."}
+              : !featureBrief.trim()
+                ? "Complete the preparation stage first to generate a feature brief, then run Kick-off."
+                : "Preparation is ready. Run Kick-off to detect environment requirements and generate the task breakdown."}
           </p>
-        </div>
+
+          {/* Run Kick-off button — shown only when kickoff hasn't run and not currently running */}
+          {!isThisRunning && (
+            <Button
+              disabled={!canRun}
+              onClick={runKickoff}
+              className="bg-[#712ae2] hover:bg-[#5f24c2] font-bold px-6 gap-2 disabled:opacity-40"
+            >
+              <Zap size={15} />
+              Run Kick-off
+            </Button>
+          )}
+        </motion.div>
       </div>
     );
   }
