@@ -42,24 +42,26 @@ function CheckCircleIcon({ size = 15 }: { size?: number }) {
   );
 }
 
-
 // ─── Style Carousel ──────────────────────────────────────────────────────────
 
 import type { DesignStyle } from "@/components/DesignStyleCard";
 
 // Each slot: offset from center → visual properties
-const SLOTS: Record<number, { x: string; scale: number; opacity: number; z: number }> = {
+const SLOTS: Record<
+  number,
+  { x: string; scale: number; opacity: number; z: number }
+> = {
   [-2]: { x: "-148%", scale: 0.62, opacity: 0.28, z: 0 },
-  [-1]: { x:  "-88%", scale: 0.78, opacity: 0.58, z: 1 },
-  [  0]: { x:    "0%", scale: 1.00, opacity: 1.00, z: 3 },
-  [  1]: { x:   "88%", scale: 0.78, opacity: 0.58, z: 1 },
-  [  2]: { x:  "148%", scale: 0.62, opacity: 0.28, z: 0 },
+  [-1]: { x: "-88%", scale: 0.78, opacity: 0.58, z: 1 },
+  [0]: { x: "0%", scale: 1.0, opacity: 1.0, z: 3 },
+  [1]: { x: "88%", scale: 0.78, opacity: 0.58, z: 1 },
+  [2]: { x: "148%", scale: 0.62, opacity: 0.28, z: 0 },
 };
 
 /** Shortest circular distance from active to idx */
 function circOffset(idx: number, active: number, total: number) {
   let d = idx - active;
-  if (d >  total / 2) d -= total;
+  if (d > total / 2) d -= total;
   if (d < -total / 2) d += total;
   return d;
 }
@@ -74,7 +76,10 @@ function StyleCarousel({
   onSelect: (id: string) => void;
 }) {
   const total = styles.length;
-  const initIdx = Math.max(0, styles.findIndex((s) => s.id === selectedId));
+  const initIdx = Math.max(
+    0,
+    styles.findIndex((s) => s.id === selectedId),
+  );
   const [active, setActive] = useState(initIdx);
 
   useEffect(() => {
@@ -83,10 +88,13 @@ function StyleCarousel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  const goTo = useCallback((idx: number) => {
-    setActive(idx);
-    onSelect(styles[idx].id);
-  }, [styles, onSelect]);
+  const goTo = useCallback(
+    (idx: number) => {
+      setActive(idx);
+      onSelect(styles[idx].id);
+    },
+    [styles, onSelect],
+  );
 
   const prev = () => goTo((active - 1 + total) % total);
   const next = () => goTo((active + 1) % total);
@@ -95,14 +103,26 @@ function StyleCarousel({
 
   return (
     <div className="flex flex-col items-center gap-4 select-none">
-      <div className="relative w-full flex items-center justify-center" style={{ height: 290 }}>
+      <div
+        className="relative w-full flex items-center justify-center"
+        style={{ height: 290 }}
+      >
         {/* Left arrow */}
         <button
           onClick={prev}
           className="absolute left-2 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-md hover:bg-slate-50 hover:border-[#712ae2] transition-all"
           aria-label="Previous style"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
@@ -115,22 +135,25 @@ function StyleCarousel({
             const isCenter = offset === 0;
 
             // Cards beyond ±2 are pushed fully off-screen (no visible jump)
-            const x     = slot ? slot.x     : offset < 0 ? "-260%" : "260%";
-            const scale = slot ? slot.scale  : 0.5;
+            const x = slot ? slot.x : offset < 0 ? "-260%" : "260%";
+            const scale = slot ? slot.scale : 0.5;
             const opacity = slot ? slot.opacity : 0;
-            const z     = slot ? slot.z      : 0;
+            const z = slot ? slot.z : 0;
 
             return (
               <div
                 key={idx}
-                onClick={() => { if (!isCenter && slot) goTo(idx); }}
+                onClick={() => {
+                  if (!isCenter && slot) goTo(idx);
+                }}
                 style={{
                   position: "absolute",
                   inset: 0,
                   transform: `translateX(${x}) scale(${scale})`,
                   opacity,
                   zIndex: z,
-                  transition: "transform 0.36s cubic-bezier(0.4,0,0.2,1), opacity 0.36s ease",
+                  transition:
+                    "transform 0.36s cubic-bezier(0.4,0,0.2,1), opacity 0.36s ease",
                   cursor: isCenter ? "default" : slot ? "pointer" : "default",
                   transformOrigin: "center center",
                   pointerEvents: slot ? "auto" : "none",
@@ -139,38 +162,64 @@ function StyleCarousel({
                 <div className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden w-full h-full shadow-sm">
                   {/* Color swatches */}
                   <div className="flex h-14 shrink-0">
-                    {(["primary","secondary","tertiary","neutral"] as const).map((key) => (
-                      <div key={key} className="flex-1" style={{ backgroundColor: style.colors[key] }} />
+                    {(
+                      ["primary", "secondary", "tertiary", "neutral"] as const
+                    ).map((key) => (
+                      <div
+                        key={key}
+                        className="flex-1"
+                        style={{ backgroundColor: style.colors[key] }}
+                      />
                     ))}
                   </div>
                   {/* Body */}
                   <div className="p-2.5 flex flex-col gap-1.5 flex-1 min-h-0">
                     <div className="flex items-center justify-between gap-1">
-                      <h3 className="text-[12px] font-bold text-slate-900 truncate">{style.name}</h3>
+                      <h3 className="text-[12px] font-bold text-slate-900 truncate">
+                        {style.name}
+                      </h3>
                       {isCenter && (
                         <span className="text-[8px] font-bold text-[#712ae2] bg-[rgba(113,42,226,0.08)] px-1.5 py-0.5 rounded-full shrink-0">
                           Selected
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-2">{style.description}</p>
+                    <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-2">
+                      {style.description}
+                    </p>
                     <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100 mt-auto">
                       <span
                         className="text-[22px] font-bold leading-none shrink-0"
-                        style={{ color: style.colors.primary, fontFamily: style.typography.headlineFont }}
+                        style={{
+                          color: style.colors.primary,
+                          fontFamily: style.typography.headlineFont,
+                        }}
                       >
                         Aa
                       </span>
                       <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-[9px] text-slate-500 truncate">{style.typography.headlineFont}</span>
-                        <span className="text-[9px] text-slate-400 truncate">{style.typography.bodyFont}</span>
+                        <span className="text-[9px] text-slate-500 truncate">
+                          {style.typography.headlineFont}
+                        </span>
+                        <span className="text-[9px] text-slate-400 truncate">
+                          {style.typography.bodyFont}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="text-[9px] font-semibold text-white px-1.5 py-0.5 rounded" style={{ backgroundColor: style.colors.primary }}>
+                      <div
+                        className="text-[9px] font-semibold text-white px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: style.colors.primary }}
+                      >
                         Primary
                       </div>
-                      <div className="text-[9px] font-semibold px-1.5 py-0.5 rounded border" style={{ color: style.colors.secondary, borderColor: style.colors.secondary }}>
+                      <div
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded border"
+                        style={{
+                          color: style.colors.secondary,
+                          borderColor: style.colors.secondary,
+                        }}
+                      >
                         Outlined
                       </div>
                     </div>
@@ -187,7 +236,16 @@ function StyleCarousel({
           className="absolute right-2 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-md hover:bg-slate-50 hover:border-[#712ae2] transition-all"
           aria-label="Next style"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
@@ -200,7 +258,9 @@ function StyleCarousel({
             key={s.id}
             onClick={() => goTo(i)}
             className={`rounded-full transition-all duration-300 ${
-              i === active ? "w-5 h-2 bg-[#712ae2]" : "w-2 h-2 bg-slate-300 hover:bg-slate-400"
+              i === active
+                ? "w-5 h-2 bg-[#712ae2]"
+                : "w-2 h-2 bg-slate-300 hover:bg-slate-400"
             }`}
             aria-label={s.name}
           />
@@ -234,9 +294,7 @@ export default function DesignSubStage() {
   const saveSubStageSnapshot = usePipelineStore(
     (s) => s.saveSubStageSnapshotForSubStage,
   );
-  const loadSubStageSnapshot = usePipelineStore(
-    (s) => s.loadSubStageSnapshot,
-  );
+  const loadSubStageSnapshot = usePipelineStore((s) => s.loadSubStageSnapshot);
   const goToSubStage = useStageStore((s) => s.goToSubStage);
   const isStageHydrated = useStageStore((s) => s.isStageHydrated);
 
@@ -263,7 +321,7 @@ export default function DesignSubStage() {
     if (didInitTab.current) return;
     didInitTab.current = true;
     if (steps.design?.content) setInnerTab("spec");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStageHydrated]);
 
   // Auto-advance to spec tab when design doc finishes
@@ -289,7 +347,7 @@ export default function DesignSubStage() {
         saveSubStageSnapshot("preparation", "design");
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStageHydrated, prdContent]);
 
   // Auto-generate design styles once PRD is available.
@@ -306,11 +364,36 @@ export default function DesignSubStage() {
     if (designStyles !== null && designStylesPrdHash === prdHash) return;
     stylesGeneratedRef.current = true;
     generateDesignStyles();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps.prd?.content, designStyles, designStylesPrdHash, designStylesLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    steps.prd?.content,
+    designStyles,
+    designStylesPrdHash,
+    designStylesLoading,
+  ]);
 
   // ── Stitch state ──
   const [promptCopied, setPromptCopied] = useState(false);
+  const [stitchHtml, setStitchHtml] = useState<string | null>(null);
+  const [stitchHtmlLoading, setStitchHtmlLoading] = useState(false);
+
+  // Fetch HTML for iframe preview whenever stitchResult changes
+  useEffect(() => {
+    if (!stitchResult?.htmlDownloadUrl) {
+      setStitchHtml(null);
+      return;
+    }
+    setStitchHtmlLoading(true);
+    const proxyUrl = `/api/stitch-proxy?url=${encodeURIComponent(stitchResult.htmlDownloadUrl)}`;
+    fetch(proxyUrl)
+      .then((r) => (r.ok ? r.text() : Promise.reject(r.statusText)))
+      .then((html) => setStitchHtml(html))
+      .catch((e) => {
+        console.warn("[DesignSubStage] Failed to load stitch HTML preview:", e);
+        setStitchHtml(null);
+      })
+      .finally(() => setStitchHtmlLoading(false));
+  }, [stitchResult?.htmlDownloadUrl]);
 
   const hasPencilContent = !!(stitchResult || stitchError || stitchGenerating);
 
@@ -332,7 +415,9 @@ export default function DesignSubStage() {
 
   const handleGenerateWithStitch = (instruction?: string) => {
     if (!selectedDesignStyleId) {
-      console.warn("[DesignSubStage] ⚠ No selectedDesignStyleId — aborting stitch generation");
+      console.warn(
+        "[DesignSubStage] ⚠ No selectedDesignStyleId — aborting stitch generation",
+      );
       return;
     }
     runStitchGenerate(instruction);
@@ -400,9 +485,7 @@ export default function DesignSubStage() {
                     <CheckCircleIcon size={12} />
                   </span>
                 )}
-                {tab.id === "spec" && isDesignRunning && (
-                  <Loading size="sm" />
-                )}
+                {tab.id === "spec" && isDesignRunning && <Loading size="sm" />}
                 {tab.id === "stitch" && stitchGenerating && (
                   <Loading size="sm" />
                 )}
@@ -443,13 +526,15 @@ export default function DesignSubStage() {
 
       {/* ── Main Content Area ── */}
       <div className="flex-1 overflow-y-auto">
-
         {/* ══ Style Tab ══ */}
         {innerTab === "style" && (
           <>
             {designStylesLoading && (
               <div className="flex items-center justify-center h-full">
-                <Loading size="lg" text="Analyzing PRD and generating design styles…" />
+                <Loading
+                  size="lg"
+                  text="Analyzing PRD and generating design styles…"
+                />
               </div>
             )}
 
@@ -502,9 +587,7 @@ export default function DesignSubStage() {
                     )}
                     {isDesignRunning
                       ? "Generating Design Spec…"
-                      : isDesignDone
-                        ? "Regenerate Design Spec"
-                        : "Generate Design Spec"}
+                      : "Generate Design Spec"}
                   </button>
                 </div>
               </div>
@@ -544,21 +627,36 @@ export default function DesignSubStage() {
             {stitchGenerating && (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <Loading size="lg" text="Generating with Stitch…" />
-                <p className="text-[12px] text-slate-400">This may take a minute. Stitch is creating your UI design.</p>
+                <p className="text-[12px] text-slate-400">
+                  This may take a minute. Stitch is creating your UI design.
+                </p>
               </div>
             )}
 
             {/* ── Stitch error ── */}
             {!stitchGenerating && stitchError && (
               <div className="flex flex-col items-center justify-center h-full gap-3">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 <div className="text-center max-w-sm">
-                  <p className="text-[13px] font-semibold text-red-600">Stitch generation failed</p>
-                  <p className="text-[12px] text-slate-500 mt-1 break-all">{stitchError}</p>
+                  <p className="text-[13px] font-semibold text-red-600">
+                    Stitch generation failed
+                  </p>
+                  <p className="text-[12px] text-slate-500 mt-1 break-all">
+                    {stitchError}
+                  </p>
                 </div>
                 <button
                   onClick={() => handleGenerateWithStitch()}
@@ -575,20 +673,35 @@ export default function DesignSubStage() {
               <div className="flex flex-col h-full">
                 {/* Result header */}
                 <div className="shrink-0 flex items-center gap-3 px-5 py-3 bg-violet-50 border-b border-violet-100">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#7c3aed"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-violet-700">Stitch Design Generated</p>
-                    <p className="text-[11px] text-violet-500 font-mono truncate">{stitchResult.projectUrl}</p>
+                    <p className="text-[12px] font-semibold text-violet-700">
+                      Stitch Design Generated
+                    </p>
+                    <p className="text-[11px] text-violet-500 font-mono truncate">
+                      {stitchResult.projectUrl}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(stitchResult.projectUrl).then(() => {
-                          setPromptCopied(true);
-                          setTimeout(() => setPromptCopied(false), 2000);
-                        });
+                        navigator.clipboard
+                          .writeText(stitchResult.projectUrl)
+                          .then(() => {
+                            setPromptCopied(true);
+                            setTimeout(() => setPromptCopied(false), 2000);
+                          });
                       }}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-violet-700 bg-white border border-violet-200 rounded-md hover:bg-violet-50 transition-colors"
                     >
@@ -600,7 +713,16 @@ export default function DesignSubStage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-white bg-violet-600 rounded-md hover:bg-violet-700 transition-colors"
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                         <polyline points="15 3 21 3 21 9" />
                         <line x1="10" y1="14" x2="21" y2="3" />
@@ -610,69 +732,148 @@ export default function DesignSubStage() {
                   </div>
                 </div>
 
-                {/* Screenshot preview */}
-                <div className="flex-1 overflow-auto flex items-start justify-center p-6">
-                  {stitchResult.screenshotUrl ? (
-                    <div className="flex flex-col items-center gap-4 max-w-4xl w-full">
-                      <img
-                        src={stitchResult.screenshotUrl}
-                        alt="Stitch generated UI design"
-                        className="w-full rounded-xl border border-slate-200 shadow-lg"
-                      />
-                      <div className="flex items-center gap-3 text-[12px] text-slate-500">
-                        <span>Project ID: <code className="font-mono text-violet-700">{stitchResult.projectId}</code></span>
-                        <span>·</span>
-                        <span>Screen ID: <code className="font-mono text-violet-700">{stitchResult.screenId}</code></span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto py-8">
-                      {/* Card */}
-                      <div className="w-full rounded-2xl border border-slate-200 bg-linear-to-br from-violet-50 to-slate-50 shadow-md overflow-hidden">
-                        {/* Header bar */}
-                        <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-slate-100">
-                          <div className="flex gap-1.5">
-                            <span className="w-3 h-3 rounded-full bg-red-400" />
-                            <span className="w-3 h-3 rounded-full bg-yellow-400" />
-                            <span className="w-3 h-3 rounded-full bg-green-400" />
-                          </div>
-                          <span className="text-[11px] text-slate-400 font-mono truncate flex-1 text-center pr-6">
-                            stitch.withgoogle.com/projects/{stitchResult.projectId}
-                          </span>
-                        </div>
-                        {/* Body */}
-                        <div className="flex flex-col items-center gap-5 px-8 py-10">
-                          <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center shadow-inner">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="3" y="3" width="18" height="18" rx="2" />
-                              <path d="M3 9h18M9 21V9" />
-                            </svg>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-[15px] font-semibold text-slate-800">设计已生成</p>
-                            <p className="text-[12px] text-slate-500 mt-1">Stitch 不允许嵌入预览，请在新标签页中查看完整设计</p>
-                          </div>
-                          <a
-                            href={stitchResult.projectUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium transition-colors shadow"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                              <polyline points="15 3 21 3 21 9" />
-                              <line x1="10" y1="14" x2="21" y2="3" />
-                            </svg>
-                            在 Stitch 中打开
-                          </a>
-                          <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                            <span>Project: <code className="font-mono text-violet-600">{stitchResult.projectId}</code></span>
-                            {stitchResult.screenId && (<><span>·</span><span>Screen: <code className="font-mono text-violet-600">{stitchResult.screenId}</code></span></>)}
-                          </div>
-                        </div>
-                      </div>
+                {/* iframe / screenshot preview */}
+                <div className="flex-1 overflow-hidden bg-slate-100">
+                  {stitchHtmlLoading && (
+                    <div className="flex items-center justify-center h-full">
+                      <Loading size="lg" text="Loading preview…" />
                     </div>
                   )}
+
+                  {!stitchHtmlLoading && stitchHtml && (
+                    <iframe
+                      srcDoc={stitchHtml}
+                      title="Stitch Design Preview"
+                      sandbox="allow-scripts allow-same-origin"
+                      className="w-full h-full border-0"
+                      style={{ minHeight: 0 }}
+                    />
+                  )}
+
+                  {!stitchHtmlLoading &&
+                    !stitchHtml &&
+                    stitchResult.screenshotUrl && (
+                      <div className="flex items-start justify-center h-full overflow-auto p-6">
+                        <div className="flex flex-col items-center gap-4 max-w-4xl w-full">
+                          <img
+                            src={stitchResult.screenshotUrl}
+                            alt="Stitch generated UI design"
+                            className="w-full rounded-xl border border-slate-200 shadow-lg"
+                          />
+                          <div className="flex items-center gap-3 text-[12px] text-slate-500">
+                            <span>
+                              Project ID:{" "}
+                              <code className="font-mono text-violet-700">
+                                {stitchResult.projectId}
+                              </code>
+                            </span>
+                            <span>·</span>
+                            <span>
+                              Screen ID:{" "}
+                              <code className="font-mono text-violet-700">
+                                {stitchResult.screenId}
+                              </code>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {!stitchHtmlLoading &&
+                    !stitchHtml &&
+                    !stitchResult.screenshotUrl && (
+                      <div className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto py-8">
+                        {/* Card */}
+                        <div className="w-full rounded-2xl border border-slate-200 bg-linear-to-br from-violet-50 to-slate-50 shadow-md overflow-hidden">
+                          {/* Header bar */}
+                          <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-slate-100">
+                            <div className="flex gap-1.5">
+                              <span className="w-3 h-3 rounded-full bg-red-400" />
+                              <span className="w-3 h-3 rounded-full bg-yellow-400" />
+                              <span className="w-3 h-3 rounded-full bg-green-400" />
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-mono truncate flex-1 text-center pr-6">
+                              stitch.withgoogle.com/projects/
+                              {stitchResult.projectId}
+                            </span>
+                          </div>
+                          {/* Body */}
+                          <div className="flex flex-col items-center gap-5 px-8 py-10">
+                            <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center shadow-inner">
+                              <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#7c3aed"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect
+                                  x="3"
+                                  y="3"
+                                  width="18"
+                                  height="18"
+                                  rx="2"
+                                />
+                                <path d="M3 9h18M9 21V9" />
+                              </svg>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-[15px] font-semibold text-slate-800">
+                                设计已生成
+                              </p>
+                              <p className="text-[12px] text-slate-500 mt-1">
+                                Stitch
+                                不允许嵌入预览，请在新标签页中查看完整设计
+                              </p>
+                            </div>
+                            <a
+                              href={stitchResult.projectUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium transition-colors shadow"
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
+                              </svg>
+                              在 Stitch 中打开
+                            </a>
+                            <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                              <span>
+                                Project:{" "}
+                                <code className="font-mono text-violet-600">
+                                  {stitchResult.projectId}
+                                </code>
+                              </span>
+                              {stitchResult.screenId && (
+                                <>
+                                  <span>·</span>
+                                  <span>
+                                    Screen:{" "}
+                                    <code className="font-mono text-violet-600">
+                                      {stitchResult.screenId}
+                                    </code>
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                 </div>
               </div>
             )}
@@ -713,7 +914,16 @@ export default function DesignSubStage() {
               className="flex items-center gap-2 shrink-0 px-4 py-2.5 bg-[#712ae2] text-white text-[13px] font-semibold rounded-full hover:bg-[#6b24da] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
               title="Generate design via Google Stitch"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
               Generate with Stitch
