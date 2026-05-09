@@ -584,6 +584,32 @@ export async function buildProjectConventionCard(
     lines.push("- **JWT**: use `signJwt`/`verifyJwt` from `backend/src/utils/jwt.ts`. Never call `jsonwebtoken` directly in feature code.");
   }
 
+  // ── Shared schema (TRD §6 product) ───────────────────────────────────────
+  // Detect either side: distributor writes both for M-tier; for S/L only one
+  // location applies. If found, instruct workers to import from it rather
+  // than re-declare any type whose name appears there.
+  const sharedSchemaCandidates = [
+    "frontend/src/shared/schema.ts",
+    "backend/src/shared/schema.ts",
+    "src/shared/schema.ts",
+    "packages/shared/src/schema.ts",
+  ];
+  const presentSchemas: string[] = [];
+  for (const p of sharedSchemaCandidates) {
+    const content = await fsRead(p, outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      presentSchemas.push(p);
+    }
+  }
+  if (presentSchemas.length > 0) {
+    lines.push(
+      `- **Shared schema (CANONICAL)**: ${presentSchemas.map((p) => `\`${p}\``).join(", ")} — TRD-frozen single source of truth for every type that crosses the API boundary. **Read it first.** Import the types you need; do NOT redefine any type whose name already appears there. The file is scaffold-protected — do NOT rewrite it.`,
+    );
+  }
+
   // ── Playwright webServer & health route (E2E infra contract) ──────────────
   const playwrightCfg = await fsRead("frontend/playwright.config.ts", outputDir);
   if (!playwrightCfg.startsWith("FILE_NOT_FOUND") && !backendPkg.startsWith("FILE_NOT_FOUND")) {
