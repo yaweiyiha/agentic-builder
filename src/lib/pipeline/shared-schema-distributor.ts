@@ -28,6 +28,7 @@ import path from "path";
 export type SharedSchemaTier = "S" | "M" | "L";
 
 const SCHEMA_BLUEPRINT_REL = ".blueprint/shared-schema.ts";
+const DAG_BLUEPRINT_REL = ".blueprint/pipeline-dag.yaml";
 
 const TARGETS_BY_TIER: Readonly<Record<SharedSchemaTier, readonly string[]>> = {
   S: ["src/shared/schema.ts"],
@@ -35,12 +36,23 @@ const TARGETS_BY_TIER: Readonly<Record<SharedSchemaTier, readonly string[]>> = {
   L: ["packages/shared/src/schema.ts"],
 };
 
+/** DAG lives at outputDir/.blueprint/pipeline-dag.yaml regardless of tier —
+ *  it's a reference contract, not source code, so no per-package fan-out. */
+const DAG_REL_TARGET = ".blueprint/pipeline-dag.yaml";
+
 export interface DistributeSharedSchemaResult {
   /** True when `.blueprint/shared-schema.ts` was present and read. */
   found: boolean;
   /** Relative paths written under outputDir. Empty when found=false. */
   written: string[];
   /** Absolute path of the source file consulted (for logging). */
+  sourcePath: string;
+}
+
+export interface DistributePipelineDagResult {
+  found: boolean;
+  /** Relative path written under outputDir, or null when found=false. */
+  written: string | null;
   sourcePath: string;
 }
 
@@ -74,6 +86,35 @@ export async function distributeSharedSchema(
     written.push(rel);
   }
   return { found: true, written, sourcePath };
+}
+
+/**
+ * Copy the TRD-frozen workflow DAG into the project's .blueprint/. Workers
+ * read it as a reference (via convention-card prompt directive) when
+ * implementing services that participate in a multi-step pipeline. Same
+ * no-op semantics as the schema distributor when the source is missing.
+ */
+export async function distributePipelineDag(
+  outputDir: string,
+  options?: { sourceDir?: string },
+): Promise<DistributePipelineDagResult> {
+  const sourceDir = options?.sourceDir ?? process.cwd();
+  const sourcePath = path.resolve(sourceDir, DAG_BLUEPRINT_REL);
+
+  let content: string;
+  try {
+    content = await fs.readFile(sourcePath, "utf8");
+  } catch {
+    return { found: false, written: null, sourcePath };
+  }
+  if (!content.trim()) {
+    return { found: false, written: null, sourcePath };
+  }
+
+  const dest = path.join(outputDir, DAG_REL_TARGET);
+  await fs.mkdir(path.dirname(dest), { recursive: true });
+  await fs.writeFile(dest, content, "utf8");
+  return { found: true, written: DAG_REL_TARGET, sourcePath };
 }
 
 /**

@@ -62,6 +62,31 @@ interface RuntimeReadinessSummary {
   disabledRules: Array<{ ruleId: string; reason: string }>;
 }
 
+interface MigrationCoverageSummary {
+  /** True when `.ralph/migration-coverage.json` was present and parsed. */
+  present: boolean;
+  /** Distinct source tasks that touched a model file. */
+  tasksTouchedModels: number;
+  /** Source tasks that touched a model without a migration. */
+  tasksWithGaps: number;
+  /** Sum of model-file gaps across all tasks. */
+  totalGaps: number;
+  /** Up to 10 example gaps for the report archive. */
+  topGaps: Array<{
+    sourceTaskId: string;
+    modelPath: string;
+    modelName: string;
+  }>;
+}
+
+const EMPTY_MIGRATION_COVERAGE: MigrationCoverageSummary = {
+  present: false,
+  tasksTouchedModels: 0,
+  tasksWithGaps: 0,
+  totalGaps: 0,
+  topGaps: [],
+};
+
 const EMPTY_RUNTIME_READINESS: RuntimeReadinessSummary = {
   present: false,
   clean: false,
@@ -150,6 +175,16 @@ interface CodingSessionReportHistoryEntry {
   runtimeReadinessErrors?: number;
   runtimeReadinessWarnings?: number;
   runtimeReadinessHasError?: boolean;
+  /**
+   * Sequelize migration-coverage gaps observed across all tasks this
+   * session (CODEGEN_HARDENING_PLAN.md §4 — Sequelize migration RULE).
+   * `migrationCoverageGaps = -1` means the report wasn't found (no
+   * Sequelize models touched, or M-tier wasn't used). `0` is a real
+   * "every model that changed got a migration" pass.
+   */
+  migrationCoverageGaps?: number;
+  migrationCoverageTasksWithGaps?: number;
+  migrationCoverageTasksTouched?: number;
 }
 
 interface StageUsageSummary {
@@ -345,10 +380,10 @@ function formatHistoryMarkdown(
 
   lines.push("## Compare Table", "");
   lines.push(
-    "| Ended At | Status | Score | Runtime | Duration | Calls | Tokens | Cost | Primary Model | Model Score | Report |",
+    "| Ended At | Status | Score | Runtime | Migrations | Duration | Calls | Tokens | Cost | Primary Model | Model Score | Report |",
   );
   lines.push(
-    "| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+    "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
   );
   const fmtRuntime = (entry: CodingSessionReportHistoryEntry): string => {
     const f = entry.runtimeReadinessFindings;
@@ -356,9 +391,16 @@ function formatHistoryMarkdown(
     if (f === 0) return "✅ 0";
     return `${f} (${entry.runtimeReadinessErrors ?? 0}E/${entry.runtimeReadinessWarnings ?? 0}W)`;
   };
+  const fmtMigration = (entry: CodingSessionReportHistoryEntry): string => {
+    const g = entry.migrationCoverageGaps;
+    if (g === undefined || g < 0) return "n/a";
+    const touched = entry.migrationCoverageTasksTouched ?? 0;
+    if (g === 0) return touched > 0 ? `✅ 0/${touched}` : "✅ 0";
+    return `${g} gap (${entry.migrationCoverageTasksWithGaps ?? 0}/${touched} task)`;
+  };
   for (const entry of entries) {
     lines.push(
-      `| ${entry.endedAt} | ${entry.status.toUpperCase()} | ${entry.score}/100 (${entry.grade}) | ${fmtRuntime(entry)} | ${formatDuration(entry.durationMs)} | ${entry.totalCalls} | ${entry.totalTokens} | $${entry.totalCostUsd.toFixed(4)} | ${entry.primaryModel} | ${entry.primaryModelScore}/100 (${entry.primaryModelGrade}) | [view](./report-history/${entry.archiveMdFile}) |`,
+      `| ${entry.endedAt} | ${entry.status.toUpperCase()} | ${entry.score}/100 (${entry.grade}) | ${fmtRuntime(entry)} | ${fmtMigration(entry)} | ${formatDuration(entry.durationMs)} | ${entry.totalCalls} | ${entry.totalTokens} | $${entry.totalCostUsd.toFixed(4)} | ${entry.primaryModel} | ${entry.primaryModelScore}/100 (${entry.primaryModelGrade}) | [view](./report-history/${entry.archiveMdFile}) |`,
     );
   }
   lines.push("");
@@ -501,6 +543,66 @@ async function updateReportHistoryIndex(
       "utf-8",
     ),
   ]);
+}
+
+async function readMigrationCoverageSummary(
+  outputDir: string,
+): Promise<MigrationCoverageSummary> {
+  const filePath = path.join(outputDir, ".ralph", "migration-coverage.json");
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    const parsed = JSON.parse(raw) as {
+      tasks?: Record<
+        string,
+        {
+          taskId?: string;
+          ok?: boolean;
+          modelFilesTouched?: string[];
+          gaps?: Array<{ modelPath?: string; modelName?: string }>;
+        }
+      >;
+    };
+    const tasks = parsed.tasks ?? {};
+    let tasksTouchedModels = 0;
+    let tasksWithGaps = 0;
+    let totalGaps = 0;
+    const topGaps: MigrationCoverageSummary["topGaps"] = [];
+    for (const entry of Object.values(tasks)) {
+      if (!entry) continue;
+      const touched = Array.isArray(entry.modelFilesTouched)
+        ? entry.modelFilesTouched.length
+        : 0;
+      if (touched > 0) tasksTouchedModels++;
+      if (entry.ok === false && Array.isArray(entry.gaps) && entry.gaps.length) {
+        tasksWithGaps++;
+        for (const gap of entry.gaps) {
+          totalGaps++;
+          if (
+            topGaps.length < 10 &&
+            gap &&
+            typeof gap.modelPath === "string" &&
+            typeof gap.modelName === "string" &&
+            typeof entry.taskId === "string"
+          ) {
+            topGaps.push({
+              sourceTaskId: entry.taskId,
+              modelPath: gap.modelPath,
+              modelName: gap.modelName,
+            });
+          }
+        }
+      }
+    }
+    return {
+      present: true,
+      tasksTouchedModels,
+      tasksWithGaps,
+      totalGaps,
+      topGaps,
+    };
+  } catch {
+    return { ...EMPTY_MIGRATION_COVERAGE };
+  }
 }
 
 async function readRuntimeReadinessSummary(
@@ -1902,6 +2004,7 @@ function formatMarkdownReport(input: {
   fileRegistry: GeneratedFile[];
   repairSummary: RepairEventSummary;
   runtimeReadiness: RuntimeReadinessSummary;
+  migrationCoverage: MigrationCoverageSummary;
   finalAudit?: FeatureChecklistAuditResult | null;
   fatalError?: string;
   suggestions: string[];
@@ -1968,6 +2071,43 @@ function formatMarkdownReport(input: {
     input.terminalSummary || "(no terminal summary captured)",
     "",
   ];
+
+  // ── Migration Coverage section ──────────────────────────────────────────
+  // Detailed breakdown of `.ralph/migration-coverage.json`. Renders only
+  // when at least one task touched a Sequelize model — non-Sequelize
+  // projects never produce the report.
+  const migration = input.migrationCoverage;
+  if (migration.present && migration.tasksTouchedModels > 0) {
+    lines.push("## Migration Coverage");
+    lines.push(
+      "Per-task check that any change under `backend/src/models/` is " +
+        "accompanied by a new migration under `backend/src/migrations/`. Full " +
+        "report: `.ralph/migration-coverage.json`.",
+    );
+    lines.push("");
+    if (migration.tasksWithGaps === 0) {
+      lines.push(
+        `✅ **Clean.** ${migration.tasksTouchedModels} task(s) touched models; every model change shipped with a migration.`,
+      );
+    } else {
+      lines.push(
+        `⚠️ **${migration.totalGaps} gap(s)** across ${migration.tasksWithGaps} task(s) ` +
+          `(${migration.tasksTouchedModels} task(s) touched models in total).`,
+      );
+      lines.push("");
+      lines.push("| Source task | Model file | Model name |");
+      lines.push("| --- | --- | --- |");
+      for (const g of migration.topGaps) {
+        lines.push(`| \`${g.sourceTaskId}\` | \`${g.modelPath}\` | \`${g.modelName}\` |`);
+      }
+      if (migration.totalGaps > migration.topGaps.length) {
+        lines.push(
+          `_… (+${migration.totalGaps - migration.topGaps.length} more, see full JSON)_`,
+        );
+      }
+    }
+    lines.push("");
+  }
 
   // ── Runtime Readiness section (CODEGEN_HARDENING_PLAN.md §6.2) ──────────
   // Detailed breakdown of `runtime-integration-audit.json`. Renders even in
@@ -2568,6 +2708,7 @@ export async function writeCodingSessionReport(
     input.endedAt,
   );
   const runtimeReadiness = await readRuntimeReadinessSummary(input.outputDir);
+  const migrationCoverage = await readMigrationCoverageSummary(input.outputDir);
   const stageUsage = aggregateStageUsage({
     usage,
     repairSummary,
@@ -2683,6 +2824,7 @@ export async function writeCodingSessionReport(
     stageUsage,
     repairSummary,
     runtimeReadiness,
+    migrationCoverage,
     preflightLedger,
     defectCategories,
     finalAudit: input.finalAudit ?? null,
@@ -2704,6 +2846,7 @@ export async function writeCodingSessionReport(
     fileRegistry: input.fileRegistry,
     repairSummary,
     runtimeReadiness,
+    migrationCoverage,
     finalAudit: input.finalAudit,
     fatalError: input.fatalError,
     suggestions,
@@ -2772,5 +2915,10 @@ export async function writeCodingSessionReport(
     runtimeReadinessErrors: runtimeReadiness.errorCount,
     runtimeReadinessWarnings: runtimeReadiness.warnCount,
     runtimeReadinessHasError: runtimeReadiness.hasError,
+    migrationCoverageGaps: migrationCoverage.present
+      ? migrationCoverage.totalGaps
+      : -1,
+    migrationCoverageTasksWithGaps: migrationCoverage.tasksWithGaps,
+    migrationCoverageTasksTouched: migrationCoverage.tasksTouchedModels,
   });
 }

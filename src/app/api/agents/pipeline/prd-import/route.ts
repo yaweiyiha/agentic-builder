@@ -6,9 +6,12 @@ import path from "path";
  * PRD import endpoint — lets the user bring their own PRD instead of having
  * the PM agent regenerate one every time.
  *
- * Mechanics: the engine (`PipelineEngine.readStaticPrd`) already prefers
- * `.blueprint/PRD.md` over the LLM output when present, so we only need to
- * write / read / delete that file from the UI.
+ * Mechanics: when this endpoint writes `.blueprint/PRD.md`, the next pipeline
+ * run sees it via `PipelineEngine.readImportedPrd()` (engine.ts) and skips
+ * the PM agent's `generatePRDStreaming` call entirely — the file's content
+ * becomes the PRD step's output verbatim. The structured-spec extractor
+ * (`attachPrdStructuredSpec`) still runs against this content so
+ * domain.rules and other downstream fields are extracted normally.
  */
 
 const BLUEPRINT_DIR = ".blueprint";

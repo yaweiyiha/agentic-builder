@@ -62,6 +62,8 @@ import {
   formatRuntimeAuditBlock,
   runRuntimeSmokeGate,
   runTscDiagnosticsAsTasks,
+  runMigrationCoverageRepair,
+  formatMigrationCoverageBlock,
 } from "@/lib/pipeline/self-heal";
 import { readResourceRequirements } from "@/lib/pipeline/resource-requirements";
 import { recordCodingSessionLlmUsage } from "@/lib/pipeline/coding-session-report";
@@ -7533,6 +7535,31 @@ async function integrationVerifyAndFix(
     );
   }
 
+  // ── Migration coverage → repair tasks ──────────────────────────────────
+  // Reads `.ralph/migration-coverage.json` written per-task by the
+  // worker hook and converts each "model touched without migration" gap
+  // into a deterministic repair-task descriptor for the verify-fix
+  // worker to execute alongside the contract-coverage repairs above.
+  let migrationCoverageResult: Awaited<
+    ReturnType<typeof runMigrationCoverageRepair>
+  > | null = null;
+  try {
+    migrationCoverageResult = await runMigrationCoverageRepair({
+      outputDir: state.outputDir,
+      emitter: getRepairEmitter(state.sessionId),
+      sessionId: state.sessionId,
+    });
+    if (migrationCoverageResult.pendingRepairTasks.length > 0) {
+      console.log(
+        `${label}: migration-coverage queued ${migrationCoverageResult.pendingRepairTasks.length} repair task(s) across ${migrationCoverageResult.tasksWithGaps} originating task(s).`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `${label}: migration-coverage repair skipped — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   // ── Runtime integration audit (CODEGEN_HARDENING_PLAN.md §4.2 / §4.3 /
   //    §4.4 / §4.5 / §4.7) ────────────────────────────────────────────────
   // Static grep-based audit catching the runtime pitfalls Phase 4 prompts
@@ -8060,11 +8087,16 @@ async function integrationVerifyAndFix(
     ? formatRuntimeAuditBlock(runtimeAuditResult)
     : "";
 
+  const migrationCoverageBlock = migrationCoverageResult
+    ? formatMigrationCoverageBlock(migrationCoverageResult)
+    : "";
+
   const openingUserContent = [
     `Project directory: ${state.outputDir}`,
     `Package manager: ${pm}`,
     prdBlock,
     coverageBlock,
+    migrationCoverageBlock,
     runtimeAuditBlock,
     dependencyAuditBlock,
     residualConflictBlock,
