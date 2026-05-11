@@ -256,6 +256,68 @@ export class PipelineEngine {
       return run;
     }
 
+    // ── Imported PRD shortcut ────────────────────────────────────────────
+    // The PRD-import API writes `.blueprint/PRD.md` directly. When that
+    // file exists with non-empty content, use it as the PRD step's output
+    // and skip the LLM call entirely — otherwise the PM agent would
+    // hallucinate a fresh PRD that overrides the user's upload. The
+    // structured spec extractor still runs against the imported content,
+    // so downstream domain.rules wiring keeps working.
+    const importedPrdContent = await this.readImportedPrd();
+    if (importedPrdContent) {
+      run = await this.executeStep(run, "prd", async () => ({
+        content: importedPrdContent,
+        model: "imported",
+        costUsd: 0,
+        durationMs: 0,
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      }));
+      if (run.status === "failed") return run;
+      const prdStep = run.steps.prd;
+      if (prdStep) {
+        run.steps.prd = {
+          ...prdStep,
+          metadata: {
+            ...(prdStep.metadata ?? {}),
+            source: "imported",
+            importedFrom: ".blueprint/PRD.md",
+          },
+        };
+      }
+    } else {
+      run = await this.executeStep(run, "prd", () =>
+        pmAgent.generatePRDEditStreaming(
+          existingPrd,
+          editInstruction,
+          (chunk, chunkType) => {
+            this.emit({
+              type: "step_stream",
+              runId: run.id,
+              stepId: "prd",
+              data: { chunk, chunkType },
+            });
+          },
+          run.sessionId,
+        ),
+      );
+      if (run.status === "failed") return run;
+
+      run = this.attachPrdSpecGateToPrdStep(run);
+      run = await this.attachPrdStructuredSpec(run);
+      this.emitPrdStepCompleteRefresh(run);
+
+      this.emit({
+        type: "pipeline_complete",
+        runId: run.id,
+        stepId: "prd",
+        data: { status: "completed", metadata: { pausedAfterPrd: true } },
+      });
+      run.status = "completed";
+      run.currentStep = null;
+      run.updatedAt = new Date().toISOString();
+      return run;
+    }
+
     run = await this.executeStep(run, "prd", () =>
       pmAgent.generatePRDStreaming(
         run.featureBrief,
@@ -391,8 +453,20 @@ export class PipelineEngine {
       });
     } else {
       if (plan.needsTrd) {
+        // Prior PRD step may have attached a structured PrdSpec with an
+        // optional `domain` section. Forward it so TRDAgent can inject
+        // PRD-provided rules as authoritative source for §7.
+        const prdMetadata = run.steps.prd?.metadata as
+          | { prdSpec?: PrdSpec }
+          | undefined;
+        const prdSpec = prdMetadata?.prdSpec ?? null;
         run = await this.executeStep(run, "trd", () =>
-          this.trdAgent.generateTRD(prdContent, undefined, run.sessionId),
+          this.trdAgent.generateTRD(
+            prdContent,
+            undefined,
+            run.sessionId,
+            prdSpec,
+          ),
         );
         if (run.status === "failed") return run;
         await this.persistTrdArtifacts(run);
@@ -1082,18 +1156,36 @@ export class PipelineEngine {
       return;
     }
 
-    const writtenRel: { schemaTs?: string; rulesYaml?: string } = {};
+    const writtenRel: {
+      schemaTs?: string;
+      rulesYaml?: string;
+      pipelineDagYaml?: string;
+    } = {};
     if (result.written.schemaTs) {
       writtenRel.schemaTs = path.relative(process.cwd(), result.written.schemaTs);
     }
     if (result.written.rulesYaml) {
       writtenRel.rulesYaml = path.relative(process.cwd(), result.written.rulesYaml);
     }
+    if (result.written.pipelineDagYaml) {
+      writtenRel.pipelineDagYaml = path.relative(
+        process.cwd(),
+        result.written.pipelineDagYaml,
+      );
+    }
 
     if (result.rulesValidation && !result.rulesValidation.ok) {
       console.warn(
         `[Pipeline] business-rules.dsl.yaml has ${result.rulesValidation.warnings.length} warning(s):`,
         result.rulesValidation.warnings
+          .map((w) => `${w.code}: ${w.message}`)
+          .join("; "),
+      );
+    }
+    if (result.dagValidation && !result.dagValidation.ok) {
+      console.warn(
+        `[Pipeline] pipeline-dag.yaml has ${result.dagValidation.warnings.length} warning(s):`,
+        result.dagValidation.warnings
           .map((w) => `${w.code}: ${w.message}`)
           .join("; "),
       );
@@ -1109,6 +1201,9 @@ export class PipelineEngine {
           malformed: result.artifacts.malformed,
           ...(result.rulesValidation
             ? { rulesValidation: result.rulesValidation }
+            : {}),
+          ...(result.dagValidation
+            ? { dagValidation: result.dagValidation }
             : {}),
         },
       },
@@ -1373,6 +1468,23 @@ export class PipelineEngine {
    * In fast mode, try to read existing document files from the code output directory.
    * Supports common filename variations.
    */
+  /**
+   * Read the user-uploaded PRD from `.blueprint/PRD.md` (written by
+   * `/api/agents/pipeline/prd-import`). Returns null when the file is
+   * absent or whitespace-only. Used to short-circuit the PM agent so
+   * uploaded PRDs are honored verbatim instead of overwritten by a
+   * fresh LLM generation.
+   */
+  private async readImportedPrd(): Promise<string | null> {
+    const filePath = path.join(this.projectRoot, ".blueprint", "PRD.md");
+    try {
+      const raw = await fs.readFile(filePath, "utf-8");
+      return raw.trim().length > 0 ? raw : null;
+    } catch {
+      return null;
+    }
+  }
+
   private async readExistingDocsFromOutput(outputRoot: string): Promise<{
     prd: string | null;
     trd: string | null;

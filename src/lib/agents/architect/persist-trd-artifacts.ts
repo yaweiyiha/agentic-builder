@@ -24,14 +24,24 @@ import {
   validateRulesDsl,
   type RulesDslValidation,
 } from "./trd-rules-validator";
+import {
+  validateWorkflowDag,
+  type DagValidation,
+} from "./dag-validator";
 
 export interface PersistedTrdArtifacts {
   /** Raw parser output — useful for surfacing malformed/unknown blocks. */
   artifacts: TrdArtifacts;
   /** Absolute paths actually written. Empty when no recognised blocks. */
-  written: { schemaTs?: string; rulesYaml?: string };
+  written: {
+    schemaTs?: string;
+    rulesYaml?: string;
+    pipelineDagYaml?: string;
+  };
   /** Result of running validateRulesDsl when rulesYaml was present. */
   rulesValidation?: RulesDslValidation;
+  /** Result of running validateWorkflowDag when pipelineDagYaml was present. */
+  dagValidation?: DagValidation;
 }
 
 export async function persistTrdArtifactsFromContent(
@@ -41,8 +51,9 @@ export async function persistTrdArtifactsFromContent(
   const artifacts = extractTrdArtifacts(content);
   await fs.mkdir(blueprintDir, { recursive: true });
 
-  const written: { schemaTs?: string; rulesYaml?: string } = {};
+  const written: PersistedTrdArtifacts["written"] = {};
   let rulesValidation: RulesDslValidation | undefined;
+  let dagValidation: DagValidation | undefined;
 
   if (artifacts.schemaTs) {
     const p = path.join(blueprintDir, "shared-schema.ts");
@@ -57,5 +68,14 @@ export async function persistTrdArtifactsFromContent(
     rulesValidation = validateRulesDsl(artifacts.rulesYaml);
   }
 
-  return { artifacts, written, rulesValidation };
+  if (artifacts.pipelineDagYaml) {
+    const p = path.join(blueprintDir, "pipeline-dag.yaml");
+    await fs.writeFile(p, artifacts.pipelineDagYaml, "utf8");
+    written.pipelineDagYaml = p;
+    dagValidation = validateWorkflowDag(artifacts.pipelineDagYaml, {
+      trdMarkdown: content,
+    });
+  }
+
+  return { artifacts, written, rulesValidation, dagValidation };
 }

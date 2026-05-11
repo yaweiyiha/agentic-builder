@@ -15,6 +15,10 @@ import {
 } from "@/lib/pipeline/scaffold-copy";
 import { distributeSharedSchema } from "@/lib/pipeline/shared-schema-distributor";
 import {
+  distributeSharedSchema,
+  distributePipelineDag,
+} from "@/lib/pipeline/shared-schema-distributor";
+import {
   getTierScaffoldSpecForCodingContext,
   writeScaffoldSpecFile,
 } from "@/lib/pipeline/scaffold-spec";
@@ -848,6 +852,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Replicate the TRD workflow DAG (.blueprint/pipeline-dag.yaml). Lives
+  // at outputRoot/.blueprint/pipeline-dag.yaml — workers read it as a
+  // reference for service ordering when implementing pipeline tasks.
+  let distributedDagPath: string | null = null;
+  try {
+    const dist = await distributePipelineDag(outputRoot);
+    distributedDagPath = dist.written;
+    if (dist.found) {
+      console.log(
+        `[CodingAPI] Pipeline DAG distributed: ${dist.written}`,
+      );
+    } else {
+      console.log(
+        `[CodingAPI] Pipeline DAG not distributed: source ${dist.sourcePath} missing (TRD §8 omitted — project has no multi-step pipelines).`,
+      );
+    }
+  } catch (e) {
+    console.warn(
+      `[CodingAPI] distributePipelineDag warning: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
   const resolvedDbUrl = resolveBlueprintGeneratedDatabaseUrl(databaseUrlBody);
   if (resolvedDbUrl) {
     try {
@@ -929,6 +955,9 @@ export async function POST(request: NextRequest) {
   // overwrite the canonical TRD-frozen schema.
   for (const p of distributedSharedSchemaPaths) {
     if (!scaffoldProtectedPaths.includes(p)) scaffoldProtectedPaths.push(p);
+  }
+  if (distributedDagPath && !scaffoldProtectedPaths.includes(distributedDagPath)) {
+    scaffoldProtectedPaths.push(distributedDagPath);
   }
 
   // Run installs for every package root present in the scaffold.

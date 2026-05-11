@@ -12,6 +12,7 @@ import type { AgentResult } from "@/lib/agents";
 import { getDesignStylePreset } from "@/lib/pipeline/design-style-presets";
 import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 import { persistTrdArtifactsFromContent } from "@/lib/agents/architect/persist-trd-artifacts";
+import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
 
 /** Pencil step: LLM (up to 16k tokens) + many batch_design chunks can exceed 5 minutes. */
 export const maxDuration = 600;
@@ -22,6 +23,7 @@ type DocAgentFn = (
   sysDesign: string,
   designSpec: string,
   sessionId: string,
+  prdSpec?: PrdSpec | null,
 ) => Promise<AgentResult>;
 
 const TIER_STACK_CONSTRAINT: Record<string, string> = {
@@ -54,8 +56,13 @@ function buildAgentMap(
     .filter((s) => s.trim().length > 0)
     .join("\n\n");
   return {
-    trd: (prd, _trd, _sys, _ds, sid) =>
-      new TRDAgent().generateTRD(`${tierConstraint}\n\n${prd}`, undefined, sid),
+    trd: (prd, _trd, _sys, _ds, sid, prdSpec) =>
+      new TRDAgent().generateTRD(
+        `${tierConstraint}\n\n${prd}`,
+        undefined,
+        sid,
+        prdSpec ?? null,
+      ),
     sysdesign: (prd, trd, _sys, _ds, sid) =>
       new SysDesignAgent().generateSysDesign(
         `${tierConstraint}\n\n${prd}`,
@@ -131,6 +138,7 @@ export async function POST(request: NextRequest) {
     designStyleId,
     designSpecContent,
     styleReferenceImageBase64,
+    prdSpec,
   } = body as {
     prdContent: string;
     selectedDocs: string[];
@@ -145,6 +153,9 @@ export async function POST(request: NextRequest) {
     designSpecContent?: string;
     /** Base64 data URL of a reference image for style matching. */
     styleReferenceImageBase64?: string;
+    /** Structured PRD spec from `steps.prd.metadata.prdSpec` — used by
+     *  TRD to inject domain.rules as authoritative source. */
+    prdSpec?: PrdSpec | null;
   };
 
   const effectiveTier = (tier ?? "M").toUpperCase() as "S" | "M" | "L";
@@ -267,7 +278,7 @@ export async function POST(request: NextRequest) {
           let result: AgentResult;
           const agentFn = agentMap[docId];
           if (!agentFn) throw new Error(`Unknown doc: ${docId}`);
-          result = await agentFn(prdContent, trd, sys, ds, sessionId);
+          result = await agentFn(prdContent, trd, sys, ds, sessionId, prdSpec);
           results[docId] = {
             content: result.content,
             costUsd: result.costUsd,
@@ -280,7 +291,11 @@ export async function POST(request: NextRequest) {
           // workers. Mirrors PipelineEngine.persistTrdArtifacts but for
           // the parallel-generate flow used by pipeline-ui.
           let trdArtifactsSummary:
-            | { schemaTs?: string; rulesYaml?: string }
+            | {
+                schemaTs?: string;
+                rulesYaml?: string;
+                pipelineDagYaml?: string;
+              }
             | undefined;
           if (docId === "trd") {
             try {
@@ -302,6 +317,12 @@ export async function POST(request: NextRequest) {
                   persisted.written.rulesYaml,
                 );
               }
+              if (persisted.written.pipelineDagYaml) {
+                trdArtifactsSummary.pipelineDagYaml = path.relative(
+                  process.cwd(),
+                  persisted.written.pipelineDagYaml,
+                );
+              }
               if (
                 persisted.rulesValidation &&
                 !persisted.rulesValidation.ok
@@ -313,8 +334,16 @@ export async function POST(request: NextRequest) {
                     .join("; "),
                 );
               }
+              if (persisted.dagValidation && !persisted.dagValidation.ok) {
+                console.warn(
+                  `[parallel-generate] pipeline-dag.yaml has ${persisted.dagValidation.warnings.length} warning(s):`,
+                  persisted.dagValidation.warnings
+                    .map((w) => `${w.code}: ${w.message}`)
+                    .join("; "),
+                );
+              }
               console.log(
-                `[parallel-generate] TRD artifacts persisted: schema=${trdArtifactsSummary.schemaTs ?? "(none)"} rules=${trdArtifactsSummary.rulesYaml ?? "(none)"}`,
+                `[parallel-generate] TRD artifacts persisted: schema=${trdArtifactsSummary.schemaTs ?? "(none)"} rules=${trdArtifactsSummary.rulesYaml ?? "(none)"} dag=${trdArtifactsSummary.pipelineDagYaml ?? "(none)"}`,
               );
             } catch (e) {
               console.warn(

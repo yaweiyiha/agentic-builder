@@ -31,6 +31,8 @@ export interface TrdArtifacts {
   schemaTs?: string;
   /** Contents of the `business-rules.dsl.yaml` block, if present. */
   rulesYaml?: string;
+  /** Contents of the `pipeline-dag.yaml` block, if present. */
+  pipelineDagYaml?: string;
   /** Blocks whose header was malformed or that never closed. */
   malformed: TrdArtifactMalformed[];
   /** Blocks with a recognisable header but unrecognised path. */
@@ -73,6 +75,8 @@ export function extractTrdArtifacts(content: string): TrdArtifacts {
       out.schemaTs = body;
     } else if (filePath === "business-rules.dsl.yaml") {
       out.rulesYaml = body;
+    } else if (filePath === "pipeline-dag.yaml") {
+      out.pipelineDagYaml = body;
     } else {
       out.unknown.push({ path: filePath, body });
     }

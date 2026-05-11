@@ -17,60 +17,6 @@ function FolderIcon() {
 
 function ChevronDownIcon() {
   return (
-<<<<<<< HEAD
-    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-6 lg:px-14">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-[var(--foreground)] transition-opacity hover:opacity-80"
-        >
-          <SparklesIcon className="shrink-0 text-[var(--accent)]" />
-          <span className="text-[17px] font-semibold tracking-tight">
-            Agentic Builder
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-7">
-          <Link
-            href="/pipeline"
-            className={`text-sm font-medium transition-colors ${
-              pathname === "/pipeline"
-                ? "text-[var(--foreground)]"
-                : "text-[var(--muted-secondary)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Pipeline
-          </Link>
-          <Link
-            href="/reports"
-            className={`text-sm font-medium transition-colors ${
-              pathname === "/reports"
-                ? "text-[var(--foreground)]"
-                : "text-[var(--muted-secondary)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Reports
-          </Link>
-          <Link
-            href="/memory"
-            className={`text-sm font-medium transition-colors ${
-              pathname === "/memory"
-                ? "text-[var(--foreground)]"
-                : "text-[var(--muted-secondary)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Memory
-          </Link>
-          <Link
-            href="/pipeline"
-            className="inline-flex items-center rounded-[10px] bg-[var(--accent)] px-[18px] py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
-          >
-            Launch Pipeline
-          </Link>
-        </div>
-      </div>
-    </header>
-=======
     <svg width="6" height="4" viewBox="0 0 6 4" fill="none" aria-hidden>
       <path d="M0.5 0.5L3 3L5.5 0.5" stroke="#94a3b8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -270,6 +216,5 @@ export default function AppNav() {
         </div>
       </div>
     </aside>
->>>>>>> 422487b (feat: 更新 AppNav 组件，添加项目管理功能和新图标)
   );
 }
