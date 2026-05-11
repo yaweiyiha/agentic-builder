@@ -11,6 +11,7 @@ import ImplguideSubStage  from "./_sub/implguide";
 import DesignSubStage     from "./_sub/design";
 import MockupSubStage     from "./_sub/mockup";
 import QaSubStage         from "./_sub/qa";
+import VerifySubStage     from "./_sub/verify";
 import type React from "react";
 
 const SUB_VIEWS: Record<PreparationSubStageId, React.ComponentType> = {
@@ -23,6 +24,7 @@ const SUB_VIEWS: Record<PreparationSubStageId, React.ComponentType> = {
   design:    DesignSubStage,
   mockup:    MockupSubStage,
   qa:        QaSubStage,
+  verify:    VerifySubStage,
 };
 
 export default function PreparationStage() {

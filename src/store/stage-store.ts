@@ -54,7 +54,8 @@ export type PreparationSubStageId =
   | "design"      // design spec
   | "pencil"      // pencil wireframe
   | "mockup"      // mockup generation
-  | "qa";         // QA checklist
+  | "qa"          // QA checklist
+  | "verify";     // pre-kickoff verification
 
 export type KickoffSubStageId =
   | "env-setup"       // environment scaffolding
@@ -87,7 +88,7 @@ export interface SubStageMeta {
 // ─── Sub-Stage Registry ───────────────────────────────────────────────────────
 
 export const SUB_STAGE_ORDER: Record<StageId, SubStageId[]> = {
-  preparation: ["initial", "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa"],
+  preparation: ["initial", "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa", "verify"],
   kickoff:     ["env-setup", "task-breakdown"],
   coding:      ["architect", "backend", "frontend", "test", "verify"],
   preview:     ["serve", "e2e"],
@@ -105,6 +106,7 @@ export const SUB_STAGE_META: Record<SubStageId, SubStageMeta> = {
   pencil:       { label: "Pencil",           desc: "Wireframe generation" },
   mockup:       { label: "Mockup",           desc: "Visual mockup" },
   qa:           { label: "QA",               desc: "QA checklist" },
+  // verify is shared with coding sub-stage; label reused below
   // kickoff
   "env-setup":       { label: "Env Setup",       desc: "Scaffold project environment" },
   "task-breakdown":  { label: "Task Breakdown",  desc: "Plan coding tasks" },
@@ -132,7 +134,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
 
 /** Pipeline step IDs that belong to the preparation stage (excludes "initial" which is UI-only). */
 export const PREPARATION_STEP_IDS = [
-  "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa",
+  "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa", "verify",
 ] as const;
 
 // ─── Default active sub-stage per stage ──────────────────────────────────────

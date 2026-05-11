@@ -26,7 +26,7 @@ export default function TrdSubStage() {
       step={step}
       content={content}
       confirmLabel="Confirm TRD"
-      onConfirm={() => goToSubStage("sysdesign", "preparation")}
+      onConfirm={() => goToSubStage("qa", "preparation")}
       showDownload
     />
   );

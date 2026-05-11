@@ -110,7 +110,7 @@ const TOKEN_ESTIMATES: Record<string, number> = {
   trd: 6000,
   sysdesign: 5000,
   implguide: 4000,
-  design: 3000,
+  design: 16000,
   pencil: 8000,
   qa: 2500,
   verify: 2000,

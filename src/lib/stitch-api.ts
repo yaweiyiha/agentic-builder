@@ -231,3 +231,119 @@ export async function generateStitchScreen(
     projectUrl: `${STITCH_PROJECT_BASE_URL}/${projectId}`,
   };
 }
+
+/**
+ * Fetch all screen screenshot URLs for a Stitch project using the REST API.
+ * The MCP `list_screens` tool returns empty objects, but the REST API
+ * at /v1/projects/{id}/screens returns proper screenshot download URLs.
+ */
+export interface StitchScreenshot {
+  screenId: string;
+  title: string;
+  screenshotUrl: string;
+}
+
+export async function fetchStitchProjectScreenshots(
+  projectId: string,
+): Promise<StitchScreenshot[]> {
+  const authHeaders = await buildAuthHeaders();
+  const projectHeader: Record<string, string> = {};
+  const gcp = process.env.GOOGLE_CLOUD_PROJECT ?? process.env.GCLOUD_PROJECT;
+  if (gcp) projectHeader["X-Goog-User-Project"] = gcp;
+
+  const resp = await fetch(
+    `https://stitch.googleapis.com/v1/projects/${projectId}/screens`,
+    { headers: { ...authHeaders, ...projectHeader } },
+  );
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Stitch REST API ${resp.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = (await resp.json()) as {
+    screens?: Array<{
+      id?: string;
+      name?: string;
+      title?: string;
+      screenshot?: { downloadUrl?: string };
+    }>;
+  };
+
+  const results: StitchScreenshot[] = [];
+  for (const s of data.screens ?? []) {
+    let url = s.screenshot?.downloadUrl;
+    if (!url) continue;
+    // lh3.googleusercontent.com supports size suffixes.
+    // Append =s0 to request the original full-resolution image.
+    if (url.includes("lh3.googleusercontent.com") && !url.includes("=s")) {
+      url = url + "=s0";
+    }
+    // Extract screenId from "projects/{p}/screens/{s}" or use id field
+    const screenId =
+      s.id ??
+      (s.name?.includes("/screens/") ? s.name.split("/screens/")[1] : "") ??
+      "";
+    results.push({
+      screenId,
+      title: s.title ?? screenId,
+      screenshotUrl: url,
+    });
+  }
+  return results;
+}
+
+/**
+ * Fetch the HTML content for an already-generated Stitch screen.
+ * Uses the `get_screen` MCP tool to retrieve fresh download URLs,
+ * then fetches and returns the raw HTML string.
+ * Returns null if the screen cannot be fetched or has no HTML export.
+ */
+export async function fetchStitchScreenHtml(
+  projectId: string,
+  screenId: string,
+): Promise<string | null> {
+  interface GetScreenResult {
+    screens?: Array<{
+      htmlCode?: { downloadUrl?: string };
+      screenshot?: { downloadUrl?: string };
+    }>;
+    htmlCode?: { downloadUrl?: string };
+    screenshot?: { downloadUrl?: string };
+  }
+
+  let htmlUrl: string | null = null;
+
+  try {
+    const result = await callStitchTool<GetScreenResult>("get_screen", {
+      projectId,
+      screenId,
+    });
+    console.log("[StitchAPI] get_screen raw:", JSON.stringify(result));
+
+    // The response may nest screens under a `screens` array or be a flat object
+    const screenObj = (result?.screens ?? [])[0] ?? result;
+    htmlUrl =
+      (screenObj as { htmlCode?: { downloadUrl?: string } })?.htmlCode?.downloadUrl ?? null;
+  } catch (e) {
+    console.warn("[StitchAPI] get_screen failed:", e);
+  }
+
+  if (!htmlUrl) return null;
+
+  try {
+    // Download the signed URL WITHOUT auth headers — these are self-authenticating
+    // Google Storage URLs; passing a Bearer token alongside causes a 400/empty response.
+    const resp = await fetch(htmlUrl, {
+      headers: { Accept: "text/html,text/plain,*/*" },
+    });
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    // Only treat the content as displayable HTML if it actually looks like HTML.
+    // Stitch sometimes stores the input PRD text as the "htmlCode" for older generations.
+    const looksLikeHtml = /^\s*(<(!DOCTYPE|html|head|body|div|<!--))/i.test(text);
+    return looksLikeHtml ? text : null;
+  } catch {
+    return null;
+  }
+}

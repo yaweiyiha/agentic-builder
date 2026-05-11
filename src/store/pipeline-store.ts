@@ -226,6 +226,10 @@ interface PipelineState {
   runDesignDoc: (editInstruction?: string) => void;
   /** Generate (or re-generate) the TRD document. Pass editInstruction to revise an existing draft. */
   runTrd: (editInstruction?: string) => void;
+  /** Generate (or re-generate) the QA plan. */
+  runQa: (editInstruction?: string) => void;
+  /** Generate (or re-generate) the Verify checklist. */
+  runVerify: (editInstruction?: string) => void;
   /** Generate (or re-generate) the Pencil wireframe from the PRD + chosen design style. */
   runPencilDoc: (styleId: string, styleReferenceImage?: string | null, editInstruction?: string) => void;
   /**
@@ -566,7 +570,7 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       runDesignDoc: (editInstruction?: string) => {
-        const { steps, featureBrief, codeOutputDir } = get();
+        const { steps, featureBrief, codeOutputDir, selectedDesignStyleId } = get();
         const prdContent = steps.prd?.content ?? featureBrief;
         if (!prdContent.trim()) return;
 
@@ -598,6 +602,7 @@ export const usePipelineStore = create<PipelineState>()(
               (steps.intent?.metadata as Record<string, unknown> | undefined)
                 ?.classification as { tier?: string } | undefined
             )?.tier ?? "M",
+            designStyleId: selectedDesignStyleId ?? undefined,
             ...(editInstruction?.trim() ? {
               editInstruction: editInstruction.trim(),
               existingDesign: steps.design?.content ?? "",
@@ -831,6 +836,268 @@ export const usePipelineStore = create<PipelineState>()(
             }
             if (buffer.startsWith("data: ")) {
               try { handleParallelEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
+            }
+            if (get().isRunning) set({ isRunning: false, currentStep: null });
+          })
+          .catch((err) => {
+            set({
+              isRunning: false,
+              currentStep: null,
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          });
+      },
+
+      runQa: (editInstruction?: string) => {
+        const { steps, featureBrief, codeOutputDir } = get();
+        const prdContent = steps.prd?.content ?? featureBrief;
+        if (!prdContent.trim()) return;
+
+        set({
+          isRunning: true,
+          error: null,
+          currentStep: "qa",
+          streamingContent: "",
+          streamingThinking: "",
+          steps: {
+            ...steps,
+            qa: {
+              stepId: "qa" as PipelineStepId,
+              status: "running" as const,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+        scheduleSync(get);
+
+        const requestPayload = {
+          prdContent,
+          selectedDocs: ["qa"],
+          sessionId: steps.intent?.timestamp ?? "session",
+          codeOutputDir,
+          tier: (
+            (steps.intent?.metadata as Record<string, unknown> | undefined)
+              ?.classification as { tier?: string } | undefined
+          )?.tier ?? "M",
+          ...(editInstruction?.trim() ? {
+            editInstruction: editInstruction.trim(),
+            existingContent: steps.qa?.content ?? "",
+          } : {}),
+        };
+
+        fetch("/api/agents/parallel-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        })
+          .then(async (resp) => {
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              set({
+                isRunning: false,
+                currentStep: null,
+                steps: {
+                  ...get().steps,
+                  qa: {
+                    stepId: "qa" as PipelineStepId,
+                    status: "failed" as const,
+                    error: (errData as { error?: string }).error || "QA generation failed",
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              });
+              return;
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) {
+              set({ isRunning: false, currentStep: null });
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let qaContent = "";
+            let qaCost = 0;
+            let qaDuration = 0;
+
+            const handleEvent = (payload: Record<string, unknown>) => {
+              const type = payload.type as string;
+              if (type === "doc_stream") {
+                const chunk = payload.chunk as string | undefined;
+                if (chunk) {
+                  qaContent += chunk;
+                  set({ streamingContent: qaContent });
+                }
+              } else if (type === "doc_complete" && payload.docId === "qa") {
+                qaContent = (payload.content as string) || qaContent;
+                qaCost = (payload.costUsd as number) || 0;
+                qaDuration = (payload.durationMs as number) || 0;
+                const completedStep: StepResult = {
+                  stepId: "qa",
+                  status: "completed",
+                  content: qaContent,
+                  costUsd: qaCost,
+                  durationMs: qaDuration,
+                  timestamp: new Date().toISOString(),
+                };
+                set({
+                  steps: { ...get().steps, qa: completedStep },
+                  totalCostUsd: get().totalCostUsd + qaCost,
+                  streamingContent: "",
+                });
+                scheduleSync(get);
+                saveSubStageSnapshot(get, "qa");
+              } else if (type === "generation_complete") {
+                set({ isRunning: false, currentStep: null });
+                scheduleSync(get);
+              }
+            };
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try { handleEvent(JSON.parse(line.slice(6))); } catch { /* skip */ }
+              }
+            }
+            if (buffer.startsWith("data: ")) {
+              try { handleEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
+            }
+            if (get().isRunning) set({ isRunning: false, currentStep: null });
+          })
+          .catch((err) => {
+            set({
+              isRunning: false,
+              currentStep: null,
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          });
+      },
+
+      runVerify: (editInstruction?: string) => {
+        const { steps, featureBrief, codeOutputDir } = get();
+        const prdContent = steps.prd?.content ?? featureBrief;
+        if (!prdContent.trim()) return;
+
+        set({
+          isRunning: true,
+          error: null,
+          currentStep: "verify",
+          streamingContent: "",
+          streamingThinking: "",
+          steps: {
+            ...steps,
+            verify: {
+              stepId: "verify" as PipelineStepId,
+              status: "running" as const,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+        scheduleSync(get);
+
+        const requestPayload = {
+          prdContent,
+          selectedDocs: ["verify"],
+          sessionId: steps.intent?.timestamp ?? "session",
+          codeOutputDir,
+          tier: (
+            (steps.intent?.metadata as Record<string, unknown> | undefined)
+              ?.classification as { tier?: string } | undefined
+          )?.tier ?? "M",
+          ...(editInstruction?.trim() ? {
+            editInstruction: editInstruction.trim(),
+            existingContent: steps.verify?.content ?? "",
+          } : {}),
+        };
+
+        fetch("/api/agents/parallel-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        })
+          .then(async (resp) => {
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              set({
+                isRunning: false,
+                currentStep: null,
+                steps: {
+                  ...get().steps,
+                  verify: {
+                    stepId: "verify" as PipelineStepId,
+                    status: "failed" as const,
+                    error: (errData as { error?: string }).error || "Verify generation failed",
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              });
+              return;
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) {
+              set({ isRunning: false, currentStep: null });
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let verifyContent = "";
+            let verifyCost = 0;
+            let verifyDuration = 0;
+
+            const handleEvent = (payload: Record<string, unknown>) => {
+              const type = payload.type as string;
+              if (type === "doc_stream") {
+                const chunk = payload.chunk as string | undefined;
+                if (chunk) {
+                  verifyContent += chunk;
+                  set({ streamingContent: verifyContent });
+                }
+              } else if (type === "doc_complete" && payload.docId === "verify") {
+                verifyContent = (payload.content as string) || verifyContent;
+                verifyCost = (payload.costUsd as number) || 0;
+                verifyDuration = (payload.durationMs as number) || 0;
+                const completedStep: StepResult = {
+                  stepId: "verify",
+                  status: "completed",
+                  content: verifyContent,
+                  costUsd: verifyCost,
+                  durationMs: verifyDuration,
+                  timestamp: new Date().toISOString(),
+                };
+                set({
+                  steps: { ...get().steps, verify: completedStep },
+                  totalCostUsd: get().totalCostUsd + verifyCost,
+                  streamingContent: "",
+                });
+                scheduleSync(get);
+                saveSubStageSnapshot(get, "verify");
+              } else if (type === "generation_complete") {
+                set({ isRunning: false, currentStep: null });
+                scheduleSync(get);
+              }
+            };
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try { handleEvent(JSON.parse(line.slice(6))); } catch { /* skip */ }
+              }
+            }
+            if (buffer.startsWith("data: ")) {
+              try { handleEvent(JSON.parse(buffer.slice(6))); } catch { /* skip */ }
             }
             if (get().isRunning) set({ isRunning: false, currentStep: null });
           })
@@ -1770,7 +2037,18 @@ export const usePipelineStore = create<PipelineState>()(
             fastFromPrd:   snap.fastFromPrd   ?? true,
             codeOutputDir: snap.codeOutputDir ?? "generated-code",
             steps:         snap.steps
-              ? { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) }
+              ? (() => {
+                  const restored = { ...EMPTY_STEPS, ...(snap.steps as Record<PipelineStepId, StepResult | null>) };
+                  // Clear any steps that were previously skipped (quick-start stub) so they
+                  // show as "not generated" rather than displaying the skip placeholder text.
+                  for (const key of Object.keys(restored) as PipelineStepId[]) {
+                    const step = restored[key];
+                    if (step?.metadata && (step.metadata as Record<string, unknown>)["skipped"] === true) {
+                      restored[key] = null;
+                    }
+                  }
+                  return restored;
+                })()
               : { ...EMPTY_STEPS },
             designStyles: snap.designStyles ?? null,
             designStylesLoading: snap.designStylesLoading ?? false,
