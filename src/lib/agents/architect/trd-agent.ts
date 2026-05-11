@@ -1,5 +1,9 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import type {
+  PrdDomainSpec,
+  PrdRuleSpec,
+} from "@/lib/requirements/prd-spec-types";
 
 const SYSTEM_PROMPT = `You are a senior Technical Architect Agent.
 
@@ -140,6 +144,14 @@ rules:
   generic chat UI, etc.), **omit §7 entirely**. Do not emit an empty rules
   block, and do not include a heading without a body.
 
+### Authoritative source for boundary values
+If the user message contains a section titled "## PRD-provided domain
+rules", those rules are **authoritative**. Copy every \`id\`, \`type\`,
+\`inputVariableId\`, segment boundary, and decision case **verbatim** into
+§7. Do NOT round numbers, do NOT add/remove segments, do NOT invent new
+rules beyond what is listed. You may add a \`description\` field if absent
+and reformat the YAML for clarity, but the numeric values are fixed.
+
 ## 8. Workflow DAG (CONDITIONAL)
 
 If — and only if — the system has any **multi-step deterministic pipeline**
@@ -201,12 +213,96 @@ export class TRDAgent extends BaseAgent {
     prdContent: string,
     additionalContext?: string,
     sessionId?: string,
+    /** Optional structured PRD spec — when its `domain.rules` is non-empty,
+     *  the rules are injected into the prompt as authoritative source so
+     *  the LLM cannot invent its own boundary values for §7. */
+    prdSpec?: { domain?: PrdDomainSpec } | null,
   ) {
+    const rulesBlock = renderAuthoritativeRulesBlock(prdSpec?.domain?.rules);
+    const augmentedContext = [additionalContext, rulesBlock]
+      .filter((s) => s && s.trim().length > 0)
+      .join("\n\n");
     return this.run(
       `Generate a comprehensive Technical Requirements Document (TRD) based on the following PRD:\n\n${prdContent}`,
-      additionalContext,
+      augmentedContext.length > 0 ? augmentedContext : undefined,
       "step-trd",
       sessionId,
     );
   }
+}
+
+/**
+ * Render PRD-extracted rules as a YAML-friendly authoritative source
+ * block for the TRD prompt. The LLM is instructed (in SYSTEM_PROMPT) to
+ * copy these values verbatim into §7. Returns empty string when there
+ * are no rules — the prompt then falls back to its existing "if
+ * applicable, emit §7" behavior.
+ *
+ * Only rules whose `type` is in the MVP set (piecewise-linear,
+ * decision-table) are rendered with full structure; "other" rules pass
+ * through with their formula text so the LLM has the description but
+ * knows not to claim it's a typed rule.
+ */
+export function renderAuthoritativeRulesBlock(
+  rules: PrdRuleSpec[] | undefined,
+): string {
+  if (!rules || rules.length === 0) return "";
+
+  const lines: string[] = [
+    "## PRD-provided domain rules",
+    "",
+    "The following rules were extracted from the PRD and are AUTHORITATIVE.",
+    "Copy every numeric value verbatim into §7 of your TRD output. Do NOT",
+    "invent new boundaries, add/remove segments, or round any number.",
+    "",
+    "```yaml",
+    "rules:",
+  ];
+  for (const r of rules) {
+    lines.push(`  - id: ${yamlSafe(r.id)}`);
+    lines.push(`    name: ${yamlString(r.name)}`);
+    if (r.description) {
+      lines.push(`    description: ${yamlString(r.description)}`);
+    }
+    lines.push(`    type: ${r.type}`);
+    if (r.inputVariableId) {
+      lines.push(`    inputVariableId: ${yamlSafe(r.inputVariableId)}`);
+    }
+    if (r.type === "piecewise-linear" && r.segments?.length) {
+      lines.push(`    segments:`);
+      for (const s of r.segments) {
+        lines.push(
+          `      - { from: ${s.from}, to: ${s.to}, outputFrom: ${s.outputFrom}, outputTo: ${s.outputTo} }`,
+        );
+      }
+    }
+    if (r.type === "decision-table" && r.cases?.length) {
+      lines.push(`    cases:`);
+      for (const c of r.cases) {
+        const whenStr = Object.keys(c.when).length === 0
+          ? "{}"
+          : `{ ${Object.entries(c.when)
+              .map(([k, v]) => `${k}: ${yamlString(String(v))}`)
+              .join(", ")} }`;
+        lines.push(
+          `      - { when: ${whenStr}, then: ${yamlString(String(c.then))} }`,
+        );
+      }
+    }
+    if (r.type === "other" && r.formula) {
+      lines.push(`    formula: ${yamlString(r.formula)}`);
+    }
+  }
+  lines.push("```");
+  return lines.join("\n");
+}
+
+function yamlSafe(s: string): string {
+  return /^[a-zA-Z0-9_-]+$/.test(s) ? s : yamlString(s);
+}
+
+function yamlString(s: string): string {
+  // Conservative double-quoting; escape backslashes and double-quotes.
+  const escaped = s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escaped}"`;
 }

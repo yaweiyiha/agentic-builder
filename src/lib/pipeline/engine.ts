@@ -391,8 +391,20 @@ export class PipelineEngine {
       });
     } else {
       if (plan.needsTrd) {
+        // Prior PRD step may have attached a structured PrdSpec with an
+        // optional `domain` section. Forward it so TRDAgent can inject
+        // PRD-provided rules as authoritative source for §7.
+        const prdMetadata = run.steps.prd?.metadata as
+          | { prdSpec?: PrdSpec }
+          | undefined;
+        const prdSpec = prdMetadata?.prdSpec ?? null;
         run = await this.executeStep(run, "trd", () =>
-          this.trdAgent.generateTRD(prdContent, undefined, run.sessionId),
+          this.trdAgent.generateTRD(
+            prdContent,
+            undefined,
+            run.sessionId,
+            prdSpec,
+          ),
         );
         if (run.status === "failed") return run;
         await this.persistTrdArtifacts(run);
