@@ -1052,3 +1052,19 @@ Next.js 16 在 `<distDir>/lock` 上加了文件锁，**只看 distDir 不看 por
 4. `electron:dev:b` 改用 `npm run dev:b` 启 Next，且整段命令前加 `PORT=... NEXT_DIST_DIR=...`，确保 `concurrently` 子进程也继承到。
 
 如果手动起 B 而不走脚本，记得 `PORT` 和 `NEXT_DIST_DIR` 两个 env 必须同时设置，缺一会回退到 A 的端口或 distDir。
+
+---
+
+## 附录 E · 部署与 CI/CD（Dokploy）
+
+平台选型：[Dokploy](https://github.com/dokploy/dokploy) —— 可自托管的应用/数据库部署与编排（Docker、Compose、Traefik 路由等），用作类 PaaS 的发布入口。官方描述见仓库 README 与 [docs.dokploy.com](https://docs.dokploy.com)（安装脚本示例在仓库中）。
+
+**当前进度（与路线图「CI/CD / 部署」条目对齐）**
+
+| 里程碑 | 状态 | 说明 |
+|--------|------|------|
+| 通过 Dokploy 打通 CI/CD 流程 | ✅ 已验证 | 流水线可走通并完成发布 |
+| 前端页面部署 | ✅ 已完成 | 生产侧前端已上线可访问 |
+| 数据库 + 后端 API 部署 | ⏳ 下周 | 排期在后续迭代；需对齐镜像/环境变量、健康检查与反向代理路由 |
+
+**注意**：Dokploy 侧数据库创建、备份策略与同机/多机网络要与 generated 项目的 `DATABASE_URL`、后端监听端口及 CORS/前端 `VITE_*` 基地址一致，避免与本地 `generated-code` 双栈混淆。

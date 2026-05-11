@@ -17,6 +17,7 @@ import { pool } from "./client";
 // rewrites __dirname to a `/ROOT/...` placeholder that doesn't exist on
 // disk, so resolving from the project root is the only stable path.
 const migrationsDir = path.resolve(process.cwd(), "src/lib/db/migrations");
+const DB_AUTO_PROVISION = process.env.DB_AUTO_PROVISION === "true";
 
 /**
  * Parse the DATABASE_URL and return connection options pointing to the
@@ -64,6 +65,10 @@ function targetDbName(): string {
  * Connects to the maintenance "postgres" DB as the current OS superuser.
  */
 export async function ensureDatabase(): Promise<void> {
+  if (!DB_AUTO_PROVISION) {
+    return;
+  }
+
   const dbName = targetDbName();
 
   // Extract target role & password directly from DATABASE_URL
@@ -80,37 +85,45 @@ export async function ensureDatabase(): Promise<void> {
 
   const mainPool = new Pool(maintenancePoolOpts());
   try {
-    // 1. Ensure the role exists
-    const { rows: roleRows } = await mainPool.query(
-      "SELECT 1 FROM pg_roles WHERE rolname = $1",
-      [roleUser],
-    );
-    if (roleRows.length === 0) {
-      console.log(`[migrate] Role "${roleUser}" not found — creating…`);
-      const pwClause = rolePass
-        ? ` PASSWORD '${rolePass.replace(/'/g, "''")}'`
-        : "";
-      await mainPool.query(
-        `CREATE ROLE "${roleUser}" WITH LOGIN${pwClause}`,
+    try {
+      // 1. Ensure the role exists
+      const { rows: roleRows } = await mainPool.query(
+        "SELECT 1 FROM pg_roles WHERE rolname = $1",
+        [roleUser],
       );
-      console.log(`[migrate] ✓ Role "${roleUser}" created.`);
-    } else {
-      console.log(`[migrate] Role "${roleUser}" already exists.`);
-    }
+      if (roleRows.length === 0) {
+        console.log(`[migrate] Role "${roleUser}" not found — creating…`);
+        const pwClause = rolePass
+          ? ` PASSWORD '${rolePass.replace(/'/g, "''")}'`
+          : "";
+        await mainPool.query(
+          `CREATE ROLE "${roleUser}" WITH LOGIN${pwClause}`,
+        );
+        console.log(`[migrate] ✓ Role "${roleUser}" created.`);
+      } else {
+        console.log(`[migrate] Role "${roleUser}" already exists.`);
+      }
 
-    // 2. Ensure the database exists
-    const { rows: dbRows } = await mainPool.query(
-      "SELECT 1 FROM pg_database WHERE datname = $1",
-      [dbName],
-    );
-    if (dbRows.length === 0) {
-      console.log(`[migrate] Database "${dbName}" not found — creating…`);
-      await mainPool.query(
-        `CREATE DATABASE "${dbName}" OWNER "${roleUser}"`,
+      // 2. Ensure the database exists
+      const { rows: dbRows } = await mainPool.query(
+        "SELECT 1 FROM pg_database WHERE datname = $1",
+        [dbName],
       );
-      console.log(`[migrate] ✓ Database "${dbName}" created.`);
-    } else {
-      console.log(`[migrate] Database "${dbName}" already exists.`);
+      if (dbRows.length === 0) {
+        console.log(`[migrate] Database "${dbName}" not found — creating…`);
+        await mainPool.query(
+          `CREATE DATABASE "${dbName}" OWNER "${roleUser}"`,
+        );
+        console.log(`[migrate] ✓ Database "${dbName}" created.`);
+      } else {
+        console.log(`[migrate] Database "${dbName}" already exists.`);
+      }
+    } catch (err) {
+      console.warn(
+        "[migrate] Skipping automatic DB provisioning. " +
+          "Set DB_AUTO_PROVISION=true and use a privileged account if you need CREATE ROLE/CREATE DATABASE.",
+      );
+      console.warn("[migrate] Provisioning error:", err);
     }
   } finally {
     await mainPool.end();
