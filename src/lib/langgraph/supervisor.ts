@@ -43,6 +43,7 @@ import {
   injectBaselineEndpoints,
   type ApiContractEntry,
 } from "./baseline-endpoints";
+import { computeStagnationReplan } from "@/lib/pipeline/self-heal";
 import {
   chatCompletionWithFallback,
   resolveModel,
@@ -8241,6 +8242,11 @@ async function integrationVerifyAndFix(
   let stagnationFallbackUsed = false;
   let stagnationFallbackIterationsLeft = 0;
   let stagnationFallbackPassedEmitted = false;
+  // R6: when fallback ALSO exhausts without progress, try ONE fresh-eyes
+  // replan before truly aborting. Resets bloated message history,
+  // injects a focused 3-step plan from a separate LLM call.
+  let stagnationReplanAttempted = false;
+  let stagnationReplanBudgetLeft = 0;
   const repeatedReadOnlyActionCounts = new Map<string, number>();
   let progressScore = 0;
   let lastMeaningfulProgressIteration = 0;
@@ -8977,6 +8983,110 @@ async function integrationVerifyAndFix(
           },
         });
 
+        // ── R6: pre-abort fresh-eyes replan ──────────────────────────────
+        // The fallback didn't work, which means the worker is stuck
+        // INSIDE its own message context. Call a separate LLM to produce
+        // a focused 3-step plan, drop the bloated history, and reseed.
+        if (!stagnationReplanAttempted) {
+          stagnationReplanAttempted = true;
+          const repeatedReads: string[] = [];
+          for (const [fp, n] of repeatedReadOnlyActionCounts.entries()) {
+            if (n >= 2 && fp.startsWith("read_file:")) {
+              repeatedReads.push(fp.replace(/^read_file:/, ""));
+            }
+          }
+          const repeatedActions: string[] = [];
+          for (const [fp, n] of repeatedReadOnlyActionCounts.entries()) {
+            if (n >= 2) repeatedActions.push(`${fp} ×${n}`);
+          }
+          const diagnostics = await collectStagnationDiagnostics(
+            state.outputDir,
+          );
+          const replanResult = await computeStagnationReplan({
+            diagnosticsSnapshot: diagnostics,
+            repeatedActions,
+            repeatedReads,
+            lastProgressReason: lastMeaningfulProgressReason,
+            iterationsConsumed: iterations - lastMeaningfulProgressIteration,
+            chat: async (msgs) => {
+              const replanChain = resolveModelChain(
+                MODEL_CONFIG.taskBreakdown ?? MODEL_CONFIG.codeFix ?? "gpt-4o",
+                resolveModel,
+              );
+              const resp = await chatCompletionWithFallback(
+                msgs as ChatMessage[],
+                replanChain,
+                { temperature: 0.1, max_tokens: 2048 },
+              );
+              return resp.choices[0]?.message?.content ?? "";
+            },
+          });
+
+          if (replanResult.ok) {
+            // Drop the bloated message history but keep the system prompt
+            // — the system role definitions are still valid; only the
+            // accumulated tool-call history is poisoning the worker.
+            const systemMessage = messages[0]!;
+            messages.length = 0;
+            messages.push(systemMessage);
+            messages.push({
+              role: "user",
+              content: [
+                "SYSTEM CORRECTION — STAGNATION REPLAN (fallback also exhausted).",
+                "Your previous message history has been DROPPED to clear context poisoning.",
+                "Below is a fresh 3-step plan from an independent triage LLM. Execute it in order. Do NOT re-read files mentioned in the plan — act on them directly.",
+                "",
+                replanResult.plan,
+                "",
+                "After executing all three steps, call `report_done(status='pass', summary=…)` if validation passes, or `report_done(status='fail', summary=<specific blocker>)` if a concrete unresolvable issue remains.",
+              ].join("\n"),
+            });
+
+            stagnationReplanBudgetLeft = 4;
+            stagnationFallbackIterationsLeft = 0;
+            stagnationFallbackUsed = false;
+            consecutiveNoMutationIterations = 0;
+            stagnationWarningsWithoutProgress = 0;
+            repeatedReadOnlyActionCounts.clear();
+
+            getRepairEmitter(state.sessionId)({
+              stage: "integration-gate",
+              event: "stagnation_replan_injected",
+              details: {
+                triggeredAtIteration: iterations,
+                planBulletCount: replanResult.diagnostics.bulletCount,
+                budgetIterations: stagnationReplanBudgetLeft,
+              },
+            });
+            console.warn(
+              `${label}: pre-abort stagnation replan injected — granting ${stagnationReplanBudgetLeft} more iteration(s).`,
+            );
+            continue;
+          }
+
+          // Replan LLM itself failed — log and fall through to abort.
+          getRepairEmitter(state.sessionId)({
+            stage: "integration-gate",
+            event: "stagnation_replan_failed",
+            details: {
+              triggeredAtIteration: iterations,
+              reason: replanResult.diagnostics.reason ?? "unknown",
+            },
+          });
+          console.warn(
+            `${label}: stagnation replan failed (${replanResult.diagnostics.reason ?? "unknown"}); aborting.`,
+          );
+        } else if (stagnationReplanBudgetLeft > 0) {
+          // Drain replan budget before truly aborting.
+          stagnationReplanBudgetLeft -= 1;
+          if (stagnationReplanBudgetLeft > 0) {
+            console.warn(
+              `${label}: stagnation persists during replan window (${stagnationReplanBudgetLeft} iteration(s) of replan budget left).`,
+            );
+            continue;
+          }
+        }
+
         finalStatus = "fail";
         finalSummary = [
           "IntegrationVerifyFix stalled without making code changes.",
@@ -9224,6 +9334,107 @@ async function integrationVerifyAndFix(
     integrationFixAttempts: iterations,
     totalCostUsd,
   };
+}
+
+/**
+ * Snapshot the .ralph diagnostic files into the compact summary the
+ * stagnation-replan LLM consumes. Each list is capped to 10 entries so
+ * the prompt stays under the LLM's effective attention budget.
+ */
+async function collectStagnationDiagnostics(outputDir: string): Promise<{
+  tscErrors?: string[];
+  contractCoverageGaps?: string[];
+  routeAudit?: string[];
+  migrationGaps?: string[];
+}> {
+  const out: {
+    tscErrors?: string[];
+    contractCoverageGaps?: string[];
+    routeAudit?: string[];
+    migrationGaps?: string[];
+  } = {};
+
+  const tryReadJson = async (relPath: string): Promise<unknown> => {
+    const raw = await fsRead(relPath, outputDir);
+    if (raw.startsWith("FILE_NOT_FOUND") || raw.startsWith("REJECTED")) {
+      return null;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const tsc = (await tryReadJson(".ralph/tsc-diagnostics.json")) as
+    | { tasks?: Array<{ instruction?: string }> }
+    | null;
+  if (tsc?.tasks && Array.isArray(tsc.tasks)) {
+    out.tscErrors = tsc.tasks
+      .map((t) => (typeof t?.instruction === "string" ? t.instruction : null))
+      .filter((s): s is string => !!s)
+      .slice(0, 10);
+  }
+
+  const coverage = (await tryReadJson(".ralph/contract-usage-coverage.json")) as
+    | {
+        pendingRepairTasks?: Array<{
+          method?: string;
+          endpoint?: string;
+          directive?: string;
+        }>;
+      }
+    | null;
+  if (coverage?.pendingRepairTasks && Array.isArray(coverage.pendingRepairTasks)) {
+    out.contractCoverageGaps = coverage.pendingRepairTasks
+      .slice(0, 10)
+      .map((t) => `${t.method ?? "?"} ${t.endpoint ?? "?"} — ${t.directive ?? ""}`);
+  }
+
+  const routeAudit = (await tryReadJson(".ralph/route-audit.json")) as
+    | {
+        unregisteredModules?: string[];
+        unresolvedRegistrations?: string[];
+      }
+    | null;
+  if (routeAudit) {
+    const lines: string[] = [];
+    for (const m of routeAudit.unregisteredModules ?? []) {
+      lines.push(`unregistered: ${m}`);
+    }
+    for (const r of routeAudit.unresolvedRegistrations ?? []) {
+      lines.push(`unresolved registration: ${r}`);
+    }
+    if (lines.length > 0) out.routeAudit = lines.slice(0, 10);
+  }
+
+  const migration = (await tryReadJson(".ralph/migration-coverage.json")) as
+    | {
+        tasks?: Record<
+          string,
+          {
+            ok?: boolean;
+            gaps?: Array<{ modelPath?: string; modelName?: string }>;
+          }
+        >;
+      }
+    | null;
+  if (migration?.tasks) {
+    const lines: string[] = [];
+    for (const entry of Object.values(migration.tasks)) {
+      if (!entry || entry.ok || !Array.isArray(entry.gaps)) continue;
+      for (const g of entry.gaps) {
+        lines.push(
+          `model ${g.modelPath ?? "?"} needs migration ${g.modelName ?? "?"}`,
+        );
+        if (lines.length >= 10) break;
+      }
+      if (lines.length >= 10) break;
+    }
+    if (lines.length > 0) out.migrationGaps = lines;
+  }
+
+  return out;
 }
 
 function summary(state: SupervisorState) {

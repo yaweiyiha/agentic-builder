@@ -96,3 +96,11 @@ export type {
   MigrationCoverageRepairInput,
   MigrationCoverageRepairResult,
 } from "./migration-coverage-repair";
+export {
+  computeStagnationReplan,
+  buildReplanContext,
+} from "./stagnation-replan";
+export type {
+  StagnationReplanInput,
+  StagnationReplanResult,
+} from "./stagnation-replan";
