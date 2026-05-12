@@ -217,17 +217,19 @@ export class TRDAgent extends BaseAgent {
      *  the rules are injected into the prompt as authoritative source so
      *  the LLM cannot invent its own boundary values for §7. */
     prdSpec?: { domain?: PrdDomainSpec } | null,
+    /** When provided, switches to streaming mode and calls onChunk for each content delta. */
+    onChunk?: (chunk: string) => void,
   ) {
     const rulesBlock = renderAuthoritativeRulesBlock(prdSpec?.domain?.rules);
     const augmentedContext = [additionalContext, rulesBlock]
       .filter((s) => s && s.trim().length > 0)
       .join("\n\n");
-    return this.run(
-      `Generate a comprehensive Technical Requirements Document (TRD) based on the following PRD:\n\n${prdContent}`,
-      augmentedContext.length > 0 ? augmentedContext : undefined,
-      "step-trd",
-      sessionId,
-    );
+    const message = `Generate a comprehensive Technical Requirements Document (TRD) based on the following PRD:\n\n${prdContent}`;
+    const ctx = augmentedContext.length > 0 ? augmentedContext : undefined;
+    if (onChunk) {
+      return this.streamRun(message, (chunk) => onChunk(chunk), ctx, "step-trd", sessionId);
+    }
+    return this.run(message, ctx, "step-trd", sessionId);
   }
 }
 

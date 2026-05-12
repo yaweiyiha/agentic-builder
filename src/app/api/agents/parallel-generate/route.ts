@@ -24,6 +24,7 @@ type DocAgentFn = (
   designSpec: string,
   sessionId: string,
   prdSpec?: PrdSpec | null,
+  onChunk?: (chunk: string) => void,
 ) => Promise<AgentResult>;
 
 const TIER_STACK_CONSTRAINT: Record<string, string> = {
@@ -56,12 +57,13 @@ function buildAgentMap(
     .filter((s) => s.trim().length > 0)
     .join("\n\n");
   return {
-    trd: (prd, _trd, _sys, _ds, sid, prdSpec) =>
+    trd: (prd, _trd, _sys, _ds, sid, prdSpec, onChunk) =>
       new TRDAgent().generateTRD(
         `${tierConstraint}\n\n${prd}`,
         undefined,
         sid,
         prdSpec ?? null,
+        onChunk,
       ),
     sysdesign: (prd, trd, _sys, _ds, sid) =>
       new SysDesignAgent().generateSysDesign(
@@ -84,8 +86,8 @@ function buildAgentMap(
       }
       return agent.generateDesign(prd, ctx, sid);
     },
-    qa: (prd, _trd, _sys, _ds, sid) =>
-      new QAAgent().generateAudit(prd, "", sid),
+    qa: (prd, _trd, _sys, _ds, sid, _prdSpec, onChunk) =>
+      new QAAgent().generateAudit(prd, "", sid, onChunk),
     verify: (prd, _trd, _sys, _ds, sid) =>
       new VerifierAgent().verifyAlignment(prd, "", sid),
     pencil: (prd, _trd, _sys, ds, sid) => {
@@ -278,7 +280,10 @@ export async function POST(request: NextRequest) {
           let result: AgentResult;
           const agentFn = agentMap[docId];
           if (!agentFn) throw new Error(`Unknown doc: ${docId}`);
-          result = await agentFn(prdContent, trd, sys, ds, sessionId, prdSpec);
+          result = await agentFn(
+            prdContent, trd, sys, ds, sessionId, prdSpec,
+            (chunk: string) => send({ type: "doc_stream", docId, chunk }),
+          );
           results[docId] = {
             content: result.content,
             costUsd: result.costUsd,
