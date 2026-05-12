@@ -7,7 +7,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computeRelativeImportPath,
-  pinApiRouterPrefix,
   wireRegistrationsIntoIndex,
 } from "../route-audit-autofix";
 
@@ -163,61 +162,6 @@ export function createApiRouter(): Router {
     expect(r.wired).toEqual(["registerMonitorRoutes"]);
     expect(r.content.match(/import \{ registerMonitorRoutes \}/g) ?? []).toHaveLength(1);
     expect(r.content).toContain("registerMonitorRoutes(apiRouter);");
-  });
-});
-
-describe("pinApiRouterPrefix", () => {
-  it("rewrites /api → /api/v1 when contracts use /api/v1", () => {
-    const r = pinApiRouterPrefix(SCAFFOLD_INDEX, "/api/v1");
-    expect(r.changed).toBe(true);
-    expect(r.from).toBe("/api");
-    expect(r.to).toBe("/api/v1");
-    expect(r.content).toContain(`new Router({ prefix: "/api/v1" })`);
-    expect(r.content).not.toContain(`new Router({ prefix: "/api" })`);
-  });
-
-  it("is a no-op when prefix already matches", () => {
-    const already = SCAFFOLD_INDEX.replace(
-      `prefix: "/api"`,
-      `prefix: "/api/v1"`,
-    );
-    const r = pinApiRouterPrefix(already, "/api/v1");
-    expect(r.changed).toBe(false);
-    expect(r.content).toBe(already);
-  });
-
-  it("refuses to rewrite non-/api prefixes (e.g. /services/api)", () => {
-    const custom = SCAFFOLD_INDEX.replace(
-      `prefix: "/api"`,
-      `prefix: "/services/api"`,
-    );
-    const r = pinApiRouterPrefix(custom, "/api/v1");
-    expect(r.changed).toBe(false);
-    expect(r.reason).toMatch(/rewrite rule limits/);
-    expect(r.content).toBe(custom);
-  });
-
-  it("refuses to rewrite when contract prefix is not /api/vN", () => {
-    const r = pinApiRouterPrefix(SCAFFOLD_INDEX, "/services/api");
-    expect(r.changed).toBe(false);
-    expect(r.reason).toMatch(/rewrite rule limits/);
-  });
-
-  it("returns unchanged when index.ts has no Router({ prefix }) call", () => {
-    const minimal = `// no router here\nexport function noop() {}\n`;
-    const r = pinApiRouterPrefix(minimal, "/api/v1");
-    expect(r.changed).toBe(false);
-    expect(r.content).toBe(minimal);
-  });
-
-  it("preserves single-quote / backtick quoting style", () => {
-    const single = SCAFFOLD_INDEX.replace(
-      `prefix: "/api"`,
-      `prefix: '/api'`,
-    );
-    const r = pinApiRouterPrefix(single, "/api/v1");
-    expect(r.changed).toBe(true);
-    expect(r.content).toContain(`prefix: '/api/v1'`);
   });
 });
 

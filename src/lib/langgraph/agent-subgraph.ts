@@ -54,10 +54,6 @@ import {
   discardTaskSnapshot,
 } from "./task-snapshot";
 import { pickPrdSpecEntriesForTask } from "./prd-spec-prompt";
-import {
-  detectContractPrefix,
-  type ApiContractEntry,
-} from "./baseline-endpoints";
 import { getRepairEmitter } from "@/lib/pipeline/self-heal";
 import { recordCodingSessionLlmUsage } from "@/lib/pipeline/coding-session-report";
 import { trimProjectContextForTask } from "./worker-context-trim";
@@ -655,49 +651,6 @@ export async function buildProjectConventionCard(
       "- **Route registrar pattern**: `export function registerXxxRoutes(apiRouter: Router): void` — one registrar per domain, call `apiRouter.<verb>(...)` directly",
       "- **Module index**: `backend/src/api/modules/index.ts` — every registrar must be imported and called here",
     );
-
-    // ── API prefix pin ─────────────────────────────────────────────────────
-    // When API_CONTRACTS.json uses a versioned prefix (e.g. /api/v1) but
-    // the scaffold default `apiRouter` uses `/api`, every route 404s. The
-    // preflight codemod (R10/R11 in route-audit-autofix) rewrites the
-    // literal — this rule prevents the bug from being written in the
-    // first place. Only emit when we have ≥3 contract entries (the rule
-    // is otherwise too speculative) and a discernible dominant prefix.
-    const contractRaw = await fsRead("API_CONTRACTS.json", outputDir);
-    if (
-      !contractRaw.startsWith("FILE_NOT_FOUND") &&
-      !contractRaw.startsWith("REJECTED")
-    ) {
-      try {
-        const parsedRaw = JSON.parse(contractRaw);
-        if (Array.isArray(parsedRaw) && parsedRaw.length >= 3) {
-          const contracts: ApiContractEntry[] = (
-            parsedRaw as Array<Record<string, unknown>>
-          )
-            .filter(
-              (c) =>
-                typeof c.endpoint === "string" &&
-                typeof c.method === "string",
-            )
-            .map((c) => ({
-              service: typeof c.service === "string" ? c.service : "",
-              endpoint: c.endpoint as string,
-              method: c.method as string,
-            }));
-          if (contracts.length >= 3) {
-            const dominantPrefix = detectContractPrefix(contracts);
-            const matching = contracts.filter((c) =>
-              c.endpoint.startsWith(dominantPrefix + "/"),
-            ).length;
-            lines.push(
-              `- **API path prefix (HARD RULE)**: \`apiRouter\` MUST be instantiated as \`new Router({ prefix: "${dominantPrefix}" })\` in \`backend/src/api/modules/index.ts\`. ${matching} of ${contracts.length} contract endpoints use \`${dominantPrefix}\` — every route declares its path WITHOUT this prefix (e.g. \`apiRouter.get("/users/:id", ...)\` resolves to \`${dominantPrefix}/users/:id\`). Mismatching the prefix causes 404 on every endpoint and the route audit will flag dozens of false "missing contract" findings.`,
-            );
-          }
-        }
-      } catch {
-        // Ignore malformed contracts — earlier phases handle reporting.
-      }
-    }
   }
 
   // ── JWT helper ────────────────────────────────────────────────────────────

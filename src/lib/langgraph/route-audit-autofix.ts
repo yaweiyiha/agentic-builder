@@ -1,29 +1,31 @@
 /**
- * Deterministic route-audit auto-fixes.
+ * Deterministic route-audit auto-fix.
  *
- * The route audit (`auditApiRouteRegistration` in supervisor.ts) detects two
- * recurring failure patterns that are mechanical, not creative:
+ * The route audit (`auditApiRouteRegistration` in supervisor.ts) detects
+ * a recurring failure pattern that is mechanical, not creative:
  *
- *   1. **Unregistered modules** — a `*.routes.ts` file exports
- *      `register<X>Routes(apiRouter)` but `backend/src/api/modules/index.ts`
- *      never imports + calls it. Cause: workers split route generation
- *      across roles and the aggregator was someone else's task.
- *
- *   2. **API prefix drift** — the dominant contract prefix is `/api/v1`
- *      but `apiRouter` was instantiated with `new Router({ prefix: "/api" })`.
- *      Every contract endpoint then 404s. The audit reports 16+ "missing
- *      contract endpoint" findings that are all the SAME bug.
+ *   **Unregistered modules** — a `*.routes.ts` file exports
+ *   `register<X>Routes(apiRouter)` but `backend/src/api/modules/index.ts`
+ *   never imports + calls it. Cause: workers split route generation
+ *   across roles and the aggregator was someone else's task.
  *
  * Historically the supervisor surfaced these as HARD FAIL findings and let
  * the integration-verify-fix worker iterate to convergence. That cost ~$1
- * per run in LLM tokens and frequently exhausted the budget without fixing
- * the prefix bug (the worker would patch endpoint-by-endpoint instead of
- * fixing the prefix once).
+ * per run in LLM tokens. This module patches the aggregator
+ * deterministically — same philosophy as `autoAppendMissingScopedEndpoints`
+ * (contract holes) and `injectBaselineEndpoints` (implicit /auth, /health).
+ * The pure helper is a string→string transform so it unit-tests cleanly
+ * without IO.
  *
- * Both fixes are now applied deterministically — same philosophy as
- * `autoAppendMissingScopedEndpoints` (contract holes) and
- * `injectBaselineEndpoints` (implicit /auth, /health). The pure helpers
- * here are string→string transforms so they unit-test cleanly without IO.
+ * Earlier this module also exported `pinApiRouterPrefix` to rewrite
+ * `new Router({ prefix: "/api" })` → `new Router({ prefix: "/api/v1" })`
+ * when contracts used the versioned prefix. The replay harness revealed
+ * that most real backends inject the `/v1/...` segment via a SUB-router
+ * prefix inside the routes file, so blindly bumping the apiRouter prefix
+ * produced double-versioned paths like `/api/v1/v1/foo`. The audit
+ * parser was fixed instead to recognize sub-router prefixes, removing
+ * the phantom findings without the regression risk; that codemod is
+ * gone.
  */
 
 import path from "node:path";
@@ -198,63 +200,6 @@ export function wireRegistrationsIntoIndex(
     content,
     wired: toWire.map((r) => r.exportName),
     skipped,
-  };
-}
-
-export interface PrefixPinResult {
-  /** New content when changed, or original content when unchanged. */
-  content: string;
-  changed: boolean;
-  from?: string;
-  to?: string;
-  reason?: string;
-}
-
-/**
- * Pure transform: rewrite the apiRouter prefix when the dominant contract
- * prefix is more specific than what's hardcoded in `index.ts`.
- *
- * Specifically: we ONLY rewrite when the current prefix is exactly `/api`
- * AND the contract prefix is `/api/<version>` (e.g. `/api/v1`). This
- * conservative rule covers the failure mode we've seen (worker hardcodes
- * `/api` while contracts use `/api/v1`) without breaking projects that
- * deliberately chose a different prefix (e.g. `/v1`, `/services/api`).
- */
-export function pinApiRouterPrefix(
-  indexContent: string,
-  contractPrefix: string,
-): PrefixPinResult {
-  const routerCtorRe =
-    /new\s+Router\s*\(\s*\{([^}]*?)\bprefix\s*:\s*(["'`])([^"'`]+)\2/;
-  const match = indexContent.match(routerCtorRe);
-  if (!match) {
-    return { content: indexContent, changed: false };
-  }
-  const currentPrefix = match[3];
-  if (currentPrefix === contractPrefix) {
-    return { content: indexContent, changed: false };
-  }
-  // Conservative rewrite rule (see jsdoc above).
-  const isSafeRewrite =
-    currentPrefix === "/api" && /^\/api\/v\d+$/.test(contractPrefix);
-  if (!isSafeRewrite) {
-    return {
-      content: indexContent,
-      changed: false,
-      from: currentPrefix,
-      to: contractPrefix,
-      reason: `prefix mismatch (current=${currentPrefix}, contract=${contractPrefix}) but rewrite rule limits to /api → /api/v* — left for the LLM to resolve`,
-    };
-  }
-  const newContent = indexContent.replace(
-    routerCtorRe,
-    `new Router({$1prefix: ${match[2]}${contractPrefix}${match[2]}`,
-  );
-  return {
-    content: newContent,
-    changed: true,
-    from: currentPrefix,
-    to: contractPrefix,
   };
 }
 
