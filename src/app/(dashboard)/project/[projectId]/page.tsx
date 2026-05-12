@@ -54,24 +54,31 @@ export default function ProjectPage() {
     const entry = STEP_REGISTRY[stepId];
     if (!entry?.snapshot?.save) return;
     const s = useStepStore.getState();
-    const data = {
+    const data: Record<string, unknown> = {
       featureBrief: s.featureBrief,
       steps: s.steps as Record<string, unknown>,
       totalCostUsd: s.totalCostUsd,
       codeOutputDir: s.codeOutputDir,
       currentStep: s.currentStep,
     };
+    // Include intentMessages when saving the intent step
+    if (stepId === "intent") {
+      data.intentMessages = s.intentMessages;
+      data.intentEnrichedBrief = s.intentEnrichedBrief;
+    }
     entry.snapshot.save(slug, data).catch((err) =>
       console.error(`[ProjectPage] snapshot save error (${stepId}):`, err),
     );
   }
 
-  function loadSnapshotForStep(slug: string, stepId: StepId) {
+  async function loadSnapshotForStep(slug: string, stepId: StepId) {
     const entry = STEP_REGISTRY[stepId];
     if (!entry?.snapshot?.load) return;
-    entry.snapshot.load(slug).catch((err) =>
-      console.error(`[ProjectPage] snapshot load error (${stepId}):`, err),
-    );
+    try {
+      await entry.snapshot.load(slug);
+    } catch (err) {
+      console.error(`[ProjectPage] snapshot load error (${stepId}):`, err);
+    }
   }
 
   // ── Hydration: fetch current step from backend on project change ──
@@ -93,13 +100,13 @@ export default function ProjectPage() {
     useStepStore.getState().setProjectSlug(projectId);
 
     fetchProjectNav(projectId)
-      .then((nav) => {
+      .then(async (nav) => {
         if (nav) {
           setActiveStep(nav.activeStep);
           activeStepRef.current = nav.activeStep;
           setTier(nav.tier);
-          // Load the persisted step's snapshot on page refresh
-          loadSnapshotForStep(projectId, nav.activeStep);
+          // Load snapshot first, then mark hydrated — prevents auto-start racing
+          await loadSnapshotForStep(projectId, nav.activeStep);
         }
       })
       .catch((err) => console.error("[ProjectPage] hydration error:", err))
@@ -141,17 +148,21 @@ export default function ProjectPage() {
   // ── Build step UI props ──
   const stepUIProps: StepUIProps | null = useMemo(() => {
     if (!stepEntry) return null;
+    // Read live agent state from step-store for reactive streaming UI
+    const s = useStepStore.getState();
     return {
       agentState: {
-        streamingContent: "",
-        streamingThinking: "",
-        isRunning: false,
-        error: null,
-        totalCostUsd: 0,
+        streamingContent: s.streamingContent,
+        streamingThinking: s.streamingThinking,
+        isRunning: s.isRunning,
+        error: s.error,
+        totalCostUsd: s.totalCostUsd,
       },
       stepResult: stepResults[activeStep] ?? null,
       stepConfig,
-      onStart: () => {},
+      onStart: (editInstruction?: string) => {
+        void useStepStore.getState().executeStep(activeStep, editInstruction);
+      },
       onNavigate: handleStepChange,
       isHydrated: !loading,
       projectSlug: projectId,

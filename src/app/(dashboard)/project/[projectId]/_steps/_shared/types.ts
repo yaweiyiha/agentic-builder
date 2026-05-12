@@ -47,6 +47,8 @@ export interface StepAgentContext {
   previousSteps: Partial<Record<StepId, StepResultData>>;
   tier: "S" | "M" | "L";
   sessionId: string;
+  /** Optional edit instruction for re-run flows */
+  editInstruction?: string;
   emitState: (update: Partial<StepAgentState>) => void;
   getState: () => StepAgentState;
 }

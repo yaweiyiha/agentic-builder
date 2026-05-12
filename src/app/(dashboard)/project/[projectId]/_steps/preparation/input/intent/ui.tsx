@@ -8,7 +8,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { useStepStore } from "@/store/step-store";
 import { useStepNavigationStore } from "@/store/step-navigation-store";
-import { usePipelineStore } from "@/store/pipeline-store";
 import { getNextStep } from "@/_config/pipeline-flow";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StageInputBar from "@/components/StageInputBar";
@@ -235,7 +234,7 @@ function AIMessage({
 
 export function IntentUI(props: StepUIProps) {
   const isRunning = useStepStore((s) => s.isRunning);
-  const startPipeline = usePipelineStore((s) => s.startPipeline); // bridge: pipeline-store handles SSE
+  const executeStep = useStepStore((s) => s.executeStep);
   const featureBrief = useStepStore((s) => s.featureBrief);
   const tier = useStepNavigationStore((s) => s.tier);
   const nextStep = getNextStep("intent", tier);
@@ -383,8 +382,11 @@ export function IntentUI(props: StepUIProps) {
   async function handleStartGeneration(questions: IntentQuestion[], answers: Record<string, string | string[]>) {
     const hasAnswers = Object.keys(answers).length > 0;
     if (hasAnswers && questions.length > 0) await handleFormSubmit(questions, answers);
-    startPipeline(enrichedBriefRef.current);
-    if (nextStep) props.onNavigate(nextStep);
+    // Start the next step's execution (e.g., PRD) via step-store
+    if (nextStep) {
+      void executeStep(nextStep);
+      props.onNavigate(nextStep);
+    }
   }
 
   async function handleSend() {

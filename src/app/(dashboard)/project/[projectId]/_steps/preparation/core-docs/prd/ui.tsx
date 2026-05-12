@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight, History, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useStepStore } from "@/store/step-store";
 import { useStepNavigationStore } from "@/store/step-navigation-store";
-import { usePipelineStore } from "@/store/pipeline-store";
 import { getNextStep } from "@/_config/pipeline-flow";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import StageInputBar from "@/components/StageInputBar";
@@ -130,16 +129,14 @@ const DOC_TABS: { id: DocTab; label: string }[] = [
 
 // ─── Main Component ────────────────────────────────────────────────────────
 export function PrdUI(props: StepUIProps) {
-  // Step data from step-store (backed by snapshot persistence)
+  // All state from step-store (single source of truth)
   const step = useStepStore((s) => s.steps.prd);
   const streamingContent = useStepStore((s) => s.streamingContent);
   const currentStep = useStepStore((s) => s.currentStep);
   const isRunning = useStepStore((s) => s.isRunning);
   const featureBrief = useStepStore((s) => s.featureBrief);
   const isHydrated = useStepStore((s) => s.isHydrated);
-  // Pipeline actions from pipeline-store (not in step-store)
-  const startPipeline = usePipelineStore((s) => s.startPipeline);
-  const rerunPrd = usePipelineStore((s) => s.rerunPrd);
+  const executeStep = useStepStore((s) => s.executeStep);
   // Navigation
   const tier = useStepNavigationStore((s) => s.tier);
   const nextStep = getNextStep("prd", tier);
@@ -159,9 +156,9 @@ export function PrdUI(props: StepUIProps) {
     if (step?.content) return;
     if (!featureBrief.trim()) return;
     autoStartedRef.current = true;
-    startPipeline(featureBrief);
+    void executeStep("prd");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHydrated, featureBrief]);
+  }, [isHydrated, featureBrief, step?.content]);
 
   const isThisRunning = isRunning && currentStep === "prd";
   const content = isThisRunning ? streamingContent : (step?.content ?? "");
@@ -238,7 +235,7 @@ export function PrdUI(props: StepUIProps) {
 
       <StageInputBar
         value={editInput} onChange={setEditInput}
-        onSubmit={() => { const instruction = editInput.trim(); if (!instruction || isThisRunning) return; setEditInput(""); setShowDiff(false); rerunPrd(instruction); }}
+        onSubmit={() => { const instruction = editInput.trim(); if (!instruction || isThisRunning) return; setEditInput(""); setShowDiff(false); void executeStep("prd", instruction); }}
         placeholder="Ask AgenticBuilder to edit this PRD…" disabled={isThisRunning}
         actions={<div className="flex items-center gap-3 shrink-0"><button onClick={() => { if (nextStep) props.onNavigate(nextStep); }} className="flex items-center gap-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95">Confirm PRD<ArrowRight size={16} color="white" /></button></div>}
       />

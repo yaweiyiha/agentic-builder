@@ -18,15 +18,15 @@
 export const MODEL_CONFIG = {
   // ── Preparation phase ──────────────────────────────────────────────────────
 
-  intent: "openai/gpt-5.4",
-  prd: "openai/gpt-5.4",
+  intent: "deepseek/deepseek-v4-flash",
+  prd: "deepseek/deepseek-v4-flash",
   prdInteractionImage: "alibaba/wan-2.6",
   prdSpecExtract: "openai/gpt-5.4",
   prdRefine: "openai/gpt-5.4",
-  trd: "openai/gpt-5.4",
+  trd: "deepseek/deepseek-v4-flash",
   sysdesign: "gpt-4o",
   implguide: "gpt-4o",
-  design: "openai/gpt-5.4",
+  design: "deepseek/deepseek-v4-flash",
   pencil: "openai/gpt-5.4",
   pencilToolUse: "openai/gpt-5.4",
   mockup: "gpt-4o-mini",

@@ -14,28 +14,6 @@ import type { StepUIProps } from "../../../_shared/types";
 type DocTab = "prd" | "design" | "trd" | "qa";
 type InnerTab = "style" | "spec" | "stitch";
 
-const DOC_TABS: { id: DocTab; label: string }[] = [
-  { id: "prd", label: "PRD" },
-  { id: "design", label: "Design Document" },
-  { id: "trd", label: "Technical Specs" },
-  { id: "qa", label: "QA Plan" },
-];
-
-const INNER_TABS: { id: InnerTab; label: string }[] = [
-  { id: "style", label: "Style" },
-  { id: "spec", label: "Design Spec" },
-  { id: "stitch", label: "Design" },
-];
-
-function CheckCircleIcon({ size = 15 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="9 12 11 14 15 10" />
-    </svg>
-  );
-}
-
 // ─── Style Carousel ──────────────────────────────────────────────────────────
 
 import type { DesignStyle } from "@/components/DesignStyleCard";
@@ -279,6 +257,7 @@ export function DesignUI(props: StepUIProps) {
   const streamingContent = useStepStore((s) => s.streamingContent);
   const currentStep = useStepStore((s) => s.currentStep);
   const isRunning = useStepStore((s) => s.isRunning);
+  const executeStep = useStepStore((s) => s.executeStep);
   const tier = useStepNavigationStore((s) => s.tier);
   const nextStep = getNextStep("design", tier);
 
@@ -360,7 +339,7 @@ export function DesignUI(props: StepUIProps) {
 
   // ── Actions ──
   const handleGenerateDesignDoc = () => {
-    usePipelineStore.getState().runDesignDoc();
+    void executeStep("design");
     setInnerTab("spec");
   };
 
@@ -394,64 +373,6 @@ export function DesignUI(props: StepUIProps) {
 
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden">
-      {/* ── Outer Document Tab Bar ── */}
-      <div className="shrink-0 bg-white border-b border-[#e2e8f0] flex items-center px-8">
-        <div className="flex gap-8">
-          {DOC_TABS.map((tab) => {
-            const isActive = tab.id === "design";
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleOuterTabChange(tab.id)}
-                className={[
-                  "relative flex items-center gap-2 py-4.25 text-[14px] font-semibold transition-colors",
-                  isActive ? "text-[#712ae2] border-b-2 border-[#712ae2]" : "text-[#94a3b8] hover:text-[#64748b]",
-                ].join(" ")}
-              >
-                <span>{tab.label}</span>
-                {tab.id === "design" && isDesignDone && (
-                  <span className="text-[#712ae2]"><CheckCircleIcon size={15} /></span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Inner Tab Bar ── */}
-      <div className="shrink-0 bg-slate-50 border-b border-[#e2e8f0] flex items-center justify-between px-8">
-        <div className="flex gap-6">
-          {INNER_TABS.map((tab) => {
-            const isActive = innerTab === tab.id;
-            const isDisabled = (tab.id === "spec" && !hasDesignContent) || (tab.id === "stitch" && !hasStitchContent);
-            return (
-              <button
-                key={tab.id}
-                onClick={() => !isDisabled && setInnerTab(tab.id)}
-                disabled={isDisabled}
-                className={[
-                  "relative flex items-center gap-1.5 py-3 text-[13px] font-medium transition-colors",
-                  isActive ? "text-[#712ae2] border-b-2 border-[#712ae2]" : isDisabled ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-slate-700",
-                ].join(" ")}
-              >
-                {tab.label}
-                {tab.id === "spec" && isDesignDone && <span className="text-emerald-500"><CheckCircleIcon size={12} /></span>}
-                {tab.id === "spec" && isDesignRunning && <Loading size="sm" />}
-                {tab.id === "stitch" && stitchGenerating && <Loading size="sm" />}
-              </button>
-            );
-          })}
-        </div>
-
-        {innerTab === "style" && (
-          <button onClick={handleRegenerateStyles} disabled={designStylesLoading} title="Regenerate Design Styles" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:text-slate-900 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={designStylesLoading ? "animate-spin" : ""} aria-hidden>
-              <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-            </svg>
-            {designStylesLoading ? "Regenerating…" : "Regenerate Styles"}
-          </button>
-        )}
-      </div>
 
       {/* ── Main Content ── */}
       <div className="flex-1 overflow-y-auto">
@@ -610,7 +531,7 @@ export function DesignUI(props: StepUIProps) {
             const instruction = specInput.trim();
             if (!instruction || isDesignRunning) return;
             setSpecInput("");
-            usePipelineStore.getState().runDesignDoc(instruction);
+            void executeStep("design", instruction);
           }}
           placeholder="Ask AgenticBuilder to revise the design spec…"
           disabled={isDesignRunning}

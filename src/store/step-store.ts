@@ -45,7 +45,7 @@ function saveStepSnapshot(
     featureBrief: s.featureBrief,
     currentStep: s.currentStep,
     totalCostUsd: s.totalCostUsd,
-    isRunning: false,
+    isRunning: s.isRunning,
     fastFromPrd: s.fastFromPrd,
     codeOutputDir: s.codeOutputDir,
     steps: s.steps as Record<string, unknown>,
@@ -61,6 +61,31 @@ function saveStepSnapshot(
       snapshot,
     }),
   }).catch((err) => console.error(`[step-store] snapshot error (${stepId}):`, err));
+}
+
+// ── Debounced stream save ────────────────────────────────────────────────────
+let _streamSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingStreamSaveStepId: StepId | null = null;
+
+function _scheduleStreamSave(get: () => StepStoreState, stepId: StepId) {
+  _pendingStreamSaveStepId = stepId;
+  if (_streamSaveTimer) return;
+  _streamSaveTimer = setTimeout(() => {
+    _streamSaveTimer = null;
+    const sid = _pendingStreamSaveStepId;
+    _pendingStreamSaveStepId = null;
+    if (sid) saveStepSnapshot(get, sid);
+  }, 3000);
+}
+
+function _flushStreamSave(get: () => StepStoreState) {
+  if (_streamSaveTimer) {
+    clearTimeout(_streamSaveTimer);
+    _streamSaveTimer = null;
+  }
+  const sid = _pendingStreamSaveStepId;
+  _pendingStreamSaveStepId = null;
+  if (sid) saveStepSnapshot(get, sid);
 }
 
 // ── Store Interface ───────────────────────────────────────────────────────────
@@ -105,10 +130,15 @@ export interface StepStoreState {
   setStepResult: (stepId: StepId, result: StepResultData) => void;
   /** Mark a step as running */
   setStepRunning: (stepId: StepId) => void;
+  /** Append streaming content to step (debounced snapshot save) */
+  setStepStreaming: (stepId: StepId, contentChunk: string) => void;
   /** Mark a step as completed with content */
   setStepCompleted: (stepId: StepId, content: string, costUsd?: number, durationMs?: number) => void;
   /** Mark a step as failed */
   setStepFailed: (stepId: StepId, error: string) => void;
+
+  /** Execute a step via its registered agent with SSE streaming + snapshot saving */
+  executeStep: (stepId: StepId, editInstruction?: string) => Promise<void>;
 
   /** Set the project slug for DB sync */
   setProjectSlug: (slug: string) => void;
@@ -182,6 +212,22 @@ export const useStepStore = create<StepStoreState>()(
         }));
       },
 
+      setStepStreaming: (stepId, contentChunk) => {
+        set((s) => ({
+          streamingContent: s.streamingContent + contentChunk,
+          steps: {
+            ...s.steps,
+            [stepId]: {
+              stepId,
+              status: "running",
+              content: (s.steps[stepId]?.content ?? "") + contentChunk,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        }));
+        _scheduleStreamSave(get, stepId);
+      },
+
       setStepCompleted: (stepId, content, costUsd = 0, durationMs = 0) => {
         set((s) => ({
           steps: {
@@ -205,6 +251,7 @@ export const useStepStore = create<StepStoreState>()(
       },
 
       setStepFailed: (stepId, error) => {
+        _flushStreamSave(get);
         set((s) => ({
           steps: {
             ...s.steps,
@@ -219,6 +266,7 @@ export const useStepStore = create<StepStoreState>()(
           currentStep: null,
           error,
         }));
+        saveStepSnapshot(get, stepId);
       },
 
       // ── DB Sync ──
@@ -320,6 +368,8 @@ export const useStepStore = create<StepStoreState>()(
       },
 
       saveIntentSnapshot: (messages, enrichedBrief) => {
+        // Update step-store's own intent state
+        set({ intentMessages: messages, intentEnrichedBrief: enrichedBrief });
         if (!_stepProjectSlug) return;
         const s = get();
         const path = getNodePath("intent");
@@ -346,7 +396,73 @@ export const useStepStore = create<StepStoreState>()(
         }).catch((err) => console.error("[step-store] intent snapshot error:", err));
       },
 
-      // ── Pipeline Start ──
+      // ── Step Execution (replaces pipeline-store SSE flow) ──
+      executeStep: async (stepId: StepId, editInstruction?: string) => {
+        const s = get();
+        if (s.isRunning) return;
+
+        // Lazy-load the step registry to find the agent
+        let entry: { agent: { execute: (ctx: import("@/app/(dashboard)/project/[projectId]/_steps/_shared/types").StepAgentContext) => Promise<import("@/app/(dashboard)/project/[projectId]/_steps/_shared/types").StepResultData> } } | undefined;
+        try {
+          const mod = await import("@/app/(dashboard)/project/[projectId]/_steps/step-registry");
+          entry = mod.STEP_REGISTRY[stepId];
+        } catch {
+          set({ error: `Failed to load step registry for ${stepId}` });
+          return;
+        }
+        if (!entry?.agent) {
+          set({ error: `No agent registered for step ${stepId}` });
+          return;
+        }
+
+        const sessionId = newSessionId();
+        get().setStepRunning(stepId);
+
+        try {
+          const ctx = {
+            projectSlug: _stepProjectSlug,
+            featureBrief: s.featureBrief,
+            codeOutputDir: s.codeOutputDir,
+            previousSteps: s.steps as Partial<Record<StepId, import("@/app/(dashboard)/project/[projectId]/_steps/_shared/types").StepResultData>>,
+            tier: s.tier,
+            sessionId,
+            editInstruction,
+            emitState: (update: Partial<import("@/app/(dashboard)/project/[projectId]/_steps/_shared/types").StepAgentState>) => {
+              if (update.streamingContent !== undefined) {
+                const current = get().streamingContent;
+                const delta = update.streamingContent.slice(current.length);
+                if (delta) get().setStepStreaming(stepId, delta);
+              }
+              if (update.streamingThinking !== undefined) {
+                set({ streamingThinking: update.streamingThinking });
+              }
+              if (update.isRunning !== undefined) set({ isRunning: update.isRunning });
+              if (update.error !== undefined) set({ error: update.error });
+            },
+            getState: () => ({
+              streamingContent: get().streamingContent,
+              streamingThinking: get().streamingThinking,
+              isRunning: get().isRunning,
+              error: get().error,
+              totalCostUsd: get().totalCostUsd,
+            }),
+          };
+
+          const result = await entry.agent.execute(ctx);
+          _flushStreamSave(get);
+
+          if (result.status === "completed") {
+            get().setStepCompleted(stepId, result.content ?? "", result.costUsd ?? 0, result.durationMs ?? 0);
+          } else if (result.status === "failed") {
+            get().setStepFailed(stepId, result.error ?? "Step failed");
+          }
+        } catch (err) {
+          _flushStreamSave(get);
+          get().setStepFailed(stepId, err instanceof Error ? err.message : "Unknown error");
+        }
+      },
+
+      // ── Legacy Pipeline Start (deprecated, use executeStep instead) ──
       startPipeline: (featureBrief: string) => {
         const { codeOutputDir, fastFromPrd } = get();
         const sessionId = newSessionId();
