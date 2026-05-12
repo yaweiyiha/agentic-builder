@@ -12,7 +12,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getSubStageSnapshot,
-  getActiveSubStageSnapshot,
   upsertSubStageSnapshot,
   type SubStageSnapshot,
 } from "@/lib/project-store";
@@ -50,9 +49,11 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ stageId: stage, subStageId: subStage, snapshot: null });
     }
 
-    // No params — return the currently-active sub-stage snapshot (with built-in fallback).
-    const result = await getActiveSubStageSnapshot(projectId);
-    return NextResponse.json(result);
+    // No params — require stage and subStage query params
+    return NextResponse.json(
+      { error: "Missing required query params: stage, subStage" },
+      { status: 400 },
+    );
   } catch (err) {
     console.error("[api/substage-snapshot] GET error:", err);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });

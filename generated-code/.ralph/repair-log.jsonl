@@ -795,3 +795,12 @@
 {"stage":"worker-verify","event":"task_plan_unfulfilled","taskId":"T-001","files":["docker-compose.yml",".env","backend/src/db.ts"],"details":{"missingCreates":["docker-compose.yml",".env"],"unmodified":["backend/src/db.ts"],"fixAttempts":0},"timestamp":"2026-05-09T08:10:40.840Z"}
 {"stage":"task","event":"snapshot_cleaned","taskId":"T-001","timestamp":"2026-05-09T08:11:03.084Z"}
 {"stage":"worker-context","event":"doc_truncated","details":{"label":"api-contract-generation","keptSections":16,"droppedSections":65,"budgetChars":12000,"usedChars":12008,"alwaysKeptSections":0,"forceKeptSections":0,"overBudget":0},"timestamp":"2026-05-09T08:11:03.128Z"}
+{"stage":"coverage-gate","event":"repair_start","attempt":1,"missingIds":["FR-SY01","FR-SY03","FR-SY04"],"details":{"existingTaskCount":12,"batchSize":15},"timestamp":"2026-05-11T09:03:42.981Z"}
+{"stage":"coverage-gate","event":"repair_done","attempt":1,"repairedIds":["FR-SY01","FR-SY03","FR-SY04"],"stillMissing":[],"details":{"addedThisAttempt":2},"timestamp":"2026-05-11T09:04:04.453Z"}
+{"stage":"coverage-gate","event":"repair_final_state","attempt":1,"stillMissing":[],"details":{"addedTotal":2,"costUsd":0},"timestamp":"2026-05-11T09:04:04.454Z"}
+{"stage":"coverage-gate","event":"repair_start","attempt":1,"missingIds":["AC-13","FR-PR06","FR-SE01","FR-SE02","FR-TA04","FR-TA05"],"details":{"existingTaskCount":12,"batchSize":15},"timestamp":"2026-05-11T09:04:35.358Z"}
+{"stage":"coverage-gate","event":"repair_done","attempt":1,"repairedIds":["AC-13","FR-PR06","FR-SE01","FR-SE02","FR-TA04","FR-TA05"],"stillMissing":[],"details":{"addedThisAttempt":3},"timestamp":"2026-05-11T09:05:05.912Z"}
+{"stage":"coverage-gate","event":"repair_final_state","attempt":1,"stillMissing":[],"details":{"addedTotal":3,"costUsd":0},"timestamp":"2026-05-11T09:05:05.912Z"}
+{"stage":"coverage-gate","event":"repair_start","attempt":1,"missingIds":["FR-PR03"],"details":{"existingTaskCount":12,"batchSize":15},"timestamp":"2026-05-12T00:10:26.568Z"}
+{"stage":"coverage-gate","event":"repair_done","attempt":1,"repairedIds":["FR-PR03"],"stillMissing":[],"details":{"addedThisAttempt":1},"timestamp":"2026-05-12T00:10:39.503Z"}
+{"stage":"coverage-gate","event":"repair_final_state","attempt":1,"stillMissing":[],"details":{"addedTotal":1,"costUsd":0},"timestamp":"2026-05-12T00:10:39.503Z"}

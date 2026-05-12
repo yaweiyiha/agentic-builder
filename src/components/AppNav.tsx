@@ -54,7 +54,7 @@ function LogoMark() {
 export default function AppNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { projects, loading, createProject } = useProjects();
+  const { projects, loading, createProject, addLocalProject } = useProjects();
   const resetStage = useStageStore((s) => s.resetStage);
   const setProjectSlugForSync = useStageStore((s) => s.setProjectSlugForSync);
   const setProjectName = useStageStore((s) => s.setProjectName);
@@ -67,14 +67,17 @@ export default function AppNav() {
   async function handleNewProject() {
     resetStage();
     resetPipeline();
+    // Create local project immediately for instant UI feedback
+    const localProject = addLocalProject("New Project");
+    setProjectSlugForSync(localProject.id);
+    pipelineSetProjectSlugForSync(localProject.id);
+    setProjectName("New Project");
+    router.push(`/project/${localProject.id}`);
+    // Try creating on the server in the background; replace local placeholder on success
     try {
-      const project = await createProject("New Project");
-      setProjectSlugForSync(project.id);
-      pipelineSetProjectSlugForSync(project.id);
-      setProjectName("New Project");
-      router.push(`/project/${project.id}`);
+      await createProject("New Project", localProject.id);
     } catch (err) {
-      console.error("[AppNav] Failed to create project:", err);
+      console.error("[AppNav] Server project creation failed (will retry on next action):", err);
     }
   }
 

@@ -14,9 +14,6 @@ let _syncTimer: ReturnType<typeof setTimeout> | null = null;
 let _currentProjectSlug = "";
 
 function scheduleSync(getState: () => PipelineState) {
-  // NOTE: project_pipeline_state is deprecated. We no longer push to it here.
-  // All persistent state is captured via saveSubStageSnapshot / saveIntentSnapshot.
-  // This function is kept as a no-op stub so call-sites don't need updating.
   void getState;
 }
 
@@ -37,21 +34,6 @@ const STEP_TO_STAGE_SUBSTAGE: Partial<Record<PipelineStepId, { stage: string; su
   kickoff:   { stage: "kickoff",     subStage: "task-breakdown" },
   verify:    { stage: "coding",      subStage: "verify" },
 };
-
-/** Fire-and-forget: save substage status (idle|running|completed|error) to DB. */
-function saveSubStageStatus(
-  slug: string,
-  stageId: string,
-  subStageId: string,
-  status: "idle" | "running" | "completed" | "error",
-  opts?: { contextRefs?: Record<string, unknown>; stepIds?: string[] },
-): void {
-  fetch(`/api/projects/${slug}/substage-status`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ stageId, subStageId, status, ...opts }),
-  }).catch((err) => console.error(`[pipeline-store] substage-status error (${stageId}/${subStageId}):`, err));
-}
 
 /** Saves a full pipeline snapshot for the given step's (stage, subStage). */
 function saveSubStageSnapshot(getState: () => PipelineState, stepId: PipelineStepId): void {
@@ -1503,13 +1485,6 @@ export const usePipelineStore = create<PipelineState>()(
         });
         scheduleSync(get);
 
-        // Mark intent substage as running
-        if (_currentProjectSlug) {
-          saveSubStageStatus(_currentProjectSlug, "preparation", "intent", "running", {
-            stepIds: ["intent"],
-          });
-        }
-
         fetch("/api/agents/pipeline", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1966,32 +1941,6 @@ export const usePipelineStore = create<PipelineState>()(
               return;
             }
           }
-          // Fallback: load base pipeline state (no steps)
-          const resp = await fetch(`/api/projects/${slug}/state`, { cache: "no-store" });
-          if (!resp.ok) return;
-          const data = (await resp.json()) as {
-            pipelineState?: {
-              featureBrief?:  string;
-              currentStep?:   string | null;
-              activeTab?:     string;
-              totalCostUsd?:  number;
-              isRunning?:     boolean;
-              fastFromPrd?:   boolean;
-              codeOutputDir?: string;
-            } | null;
-          };
-          const ps = data.pipelineState;
-          if (!ps) return;
-          set({
-            featureBrief:  ps.featureBrief  ?? "",
-            currentStep:   (ps.currentStep  as PipelineStepId | null) ?? null,
-            activeTab:     (ps.activeTab    as PipelineStepId) ?? "intent",
-            totalCostUsd:  ps.totalCostUsd  ?? 0,
-            isRunning:     false,
-            fastFromPrd:   ps.fastFromPrd   ?? true,
-            codeOutputDir: ps.codeOutputDir ?? "generated-code",
-            steps:         { ...EMPTY_STEPS },
-          });
         } catch (err) {
           console.error("[pipeline-store] loadFromServer error:", err);
         }
@@ -2225,14 +2174,6 @@ function handleEvent(
 
     // Persist a full substage snapshot so the user can revisit this sub-stage later.
     saveSubStageSnapshot(get, stepId);
-
-    // Mark substage as completed in status table
-    const statusMapping = STEP_TO_STAGE_SUBSTAGE[stepId];
-    if (statusMapping && _currentProjectSlug) {
-      saveSubStageStatus(_currentProjectSlug, statusMapping.stage, statusMapping.subStage, "completed", {
-        stepIds: [stepId],
-      });
-    }
 
     // When the intent step completes, extract AI-generated project_name and
     // update the stage store so the sidebar immediately reflects the name.
