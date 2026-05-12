@@ -19,7 +19,7 @@ import {
 /** Substage order — mirrors stage-store, used for fallback walk. */
 const SUB_STAGE_ORDER: Record<string, string[]> = {
   preparation: ["initial", "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa"],
-  kickoff:     ["env-setup", "task-breakdown"],
+  kickoff:     ["env-setup", "summary", "task-breakdown"],
   coding:      ["architect", "backend", "frontend", "test", "verify"],
   preview:     ["serve", "e2e"],
 };

@@ -61,6 +61,10 @@ import { envSetupAgent } from "./kickoff/setup/env-setup/agent";
 import { EnvSetupUI } from "./kickoff/setup/env-setup/ui";
 import { envSetupSnapshot } from "./kickoff/setup/env-setup/snapshot";
 
+import { summaryAgent } from "./kickoff/summary/agent";
+import { SummaryUI } from "./kickoff/summary/ui";
+import { summarySnapshot } from "./kickoff/summary/snapshot";
+
 import { taskBreakdownAgent } from "./kickoff/planning/task-breakdown/agent";
 import { TaskBreakdownUI } from "./kickoff/planning/task-breakdown/ui";
 import { taskBreakdownSnapshot } from "./kickoff/planning/task-breakdown/snapshot";
@@ -119,6 +123,7 @@ export const STEP_REGISTRY: Record<StepId, StepEntry> = {
   verify:       { component: VerifyUI,       agent: verifyAgent,       snapshot: verifySnapshot },
   // Kickoff
   "env-setup":      { component: EnvSetupUI,      agent: envSetupAgent,      snapshot: envSetupSnapshot },
+  summary:          { component: SummaryUI,        agent: summaryAgent,        snapshot: summarySnapshot },
   "task-breakdown": { component: TaskBreakdownUI, agent: taskBreakdownAgent, snapshot: taskBreakdownSnapshot },
   // Coding
   architect:       { component: ArchitectUI,       agent: architectAgent,       snapshot: architectSnapshot },

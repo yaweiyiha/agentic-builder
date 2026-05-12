@@ -11,7 +11,7 @@ export function EnvSetupUI({ onNavigate, isHydrated, projectSlug }: StepUIProps)
   const featureBrief = useStepStore((s) => s.featureBrief);
   const codeOutputDir = useStepStore((s) => s.codeOutputDir);
   const steps = useStepStore((s) => s.steps);
-  const setStepCompleted = useStepStore((s) => s.setStepCompleted);
+  const setStepResult = useStepStore((s) => s.setStepResult);
   const setStepFailed = useStepStore((s) => s.setStepFailed);
 
   const handleKickoff = async () => {
@@ -57,8 +57,29 @@ export function EnvSetupUI({ onNavigate, isHydrated, projectSlug }: StepUIProps)
             } else if (event.type === "step_complete") {
               kickoffContent = event.data?.content ?? kickoffContent;
             } else if (event.type === "done") {
-              setStepCompleted("env-setup", kickoffContent, event.run?.steps?.kickoff?.costUsd ?? 0);
-              setStepCompleted("task-breakdown", kickoffContent, 0);
+              const kickoffMeta = event.run?.steps?.kickoff;
+              const costUsd = kickoffMeta?.costUsd ?? 0;
+              const durationMs = kickoffMeta?.durationMs ?? 0;
+              const metadata = kickoffMeta?.metadata ?? {};
+              const now = new Date().toISOString();
+              setStepResult("env-setup", {
+                stepId: "env-setup",
+                status: "completed",
+                content: kickoffContent,
+                costUsd,
+                durationMs,
+                metadata,
+                timestamp: now,
+              });
+              setStepResult("task-breakdown", {
+                stepId: "task-breakdown",
+                status: "completed",
+                content: kickoffContent,
+                costUsd: 0,
+                durationMs: 0,
+                metadata,
+                timestamp: now,
+              });
               onNavigate("task-breakdown");
             }
           } catch { /* skip */ }

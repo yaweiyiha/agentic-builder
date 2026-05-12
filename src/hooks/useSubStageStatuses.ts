@@ -68,7 +68,7 @@ export function useSubStageStatuses(): Record<SubStageId, StageStatus> {
     const step = steps.kickoff;
     if (!step) return "idle";
 
-    if (subId === "env-setup") {
+    if (subId === "env-setup" || subId === "summary") {
       if (step.status === "running") return "active";
       if (step.status === "completed") return "completed";
       if (step.status === "failed") return "error";

@@ -21,7 +21,7 @@ function newSessionId(): string {
 const ALL_STEP_IDS: StepId[] = [
   "initial", "intent", "prd", "trd", "sysdesign", "implguide",
   "design", "pencil", "mockup", "qa", "verify",
-  "env-setup", "task-breakdown",
+  "env-setup", "summary", "task-breakdown",
   "architect", "backend", "frontend", "test", "coding-verify",
   "serve", "e2e",
 ];

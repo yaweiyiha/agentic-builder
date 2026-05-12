@@ -105,7 +105,7 @@ export function DocViewerUi({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => goToStep("env-setup")}
+          onClick={() => goToStep("summary")}
           className="text-[#712ae2] border-[rgba(113,42,226,0.2)] hover:bg-[rgba(113,42,226,0.05)] hover:text-[#712ae2] text-xs font-bold"
         >
           Proceed to Kick-off

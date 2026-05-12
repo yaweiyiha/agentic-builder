@@ -37,7 +37,7 @@ export function QaUI(props: StepUIProps) {
       isDone={isDone}
       step={step}
       content={content}
-      confirmLabel="Proceed to Verify"
+      confirmLabel="Next Step"
       onConfirm={() => { if (nextStep) props.onNavigate(nextStep); }}
     />
   );

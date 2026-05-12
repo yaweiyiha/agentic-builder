@@ -25,6 +25,7 @@ export type StepId =
   | "verify"
   // kickoff
   | "env-setup"
+  | "summary"
   | "task-breakdown"
   // coding
   | "architect"
@@ -44,6 +45,7 @@ export type GroupId =
   | "quality"
   | "setup"
   | "planning"
+  | "summary"
   | "agents"
   | "verification"
   | "server"
@@ -227,34 +229,20 @@ export const PIPELINE_FLOW: FlowNode[] = [
     dependsOn: ["preparation"],
     children: [
       {
-        id: "setup",
-        label: "Setup",
+        id: "summary",
+        label: "Summary",
         level: 2,
-        children: [
-          {
-            id: "env-setup",
-            label: "Env Setup",
-            level: 3,
-            stepConfig: {
-              uiKind: "panel",
-              apiEndpoint: "/api/agents/kickoff",
-            },
-          },
-        ],
+        stepConfig: {
+          uiKind: "panel",
+          apiEndpoint: "/api/agents/kickoff",
+        },
       },
       {
-        id: "planning",
-        label: "Planning",
+        id: "task-breakdown",
+        label: "Task Breakdown",
         level: 2,
-        dependsOn: ["setup"],
-        children: [
-          {
-            id: "task-breakdown",
-            label: "Task Breakdown",
-            level: 3,
-            stepConfig: { uiKind: "panel" },
-          },
-        ],
+        dependsOn: ["summary"],
+        stepConfig: { uiKind: "panel" },
       },
     ],
   },
@@ -548,6 +536,7 @@ export const STEP_LABELS: Record<StepId, string> = {
   qa: "QA",
   verify: "Verify",
   "env-setup": "Env Setup",
+  summary: "Summary",
   "task-breakdown": "Task Breakdown",
   architect: "Architect",
   backend: "Backend",
@@ -566,6 +555,7 @@ export const GROUP_LABELS: Record<GroupId, string> = {
   quality: "Quality",
   setup: "Setup",
   planning: "Planning",
+  summary: "Summary",
   agents: "Agents",
   verification: "Verification",
   server: "Server",
