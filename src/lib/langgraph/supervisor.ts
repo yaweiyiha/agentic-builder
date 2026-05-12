@@ -40,6 +40,10 @@ import {
   type FsWriteOptions,
 } from "./tools";
 import {
+  injectBaselineEndpoints,
+  type ApiContractEntry,
+} from "./baseline-endpoints";
+import {
   chatCompletionWithFallback,
   resolveModel,
   estimateCost,
@@ -1502,6 +1506,32 @@ async function collectConventionViolations(
         );
         touchedFiles.add(routerPath);
       }
+
+      // Detect placeholder antd <Result> used in lieu of real view components.
+      // Each view file that exists under views/ must be rendered directly in the route, not wrapped by a Result placeholder.
+      const resultPlaceholderInRouter =
+        /<Result\b[^>]*status\s*=/.test(routerContent);
+      if (resultPlaceholderInRouter) {
+        violations.push(
+          `[CONVENTION] ${routerPath}: Route registry uses antd <Result> as placeholder for real routes. ` +
+            `Import and render the actual view component for every route — placeholder <Result> elements are forbidden in production routing.`,
+        );
+        touchedFiles.add(routerPath);
+      }
+
+      // Also check App.tsx when it doubles as the route registry.
+      const appPath = "frontend/src/App.tsx";
+      const appContent = await fsRead(appPath, outputDir);
+      if (!appContent.startsWith("FILE_NOT_FOUND") && !appContent.startsWith("REJECTED")) {
+        const resultPlaceholderInApp = /<Result\b[^>]*status\s*=/.test(appContent);
+        if (resultPlaceholderInApp && viewFiles.length > 0) {
+          violations.push(
+            `[CONVENTION] ${appPath}: Route registry uses antd <Result> as placeholder for real routes. ` +
+              `Import and render the actual view components from frontend/src/views/ for every route.`,
+          );
+          touchedFiles.add(appPath);
+        }
+      }
     }
 
     const homeEntryCandidates = [
@@ -1554,6 +1584,35 @@ async function collectConventionViolations(
         );
         touchedFiles.add(appEntryPath);
       }
+    }
+  }
+
+  // Check backend db.ts for unsafe unconditional CREATE EXTENSION timescaledb.
+  // TimescaleDB is not available on standard Postgres installs; the call must be
+  // guarded by an env var or wrapped in a try/catch with a soft fallback.
+  if (isMTier) {
+    const dbCandidates = [
+      "backend/src/db.ts",
+      "backend/src/config/database.ts",
+      "backend/src/database/connection.ts",
+    ];
+    for (const dbPath of dbCandidates) {
+      const dbContent = await fsRead(dbPath, outputDir);
+      if (dbContent.startsWith("FILE_NOT_FOUND") || dbContent.startsWith("REJECTED")) {
+        continue;
+      }
+      const hasHardTimescale =
+        /CREATE\s+EXTENSION\s+(?:IF\s+NOT\s+EXISTS\s+)?timescaledb/i.test(dbContent) &&
+        !/TIMESCALE_DISABLED|process\.env\.TIMESCALE/i.test(dbContent);
+      if (hasHardTimescale) {
+        violations.push(
+          `[CONVENTION] ${dbPath}: Unconditional "CREATE EXTENSION timescaledb" will crash on standard PostgreSQL installs. ` +
+            `Wrap the call in a try/catch with a console.warn fallback, or guard it with an env flag (e.g. TIMESCALE_DISABLED). ` +
+            `Do NOT throw on extension unavailability — the server must start without TimescaleDB.`,
+        );
+        touchedFiles.add(dbPath);
+      }
+      break;
     }
   }
 
@@ -2731,6 +2790,41 @@ async function generateApiContracts(state: SupervisorState) {
         },
       });
     }
+
+    // ── Baseline endpoint injection ───────────────────────────────────────
+    // The contract LLM is told "when in doubt, OMIT" so it doesn't emit
+    // speculative CRUD. The downside: implicit baselines like
+    // POST /auth/login that the PRD assumes (the way it assumes TCP/IP
+    // works) get dropped too. Backfill them deterministically here from
+    // a curated whitelist that ALWAYS applies to any backend project.
+    // Detection: contracts mention `service: "auth"` OR the scaffold
+    // ships `auth.routes.ts`. Endpoints already emitted by the LLM are
+    // de-duped by `METHOD <path>` so we never double-emit.
+    const authRoutesContent = await fsRead(
+      "backend/src/api/modules/auth/auth.routes.ts",
+      state.outputDir,
+    );
+    const hasAuthRoutes =
+      !authRoutesContent.startsWith("FILE_NOT_FOUND") &&
+      !authRoutesContent.startsWith("REJECTED");
+    const baselineResult = injectBaselineEndpoints({
+      contracts: parsed as ApiContractEntry[],
+      hasAuthRoutes,
+    });
+    if (baselineResult.added.length > 0) {
+      console.log(
+        `[Supervisor] generateApiContracts: baseline-injected ${baselineResult.added.length} implicit endpoint(s): ${baselineResult.added.join(", ")}`,
+      );
+      getRepairEmitter(state.sessionId)({
+        stage: "generate_api_contracts",
+        event: "baseline_endpoints_injected",
+        details: {
+          added: baselineResult.added,
+          skipped: baselineResult.skipped,
+        },
+      });
+    }
+    parsed = baselineResult.contracts;
 
     const contracts: ApiContract[] = parsed.map((item) => ({
       service: item.service ?? "unknown",
