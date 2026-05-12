@@ -585,6 +585,41 @@ export async function buildProjectConventionCard(
           "post-task migration-coverage check will flag missing migrations " +
           "and create a repair task.",
       );
+
+      // ── TimescaleDB safety RULE ─────────────────────────────────────────
+      // Fires when the project references TimescaleDB anywhere — db.ts
+      // helper, PRD/TRD mention, or existing migrations. Raw
+      // `CREATE EXTENSION timescaledb` in migrations is the single most
+      // common reason an M-tier backend won't start on a fresh Postgres.
+      const timescaleHelper = await fsRead(
+        "backend/src/utils/timescale.ts",
+        outputDir,
+      );
+      const dbInit = await fsRead("backend/src/db.ts", outputDir);
+      const usesTimescale =
+        (!timescaleHelper.startsWith("FILE_NOT_FOUND") &&
+          !timescaleHelper.startsWith("REJECTED")) ||
+        (!dbInit.startsWith("FILE_NOT_FOUND") &&
+          /timescale|TIMESCALE_DISABLED|hypertable/i.test(dbInit));
+      if (usesTimescale) {
+        lines.push(
+          "- **TimescaleDB safety RULE (CRITICAL)**: TimescaleDB is NOT part " +
+            "of stock PostgreSQL — Homebrew, Docker dev images, CI runners, " +
+            "and most cloud preview DBs do not have it. Calling " +
+            "`CREATE EXTENSION timescaledb` or `create_hypertable` directly " +
+            "in any migration's `up()` body will THROW and kill backend " +
+            "startup. Use the helpers in `backend/src/utils/timescale.ts` " +
+            "instead — they respect `TIMESCALE_DISABLED=1` (set in `.env.example`) " +
+            "and silently fall back to plain Postgres tables when the " +
+            "extension is unavailable. Specifically: " +
+            "(a) `enableTimescaleExtension(sequelize)` for CREATE EXTENSION; " +
+            "(b) `createHypertableIfPossible(queryInterface, 'table', 'time_col')` " +
+            "for hypertable conversion; " +
+            "(c) `runTimescaleQuery(sequelize, sql, 'description')` for " +
+            "compression / retention / continuous aggregate SQL. " +
+            "NEVER inline raw Timescale SQL in a migration's up() body.",
+        );
+      }
     }
   }
 
