@@ -144,9 +144,16 @@ const RALPH_FAILED_RE = /<promise>TASK_FAILED:\s*([\s\S]*?)<\/promise>/;
  */
 const FRONTEND_IMPORT_RULES = `
 ## Frontend import path rules
-- Read the provided \`vite.config.ts\` / \`tsconfig.json\` context before writing imports.
-- If those files show \`@\` mapped to \`./src\`, use the \`@/\` alias for cross-directory imports.
-- If no alias is configured, use normal relative imports and do NOT invent \`@/\`.
+- ALWAYS call \`read_file("frontend/vite.config.ts")\` before writing any import that uses the \`@/\` alias.
+- Only use \`@/\` imports if \`vite.config.ts\` already contains a \`resolve.alias\` block mapping \`@\` to \`./src\` (or similar).
+- If \`@/\` alias is NOT yet configured in \`vite.config.ts\`, you MUST add it before (or in the same write-batch as) any file that uses it:
+  \`\`\`ts
+  import path from "path";
+  // inside defineConfig:
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  \`\`\`
+  Also ensure \`tsconfig.app.json\` (or \`tsconfig.json\`) has \`"paths": { "@/*": ["src/*"] }\` under \`compilerOptions\`.
+- If no alias exists and you cannot update the config, fall back to relative imports and do NOT invent \`@/\`.
 - If the project includes a shared package, import it using the package name defined in its \`package.json\` (for example \`@project/shared\`), never via deep relative paths into another package.
 `;
 
