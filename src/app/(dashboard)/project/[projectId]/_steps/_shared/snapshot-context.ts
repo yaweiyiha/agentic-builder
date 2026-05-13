@@ -53,9 +53,14 @@ export async function loadAllStepSnapshots(projectSlug: string): Promise<void> {
   const merged = { ...s.steps } as Record<string, Record<string, unknown>>;
   for (const [stepId, snap] of Object.entries(all)) {
     if (!snap || (snap.content === undefined && snap.metadata === undefined)) continue;
+    // A step has meaningful data if it has content OR non-empty metadata (e.g.
+    // design step at style phase stores designStyles in metadata before content).
+    const hasMeta = snap.metadata != null && typeof snap.metadata === "object" && Object.keys(snap.metadata as Record<string, unknown>).length > 0;
+    const hasContent = (snap.content != null && snap.content !== "") || hasMeta;
     merged[stepId] = {
       ...(merged[stepId] ?? {}),
       ...snap,
+      status: hasContent ? (snap.status ?? "pending") : "pending",
       stepId,
       timestamp: new Date().toISOString(),
     };

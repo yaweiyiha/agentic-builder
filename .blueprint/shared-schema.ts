@@ -3,8 +3,11 @@
 // module rather than redefine. No `any`. ISO 8601 strings for timestamps.
 
 export type UserId = string;
-export type SessionId = string;
 export type TaskId = string;
+export type SessionId = string;
+
+export type TaskStatus = "to_do" | "in_progress" | "done";
+export type TaskPriority = "low" | "medium" | "high";
 
 export interface User {
   id: UserId;
@@ -18,13 +21,8 @@ export interface Session {
   id: SessionId;
   userId: UserId;
   expiresAt: string;
-  revokedAt: string | null;
   createdAt: string;
-  updatedAt: string;
 }
-
-export type TaskStatus = "to_do" | "in_progress" | "done";
-export type TaskPriority = "low" | "medium" | "high";
 
 export interface Task {
   id: TaskId;
@@ -36,6 +34,10 @@ export interface Task {
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AuthUserResponse {
+  user: User;
 }
 
 export interface RegisterRequest {
@@ -57,20 +59,38 @@ export interface LoginResponse {
   user: User;
 }
 
-export interface LogoutRequest {}
+export interface LogoutRequest {
+  sessionId?: SessionId;
+}
 
 export interface LogoutResponse {
   success: true;
 }
 
 export interface MeResponse {
+  user: User | null;
+}
+
+export interface UpdateMeRequest {
+  displayName?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
+export interface UpdateMeResponse {
   user: User;
+}
+
+export interface DeleteMeRequest {
+  password: string;
+}
+
+export interface DeleteMeResponse {
+  success: true;
 }
 
 export interface ListTasksRequest {
   status?: TaskStatus | "all";
-  sort?: "newest" | "oldest" | "due_date_asc" | "due_date_desc" | "priority";
-  search?: string;
 }
 
 export interface ListTasksResponse {
@@ -90,7 +110,7 @@ export interface CreateTaskRequest {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
-  dueDate?: string;
+  dueDate?: string | null;
 }
 
 export interface CreateTaskResponse {
@@ -118,23 +138,18 @@ export interface DeleteTaskResponse {
   success: true;
 }
 
-export interface UpdateMeRequest {
-  displayName?: string;
-  password?: string;
+export interface HealthResponse {
+  status: "ok";
+  timestamp: string;
 }
 
-export interface UpdateMeResponse {
-  user: User;
-}
-
-export interface DeleteMeRequest {}
-
-export interface DeleteMeResponse {
-  success: true;
-}
-
-export interface ApiErrorResponse {
-  code: string;
-  message: string;
-  fieldErrors?: Record<string, string>;
+export interface ErrorResponse {
+  error: {
+    code: string;
+    message: string;
+    details?: Array<{
+      field?: string;
+      message: string;
+    }>;
+  };
 }

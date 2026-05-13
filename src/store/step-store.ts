@@ -170,6 +170,7 @@ export const useStepStore = create<StepStoreState>()(
           steps: { ...s.steps, [stepId]: result },
           totalCostUsd: s.totalCostUsd + (result.costUsd ?? 0),
         }));
+        saveStepSnapshot(get, stepId);
       },
 
       patchStepMeta: (stepId, meta) => {
