@@ -1,0 +1,37 @@
+version: 1
+pipelines:
+  - id: auth-register-seed
+    description: "User registration flow followed by default category seeding and auth session issuance."
+    schedule: { cron: "on-demand" }
+    failure: { strategy: abort, retries: 0, compensation: rollback-user }
+    nodes:
+      - { id: create-user, service: AuthService, function: registerUser }
+      - { id: seed-categories, service: CategoryService, function: seedDefaultCategories, dependsOn: [create-user] }
+      - { id: issue-session, service: AuthService, function: issueSession, dependsOn: [seed-categories] }
+
+  - id: task-create-persist
+    description: "Create task, persist, then invalidate cached dashboard queries."
+    schedule: { cron: "on-demand" }
+    failure: { strategy: abort, retries: 0, compensation: rollback-task }
+    nodes:
+      - { id: validate-input, service: ValidationService, function: validateCreateTask }
+      - { id: persist-task, service: TaskService, function: createTask, dependsOn: [validate-input] }
+      - { id: invalidate-cache, service: NotificationService, function: publishTaskMutation, dependsOn: [persist-task] }
+
+  - id: task-update-persist
+    description: "Update task, persist, then invalidate cached dashboard queries."
+    schedule: { cron: "on-demand" }
+    failure: { strategy: abort, retries: 0, compensation: rollback-task-update }
+    nodes:
+      - { id: validate-input, service: ValidationService, function: validateUpdateTask }
+      - { id: persist-update, service: TaskService, function: updateTask, dependsOn: [validate-input] }
+      - { id: invalidate-cache, service: NotificationService, function: publishTaskMutation, dependsOn: [persist-update] }
+
+  - id: task-delete-persist
+    description: "Delete task and publish mutation event."
+    schedule: { cron: "on-demand" }
+    failure: { strategy: abort, retries: 0, compensation: restore-task }
+    nodes:
+      - { id: authorize-delete, service: TaskService, function: authorizeTaskOwnership }
+      - { id: delete-task, service: TaskService, function: deleteTask, dependsOn: [authorize-delete] }
+      - { id: publish-delete, service: NotificationService, function: publishTaskMutation, dependsOn: [delete-task] }

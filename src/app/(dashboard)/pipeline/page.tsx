@@ -250,15 +250,20 @@ export default function PipelinePage() {
       : prepSubTab;
 
   const handlePhaseClick = (phase: TopPhase) => {
+    console.log("[PipelinePage] handlePhaseClick called", { phase, activePhase, activeTab, prepSubTab, effectivePrepSub });
     if (phase === "coding" || phase === "preview") {
+      console.log("[PipelinePage] setting activeOverridePhase to", phase);
       setActiveOverridePhase(phase);
       return;
     }
     setActiveOverridePhase(null);
     if (phase === "preparation") {
+      console.log("[PipelinePage] setting activeTab to effectivePrepSub:", effectivePrepSub);
       setActiveTab(effectivePrepSub);
     } else {
-      setActiveTab(stepIdForPhase(phase));
+      const nextTab = stepIdForPhase(phase);
+      console.log("[PipelinePage] setting activeTab to stepIdForPhase:", nextTab);
+      setActiveTab(nextTab);
     }
   };
 

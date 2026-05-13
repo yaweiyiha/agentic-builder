@@ -23,23 +23,6 @@ export const projects = pgTable("projects", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ─── project_pipeline_state ──────────────────────────────────────────────────
-
-export const projectPipelineState = pgTable("project_pipeline_state", {
-  projectId:     text("project_id")
-    .primaryKey()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  featureBrief:  text("feature_brief").notNull().default(""),
-  currentStep:   text("current_step"),
-  activeTab:     text("active_tab").notNull().default("intent"),
-  totalCostUsd:  doublePrecision("total_cost_usd").notNull().default(0),
-  isRunning:     boolean("is_running").notNull().default(false),
-  fastFromPrd:   boolean("fast_from_prd").notNull().default(true),
-  codeOutputDir: text("code_output_dir").notNull().default("generated-code"),
-  stepsJson:     jsonb("steps_json").notNull().default({}),
-  updatedAt:     timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 // ─── project_stage_state ─────────────────────────────────────────────────────
 
 export const projectStageState = pgTable("project_stage_state", {
@@ -54,51 +37,70 @@ export const projectStageState = pgTable("project_stage_state", {
   updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ─── project_substage_snapshot ───────────────────────────────────────────────
+// ─── project_step_snapshot ───────────────────────────────────────────────────
+// Flat table: each row is a snapshot for one step (level-2), keyed by stepId.
+// No stage/subStage distinction, no fallback walk — load exactly what you need.
 
-export const projectSubstageSnapshot = pgTable(
-  "project_substage_snapshot",
+export const projectStepSnapshot = pgTable(
+  "project_step_snapshot",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    stepId:    text("step_id").notNull(),
+    snapshot:  jsonb("snapshot").notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.stepId] }),
+  ],
+);
+
+// ─── project_step_navigation ─────────────────────────────────────────────────
+// Tracks which step each project is currently on (source of truth for page.tsx)
+
+export const projectStepNavigation = pgTable("project_step_navigation", {
+  projectId:   text("project_id")
+    .primaryKey()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  activeStep:  text("active_step").notNull().default("initial"),
+  tier:        text("tier").notNull().default("M"),
+  updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── project_step_artifacts ──────────────────────────────────────────────────
+// Records input/output artifacts for each step execution per project
+
+export const projectStepArtifacts = pgTable(
+  "project_step_artifacts",
   {
     projectId:  text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    stageId:    text("stage_id").notNull(),
-    subStageId: text("sub_stage_id").notNull(),
-    snapshot:   jsonb("snapshot").notNull().default({}),
-    updatedAt:  timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    stepId:     text("step_id").notNull(),
+    runIndex:   text("run_index").notNull().default("0"),
+    status:     text("status").notNull().default("idle"),  // idle | running | completed | failed
+    input:      jsonb("input").notNull().default({}),
+    output:     jsonb("output").notNull().default({}),
+    costUsd:    doublePrecision("cost_usd").notNull().default(0),
+    durationMs: doublePrecision("duration_ms").notNull().default(0),
+    model:      text("model"),
+    traceId:    text("trace_id"),
+    error:      text("error"),
+    startedAt:  timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt:  timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.projectId, t.stageId, t.subStageId] }),
-  ],
-);
-
-// ─── project_substage_status ─────────────────────────────────────────────────
-
-export const projectSubstageStatus = pgTable(
-  "project_substage_status",
-  {
-  projectId:   text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  stageId:     text("stage_id").notNull(),
-  subStageId:  text("sub_stage_id").notNull(),
-  status:      text("status").notNull().default("idle"),
-  startedAt:   timestamp("started_at", { withTimezone: true }),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-  contextRefs: jsonb("context_refs").notNull().default({}),
-    stepIds:     text("step_ids").array().notNull().default([]),
-    updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.projectId, t.stageId, t.subStageId] }),
+    primaryKey({ columns: [t.projectId, t.stepId, t.runIndex] }),
   ],
 );
 
 // ─── Inferred TypeScript types ───────────────────────────────────────────────
 
-export type Project                = typeof projects.$inferSelect;
-export type NewProject             = typeof projects.$inferInsert;
-export type ProjectPipelineState   = typeof projectPipelineState.$inferSelect;
-export type ProjectStageState      = typeof projectStageState.$inferSelect;
-export type ProjectSubstageSnapshot = typeof projectSubstageSnapshot.$inferSelect;
-export type ProjectSubstageStatus  = typeof projectSubstageStatus.$inferSelect;
+export type Project                 = typeof projects.$inferSelect;
+export type NewProject              = typeof projects.$inferInsert;
+export type ProjectStageState       = typeof projectStageState.$inferSelect;
+export type ProjectStepSnapshot = typeof projectStepSnapshot.$inferSelect;
+export type ProjectStepNavigation   = typeof projectStepNavigation.$inferSelect;
+export type ProjectStepArtifact     = typeof projectStepArtifacts.$inferSelect;

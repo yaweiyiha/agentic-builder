@@ -44,19 +44,12 @@ function StageProgressBar() {
 }
 
 export default function InitialSubStage() {
-  const [mode, setMode] = useState<"Quick" | "Advanced">("Quick");
   const [prompt, setPrompt] = useState("");
   const [prdDialogOpen, setPrdDialogOpen] = useState(false);
 
   const setPendingBrief = usePipelineStore((s) => s.setPendingBrief);
-  const setFastFromPrd  = usePipelineStore((s) => s.setFastFromPrd);
   const isRunning       = usePipelineStore((s) => s.isRunning);
   const goToSubStage    = useStageStore((s) => s.goToSubStage);
-
-  function handleModeChange(m: "Quick" | "Advanced") {
-    setMode(m);
-    setFastFromPrd(m === "Quick");
-  }
 
   function handleInitialize() {
     if (!prompt.trim() || isRunning) return;
@@ -97,22 +90,7 @@ export default function InitialSubStage() {
               <Separator />
 
               <div className="flex items-center justify-between bg-[#fafbfc] px-4 py-3">
-                {/* Mode toggle */}
-                <div className="flex items-center gap-1 bg-[#e2e8f0]/60 rounded p-1">
-                  {(["Quick", "Advanced"] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => handleModeChange(m)}
-                      className={`px-3.5 py-1.5 text-[11px] font-semibold rounded-sm transition-all ${
-                        mode === m
-                          ? "bg-white text-[#0f172a] shadow-sm"
-                          : "text-[#64748b] hover:text-[#334155]"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
+                <div />
 
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1">

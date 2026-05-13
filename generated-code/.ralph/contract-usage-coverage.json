@@ -1,18 +1,160 @@
 {
   "policy": "prune",
   "totals": {
-    "contractEntries": 9,
-    "frontendCalls": 9,
-    "consistent": 8,
+    "contractEntries": 13,
+    "frontendCalls": 0,
+    "consistent": 0,
     "surplus": 0,
-    "frontendWiringMissing": 0,
+    "frontendWiringMissing": 11,
     "contractGap": 0,
     "frontendRogue": 0,
-    "adminSkipped": 1
+    "adminSkipped": 2
   },
-  "notes": [
-    "Frontend contract calls are implemented in frontend/src/api/spriClient.ts via canonical apiClient.",
-    "Admin endpoint GET /api/ingestion/status remains intentionally audience=admin and is excluded from user-facing wiring requirements."
+  "classifications": [
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/auth/register",
+        "audience": "user",
+        "prdJustification": "POST /api/auth/register creates a user, auto-logs in, and returns the current user/session context"
+      },
+      "prdJustified": true,
+      "reason": "prdJustification-quote-found"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/auth/login",
+        "audience": "user",
+        "prdJustification": "POST /api/auth/login verifies credentials and establishes a session"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/auth/logout",
+        "audience": "user",
+        "prdJustification": "POST /api/auth/logout invalidates the session and clears the cookie"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/auth/me",
+        "audience": "user",
+        "prdJustification": "GET /api/auth/me returns the authenticated user or 401"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "PATCH",
+        "endpoint": "/api/users/me",
+        "audience": "user",
+        "prdJustification": "PATCH /api/users/me updates display name and/or password"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:users"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "DELETE",
+        "endpoint": "/api/users/me",
+        "audience": "user",
+        "prdJustification": "DELETE /api/users/me deletes the account and its owned tasks as per retention policy"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:users"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/tasks",
+        "audience": "user",
+        "prdJustification": "GET /api/tasks returns all tasks for the current user, sorted newest-first by default"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:tasks"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/tasks/:id",
+        "audience": "user",
+        "prdJustification": "GET /api/tasks/:id returns a single owned task"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:tasks"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/tasks",
+        "audience": "user",
+        "prdJustification": "POST /api/tasks creates a task with title required"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:tasks"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "PUT",
+        "endpoint": "/api/tasks/:id",
+        "audience": "user",
+        "prdJustification": "PUT /api/tasks/:id updates any field of an owned task"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:tasks"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "DELETE",
+        "endpoint": "/api/tasks/:id",
+        "audience": "user",
+        "prdJustification": "DELETE /api/tasks/:id deletes an owned task after confirmation in the UI"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:tasks"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/health/live",
+        "audience": "admin",
+        "prdJustification": "HealthService provides Liveness/readiness checks"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/health/ready",
+        "audience": "admin",
+        "prdJustification": "HealthService provides Liveness/readiness checks"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    }
   ],
-  "pendingRepairTasks": []
+  "pendingRepairTasks": [],
+  "pruned": []
 }

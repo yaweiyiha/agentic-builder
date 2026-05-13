@@ -58,15 +58,12 @@ export type PreparationSubStageId =
   | "verify";     // pre-kickoff verification
 
 export type KickoffSubStageId =
-  | "env-setup"       // environment scaffolding
+  | "env-setup"       // environment scaffolding (legacy)
+  | "summary"         // kickoff summary
   | "task-breakdown"; // task breakdown planning
 
 export type CodingSubStageId =
-  | "architect"  // architect agent
-  | "backend"    // backend agent
-  | "frontend"   // frontend agent
-  | "test"       // test agent
-  | "verify";    // integration verify
+  | "agents";    // coding agents
 
 export type PreviewSubStageId =
   | "serve"  // dev-server startup
@@ -89,8 +86,8 @@ export interface SubStageMeta {
 
 export const SUB_STAGE_ORDER: Record<StageId, SubStageId[]> = {
   preparation: ["initial", "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa", "verify"],
-  kickoff:     ["env-setup", "task-breakdown"],
-  coding:      ["architect", "backend", "frontend", "test", "verify"],
+  kickoff:     ["env-setup", "summary", "task-breakdown"],
+  coding:      ["agents"],
   preview:     ["serve", "e2e"],
 };
 
@@ -109,6 +106,7 @@ export const SUB_STAGE_META: Record<SubStageId, SubStageMeta> = {
   // verify is shared with coding sub-stage; label reused below
   // kickoff
   "env-setup":       { label: "Env Setup",       desc: "Scaffold project environment" },
+  "summary":         { label: "Summary",         desc: "Kick-off summary" },
   "task-breakdown":  { label: "Task Breakdown",  desc: "Plan coding tasks" },
   // coding
   architect:    { label: "Architect",        desc: "Architect agent" },
@@ -141,8 +139,8 @@ export const PREPARATION_STEP_IDS = [
 
 const DEFAULT_SUB_STAGES: Record<StageId, SubStageId> = {
   preparation: "initial",
-  kickoff:     "env-setup",
-  coding:      "architect",
+  kickoff:     "summary",
+  coding:      "agents",
   preview:     "serve",
 };
 

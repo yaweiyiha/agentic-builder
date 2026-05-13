@@ -80,14 +80,15 @@ export class QAAgent extends BaseAgent {
   async generateAudit(
     prdContent: string,
     designContent: string,
-    sessionId?: string
+    sessionId?: string,
+    /** When provided, switches to streaming mode and calls onChunk for each content delta. */
+    onChunk?: (chunk: string) => void,
   ) {
     const context = `## PRD Document\n${prdContent}\n\n## Design Specification\n${designContent}`;
-    return this.run(
-      "Analyze the PRD and Design specification. Generate a comprehensive audit report (AUDIT.json) and test plan.",
-      context,
-      "step-3-qa",
-      sessionId
-    );
+    const message = "Analyze the PRD and Design specification. Generate a comprehensive audit report (AUDIT.json) and test plan.";
+    if (onChunk) {
+      return this.streamRun(message, (chunk) => onChunk(chunk), context, "step-3-qa", sessionId);
+    }
+    return this.run(message, context, "step-3-qa", sessionId);
   }
 }

@@ -9,11 +9,9 @@
 import { and, desc, eq, like, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
-  projectPipelineState,
   projects,
   projectStageState,
-  projectSubstageSnapshot,
-  projectSubstageStatus,
+  projectStepSnapshot,
 } from "@/lib/db/schema";
 import type { Project } from "@/types/project";
 
@@ -48,7 +46,7 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
   return (rows[0] as Project) ?? null;
 }
 
-export async function createProject(name: string): Promise<Project> {
+export async function createProject(name: string, clientId?: string): Promise<Project> {
   const baseSlug =
     name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") ||
     `project-${Date.now()}`;
@@ -65,7 +63,7 @@ export async function createProject(name: string): Promise<Project> {
     finalSlug = `${baseSlug}-${counter++}`;
   }
 
-  const id = crypto.randomUUID();
+  const id = clientId ?? crypto.randomUUID();
   const rows = await db
     .insert(projects)
     .values({ id, slug: finalSlug, name: name.trim() })
@@ -84,75 +82,6 @@ export async function updateProjectName(projectId: string, name: string): Promis
     .update(projects)
     .set({ name: name.trim() })
     .where(eq(projects.id, projectId));
-}
-
-// ─── Pipeline State ───────────────────────────────────────────────────────────
-
-export interface PipelineStateRow {
-  featureBrief:  string;
-  currentStep:   string | null;
-  activeTab:     string;
-  totalCostUsd:  number;
-  isRunning:     boolean;
-  fastFromPrd:   boolean;
-  codeOutputDir: string;
-  stepsJson:     Record<string, unknown>;
-}
-
-export async function getPipelineState(projectId: string): Promise<PipelineStateRow | null> {
-  const rows = await db
-    .select({
-      featureBrief:  projectPipelineState.featureBrief,
-      currentStep:   projectPipelineState.currentStep,
-      activeTab:     projectPipelineState.activeTab,
-      totalCostUsd:  projectPipelineState.totalCostUsd,
-      isRunning:     projectPipelineState.isRunning,
-      fastFromPrd:   projectPipelineState.fastFromPrd,
-      codeOutputDir: projectPipelineState.codeOutputDir,
-      stepsJson:     projectPipelineState.stepsJson,
-    })
-    .from(projectPipelineState)
-    .where(eq(projectPipelineState.projectId, projectId))
-    .limit(1);
-
-  if (!rows[0]) return null;
-  return rows[0] as PipelineStateRow;
-}
-
-export async function upsertPipelineState(
-  projectId: string,
-  state: Partial<PipelineStateRow>,
-): Promise<void> {
-  const values = {
-    projectId,
-    featureBrief:  state.featureBrief  ?? "",
-    currentStep:   state.currentStep   ?? null,
-    activeTab:     state.activeTab     ?? "intent",
-    totalCostUsd:  state.totalCostUsd  ?? 0,
-    isRunning:     state.isRunning     ?? false,
-    fastFromPrd:   state.fastFromPrd   ?? true,
-    codeOutputDir: state.codeOutputDir ?? "generated-code",
-    stepsJson:     (state.stepsJson    ?? {}) as Record<string, unknown>,
-    updatedAt:     new Date(),
-  };
-
-  await db
-    .insert(projectPipelineState)
-    .values(values)
-    .onConflictDoUpdate({
-      target: projectPipelineState.projectId,
-      set: {
-        featureBrief:  values.featureBrief,
-        currentStep:   values.currentStep,
-        activeTab:     values.activeTab,
-        totalCostUsd:  values.totalCostUsd,
-        isRunning:     values.isRunning,
-        fastFromPrd:   values.fastFromPrd,
-        codeOutputDir: values.codeOutputDir,
-        stepsJson:     values.stepsJson,
-        updatedAt:     sql`NOW()`,
-      },
-    });
 }
 
 // ─── Stage State ──────────────────────────────────────────────────────────────
@@ -212,13 +141,81 @@ export async function upsertStageState(
     });
 }
 
-// ─── Sub-Stage Snapshots ──────────────────────────────────────────────────────
+// ─── Step Snapshots (flat, keyed by stepId) ────────────────────────────────────
+
+/** Per-step snapshot — only contains this step's own data. */
+export interface StepSnapshot {
+  content?:   string | null;
+  metadata?:  Record<string, unknown> | null;
+  status?:    string;
+  costUsd?:   number;
+  durationMs?: number;
+  error?:     string | null;
+  model?:     string | null;
+}
+
+export async function upsertStepSnapshot(
+  projectId: string,
+  stepId: string,
+  snapshot: StepSnapshot,
+): Promise<void> {
+  await db
+    .insert(projectStepSnapshot)
+    .values({
+      projectId,
+      stepId,
+      snapshot: snapshot as Record<string, unknown>,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [projectStepSnapshot.projectId, projectStepSnapshot.stepId],
+      set: {
+        snapshot:  snapshot as Record<string, unknown>,
+        updatedAt: sql`NOW()`,
+      },
+    });
+}
+
+/** Fetch all step snapshots for a project, returned as { stepId: snapshot, ... }. */
+export async function getAllStepSnapshots(
+  projectId: string,
+): Promise<Record<string, StepSnapshot>> {
+  const rows = await db
+    .select({ stepId: projectStepSnapshot.stepId, snapshot: projectStepSnapshot.snapshot })
+    .from(projectStepSnapshot)
+    .where(eq(projectStepSnapshot.projectId, projectId));
+
+  const result: Record<string, StepSnapshot> = {};
+  for (const row of rows) {
+    result[row.stepId] = row.snapshot as StepSnapshot;
+  }
+  return result;
+}
+
+export async function getStepSnapshot(
+  projectId: string,
+  stepId: string,
+): Promise<StepSnapshot | null> {
+  const rows = await db
+    .select({ snapshot: projectStepSnapshot.snapshot })
+    .from(projectStepSnapshot)
+    .where(
+      and(
+        eq(projectStepSnapshot.projectId, projectId),
+        eq(projectStepSnapshot.stepId,    stepId),
+      ),
+    )
+    .limit(1);
+
+  return (rows[0]?.snapshot as StepSnapshot) ?? null;
+}
+
+// ─── Sub-Stage Snapshots (legacy, used by pipeline-store) ──────────────────────
 
 /** Full pipeline state persisted per (project, stage, sub-stage). */
 export interface SubStageSnapshot {
   featureBrief:  string;
   currentStep:   string | null;
-  activeTab:     string;
   totalCostUsd:  number;
   isRunning:     boolean;
   fastFromPrd:   boolean;
@@ -232,42 +229,23 @@ export interface SubStageSnapshot {
   intentEnrichedBrief?:    string;
 }
 
-// ─── Sub-Stage Status ─────────────────────────────────────────────────────────
-
-export type SubStageStatusValue = "idle" | "running" | "completed" | "error";
-
-export interface SubStageStatusRow {
-  stageId:      string;
-  subStageId:   string;
-  status:       SubStageStatusValue;
-  startedAt:    string | null;
-  completedAt:  string | null;
-  contextRefs:  Record<string, unknown>;
-  stepIds:      string[];
-  updatedAt:    string;
-}
-
 export async function upsertSubStageSnapshot(
   projectId: string,
-  stageId: string,
+  _stageId: string,
   subStageId: string,
   snapshot: SubStageSnapshot,
 ): Promise<void> {
+  // Map to the flat project_step_snapshot table using subStageId as stepId
   await db
-    .insert(projectSubstageSnapshot)
+    .insert(projectStepSnapshot)
     .values({
       projectId,
-      stageId,
-      subStageId,
+      stepId: subStageId,
       snapshot: snapshot as Record<string, unknown>,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
-      target: [
-        projectSubstageSnapshot.projectId,
-        projectSubstageSnapshot.stageId,
-        projectSubstageSnapshot.subStageId,
-      ],
+      target: [projectStepSnapshot.projectId, projectStepSnapshot.stepId],
       set: {
         snapshot:  snapshot as Record<string, unknown>,
         updatedAt: sql`NOW()`,
@@ -277,161 +255,19 @@ export async function upsertSubStageSnapshot(
 
 export async function getSubStageSnapshot(
   projectId: string,
-  stageId: string,
+  _stageId: string,
   subStageId: string,
 ): Promise<SubStageSnapshot | null> {
   const rows = await db
-    .select({ snapshot: projectSubstageSnapshot.snapshot })
-    .from(projectSubstageSnapshot)
+    .select({ snapshot: projectStepSnapshot.snapshot })
+    .from(projectStepSnapshot)
     .where(
       and(
-        eq(projectSubstageSnapshot.projectId,  projectId),
-        eq(projectSubstageSnapshot.stageId,    stageId),
-        eq(projectSubstageSnapshot.subStageId, subStageId),
+        eq(projectStepSnapshot.projectId, projectId),
+        eq(projectStepSnapshot.stepId,    subStageId),
       ),
     )
     .limit(1);
 
   return (rows[0]?.snapshot as SubStageSnapshot) ?? null;
-}
-
-export async function upsertSubStageStatus(
-  projectId: string,
-  stageId: string,
-  subStageId: string,
-  status: SubStageStatusValue,
-  opts?: {
-    contextRefs?: Record<string, unknown>;
-    stepIds?: string[];
-  },
-): Promise<void> {
-  const now = new Date();
-
-  await db
-    .insert(projectSubstageStatus)
-    .values({
-      projectId,
-      stageId,
-      subStageId,
-      status,
-      contextRefs: (opts?.contextRefs ?? {}) as Record<string, unknown>,
-      stepIds:     opts?.stepIds ?? [],
-      updatedAt:   now,
-      startedAt:   status === "running"   ? now : null,
-      completedAt: status === "completed" ? now : null,
-    })
-    .onConflictDoUpdate({
-      target: [
-        projectSubstageStatus.projectId,
-        projectSubstageStatus.stageId,
-        projectSubstageStatus.subStageId,
-      ],
-      set: {
-        status:      status,
-        contextRefs: (opts?.contextRefs ?? {}) as Record<string, unknown>,
-        stepIds:     opts?.stepIds ?? [],
-        updatedAt:   sql`NOW()`,
-        ...(status === "running"   ? { startedAt:   sql`NOW()` } : {}),
-        ...(status === "completed" ? { completedAt: sql`NOW()` } : {}),
-      },
-    });
-}
-
-export async function getSubStageStatus(
-  projectId: string,
-  stageId: string,
-  subStageId: string,
-): Promise<SubStageStatusRow | null> {
-  const rows = await db
-    .select({
-      stageId:     projectSubstageStatus.stageId,
-      subStageId:  projectSubstageStatus.subStageId,
-      status:      projectSubstageStatus.status,
-      startedAt:   projectSubstageStatus.startedAt,
-      completedAt: projectSubstageStatus.completedAt,
-      contextRefs: projectSubstageStatus.contextRefs,
-      stepIds:     projectSubstageStatus.stepIds,
-      updatedAt:   projectSubstageStatus.updatedAt,
-    })
-    .from(projectSubstageStatus)
-    .where(
-      and(
-        eq(projectSubstageStatus.projectId,  projectId),
-        eq(projectSubstageStatus.stageId,    stageId),
-        eq(projectSubstageStatus.subStageId, subStageId),
-      ),
-    )
-    .limit(1);
-
-  if (!rows[0]) return null;
-  const r = rows[0];
-  return {
-    stageId:     r.stageId,
-    subStageId:  r.subStageId,
-    status:      r.status as SubStageStatusValue,
-    startedAt:   r.startedAt?.toISOString() ?? null,
-    completedAt: r.completedAt?.toISOString() ?? null,
-    contextRefs: r.contextRefs as Record<string, unknown>,
-    stepIds:     r.stepIds ?? [],
-    updatedAt:   r.updatedAt.toISOString(),
-  };
-}
-
-export async function listSubStageStatuses(
-  projectId: string,
-): Promise<SubStageStatusRow[]> {
-  const rows = await db
-    .select({
-      stageId:     projectSubstageStatus.stageId,
-      subStageId:  projectSubstageStatus.subStageId,
-      status:      projectSubstageStatus.status,
-      startedAt:   projectSubstageStatus.startedAt,
-      completedAt: projectSubstageStatus.completedAt,
-      contextRefs: projectSubstageStatus.contextRefs,
-      stepIds:     projectSubstageStatus.stepIds,
-      updatedAt:   projectSubstageStatus.updatedAt,
-    })
-    .from(projectSubstageStatus)
-    .where(eq(projectSubstageStatus.projectId, projectId))
-    .orderBy(projectSubstageStatus.updatedAt);
-
-  return rows.map((r) => ({
-    stageId:     r.stageId,
-    subStageId:  r.subStageId,
-    status:      r.status as SubStageStatusValue,
-    startedAt:   r.startedAt?.toISOString() ?? null,
-    completedAt: r.completedAt?.toISOString() ?? null,
-    contextRefs: r.contextRefs as Record<string, unknown>,
-    stepIds:     r.stepIds ?? [],
-    updatedAt:   r.updatedAt.toISOString(),
-  }));
-}
-
-const SUB_STAGE_ORDER_BY_STAGE: Record<string, string[]> = {
-  preparation: ["initial", "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa"],
-  kickoff:     ["env-setup", "task-breakdown"],
-  coding:      ["architect", "backend", "frontend", "test", "verify"],
-  preview:     ["serve", "e2e"],
-};
-
-export async function getActiveSubStageSnapshot(
-  projectId: string,
-): Promise<{ stageId: string; subStageId: string; snapshot: SubStageSnapshot | null }> {
-  const stageRow = await getStageState(projectId);
-  const stageId    = stageRow?.activeStage ?? "preparation";
-  const subStageId = (stageRow?.activeSubStages?.[stageId] as string | undefined) ?? "initial";
-
-  const exactSnapshot = await getSubStageSnapshot(projectId, stageId, subStageId);
-  if (exactSnapshot) return { stageId, subStageId, snapshot: exactSnapshot };
-
-  const order = SUB_STAGE_ORDER_BY_STAGE[stageId] ?? [];
-  const currentIdx = order.indexOf(subStageId);
-  for (let i = currentIdx - 1; i >= 0; i--) {
-    const prevSnapshot = await getSubStageSnapshot(projectId, stageId, order[i]);
-    if (prevSnapshot) {
-      return { stageId, subStageId, snapshot: prevSnapshot };
-    }
-  }
-
-  return { stageId, subStageId, snapshot: null };
 }
