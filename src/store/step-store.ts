@@ -38,54 +38,30 @@ function saveStepSnapshot(
   stepId: StepId,
 ): void {
   if (!_stepProjectSlug) return;
-  const path = getNodePath(stepId);
-  if (!path) return;
   const s = get();
-  const snapshot = {
-    featureBrief: s.featureBrief,
-    currentStep: s.currentStep,
-    totalCostUsd: s.totalCostUsd,
-    isRunning: s.isRunning,
-    fastFromPrd: s.fastFromPrd,
-    codeOutputDir: s.codeOutputDir,
-    steps: s.steps as Record<string, unknown>,
-    intentMessages: s.intentMessages,
-    intentEnrichedBrief: s.intentEnrichedBrief,
-  };
-  fetch(`/api/projects/${_stepProjectSlug}/substage-snapshot`, {
+  const stepData = s.steps[stepId];
+  fetch(`/api/projects/${_stepProjectSlug}/project-step-snapshot`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      stageId: path.stage.id,
-      subStageId: path.step.id,
-      snapshot,
+      stepId,
+      snapshot: {
+        content:   stepData?.content ?? null,
+        metadata:  stepData?.metadata ?? null,
+        status:    stepData?.status ?? null,
+        costUsd:   stepData?.costUsd ?? null,
+        durationMs: stepData?.durationMs ?? null,
+        model:     stepData?.model ?? null,
+        error:     stepData?.error ?? null,
+      },
     }),
   }).catch((err) => console.error(`[step-store] snapshot error (${stepId}):`, err));
 }
 
-// ── Debounced stream save ────────────────────────────────────────────────────
-let _streamSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let _pendingStreamSaveStepId: StepId | null = null;
-
-function _scheduleStreamSave(get: () => StepStoreState, stepId: StepId) {
-  _pendingStreamSaveStepId = stepId;
-  if (_streamSaveTimer) return;
-  _streamSaveTimer = setTimeout(() => {
-    _streamSaveTimer = null;
-    const sid = _pendingStreamSaveStepId;
-    _pendingStreamSaveStepId = null;
-    if (sid) saveStepSnapshot(get, sid);
-  }, 3000);
-}
-
+// ── Final snapshot save (called on step completion/failure) ──────────────────
 function _flushStreamSave(get: () => StepStoreState) {
-  if (_streamSaveTimer) {
-    clearTimeout(_streamSaveTimer);
-    _streamSaveTimer = null;
-  }
-  const sid = _pendingStreamSaveStepId;
-  _pendingStreamSaveStepId = null;
-  if (sid) saveStepSnapshot(get, sid);
+  // Snapshot is saved on step completion/failure.
+  // During streaming, no intermediate saves occur.
 }
 
 // ── Store Interface ───────────────────────────────────────────────────────────
@@ -194,6 +170,7 @@ export const useStepStore = create<StepStoreState>()(
           steps: { ...s.steps, [stepId]: result },
           totalCostUsd: s.totalCostUsd + (result.costUsd ?? 0),
         }));
+        saveStepSnapshot(get, stepId);
       },
 
       patchStepMeta: (stepId, meta) => {
@@ -209,11 +186,12 @@ export const useStepStore = create<StepStoreState>()(
             },
           };
         });
-        // Debounced DB persist so style/stitch changes survive refresh
-        _scheduleStreamSave(get, stepId);
+        // Snapshot is saved on step completion only (setStepCompleted / setStepFailed)
       },
 
       setStepRunning: (stepId) => {
+        const prevState = get();
+        console.log("[step-store] setStepRunning", { stepId, wasRunning: prevState.isRunning, wasCurrentStep: prevState.currentStep });
         set((s) => ({
           currentStep: stepId,
           isRunning: true,
@@ -244,7 +222,6 @@ export const useStepStore = create<StepStoreState>()(
             },
           },
         }));
-        _scheduleStreamSave(get, stepId);
       },
 
       setStepCompleted: (stepId, content, costUsd = 0, durationMs = 0) => {
@@ -270,7 +247,7 @@ export const useStepStore = create<StepStoreState>()(
       },
 
       setStepFailed: (stepId, error) => {
-        _flushStreamSave(get);
+        saveStepSnapshot(get, stepId);
         set((s) => ({
           steps: {
             ...s.steps,
@@ -296,37 +273,23 @@ export const useStepStore = create<StepStoreState>()(
       loadFromServer: async (slug: string) => {
         _stepProjectSlug = slug;
         try {
-          // Try to restore the active substage snapshot
-          const snapResp = await fetch(`/api/projects/${slug}/substage-snapshot`, { cache: "no-store" });
+          // Load all step snapshots from the flat table
+          const snapResp = await fetch(`/api/projects/${slug}/project-step-snapshot`, { cache: "no-store" });
           if (snapResp.ok) {
-            const snapData = (await snapResp.json()) as {
-              snapshot?: {
-                featureBrief?: string;
-                currentStep?: string | null;
-                totalCostUsd?: number;
-                isRunning?: boolean;
-                fastFromPrd?: boolean;
-                codeOutputDir?: string;
-                steps?: Record<string, unknown>;
-                intentMessages?: unknown[];
-                intentEnrichedBrief?: string;
-              } | null;
-            };
-            if (snapData.snapshot) {
-              const snap = snapData.snapshot;
-              set({
-                featureBrief: snap.featureBrief ?? "",
-                currentStep: (snap.currentStep as StepId | null) ?? null,
-                totalCostUsd: snap.totalCostUsd ?? 0,
-                isRunning: false,
-                fastFromPrd: snap.fastFromPrd ?? true,
-                codeOutputDir: snap.codeOutputDir ?? "generated-code",
-                steps: snap.steps
-                  ? { ...emptySteps(), ...(snap.steps as Record<StepId, StepResultData | null>) }
-                  : emptySteps(),
-                intentMessages: snap.intentMessages ?? [],
-                intentEnrichedBrief: snap.intentEnrichedBrief ?? "",
-              });
+            const snapData = (await snapResp.json()) as { snapshots?: Record<string, { content?: string; metadata?: Record<string, unknown> }> };
+            if (snapData.snapshots) {
+              const steps = emptySteps();
+              for (const [stepId, snap] of Object.entries(snapData.snapshots)) {
+                if (snap.content || snap.metadata) {
+                  (steps as Record<string, unknown>)[stepId] = {
+                    stepId,
+                    status: snap.content ? "completed" : "pending",
+                    content: snap.content ?? null,
+                    metadata: snap.metadata ?? null,
+                    timestamp: new Date().toISOString(),
+                  };
+                }
+              }
               set({ isHydrated: true });
               return;
             }
@@ -341,42 +304,18 @@ export const useStepStore = create<StepStoreState>()(
 
       loadStepSnapshot: async (stepId: StepId): Promise<boolean> => {
         if (!_stepProjectSlug || get().isRunning) return false;
-        const path = getNodePath(stepId);
-        if (!path) return false;
         try {
-          const url = `/api/projects/${_stepProjectSlug}/substage-snapshot?stage=${encodeURIComponent(path.stage.id)}&subStage=${encodeURIComponent(path.step.id)}`;
+          const url = `/api/projects/${_stepProjectSlug}/project-step-snapshot?stepId=${encodeURIComponent(stepId)}`;
           const resp = await fetch(url, { cache: "no-store" });
           if (!resp.ok) return false;
-          const data = (await resp.json()) as {
-            snapshot?: {
-              featureBrief?: string;
-              currentStep?: string | null;
-              totalCostUsd?: number;
-              isRunning?: boolean;
-              fastFromPrd?: boolean;
-              codeOutputDir?: string;
-              steps?: Record<string, unknown>;
-              intentMessages?: unknown[];
-              intentEnrichedBrief?: string;
-            } | null;
-          };
-          if (!data.snapshot) return false;
-          const snap = data.snapshot;
-          set({
-            featureBrief: snap.featureBrief ?? "",
-            currentStep: (snap.currentStep as StepId | null) ?? null,
-            totalCostUsd: snap.totalCostUsd ?? 0,
-            isRunning: false,
-            fastFromPrd: snap.fastFromPrd ?? true,
-            codeOutputDir: snap.codeOutputDir ?? "generated-code",
-            steps: snap.steps
-              ? { ...emptySteps(), ...(snap.steps as Record<StepId, StepResultData | null>) }
-              : emptySteps(),
-          });
-          if (stepId === "intent" && snap.intentMessages?.length) {
+          const data = (await resp.json()) as { snapshot?: { metadata?: Record<string, unknown>; content?: string } | null } | null;
+          if (!data?.snapshot) return false;
+          // Restore intent messages from metadata
+          const meta = data.snapshot.metadata as Record<string, unknown> | undefined;
+          if (stepId === "intent" && meta?.intentMessages) {
             set({
-              intentMessages: snap.intentMessages ?? [],
-              intentEnrichedBrief: snap.intentEnrichedBrief ?? "",
+              intentMessages: meta.intentMessages as unknown[],
+              intentEnrichedBrief: (meta.intentEnrichedBrief as string) ?? "",
             });
           }
           return true;
@@ -404,13 +343,16 @@ export const useStepStore = create<StepStoreState>()(
           intentMessages: messages,
           intentEnrichedBrief: enrichedBrief,
         };
-        fetch(`/api/projects/${_stepProjectSlug}/substage-snapshot`, {
+        fetch(`/api/projects/${_stepProjectSlug}/project-step-snapshot`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            stageId: path.stage.id,
-            subStageId: path.step.id,
-            snapshot,
+            stepId: "intent",
+            snapshot: {
+              content: s.steps.intent?.content ?? null,
+              metadata: { ...(s.steps.intent?.metadata as Record<string, unknown> ?? {}), intentMessages: messages, intentEnrichedBrief: enrichedBrief },
+              status: s.steps.intent?.status ?? null,
+            },
           }),
         }).catch((err) => console.error("[step-store] intent snapshot error:", err));
       },
@@ -418,23 +360,31 @@ export const useStepStore = create<StepStoreState>()(
       // ── Step Execution (replaces pipeline-store SSE flow) ──
       executeStep: async (stepId: StepId, editInstruction?: string) => {
         const s = get();
-        if (s.isRunning) return;
+        console.log("[step-store] executeStep called", { stepId, isRunning: s.isRunning, currentStep: s.currentStep, editInstruction });
+        if (s.isRunning) {
+          console.warn("[step-store] executeStep bailed: isRunning is true", { stepId, currentStep: s.currentStep });
+          return;
+        }
 
         // Lazy-load the step registry to find the agent
         let entry: { agent: { execute: (ctx: import("@/app/(dashboard)/project/[projectId]/_steps/_shared/types").StepAgentContext) => Promise<import("@/app/(dashboard)/project/[projectId]/_steps/_shared/types").StepResultData> } } | undefined;
         try {
           const mod = await import("@/app/(dashboard)/project/[projectId]/_steps/step-registry");
           entry = mod.STEP_REGISTRY[stepId];
+          console.log("[step-store] step registry loaded", { stepId, hasEntry: !!entry, hasAgent: !!entry?.agent });
         } catch {
+          console.error("[step-store] failed to load step registry for", stepId);
           set({ error: `Failed to load step registry for ${stepId}` });
           return;
         }
         if (!entry?.agent) {
+          console.error("[step-store] no agent registered for", stepId);
           set({ error: `No agent registered for step ${stepId}` });
           return;
         }
 
         const sessionId = newSessionId();
+        console.log("[step-store] calling setStepRunning for", stepId);
         get().setStepRunning(stepId);
 
         try {
@@ -467,8 +417,9 @@ export const useStepStore = create<StepStoreState>()(
             }),
           };
 
+          console.log("[step-store] about to call agent.execute for", stepId, { isRunning: get().isRunning, currentStep: get().currentStep });
           const result = await entry.agent.execute(ctx);
-          _flushStreamSave(get);
+          console.log("[step-store] agent.execute completed for", stepId, { status: result.status, contentLen: result.content?.length });
 
           if (result.status === "completed") {
             get().setStepCompleted(stepId, result.content ?? "", result.costUsd ?? 0, result.durationMs ?? 0);
@@ -476,7 +427,6 @@ export const useStepStore = create<StepStoreState>()(
             get().setStepFailed(stepId, result.error ?? "Step failed");
           }
         } catch (err) {
-          _flushStreamSave(get);
           get().setStepFailed(stepId, err instanceof Error ? err.message : "Unknown error");
         }
       },

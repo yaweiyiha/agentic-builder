@@ -601,13 +601,30 @@ export function DesignUI(props: StepUIProps) {
   }, []);
 
   // ── Auto-generate styles effect ──────────────────────────────────────────
+  // Reads designStyles from the store reactively so snapshot-restored data
+  // is available even if the local useState hasn't been primed yet.
+  const storedDesignStyles = useStepStore((s) => {
+    const meta = s.steps.design?.metadata as Record<string, unknown> | undefined;
+    return (meta?.designStyles as DesignStyle[] | undefined) ?? null;
+  });
+
   useEffect(() => {
+    console.log("[DesignUI] auto-start effect", { prdContent: !!prdContent.trim(), designStylesLoading, autoGen: autoGenRef.current, designStylesLen: designStyles?.length, storedStylesLen: storedDesignStyles?.length, designStatus: steps.design?.status });
     if (!prdContent.trim()) return;
     if (designStylesLoading) return;
     if (autoGenRef.current) return;
-    // Already have styles (from persisted metadata or previous generation)
-    if (Array.isArray(designStyles) && designStyles.length > 0) {
+
+    // Check BOTH local state and store — snapshot-restored data lives in the
+    // store but may not have flowed into the local useState yet on first render.
+    const hasStyles = Array.isArray(designStyles) && designStyles.length > 0;
+    const hasStoredStyles = Array.isArray(storedDesignStyles) && storedDesignStyles.length > 0;
+    console.log("[DesignUI] auto-start guard check", { hasStyles, hasStoredStyles, designStyles, storedStyles: storedDesignStyles });
+    if (hasStyles || hasStoredStyles) {
       autoGenRef.current = true;
+      // Sync local state from store if it was restored but not yet in useState
+      if (!hasStyles && hasStoredStyles) {
+        setDesignStyles(storedDesignStyles);
+      }
       return;
     }
     // Trigger generation
@@ -620,7 +637,27 @@ export function DesignUI(props: StepUIProps) {
         setDesignStylesError(result.error);
       } else {
         setDesignStyles(result.styles);
-        setSelectedStyleId(result.styles[0]?.id ?? null);
+        setSelectedStyleId(result.styles?.[0]?.id ?? null);
+        // Persist snapshot immediately with the styles result (don't rely on
+        // setTimeout + useCallback closure — local state hasn't re-rendered yet).
+        fetch(`/api/projects/${props.projectSlug}/project-step-snapshot`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            stepId: "design",
+            snapshot: {
+              content: null,
+              metadata: {
+                designStyles: result.styles,
+                selectedStyleId: result.styles?.[0]?.id ?? null,
+                designSourceMode,
+                stitchResult: null,
+                prdHash,
+              },
+              status: "pending",
+            },
+          }),
+        }).catch((err) => console.error("[DesignUI] style snapshot error:", err));
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -687,8 +724,33 @@ export function DesignUI(props: StepUIProps) {
         designDirectionPrompt: htmlFile?.textContent ?? null,
       });
     }
-    void executeStep("design");
+    console.log("[DesignUI] handleGenerateDesignDoc: calling executeStep, isRunning:", isRunning, "currentStep:", currentStep);
+    const p = executeStep("design");
+    console.log("[DesignUI] executeStep returned, setting phase to spec");
     setPhase("spec");
+    p.then(() => {
+      console.log("[DesignUI] executeStep resolved");
+      const s = useStepStore.getState();
+      const stepData = s.steps.design;
+      fetch(`/api/projects/${props.projectSlug}/project-step-snapshot`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepId: "design",
+          snapshot: {
+            content: stepData?.content ?? null,
+            metadata: {
+              designStyles,
+              selectedStyleId,
+              designSourceMode,
+              stitchResult: null,
+              prdHash,
+            },
+            status: stepData?.status ?? "completed",
+          },
+        }),
+      }).catch((err) => console.error("[DesignUI] spec snapshot error:", err));
+    }).catch((e) => console.error("[DesignUI] executeStep failed:", e));
   };
 
   const handleGenerateWithStitch = (instruction?: string) => {
@@ -708,6 +770,27 @@ export function DesignUI(props: StepUIProps) {
       } else {
         setStitchResult(outcome.result);
       }
+      // Save snapshot with fresh outcome data (avoid stale closure on stitchResult)
+      const s = useStepStore.getState();
+      const stepData = s.steps.design;
+      fetch(`/api/projects/${props.projectSlug}/project-step-snapshot`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepId: "design",
+          snapshot: {
+            content: stepData?.content ?? null,
+            metadata: {
+              designStyles,
+              selectedStyleId,
+              designSourceMode,
+              stitchResult: outcome.result ?? stitchError,
+              prdHash,
+            },
+            status: stepData?.status ?? "pending",
+          },
+        }),
+      }).catch((err) => console.error("[DesignUI] stitch snapshot error:", err));
     });
     setPhase("stitch");
   };
@@ -945,7 +1028,25 @@ export function DesignUI(props: StepUIProps) {
                                   setDesignStylesError(result.error);
                                 } else {
                                   setDesignStyles(result.styles);
-                                  setSelectedStyleId(result.styles[0]?.id ?? null);
+                                  setSelectedStyleId(result.styles?.[0]?.id ?? null);
+                                  fetch(`/api/projects/${props.projectSlug}/project-step-snapshot`, {
+                                    method: "PUT",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      stepId: "design",
+                                      snapshot: {
+                                        content: null,
+                                        metadata: {
+                                          designStyles: result.styles,
+                                          selectedStyleId: result.styles?.[0]?.id ?? null,
+                                          designSourceMode,
+                                          stitchResult: null,
+                                          prdHash,
+                                        },
+                                        status: "pending",
+                                      },
+                                    }),
+                                  }).catch((err) => console.error("[DesignUI] style snapshot error:", err));
                                 }
                               });
                             }}

@@ -68,14 +68,16 @@ export function TrdUI(props: StepUIProps) {
 
   // Auto-start: when both PRD and design spec are available and TRD hasn't been generated yet
   useEffect(() => {
-    if (!isHydrated) return;
-    if (autoStartedRef.current) return;
-    if (isRunning) return;
-    if (step?.content) return;
+    console.log("[TrdUI] auto-start effect running", { isHydrated, autoStarted: autoStartedRef.current, isRunning, hasContent: !!step?.content, hasPrd: !!steps.prd?.content, hasDesign: !!steps.design?.content, prdStatus: steps.prd?.status, designStatus: steps.design?.status });
+    if (!isHydrated) { console.log("[TrdUI] skip: not hydrated"); return; }
+    if (autoStartedRef.current) { console.log("[TrdUI] skip: already started"); return; }
+    if (isRunning) { console.log("[TrdUI] skip: isRunning is true"); return; }
+    if (step?.content) { console.log("[TrdUI] skip: already has content"); return; }
     const prdContent = steps.prd?.content ?? featureBrief;
-    if (!prdContent.trim()) return;
+    if (!prdContent.trim()) { console.log("[TrdUI] skip: no prd content"); return; }
     const designContent = steps.design?.content ?? "";
-    if (!designContent.trim()) return;
+    if (!designContent.trim()) { console.log("[TrdUI] skip: no design content"); return; }
+    console.log("[TrdUI] ALL CHECKS PASSED, starting executeStep");
     autoStartedRef.current = true;
     void executeStep("trd");
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,7 +1,4 @@
+import { createStepDataSnapshot } from "../../_shared/snapshot-context";
 import type { StepSnapshot } from "../../_shared/types";
 
-export const agentsSnapshot: StepSnapshot = {
-  async load() { return null; },
-  async save() {},
-  getContextFromPrevious() { return {}; },
-};
+export const agentsSnapshot: StepSnapshot = createStepDataSnapshot("agents");

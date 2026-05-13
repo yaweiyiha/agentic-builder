@@ -11,7 +11,7 @@ import { db } from "@/lib/db/client";
 import {
   projects,
   projectStageState,
-  projectSubstageSnapshot,
+  projectStepSnapshot,
 } from "@/lib/db/schema";
 import type { Project } from "@/types/project";
 
@@ -141,7 +141,76 @@ export async function upsertStageState(
     });
 }
 
-// ─── Sub-Stage Snapshots ──────────────────────────────────────────────────────
+// ─── Step Snapshots (flat, keyed by stepId) ────────────────────────────────────
+
+/** Per-step snapshot — only contains this step's own data. */
+export interface StepSnapshot {
+  content?:   string | null;
+  metadata?:  Record<string, unknown> | null;
+  status?:    string;
+  costUsd?:   number;
+  durationMs?: number;
+  error?:     string | null;
+  model?:     string | null;
+}
+
+export async function upsertStepSnapshot(
+  projectId: string,
+  stepId: string,
+  snapshot: StepSnapshot,
+): Promise<void> {
+  await db
+    .insert(projectStepSnapshot)
+    .values({
+      projectId,
+      stepId,
+      snapshot: snapshot as Record<string, unknown>,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [projectStepSnapshot.projectId, projectStepSnapshot.stepId],
+      set: {
+        snapshot:  snapshot as Record<string, unknown>,
+        updatedAt: sql`NOW()`,
+      },
+    });
+}
+
+/** Fetch all step snapshots for a project, returned as { stepId: snapshot, ... }. */
+export async function getAllStepSnapshots(
+  projectId: string,
+): Promise<Record<string, StepSnapshot>> {
+  const rows = await db
+    .select({ stepId: projectStepSnapshot.stepId, snapshot: projectStepSnapshot.snapshot })
+    .from(projectStepSnapshot)
+    .where(eq(projectStepSnapshot.projectId, projectId));
+
+  const result: Record<string, StepSnapshot> = {};
+  for (const row of rows) {
+    result[row.stepId] = row.snapshot as StepSnapshot;
+  }
+  return result;
+}
+
+export async function getStepSnapshot(
+  projectId: string,
+  stepId: string,
+): Promise<StepSnapshot | null> {
+  const rows = await db
+    .select({ snapshot: projectStepSnapshot.snapshot })
+    .from(projectStepSnapshot)
+    .where(
+      and(
+        eq(projectStepSnapshot.projectId, projectId),
+        eq(projectStepSnapshot.stepId,    stepId),
+      ),
+    )
+    .limit(1);
+
+  return (rows[0]?.snapshot as StepSnapshot) ?? null;
+}
+
+// ─── Sub-Stage Snapshots (legacy, used by pipeline-store) ──────────────────────
 
 /** Full pipeline state persisted per (project, stage, sub-stage). */
 export interface SubStageSnapshot {
@@ -162,25 +231,21 @@ export interface SubStageSnapshot {
 
 export async function upsertSubStageSnapshot(
   projectId: string,
-  stageId: string,
+  _stageId: string,
   subStageId: string,
   snapshot: SubStageSnapshot,
 ): Promise<void> {
+  // Map to the flat project_step_snapshot table using subStageId as stepId
   await db
-    .insert(projectSubstageSnapshot)
+    .insert(projectStepSnapshot)
     .values({
       projectId,
-      stageId,
-      subStageId,
+      stepId: subStageId,
       snapshot: snapshot as Record<string, unknown>,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
-      target: [
-        projectSubstageSnapshot.projectId,
-        projectSubstageSnapshot.stageId,
-        projectSubstageSnapshot.subStageId,
-      ],
+      target: [projectStepSnapshot.projectId, projectStepSnapshot.stepId],
       set: {
         snapshot:  snapshot as Record<string, unknown>,
         updatedAt: sql`NOW()`,
@@ -190,17 +255,16 @@ export async function upsertSubStageSnapshot(
 
 export async function getSubStageSnapshot(
   projectId: string,
-  stageId: string,
+  _stageId: string,
   subStageId: string,
 ): Promise<SubStageSnapshot | null> {
   const rows = await db
-    .select({ snapshot: projectSubstageSnapshot.snapshot })
-    .from(projectSubstageSnapshot)
+    .select({ snapshot: projectStepSnapshot.snapshot })
+    .from(projectStepSnapshot)
     .where(
       and(
-        eq(projectSubstageSnapshot.projectId,  projectId),
-        eq(projectSubstageSnapshot.stageId,    stageId),
-        eq(projectSubstageSnapshot.subStageId, subStageId),
+        eq(projectStepSnapshot.projectId, projectId),
+        eq(projectStepSnapshot.stepId,    subStageId),
       ),
     )
     .limit(1);

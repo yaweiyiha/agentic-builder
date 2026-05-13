@@ -37,21 +37,22 @@ export const projectStageState = pgTable("project_stage_state", {
   updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ─── project_substage_snapshot ───────────────────────────────────────────────
+// ─── project_step_snapshot ───────────────────────────────────────────────────
+// Flat table: each row is a snapshot for one step (level-2), keyed by stepId.
+// No stage/subStage distinction, no fallback walk — load exactly what you need.
 
-export const projectSubstageSnapshot = pgTable(
-  "project_substage_snapshot",
+export const projectStepSnapshot = pgTable(
+  "project_step_snapshot",
   {
-    projectId:  text("project_id")
+    projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    stageId:    text("stage_id").notNull(),
-    subStageId: text("sub_stage_id").notNull(),
-    snapshot:   jsonb("snapshot").notNull().default({}),
-    updatedAt:  timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    stepId:    text("step_id").notNull(),
+    snapshot:  jsonb("snapshot").notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.projectId, t.stageId, t.subStageId] }),
+    primaryKey({ columns: [t.projectId, t.stepId] }),
   ],
 );
 
@@ -100,6 +101,6 @@ export const projectStepArtifacts = pgTable(
 export type Project                 = typeof projects.$inferSelect;
 export type NewProject              = typeof projects.$inferInsert;
 export type ProjectStageState       = typeof projectStageState.$inferSelect;
-export type ProjectSubstageSnapshot = typeof projectSubstageSnapshot.$inferSelect;
+export type ProjectStepSnapshot = typeof projectStepSnapshot.$inferSelect;
 export type ProjectStepNavigation   = typeof projectStepNavigation.$inferSelect;
 export type ProjectStepArtifact     = typeof projectStepArtifacts.$inferSelect;

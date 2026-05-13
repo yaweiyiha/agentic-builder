@@ -9,6 +9,7 @@ import { STEP_REGISTRY } from "./_steps/step-registry";
 import { getStepConfig } from "@/_config/pipeline-flow";
 import { useStepStore } from "@/store/step-store";
 import { useStepNavigationStore } from "@/store/step-navigation-store";
+import { loadAllStepSnapshots } from "./_steps/_shared/snapshot-context";
 import type { StepId, ProjectTier } from "@/_config/pipeline-flow";
 import type { StepUIProps } from "./_steps/_shared/types";
 import type { ComponentType } from "react";
@@ -71,16 +72,6 @@ export default function ProjectPage() {
     );
   }
 
-  async function loadSnapshotForStep(slug: string, stepId: StepId) {
-    const entry = STEP_REGISTRY[stepId];
-    if (!entry?.snapshot?.load) return;
-    try {
-      await entry.snapshot.load(slug);
-    } catch (err) {
-      console.error(`[ProjectPage] snapshot load error (${stepId}):`, err);
-    }
-  }
-
   // ── Hydration: fetch current step from backend on project change ──
   useEffect(() => {
     if (!projectId) return;
@@ -105,8 +96,8 @@ export default function ProjectPage() {
           setActiveStep(nav.activeStep);
           activeStepRef.current = nav.activeStep;
           setTier(nav.tier);
-          // Load snapshot first, then mark hydrated — prevents auto-start racing
-          await loadSnapshotForStep(projectId, nav.activeStep);
+          // Load ALL step snapshots first, then mark hydrated — prevents auto-start racing
+          await loadAllStepSnapshots(projectId);
         }
       })
       .catch((err) => console.error("[ProjectPage] hydration error:", err))
@@ -116,7 +107,7 @@ export default function ProjectPage() {
       });
   }, [projectId]);
 
-  // ── Step change handler — save snapshot, update step, load new snapshot, persist ──
+  // ── Step change handler — save snapshot, update step, load all snapshots, persist ──
   const handleStepChange = useCallback(async (stepId: StepId) => {
     const prevStep = activeStepRef.current;
 
@@ -125,12 +116,12 @@ export default function ProjectPage() {
       saveCurrentSnapshot(projectId, prevStep);
     }
 
-    // Gate auto-start effects: set isHydrated=false so step components skip
-    // auto-generation until the snapshot is fully restored.
-    useStepStore.setState({ isHydrated: false });
+    // Gate auto-start effects: reset isRunning/isHydrated so step components
+    // don't auto-generate until all snapshots are restored.
+    useStepStore.setState({ isHydrated: false, isRunning: false, currentStep: null });
 
-    // Load snapshot for the new step FIRST — prevents auto-start race
-    await loadSnapshotForStep(projectId, stepId);
+    // Load ALL step snapshots at once — every step's data is available immediately.
+    await loadAllStepSnapshots(projectId);
 
     // Now safe to render the new step with restored data
     setActiveStep(stepId);
