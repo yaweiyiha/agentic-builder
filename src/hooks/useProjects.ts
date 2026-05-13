@@ -6,8 +6,8 @@ import { type Project } from "@/types/project";
 interface UseProjectsReturn {
   projects: Project[];
   loading: boolean;
-  /** Create a new project by name. Returns the created project. */
-  createProject: (name: string) => Promise<Project>;
+  /** Create a new project by name. Pass localId to replace a placeholder. */
+  createProject: (name: string, localId?: string) => Promise<Project>;
   /**
    * Add a placeholder project to local state only — no API call.
    * Inserted at the front of the list so it appears first in the sidebar.
@@ -37,11 +37,11 @@ export function useProjects(): UseProjectsReturn {
   }, [refresh]);
 
   const createProject = useCallback(
-    async (name: string): Promise<Project> => {
+    async (name: string, localId?: string): Promise<Project> => {
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, id: localId }),
       });
 
       if (!res.ok) {
@@ -50,7 +50,13 @@ export function useProjects(): UseProjectsReturn {
       }
 
       const data = (await res.json()) as { project: Project };
-      setProjects((prev) => [...prev, data.project]);
+      setProjects((prev) => {
+        // If we had a local placeholder, replace it; otherwise insert at front
+        if (localId) {
+          return prev.map((p) => (p.id === localId ? data.project : p));
+        }
+        return [data.project, ...prev];
+      });
       return data.project;
     },
     [],

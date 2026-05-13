@@ -12,7 +12,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getSubStageSnapshot,
-  getActiveSubStageSnapshot,
   upsertSubStageSnapshot,
   type SubStageSnapshot,
 } from "@/lib/project-store";
@@ -20,7 +19,7 @@ import {
 /** Substage order — mirrors stage-store, used for fallback walk. */
 const SUB_STAGE_ORDER: Record<string, string[]> = {
   preparation: ["initial", "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa"],
-  kickoff:     ["env-setup", "task-breakdown"],
+  kickoff:     ["env-setup", "summary", "task-breakdown"],
   coding:      ["architect", "backend", "frontend", "test", "verify"],
   preview:     ["serve", "e2e"],
 };
@@ -50,9 +49,11 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ stageId: stage, subStageId: subStage, snapshot: null });
     }
 
-    // No params — return the currently-active sub-stage snapshot (with built-in fallback).
-    const result = await getActiveSubStageSnapshot(projectId);
-    return NextResponse.json(result);
+    // No params — require stage and subStage query params
+    return NextResponse.json(
+      { error: "Missing required query params: stage, subStage" },
+      { status: 400 },
+    );
   } catch (err) {
     console.error("[api/substage-snapshot] GET error:", err);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
