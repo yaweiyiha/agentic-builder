@@ -368,11 +368,11 @@ function SparkleIcon() {
 
 type DocTab = "prd" | "design" | "trd" | "qa";
 
-const DOC_TABS: { id: DocTab; label: string }[] = [
+const ALL_DOC_TABS: { id: DocTab; label: string; hideForTiers?: string[] }[] = [
   { id: "prd",    label: "PRD" },
   { id: "design", label: "Design Document" },
-  { id: "trd",    label: "Technical Specs" },
-  { id: "qa",     label: "QA Plan" },
+  { id: "trd",    label: "Technical Specs", hideForTiers: ["S"] },
+  { id: "qa",     label: "QA Plan",         hideForTiers: ["S"] },
 ];
 
 export default function PrdSubStage() {
@@ -385,6 +385,14 @@ export default function PrdSubStage() {
   const rerunPrd         = usePipelineStore((s) => s.rerunPrd);
   const goToSubStage     = useStageStore((s) => s.goToSubStage);
   const goToStage        = useStageStore((s) => s.goToStage);
+  const tier = usePipelineStore(
+    (s) => (s.steps.intent?.metadata as { classification?: { tier?: string } } | undefined)?.classification?.tier ?? "M"
+  );
+  const projectType = usePipelineStore(
+    (s) => (s.steps.intent?.metadata as { classification?: { type?: string } } | undefined)?.classification?.type ?? "unknown"
+  );
+  const sessionId = usePipelineStore((s) => s.kickoffSessionId);
+  const DOC_TABS = ALL_DOC_TABS.filter((t) => !t.hideForTiers?.includes(tier));
   const isStageHydrated  = useStageStore((s) => s.isStageHydrated);
 
   const [editInput, setEditInput] = useState("");
@@ -687,7 +695,31 @@ export default function PrdSubStage() {
         actions={
           <div className="flex items-center gap-3 shrink-0">
             <button
-              onClick={() => goToSubStage("design", "preparation")}
+              onClick={() => {
+                // Fire-and-forget: capture a prd-pattern memory so future
+                // PRD generations for similar projects can recall it. We
+                // intentionally don't await — memory writes must never block
+                // the user from advancing to the next step.
+                const original = prdHistoryRef.current[0]?.content ?? "";
+                const final = step?.content ?? content;
+                if (sessionId && final && final.length > 100) {
+                  fetch("/api/memory/prd/capture", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      sessionId,
+                      tier,
+                      projectType,
+                      originalPrd: original,
+                      finalPrd: final,
+                      source: original === final ? "human_approval" : "human_edit",
+                    }),
+                  }).catch(() => {
+                    // memory write failure must not surface to the user
+                  });
+                }
+                goToSubStage("design", "preparation");
+              }}
               className="flex items-center gap-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95"
             >
               Confirm PRD

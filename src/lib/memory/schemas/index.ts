@@ -39,6 +39,12 @@ const REGISTRY: Partial<Record<MemoryKind, KindSpec>> = {
   // L2 — Phase C
   "self-heal-log": { format: "json", schema: SelfHealLogBodySchema },
 
+  // L1 — Phase D (preparation-phase patterns)
+  // Free-form markdown: pattern body is a short natural-language guidance
+  // string the next PRD/Design agent prompt can consume verbatim.
+  "prd-pattern": { format: "markdown", maxBytes: 4 * 1024 },
+  "design-pattern": { format: "markdown", maxBytes: 4 * 1024 },
+
   // Other kinds — markdown by default until their schema lands
   // (failure-pattern, decision, handoff-note, etc.)
 };

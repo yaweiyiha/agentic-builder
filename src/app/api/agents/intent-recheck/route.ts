@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { streamChatCompletion, resolveModel } from "@/lib/openrouter";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import { classifyProject } from "@/lib/agents/shared/project-classifier";
 
 /**
  * POST /api/agents/intent-recheck
@@ -173,6 +174,25 @@ export async function POST(request: NextRequest) {
                   }));
                 }
               }
+
+              // When intent is all_clear, classify the project tier so the store
+              // can filter UI tabs (TRD, QA) before startPipeline is called.
+              let classificationMeta: Record<string, unknown> | undefined;
+              if (parsed.all_clear) {
+                try {
+                  const classification = await classifyProject(brief);
+                  classificationMeta = {
+                    tier: classification.tier,
+                    type: classification.type,
+                    needsBackend: classification.needsBackend,
+                    needsDatabase: classification.needsDatabase,
+                    reasoning: classification.reasoning,
+                  };
+                } catch {
+                  // Non-fatal — startPipeline will classify again
+                }
+              }
+
               controller.enqueue(send({
                 type: "step_complete",
                 stepId: "intent",
@@ -181,6 +201,7 @@ export async function POST(request: NextRequest) {
                   status: "completed",
                   content: JSON.stringify(parsed),
                   timestamp: new Date().toISOString(),
+                  ...(classificationMeta ? { metadata: { classification: classificationMeta } } : {}),
                 },
               }));
             } catch {

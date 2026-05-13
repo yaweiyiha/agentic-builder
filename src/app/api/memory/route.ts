@@ -9,7 +9,12 @@ export const maxDuration = 30;
  *  doc §12.7 three-layer architecture. */
 export type StatusFilter = "all" | "active" | "shadow" | "deprecated" | "approved";
 
-const SUPPORTED_KINDS: MemoryKind[] = ["failure-pattern", "classification"];
+const SUPPORTED_KINDS: MemoryKind[] = [
+  "failure-pattern",
+  "classification",
+  "prd-pattern",
+  "design-pattern",
+];
 const ACTIVE_THRESHOLD = 0.3;
 
 export interface MemoryListItem {

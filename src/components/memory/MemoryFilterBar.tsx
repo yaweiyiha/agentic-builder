@@ -30,6 +30,8 @@ export default function MemoryFilterBar() {
   const attributionRunning = useMemoryStore((s) => s.attributionRunning);
   const attributionResult = useMemoryStore((s) => s.attributionResult);
   const attributionError = useMemoryStore((s) => s.attributionError);
+  const prepAttributionResult = useMemoryStore((s) => s.prepAttributionResult);
+  const prepAttributionError = useMemoryStore((s) => s.prepAttributionError);
   const dismissAttribution = useMemoryStore((s) => s.dismissAttribution);
 
   const [confirmReset, setConfirmReset] = useState(false);
@@ -124,6 +126,13 @@ export default function MemoryFilterBar() {
           onDismiss={dismissAttribution}
         />
       )}
+      {(prepAttributionResult || prepAttributionError) && (
+        <PrepAttributionResultBanner
+          result={prepAttributionResult}
+          error={prepAttributionError}
+          onDismiss={dismissAttribution}
+        />
+      )}
     </div>
   );
 }
@@ -157,7 +166,7 @@ function AttributionResultBanner({
   return (
     <div className="flex items-start justify-between gap-4 border-t border-emerald-200 bg-emerald-50 px-6 py-2 text-sm text-emerald-900">
       <div>
-        <span className="font-medium">Attribution complete.</span>{" "}
+        <span className="font-medium">Codegen attribution complete.</span>{" "}
         Considered {result.stats.taskHistoryConsidered} tasks · attributed{" "}
         {result.stats.newlyAttributedPairs} new pair(s) · touched{" "}
         {result.stats.patternsTouched} pattern(s) · applied{" "}
@@ -171,6 +180,56 @@ function AttributionResultBanner({
       <button
         onClick={onDismiss}
         className="text-emerald-700 hover:text-emerald-900"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function PrepAttributionResultBanner({
+  result,
+  error,
+  onDismiss,
+}: {
+  result: ReturnType<typeof useMemoryStore.getState>["prepAttributionResult"];
+  error: string | null;
+  onDismiss: () => void;
+}) {
+  if (error) {
+    return (
+      <div className="flex items-start justify-between gap-4 border-t border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-900">
+        <div>
+          <span className="font-medium">PRD/Design attribution failed:</span> {error}
+        </div>
+        <button
+          onClick={onDismiss}
+          className="text-amber-700 hover:text-amber-900"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+  if (!result) return null;
+  const moved = result.attributions.filter((a) => !a.immune && a.delta !== 0).length;
+  return (
+    <div className="flex items-start justify-between gap-4 border-t border-sky-200 bg-sky-50 px-6 py-2 text-sm text-sky-900">
+      <div>
+        <span className="font-medium">PRD/Design attribution complete.</span>{" "}
+        Considered {result.stats.outcomeEventsConsidered} confirmation(s) · attributed{" "}
+        {result.stats.newlyAttributedPairs} new session(s) · touched{" "}
+        {result.stats.patternsTouched} pattern(s) · applied{" "}
+        <span className="font-mono">{result.applied}</span> score change(s).
+        {moved > 0 && (
+          <span className="ml-1 text-sky-700">
+            ({moved} moved, others were immune or net-zero.)
+          </span>
+        )}
+      </div>
+      <button
+        onClick={onDismiss}
+        className="text-sky-700 hover:text-sky-900"
       >
         ✕
       </button>

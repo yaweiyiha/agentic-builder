@@ -134,15 +134,19 @@ export default function PipelineBreadcrumb({
   const l2Items = useMemo(() => {
     const stage = stages.find((s) => s.id === activeStageId);
     if (!stage?.children) return [];
+    // PRD must be completed before tier-gated groups (Tech Docs, Quality) are visible.
+    // Until then we don't know if the project is S-tier (no TRD/QA) or M/L-tier.
+    const prdDone = (stepStates["prd"] as { status?: string } | null | undefined)?.status === "completed";
     return stage.children
       .filter((g) => g.id !== "initial")
       .filter((g) => !g.tiers || g.tiers.includes(tier))
+      .filter((g) => !g.tiers || prdDone)
       .map((g) => ({
         id: g.id,
         label: GROUP_LABELS[g.id as keyof typeof GROUP_LABELS] ?? g.label,
         parallelHint: g.parallel && (g.children?.length ?? 0) > 1,
       }));
-  }, [stages, activeStageId, tier]);
+  }, [stages, activeStageId, tier, stepStates]);
 
   const activeGroupId = currentPath?.group.id ?? (l2Items[0]?.id ?? null);
 

@@ -13,7 +13,6 @@ import {
   listScaffoldTemplateRelativePaths,
   type ScaffoldTier,
 } from "@/lib/pipeline/scaffold-copy";
-import { distributeSharedSchema } from "@/lib/pipeline/shared-schema-distributor";
 import {
   distributeSharedSchema,
   distributePipelineDag,
@@ -33,6 +32,7 @@ import {
   upsertBackendPrivyAppIdMirror,
   resolvePrivyAppIdMirrorFromFilledResources,
 } from "@/lib/pipeline/generated-code-env";
+import { normalizeProjectTier } from "@/lib/agents/shared/project-classifier";
 import {
   readResourceRequirements,
   upsertResourceEnvVars,
@@ -636,6 +636,34 @@ function detectOauthIntegrations(
   return matches;
 }
 
+/**
+ * Resolve the scaffold tier for a coding session.
+ * Priority: explicit `projectTier` arg → PRD.md badge in outputDir → default "M".
+ * Defaulting to "M" for pure-frontend (S-tier) projects causes a backend
+ * directory to be scaffolded, which in turn breaks E2E because playwright.config.ts
+ * tries to start a backend server that can't connect to any database.
+ */
+async function resolveTier(
+  projectTier: string | undefined,
+  outputRoot: string,
+): Promise<ScaffoldTier> {
+  if (projectTier) return projectTier.toUpperCase() as ScaffoldTier;
+  try {
+    const prdPath = path.join(outputRoot, "PRD.md");
+    const prdContent = await fs.readFile(prdPath, "utf-8");
+    const match = prdContent.match(/\*\*Project Tier:\s*([SML])\*\*/i);
+    if (match) {
+      const extracted = normalizeProjectTier(match[1]);
+      console.log(`[CodingAPI] Resolved tier from PRD.md badge: ${extracted}`);
+      return extracted as ScaffoldTier;
+    }
+  } catch {
+    // PRD.md may not exist yet; fall through to default
+  }
+  console.warn("[CodingAPI] projectTier not provided and PRD.md has no tier badge — defaulting to M");
+  return "M";
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const {
@@ -756,7 +784,7 @@ export async function POST(request: NextRequest) {
     `[CodingAPI] Cleaned output directory: ${outputRoot} (removed ${removedCount} entries)`,
   );
 
-  const tier = (projectTier ?? "M").toUpperCase() as ScaffoldTier;
+  const tier = await resolveTier(projectTier, outputRoot);
 
   // Read user-provided resource requirements (API keys, OAuth secrets, etc.)
   // collected during the kickoff phase BEFORE the scaffold copy so the

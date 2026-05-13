@@ -25,7 +25,9 @@ export interface ProjectClassification {
   durationMs: number;
 }
 
-export function normalizeProjectTier(_tier?: string | null): ProjectTier {
+export function normalizeProjectTier(tier?: string | null): ProjectTier {
+  const t = (tier ?? "M").toUpperCase();
+  if (t === "S" || t === "M" || t === "L") return t as ProjectTier;
   return "M";
 }
 

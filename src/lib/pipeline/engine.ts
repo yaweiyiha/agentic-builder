@@ -56,6 +56,15 @@ import {
   repairTaskCoverage,
   repairMissingBackendPhase,
 } from "./self-heal";
+import {
+  recallPrdContext,
+  recallDesignContext,
+} from "@/lib/memory/preparation-recall";
+import {
+  parseMemoryCites,
+  recordMemoryCites,
+  stripMemoryCites,
+} from "@/lib/memory/cite";
 
 type EventHandler = (event: PipelineEvent) => void;
 
@@ -290,6 +299,17 @@ export class PipelineEngine {
         };
       }
     } else {
+      // Recall PRD-pattern memory (L1, cross-project) and inject as
+      // additionalContext. When MEMORY_PRD_INJECT is off the recall still
+      // runs (trace-only) but contextChunk is empty.
+      const prdRecall = await recallPrdContext({
+        sessionId: run.sessionId,
+        featureBrief: run.featureBrief,
+        tier,
+        projectType: classification?.type,
+      });
+      const prdAdditionalContext = prdRecall.contextChunk || undefined;
+
       run = await this.executeStep(run, "prd", () =>
         pmAgent.generatePRDStreaming(
           run.featureBrief,
@@ -301,11 +321,32 @@ export class PipelineEngine {
               data: { chunk, chunkType },
             });
           },
-          undefined,
+          prdAdditionalContext,
           run.sessionId,
         ),
       );
       if (run.status === "failed") return run;
+
+      // Parse & log cites; strip the `<memory-cite />` tag from the
+      // persisted PRD content so it never leaks into downstream agents
+      // or the user-visible document.
+      const prdContent = run.steps.prd?.content ?? "";
+      if (prdRecall.active.length > 0 && prdContent) {
+        const cited = parseMemoryCites(prdContent);
+        if (cited.length > 0) {
+          await recordMemoryCites({
+            traceRoot: process.cwd(),
+            agent: "pm",
+            kickoffId: run.sessionId,
+            citedIds: cited,
+            injectedIds: prdRecall.active.map((r) => r.id),
+          });
+        }
+        const stripped = stripMemoryCites(prdContent);
+        if (stripped !== prdContent && run.steps.prd) {
+          run.steps.prd = { ...run.steps.prd, content: stripped };
+        }
+      }
 
       run = this.attachPrdSpecGateToPrdStep(run);
       run = await this.attachPrdStructuredSpec(run);
@@ -494,10 +535,38 @@ export class PipelineEngine {
       }
 
       // ── Design Spec (always run) ──
+      const designRecall = await recallDesignContext({
+        sessionId: run.sessionId,
+        featureBrief: run.featureBrief,
+        tier,
+        projectType: classification?.type,
+        prdContent,
+      });
+      const designAdditionalContext = designRecall.contextChunk || undefined;
+
       run = await this.executeStep(run, "design", () =>
-        this.designAgent.generateDesign(prdContent, undefined, run.sessionId),
+        this.designAgent.generateDesign(prdContent, designAdditionalContext, run.sessionId),
       );
       if (run.status === "failed") return run;
+
+      // Parse cite tags emitted by the design agent (best-effort)
+      const designContent = run.steps.design?.content ?? "";
+      if (designRecall.active.length > 0 && designContent) {
+        const cited = parseMemoryCites(designContent);
+        if (cited.length > 0) {
+          await recordMemoryCites({
+            traceRoot: process.cwd(),
+            agent: "design",
+            kickoffId: run.sessionId,
+            citedIds: cited,
+            injectedIds: designRecall.active.map((r) => r.id),
+          });
+        }
+        const stripped = stripMemoryCites(designContent);
+        if (stripped !== designContent && run.steps.design) {
+          run.steps.design = { ...run.steps.design, content: stripped };
+        }
+      }
 
       // ── Pencil (disabled — preserved for future re-enable) ──
       // const designContent = run.steps.design?.content ?? "";

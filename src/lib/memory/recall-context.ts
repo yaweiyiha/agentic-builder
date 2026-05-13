@@ -63,6 +63,12 @@ export interface RecallContextOptions {
    * logged as op:"reinject" so downstream analytics can distinguish.
    */
   pass?: "primary" | "secondary";
+  /**
+   * Override the inject gate. Defaults to `memoryInjectEnabled()` when
+   * omitted. Phase-specific callers (PRD/Design) pass their own gate so a
+   * single global flag isn't required.
+   */
+  injectEnabled?: () => boolean;
 }
 
 export interface RecallContextResult {
@@ -124,7 +130,7 @@ export async function recallAndPrepareInject(
       else shadow.push(r);
     }
 
-    const injectAllowed = memoryInjectEnabled();
+    const injectAllowed = (opts.injectEnabled ?? memoryInjectEnabled)();
     let block = "";
     let estimatedTokens = 0;
     if (injectAllowed && active.length > 0) {

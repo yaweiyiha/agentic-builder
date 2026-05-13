@@ -28,7 +28,17 @@ export type TraceOp =
   | "reinject"
   /** Worker-emitted citation: which injected patterns the model claimed
    *  to actually use. Drives fine-grained attribution. */
-  | "cite";
+  | "cite"
+  /**
+   * Human verdict on a preparation-phase artifact (PRD or Design). Emitted
+   * by the capture endpoints with details =
+   *   { phase: "prd" | "design", source: "human_approval" | "human_edit",
+   *     newRecordId: string, projectType, tier }
+   * Drives PRD/Design attribution: when a session ends in human_approval the
+   * patterns injected into that session's prep agent get +score; on
+   * human_edit they get -score.
+   */
+  | "prep-outcome";
 
 export interface TraceEvent {
   ts: number;

@@ -1671,10 +1671,11 @@ function summarizeE2eTaskContext(tasks: CodingTask[]): string {
 }
 
 /**
- * The canonical `webServer` block — must start BOTH the backend (on :4000,
- * health-probed at /api/health) and the frontend (on :5173). The Vite dev
- * server proxies `/api/*` to the backend, so the backend MUST be running
- * before any API-driven Playwright test executes.
+ * The canonical `webServer` block for M-tier projects — must start BOTH the
+ * backend (on :4000, health-probed at /api/health) and the frontend (on :5173).
+ * The Vite dev server proxies `/api/*` to the backend, so the backend MUST be
+ * running before any API-driven Playwright test executes.
+ * Only used when backend/package.json exists (M-tier layout).
  */
 const PLAYWRIGHT_CONFIG_CANONICAL = `import { defineConfig, devices } from "@playwright/test";
 
@@ -1725,10 +1726,11 @@ export default defineConfig({
 /**
  * Audit (and auto-repair) the frontend `playwright.config.ts` so its
  * `webServer` field always starts BOTH the backend and the frontend in
- * m-tier projects. The single most common cause of last-mile e2e `infra`
- * failures is a worker collapsing the `webServer` array back to a single
- * object, which leaves the backend offline and every API-touching test
- * fails with ECONNREFUSED through the Vite proxy.
+ * M-tier projects (those that have a `backend/` directory). The single most
+ * common cause of last-mile e2e `infra` failures is a worker collapsing the
+ * `webServer` array back to a single object, which leaves the backend offline
+ * and every API-touching test fails with ECONNREFUSED through the Vite proxy.
+ * For S-tier projects (no backend/package.json), this is a no-op.
  */
 async function ensurePlaywrightConfigStartsBackend(
   outputDir: string,
@@ -2332,8 +2334,8 @@ async function e2eVerifyAndFix(
         "",
         "## Rules",
         "- NEVER modify any file that matches *.spec.ts, *.spec.tsx, *.test.ts, *.test.tsx.",
-        "- NEVER modify `frontend/playwright.config.ts`'s `webServer` field. It MUST stay an ARRAY that starts BOTH the backend (`cd ../backend && pnpm dev`, health probe `http://localhost:4000/api/health`) AND the frontend (`pnpm dev`). Collapsing it into a single object is the #1 cause of `infra: ECONNREFUSED` failures and the supervisor will rewrite it back.",
-        "- NEVER delete `backend/src/api/modules/health/health.routes.ts` or remove the `registerHealthRoutes(...)` call in `backend/src/api/modules/index.ts`. The Playwright `webServer` health probe at `/api/health` depends on it.",
+        "- NEVER modify `frontend/playwright.config.ts`'s `webServer` field for M-tier projects (projects that have a `backend/` directory). For those projects it MUST stay an ARRAY that starts BOTH the backend (`cd ../backend && pnpm dev`, health probe `http://localhost:4000/api/health`) AND the frontend (`pnpm dev`). Collapsing it into a single object is the #1 cause of `infra: ECONNREFUSED` failures and the supervisor will rewrite it back. For S-tier projects (no `backend/` directory), the `webServer` field SHOULD be a single frontend-only object — do NOT add a backend entry.",
+        "- NEVER delete `backend/src/api/modules/health/health.routes.ts` or remove the `registerHealthRoutes(...)` call in `backend/src/api/modules/index.ts` in M-tier projects. The Playwright `webServer` health probe at `/api/health` depends on it.",
         "- Treat every locator, URL, button label, and aria-label in the test files as the ground truth for what the UI must render.",
         "- When a test expects a button named 'Go Home', the source component MUST render a button with that exact accessible name.",
         "- When a test navigates to /dashboard or /settings, those routes MUST exist and render the correct page.",
@@ -6857,16 +6859,14 @@ export async function auditApiRouteRegistration(
     /\b(?:router|apiRouter|[A-Za-z_$][\w$]*Router)\.(get|post|put|patch|delete|all|options|head)\s*\(\s*["'`]([^"'`]+)["'`]/g;
   const inlineNewRouterRe =
     /new\s+Router\s*\([^)]*\)\.(get|post|put|patch|delete|all|options|head)\s*\(\s*["'`]([^"'`]+)["'`]/g;
+  // Form 1: `apiRouter.use("/prefix", router.routes())`  — explicit string in .use()
   const mountPrefixRe =
     /apiRouter\.use\s*\(\s*["'`]([^"'`]+)["'`]\s*,\s*(?:router|[A-Za-z_$][\w$]*Router)\.routes/;
-  // Sub-router prefix declared INSIDE the routes file:
-  //   `const router = new Router({ prefix: "/v1/monitor" })`
-  // followed by `apiRouter.use(router.routes(), ...)` — the audit was
-  // previously blind to this pattern and emitted phantom "missing
-  // contract" findings (run f601032c had 16 of these — all the same
-  // bug). When index.ts mounts the sub-router WITHOUT a string prefix,
-  // the sub-router's own `prefix:` is the effective mount.
-  const subRouterPrefixRe =
+  // Form 2: `new Router({ prefix: "/prefix" })` — prefix in constructor, then
+  // `apiRouter.use(router.routes(), ...)` with NO string argument.  This is the
+  // pattern Koa codegen uses for autogen/routes.ts and must be detected separately.
+  // Previously blind to this, which caused phantom "missing contract" findings.
+  const routerCtorPrefixRe =
     /new\s+Router\s*\(\s*\{[^}]*\bprefix\s*:\s*["'`]([^"'`]+)["'`]/;
 
   for (const rel of moduleFiles) {
@@ -6885,7 +6885,9 @@ export async function auditApiRouteRegistration(
       exportNames.push(enm[1]);
     }
     const mountMatch = content.match(mountPrefixRe);
-    const subRouterPrefixMatch = content.match(subRouterPrefixRe);
+    // Fall back to constructor-based prefix when the .use("/prefix", ...) form
+    // is absent — i.e. the sub-router was created with `new Router({ prefix })`.
+    const ctorPrefixMatch = mountMatch ? null : content.match(routerCtorPrefixRe);
     const endpoints: Array<{ method: string; endpoint: string }> = [];
     const seen = new Set<string>();
     const pushEndpoint = (method: string, endpoint: string): void => {
@@ -6919,8 +6921,8 @@ export async function auditApiRouteRegistration(
         ? null
         : mountMatch
           ? mountMatch[1]
-          : subRouterPrefixMatch
-            ? subRouterPrefixMatch[1]
+          : ctorPrefixMatch
+            ? ctorPrefixMatch[1]
             : null,
       endpoints,
     });

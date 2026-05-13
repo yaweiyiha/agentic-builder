@@ -28,6 +28,31 @@ export interface AttributionRunResult {
   projectRoot: string;
 }
 
+export interface PrepAttributionRunResult {
+  ok: true;
+  applied: number;
+  attributions: Array<{
+    patternId: string;
+    oldScore: number;
+    newScore: number;
+    delta: number;
+    approvals: number;
+    edits: number;
+    immune: boolean;
+    source: string;
+    phase: string;
+  }>;
+  stats: {
+    outcomeEventsConsidered: number;
+    outcomeEventsSkippedAlreadyAttributed: number;
+    outcomeEventsSkippedNoInjection: number;
+    injectEventsConsidered: number;
+    patternsTouched: number;
+    newlyAttributedPairs: number;
+  };
+  l1Root: string;
+}
+
 interface MemoryState {
   items: MemoryListItem[];
   total: number;
@@ -46,6 +71,9 @@ interface MemoryState {
   attributionRunning: boolean;
   attributionResult: AttributionRunResult | null;
   attributionError: string | null;
+  /** Result of the parallel preparation-phase attribution call. */
+  prepAttributionResult: PrepAttributionRunResult | null;
+  prepAttributionError: string | null;
 
   fetchList: () => Promise<void>;
   setActive: (id: string | null) => void;
@@ -70,7 +98,12 @@ interface MemoryState {
   dismissAttribution: () => void;
 }
 
-const SUPPORTED_KINDS_DEFAULT: MemoryKind[] = ["failure-pattern", "classification"];
+const SUPPORTED_KINDS_DEFAULT: MemoryKind[] = [
+  "failure-pattern",
+  "classification",
+  "prd-pattern",
+  "design-pattern",
+];
 
 export const useMemoryStore = create<MemoryState>((set, get) => ({
   items: [],
@@ -90,6 +123,8 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   attributionRunning: false,
   attributionResult: null,
   attributionError: null,
+  prepAttributionResult: null,
+  prepAttributionError: null,
 
   fetchList: async () => {
     set({ loading: true, error: null });
@@ -195,40 +230,97 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
   },
   runAttribution: async (opts = {}) => {
-    set({ attributionRunning: true, attributionError: null, attributionResult: null });
-    try {
-      const resp = await fetch("/api/memory/attribute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectRoot: opts.projectRoot,
-          resetCursor: opts.resetCursor === true,
-          dryRun: opts.dryRun === true,
-        }),
-      });
-      const data = (await resp.json()) as
-        | AttributionRunResult
-        | { error: string };
-      if (!resp.ok || "error" in data) {
-        const err = "error" in data ? data.error : `HTTP ${resp.status}`;
-        set({ attributionRunning: false, attributionError: err });
-        return null;
+    set({
+      attributionRunning: true,
+      attributionError: null,
+      attributionResult: null,
+      prepAttributionError: null,
+      prepAttributionResult: null,
+    });
+
+    // Run failure-pattern + preparation attribution in parallel. Either
+    // can fail independently — we surface whichever errors and proceed
+    // with the other's result.
+    const failurePromise = (async (): Promise<{
+      data: AttributionRunResult | null;
+      error: string | null;
+    }> => {
+      try {
+        const resp = await fetch("/api/memory/attribute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectRoot: opts.projectRoot,
+            resetCursor: opts.resetCursor === true,
+            dryRun: opts.dryRun === true,
+          }),
+        });
+        const data = (await resp.json()) as
+          | AttributionRunResult
+          | { error: string };
+        if (!resp.ok || "error" in data) {
+          const err = "error" in data ? data.error : `HTTP ${resp.status}`;
+          return { data: null, error: err };
+        }
+        return { data, error: null };
+      } catch (err) {
+        return {
+          data: null,
+          error: err instanceof Error ? err.message : String(err),
+        };
       }
-      set({ attributionRunning: false, attributionResult: data });
-      // Refresh list so updated scores show up immediately.
-      if (!opts.dryRun) await get().fetchList();
-      return data;
-    } catch (err) {
-      set({
-        attributionRunning: false,
-        attributionError: err instanceof Error ? err.message : String(err),
-      });
-      return null;
-    }
+    })();
+
+    const prepPromise = (async (): Promise<{
+      data: PrepAttributionRunResult | null;
+      error: string | null;
+    }> => {
+      try {
+        const resp = await fetch("/api/memory/attribute/preparation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            resetCursor: opts.resetCursor === true,
+            dryRun: opts.dryRun === true,
+          }),
+        });
+        const data = (await resp.json()) as
+          | PrepAttributionRunResult
+          | { error: string };
+        if (!resp.ok || "error" in data) {
+          const err = "error" in data ? data.error : `HTTP ${resp.status}`;
+          return { data: null, error: err };
+        }
+        return { data, error: null };
+      } catch (err) {
+        return {
+          data: null,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    })();
+
+    const [failureRes, prepRes] = await Promise.all([failurePromise, prepPromise]);
+
+    set({
+      attributionRunning: false,
+      attributionResult: failureRes.data,
+      attributionError: failureRes.error,
+      prepAttributionResult: prepRes.data,
+      prepAttributionError: prepRes.error,
+    });
+
+    if (!opts.dryRun) await get().fetchList();
+    return failureRes.data;
   },
 
   dismissAttribution: () => {
-    set({ attributionResult: null, attributionError: null });
+    set({
+      attributionResult: null,
+      attributionError: null,
+      prepAttributionResult: null,
+      prepAttributionError: null,
+    });
   },
 
   deleteRecord: async (id) => {

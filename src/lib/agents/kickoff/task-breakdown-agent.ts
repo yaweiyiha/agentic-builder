@@ -230,6 +230,7 @@ The same split applies to the Markets scanner pipeline (Twitter API + Jina + Ope
 - **Derive** the list by: (1) enumerating what must exist in code to satisfy the PRD; (2) grouping into tasks that respect dependencies and parallelizable units; (3) **merging** work that belongs in one deliverable; **splitting** only when dependency order or review boundaries require it.
 - **Fewer tasks** for narrow PRDs; **more tasks** only when the PRD truly implies many separable surfaces (many pages, many services, strict phases). Never add filler tasks to match an imagined count.
 - **ProjectTier** (S/M/L) below is a **style and stack hint** — it does **not** set a minimum or maximum number of tasks.
+- **HARD LIMIT — S-tier**: Simple frontend projects MUST NOT exceed **4 tasks total**. If generating more than 4 tasks for S-tier, merge related work until at or below 4. Typical breakdown: (1) Scaffolding + project setup, (2) Core feature(s), (3) UI polish + integration, (4) optional infra — collapse further for thin-scope PRDs.
 
 ## Project tier hint (style only — not task count)
 ${tierStyle}

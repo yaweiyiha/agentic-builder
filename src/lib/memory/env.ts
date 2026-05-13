@@ -28,3 +28,25 @@ export function memoryCacheEnabled(): boolean {
   if (!memoryEnabled()) return false;
   return parseBool(process.env.MEMORY_CACHE, true);
 }
+
+/**
+ * Phase-specific inject toggles. Default off so PRD/Design memory can be
+ * collected for several runs (writes-only) before flipping on prompt
+ * injection. Falls back to MEMORY_INJECT when the phase-specific flag is
+ * unset, allowing a single global switch when desired.
+ */
+export function memoryInjectEnabledForPrd(): boolean {
+  if (!memoryEnabled()) return false;
+  if (process.env.MEMORY_PRD_INJECT !== undefined) {
+    return parseBool(process.env.MEMORY_PRD_INJECT, false);
+  }
+  return memoryInjectEnabled();
+}
+
+export function memoryInjectEnabledForDesign(): boolean {
+  if (!memoryEnabled()) return false;
+  if (process.env.MEMORY_DESIGN_INJECT !== undefined) {
+    return parseBool(process.env.MEMORY_DESIGN_INJECT, false);
+  }
+  return memoryInjectEnabled();
+}

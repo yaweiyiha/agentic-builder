@@ -17,6 +17,7 @@ export default function QaSubStage() {
   const content = isThisRunning ? streamingContent : (step?.content ?? "");
   const isDone  = step?.status === "completed";
 
+  // Auto-trigger QA generation if not yet generated and nothing is running
   useEffect(() => {
     if (!step && !isRunning) {
       runQa();

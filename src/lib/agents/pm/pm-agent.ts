@@ -392,6 +392,29 @@ const TIER_MAX_TOKENS: Record<ProjectTier, number> = {
   L: 24576,
 };
 
+const TIER_FULL_NAMES: Record<ProjectTier, string> = {
+  S: "Simple (single-page / micro-tool)",
+  M: "Standard (full-stack application)",
+  L: "Enterprise (complex platform)",
+};
+
+/**
+ * Injects a tier badge line immediately after the first top-level heading
+ * in the PRD markdown.  Idempotent — skips injection if the badge is already
+ * present (e.g. on a re-edit flow).
+ */
+function injectTierBadge(content: string, tier: ProjectTier): string {
+  const badge = `\n> **Project Tier: ${tier}** — ${TIER_FULL_NAMES[tier]}\n`;
+  if (content.includes(`**Project Tier: ${tier}**`)) return content;
+  const lines = content.split("\n");
+  const headingIdx = lines.findIndex((l) => l.startsWith("# "));
+  if (headingIdx >= 0) {
+    lines.splice(headingIdx + 1, 0, badge);
+    return lines.join("\n");
+  }
+  return badge + content;
+}
+
 export class PMAgent extends BaseAgent {
   private tier: ProjectTier;
 
@@ -421,12 +444,14 @@ export class PMAgent extends BaseAgent {
           ? "Generate a practical PRD for this application"
           : "Generate a comprehensive, enterprise-grade PRD for the following feature brief";
 
-    return this.run(
+    const result = await this.run(
       `${tierHint}. **Your entire response must be formatted as valid Markdown** — use ATX headings, Markdown tables, and fenced code blocks exactly as specified in the output format. Do not output plain prose without structure.\n\n${featureBrief}`,
       additionalContext,
       "step-prd",
       sessionId,
     );
+    if (result.content) result.content = injectTierBadge(result.content, this.tier);
+    return result;
   }
 
   async generatePRDStreaming(
@@ -451,6 +476,7 @@ export class PMAgent extends BaseAgent {
       "step-prd",
       sessionId,
     );
+    if (result.content) result.content = injectTierBadge(result.content, this.tier);
     return result;
   }
 

@@ -14,8 +14,6 @@ export async function POST(request: NextRequest) {
     codeOutputDir,
     fastFromPrd,
     pauseAfterPrd,
-    prdEditInstruction,
-    existingPrd,
     sessionId,
     prdEditInstruction,
     existingPrd,
@@ -24,8 +22,6 @@ export async function POST(request: NextRequest) {
     codeOutputDir?: string;
     fastFromPrd?: boolean;
     pauseAfterPrd?: boolean;
-    prdEditInstruction?: string;
-    existingPrd?: string;
     /** Stable client-generated id linking this pipeline run with a
      *  subsequent kickoff so memory records share the same kickoffId. */
     sessionId?: string;

@@ -473,6 +473,10 @@ function kindPrefix(kind: MemoryKind): string {
       return "AT";
     case "model-routing":
       return "MR";
+    case "prd-pattern":
+      return "PRD";
+    case "design-pattern":
+      return "DSG";
     case "project-card":
       return "PC";
     case "task-history":

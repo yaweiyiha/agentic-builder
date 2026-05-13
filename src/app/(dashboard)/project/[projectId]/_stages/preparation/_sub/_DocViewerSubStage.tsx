@@ -16,15 +16,16 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStageStore } from "@/store/stage-store";
+import { usePipelineStore } from "@/store/pipeline-store";
 import type { PreparationSubStageId } from "@/store/stage-store";
 
 type DocTab = "prd" | "design" | "trd" | "qa";
 
-const DOC_TABS: { id: DocTab; label: string }[] = [
+const ALL_DOC_TABS: { id: DocTab; label: string; hideForTiers?: string[] }[] = [
   { id: "prd",    label: "PRD" },
   { id: "design", label: "Design Document" },
-  { id: "trd",    label: "Technical Specs" },
-  { id: "qa",     label: "QA Plan" },
+  { id: "trd",    label: "Technical Specs", hideForTiers: ["S"] },
+  { id: "qa",     label: "QA Plan",         hideForTiers: ["S"] },
 ];
 
 interface Props {
@@ -87,6 +88,10 @@ export default function DocViewerSubStage({
   const [editInput, setEditInput] = useState("");
   const goToSubStage = useStageStore((s) => s.goToSubStage);
   const goToStage    = useStageStore((s) => s.goToStage);
+  const tier = usePipelineStore(
+    (s) => (s.steps.intent?.metadata as { classification?: { tier?: string } } | undefined)?.classification?.tier ?? "M"
+  );
+  const DOC_TABS = ALL_DOC_TABS.filter((t) => !t.hideForTiers?.includes(tier));
 
   const statusLabel = isRunning ? generatingLabel : isDone ? "DRAFT V1.0" : "PENDING";
 

@@ -1,30 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { resolveCodeOutputRoot } from "@/lib/pipeline/code-output";
 
 /**
  * PRD import endpoint — lets the user bring their own PRD instead of having
  * the PM agent regenerate one every time.
  *
- * Mechanics: when this endpoint writes `.blueprint/PRD.md`, the next pipeline
- * run sees it via `PipelineEngine.readImportedPrd()` (engine.ts) and skips
- * the PM agent's `generatePRDStreaming` call entirely — the file's content
- * becomes the PRD step's output verbatim. The structured-spec extractor
- * (`attachPrdStructuredSpec`) still runs against this content so
- * domain.rules and other downstream fields are extracted normally.
+ * Mechanics: when this endpoint writes `<outputRoot>/.blueprint/PRD.md`, the
+ * next pipeline run sees it via `PipelineEngine.readImportedPrd()` (engine.ts)
+ * and skips the PM agent's `generatePRDStreaming` call entirely — the file's
+ * content becomes the PRD step's output verbatim. The structured-spec extractor
+ * (`attachPrdStructuredSpec`) still runs against this content so domain.rules
+ * and other downstream fields are extracted normally.
+ *
+ * `codeOutputDir` is passed as a query param (GET/DELETE) or body field (POST)
+ * to scope the imported PRD to a specific project output directory. This prevents
+ * one project's imported PRD from leaking into a different project.
  */
 
-const BLUEPRINT_DIR = ".blueprint";
+const BLUEPRINT_SUBDIR = ".blueprint";
 const PRD_FILE_NAME = "PRD.md";
 
 const MAX_IMPORT_BYTES = 500_000;
 
-function blueprintDir() {
-  return path.resolve(process.cwd(), BLUEPRINT_DIR);
+function resolveOutputRoot(codeOutputDir?: string | null): string {
+  return resolveCodeOutputRoot(process.cwd(), codeOutputDir ?? undefined);
 }
 
-function prdFilePath() {
-  return path.join(blueprintDir(), PRD_FILE_NAME);
+function blueprintDir(outputRoot: string): string {
+  return path.join(outputRoot, BLUEPRINT_SUBDIR);
+}
+
+function prdFilePath(outputRoot: string): string {
+  return path.join(blueprintDir(outputRoot), PRD_FILE_NAME);
 }
 
 interface ImportedPrdStatus {
@@ -34,9 +43,9 @@ interface ImportedPrdStatus {
   preview: string;
 }
 
-async function readImportedPrdStatus(): Promise<ImportedPrdStatus> {
+async function readImportedPrdStatus(outputRoot: string): Promise<ImportedPrdStatus> {
   try {
-    const filePath = prdFilePath();
+    const filePath = prdFilePath(outputRoot);
     const [raw, stat] = await Promise.all([
       fs.readFile(filePath, "utf-8"),
       fs.stat(filePath),
@@ -56,18 +65,20 @@ async function readImportedPrdStatus(): Promise<ImportedPrdStatus> {
   }
 }
 
-export async function GET() {
-  const status = await readImportedPrdStatus();
+export async function GET(request: NextRequest) {
+  const codeOutputDir = request.nextUrl.searchParams.get("codeOutputDir");
+  const outputRoot = resolveOutputRoot(codeOutputDir);
+  const status = await readImportedPrdStatus(outputRoot);
   return NextResponse.json(status);
 }
 
 export async function POST(request: NextRequest) {
-  let body: { content?: string } = {};
+  let body: { content?: string; codeOutputDir?: string } = {};
   try {
-    body = (await request.json()) as { content?: string };
+    body = (await request.json()) as { content?: string; codeOutputDir?: string };
   } catch {
     return NextResponse.json(
-      { error: "Invalid JSON body. Expected { content: string }." },
+      { error: "Invalid JSON body. Expected { content: string, codeOutputDir?: string }." },
       { status: 400 },
     );
   }
@@ -89,9 +100,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const outputRoot = resolveOutputRoot(body.codeOutputDir);
+
   try {
-    await fs.mkdir(blueprintDir(), { recursive: true });
-    await fs.writeFile(prdFilePath(), content, "utf-8");
+    await fs.mkdir(blueprintDir(outputRoot), { recursive: true });
+    await fs.writeFile(prdFilePath(outputRoot), content, "utf-8");
   } catch (err) {
     return NextResponse.json(
       {
@@ -104,13 +117,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const status = await readImportedPrdStatus();
+  const status = await readImportedPrdStatus(outputRoot);
   return NextResponse.json({ ok: true, status });
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const codeOutputDir = request.nextUrl.searchParams.get("codeOutputDir");
+  const outputRoot = resolveOutputRoot(codeOutputDir);
+
   try {
-    await fs.unlink(prdFilePath());
+    await fs.unlink(prdFilePath(outputRoot));
   } catch (err) {
     const code = (err as NodeJS.ErrnoException)?.code;
     if (code !== "ENOENT") {
@@ -125,6 +141,6 @@ export async function DELETE() {
       );
     }
   }
-  const status = await readImportedPrdStatus();
+  const status = await readImportedPrdStatus(outputRoot);
   return NextResponse.json({ ok: true, status });
 }

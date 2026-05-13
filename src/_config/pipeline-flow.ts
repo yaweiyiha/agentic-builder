@@ -118,7 +118,6 @@ export const PIPELINE_FLOW: FlowNode[] = [
         label: "Design",
         level: 2,
         dependsOn: ["core-docs"],
-        tiers: ["M", "L"],
         stepConfig: {
           uiKind: "custom",
           docTabId: "design",

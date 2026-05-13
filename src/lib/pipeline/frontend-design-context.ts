@@ -93,6 +93,16 @@ export async function buildPublicDesignAssetsBlock(
   ].join("\n");
 }
 
+/** Read Stitch-exported HTML from outputRoot/StitchDesign.html (written by kickoff). */
+export async function readStitchDesignHtml(outputRoot: string): Promise<string> {
+  try {
+    const raw = await fs.readFile(path.join(outputRoot, "StitchDesign.html"), "utf-8");
+    return raw.trim();
+  } catch {
+    return "";
+  }
+}
+
 /** Read Pencil markdown from root (canonical) or legacy nested paths. */
 export async function readPencilDesignDoc(outputRoot: string): Promise<string> {
   const candidates = [
@@ -111,9 +121,32 @@ export async function readPencilDesignDoc(outputRoot: string): Promise<string> {
   return "";
 }
 
+const MAX_STITCH_HTML_CHARS = 40_000;
+
+/**
+ * Prepare Stitch-exported HTML for injection into the coding context.
+ * Strips CSS/JS/tags to leave plain readable text so the model can
+ * understand component names, layout hierarchy, and design tokens,
+ * then truncates to avoid blowing the context budget.
+ */
+function prepareStitchHtmlForCodegen(raw: string): string {
+  if (!raw.trim()) return "";
+  const stripped = raw
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (!stripped) return "";
+  if (stripped.length <= MAX_STITCH_HTML_CHARS) return stripped;
+  return `${stripped.slice(0, MAX_STITCH_HTML_CHARS)}\n\n[Stitch design HTML truncated for codegen]`;
+}
+
 /**
  * Single place to assemble what the supervisor passes as `frontendDesignContext`:
- * DesignSpec + cleaned Pencil summary + optional public/design file list.
+ * DesignSpec + Stitch design HTML + optional public/design file list.
+ * Pencil is replaced by Stitch for UI fidelity.
  */
 export async function buildFrontendDesignContextForCodegen(
   outputRoot: string,
@@ -121,12 +154,18 @@ export async function buildFrontendDesignContextForCodegen(
   pencilDesignRaw: string,
 ): Promise<string> {
   const pencil = preparePencilDesignForCodegen(pencilDesignRaw);
+  const stitchRaw = await readStitchDesignHtml(outputRoot);
+  const stitchText = prepareStitchHtmlForCodegen(stitchRaw);
   const assets = await buildPublicDesignAssetsBlock(outputRoot);
   return [
     designSpecDoc.trim()
       ? `## Design Specification\n\n${designSpecDoc}`
       : "",
-    pencil ? `## Pencil design (implementation summary)\n\n${pencil}` : "",
+    stitchText
+      ? `## Stitch UI Design (source of truth for visual layout)\n\nThe following is the extracted text content from a high-fidelity UI design exported from Google Stitch. Treat every component name, layout section, and design token mentioned here as the **source of truth** for the frontend implementation. Match colors, component hierarchy, and spacing exactly using Tailwind arbitrary values.\n\n${stitchText}`
+      : pencil
+        ? `## Pencil design (implementation summary)\n\n${pencil}`
+        : "",
     assets,
   ]
     .filter(Boolean)

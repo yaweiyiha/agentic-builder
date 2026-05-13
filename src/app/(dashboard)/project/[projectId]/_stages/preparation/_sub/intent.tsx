@@ -444,6 +444,7 @@ export default function IntentSubStage() {
   const isRunning = usePipelineStore((s) => s.isRunning);
   const startPipeline = usePipelineStore((s) => s.startPipeline);
   const featureBrief = usePipelineStore((s) => s.featureBrief);
+  const updateSteps = usePipelineStore((s) => s.updateSteps);
   const goToSubStage = useStageStore((s) => s.goToSubStage);
   const setProjectName = useStageStore((s) => s.setProjectName);
   const isStageHydrated = useStageStore((s) => s.isStageHydrated);
@@ -700,6 +701,21 @@ export default function IntentSubStage() {
                     content.slice(0, 200),
                   );
                 }
+              }
+              // If the route included classification metadata (all_clear path),
+              // eagerly write it to the pipeline store so tab filters (TRD, QA)
+              // reflect the correct tier before startPipeline fires.
+              const meta = event.data?.metadata as { classification?: Record<string, unknown> } | undefined;
+              if (meta?.classification) {
+                updateSteps({
+                  intent: {
+                    stepId: "intent",
+                    status: "completed",
+                    content: content,
+                    timestamp: new Date().toISOString(),
+                    metadata: { classification: meta.classification },
+                  },
+                });
               }
             } else if (event.type === "step_error") {
               console.error("[intent] step_error:", event.data?.error);

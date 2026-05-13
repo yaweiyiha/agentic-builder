@@ -24,11 +24,11 @@ async function fetchProjectNav(projectId: string) {
 }
 
 /** Persist activeStep to backend (debounced in caller) */
-async function persistActiveStep(projectId: string, stepId: StepId) {
+async function persistActiveStep(projectId: string, stepId: StepId, tier?: ProjectTier) {
   await fetch(`/api/projects/${projectId}/step-navigation`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ activeStep: stepId }),
+    body: JSON.stringify({ activeStep: stepId, ...(tier ? { tier } : {}) }),
   });
 }
 
@@ -40,9 +40,18 @@ export default function ProjectPage() {
 
   // ── Page-level state ──
   const [activeStep, setActiveStep] = useState<StepId>("initial");
-  const [tier, setTier]             = useState<ProjectTier>("M");
   const [loading, setLoading]       = useState(true);
   const [stepResults, setStepResults] = useState<Record<string, StepUIProps["stepResult"]>>({});
+
+  // Subscribe to tier from navigation store — this is the source of truth for visible steps.
+  // When intent resolves the tier (e.g. "S"), the store updates and breadcrumb re-renders immediately.
+  const tier = useStepNavigationStore((s) => s.tier);
+
+  // Subscribe to step completion states so breadcrumb can show/hide tier-gated groups
+  // (e.g. Tech Docs, Quality are hidden until PRD is generated and tier is known).
+  // Only the prd status is needed — return a stable primitive to avoid re-render loops.
+  const prdStatus = useStepStore((s) => s.steps.prd?.status ?? "idle");
+  const stepStates: Partial<Record<string, { status: string } | null>> = { prd: { status: prdStatus } };
 
   // Track previous projectId so we can detect changes and reset
   const prevProjectIdRef = useRef<string | null>(null);
@@ -95,7 +104,7 @@ export default function ProjectPage() {
         if (nav) {
           setActiveStep(nav.activeStep);
           activeStepRef.current = nav.activeStep;
-          setTier(nav.tier);
+          useStepNavigationStore.getState().setTier(nav.tier);
           // Load ALL step snapshots first, then mark hydrated — prevents auto-start racing
           await loadAllStepSnapshots(projectId);
         }
@@ -128,8 +137,9 @@ export default function ProjectPage() {
     activeStepRef.current = stepId;
     useStepStore.setState({ isHydrated: true });
 
-    // Persist activeStep to backend (fire-and-forget)
-    persistActiveStep(projectId, stepId).catch(console.error);
+    // Persist activeStep to backend (fire-and-forget), include current tier so
+    // S-tier projects are correctly restored on next page load.
+    persistActiveStep(projectId, stepId, useStepNavigationStore.getState().tier).catch(console.error);
   }, [projectId]);
 
   // ── Update step result (called by child step UIs) ──
@@ -174,7 +184,7 @@ export default function ProjectPage() {
           activeStep={activeStep}
           onStepChange={handleStepChange}
           tier={tier}
-          stepStates={{}}
+          stepStates={stepStates}
         />
         <div className="flex items-center gap-1 pt-3 pr-2 shrink-0">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-[#64748b]">
