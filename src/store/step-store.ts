@@ -22,7 +22,7 @@ const ALL_STEP_IDS: StepId[] = [
   "initial", "intent", "prd", "trd", "sysdesign", "implguide",
   "design", "pencil", "mockup", "qa", "verify",
   "env-setup", "summary", "task-breakdown",
-  "architect", "backend", "frontend", "test", "coding-verify",
+  "agents",
   "serve", "e2e",
 ];
 

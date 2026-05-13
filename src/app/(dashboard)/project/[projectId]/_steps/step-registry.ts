@@ -70,26 +70,9 @@ import { TaskBreakdownUI } from "./kickoff/planning/task-breakdown/ui";
 import { taskBreakdownSnapshot } from "./kickoff/planning/task-breakdown/snapshot";
 
 // ── Coding > Agents ──
-import { architectAgent } from "./coding/agents/architect/agent";
-import { ArchitectUI } from "./coding/agents/architect/ui";
-import { architectSnapshot } from "./coding/agents/architect/snapshot";
-
-import { backendAgent } from "./coding/agents/backend/agent";
-import { BackendUI } from "./coding/agents/backend/ui";
-import { backendSnapshot } from "./coding/agents/backend/snapshot";
-
-import { frontendAgent } from "./coding/agents/frontend/agent";
-import { FrontendUI } from "./coding/agents/frontend/ui";
-import { frontendSnapshot } from "./coding/agents/frontend/snapshot";
-
-import { testAgent } from "./coding/agents/test/agent";
-import { TestUI } from "./coding/agents/test/ui";
-import { testSnapshot } from "./coding/agents/test/snapshot";
-
-// ── Coding > Verification ──
-import { codingVerifyAgent } from "./coding/verification/coding-verify/agent";
-import { CodingVerifyUI } from "./coding/verification/coding-verify/ui";
-import { codingVerifySnapshot } from "./coding/verification/coding-verify/snapshot";
+import { agentsAgent } from "./coding/agents/agent";
+import { AgentsUI } from "./coding/agents/ui";
+import { agentsSnapshot } from "./coding/agents/snapshot";
 
 // ── Preview ──
 import { serveAgent } from "./preview/server/serve/agent";
@@ -126,11 +109,7 @@ export const STEP_REGISTRY: Record<StepId, StepEntry> = {
   summary:          { component: SummaryUI,        agent: summaryAgent,        snapshot: summarySnapshot },
   "task-breakdown": { component: TaskBreakdownUI, agent: taskBreakdownAgent, snapshot: taskBreakdownSnapshot },
   // Coding
-  architect:       { component: ArchitectUI,       agent: architectAgent,       snapshot: architectSnapshot },
-  backend:         { component: BackendUI,         agent: backendAgent,         snapshot: backendSnapshot },
-  frontend:        { component: FrontendUI,        agent: frontendAgent,        snapshot: frontendSnapshot },
-  test:            { component: TestUI,            agent: testAgent,            snapshot: testSnapshot },
-  "coding-verify": { component: CodingVerifyUI,    agent: codingVerifyAgent,    snapshot: codingVerifySnapshot },
+  agents: { component: AgentsUI, agent: agentsAgent, snapshot: agentsSnapshot },
   // Preview
   serve: { component: ServeUI, agent: serveAgent, snapshot: serveSnapshot },
   e2e:   { component: E2eUI,   agent: e2eAgent,   snapshot: e2eSnapshot },

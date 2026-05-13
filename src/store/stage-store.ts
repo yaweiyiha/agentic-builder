@@ -63,11 +63,7 @@ export type KickoffSubStageId =
   | "task-breakdown"; // task breakdown planning
 
 export type CodingSubStageId =
-  | "architect"  // architect agent
-  | "backend"    // backend agent
-  | "frontend"   // frontend agent
-  | "test"       // test agent
-  | "verify";    // integration verify
+  | "agents";    // coding agents
 
 export type PreviewSubStageId =
   | "serve"  // dev-server startup
@@ -91,7 +87,7 @@ export interface SubStageMeta {
 export const SUB_STAGE_ORDER: Record<StageId, SubStageId[]> = {
   preparation: ["initial", "intent", "prd", "trd", "sysdesign", "implguide", "design", "pencil", "mockup", "qa", "verify"],
   kickoff:     ["env-setup", "summary", "task-breakdown"],
-  coding:      ["architect", "backend", "frontend", "test", "verify"],
+  coding:      ["agents"],
   preview:     ["serve", "e2e"],
 };
 
@@ -144,7 +140,7 @@ export const PREPARATION_STEP_IDS = [
 const DEFAULT_SUB_STAGES: Record<StageId, SubStageId> = {
   preparation: "initial",
   kickoff:     "summary",
-  coding:      "architect",
+  coding:      "agents",
   preview:     "serve",
 };
 

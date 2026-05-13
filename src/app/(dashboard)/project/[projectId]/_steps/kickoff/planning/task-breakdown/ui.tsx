@@ -51,7 +51,10 @@ export function TaskBreakdownUI({ onNavigate }: StepUIProps) {
   const nextStep = getNextStep("task-breakdown", tier);
   const prevStep = getPrevStep("task-breakdown", tier);
 
+  console.log("[TaskBreakdownUI] summaryResult:", summaryResult, "taskBreakdownResult:", taskBreakdownResult);
+
   const metadata = taskBreakdownResult?.metadata ?? summaryResult?.metadata;
+  console.log("[TaskBreakdownUI] metadata:", metadata, "taskBreakdown from metadata:", metadata?.taskBreakdown);
   const tasks = parseKickoffTaskBreakdownFromMetadata(metadata);
   const isCompleted = summaryResult?.status === "completed";
   const pendingCount = tasks.filter((t) => t.executionKind === "ai_autonomous").length;
