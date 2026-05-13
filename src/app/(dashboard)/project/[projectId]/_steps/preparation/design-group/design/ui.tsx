@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Upload, X, FileImage, Code } from "lucide-react";
+import { ArrowRight, Upload, X, FileImage, Code } from "lucide-react";
 import { useStepStore } from "@/store/step-store";
 import { getNextStep } from "@/_config/pipeline-flow";
 import type { StepId } from "@/_config/pipeline-flow";
@@ -69,7 +69,7 @@ function StyleCarousel({
     <div className="flex flex-col items-center gap-4 select-none">
       <div
         className="relative w-full flex items-center justify-center"
-        style={{ height: 290 }}
+        style={{ height: 220 }}
       >
         <button
           onClick={prev}
@@ -88,7 +88,7 @@ function StyleCarousel({
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <div className="relative w-44" style={{ height: 290 }}>
+        <div className="relative w-44" style={{ height: 220 }}>
           {styles.map((style, idx) => {
             const offset = circOffset(idx, active, total);
             const slot = SLOTS[offset];
@@ -117,7 +117,7 @@ function StyleCarousel({
                 }}
               >
                 <div className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden w-full h-full shadow-sm">
-                  <div className="flex h-14 shrink-0">
+                  <div className="flex h-10 shrink-0">
                     {(
                       ["primary", "secondary", "tertiary", "neutral"] as const
                     ).map((key) => (
@@ -128,9 +128,9 @@ function StyleCarousel({
                       />
                     ))}
                   </div>
-                  <div className="p-2.5 flex flex-col gap-1.5 flex-1 min-h-0">
+                  <div className="p-2 flex flex-col gap-1 flex-1 min-h-0">
                     <div className="flex items-center justify-between gap-1">
-                      <h3 className="text-[12px] font-bold text-slate-900 truncate">
+                      <h3 className="text-[11px] font-bold text-slate-900 truncate">
                         {style.name}
                       </h3>
                       {isCenter && (
@@ -142,9 +142,9 @@ function StyleCarousel({
                     <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-2">
                       {style.description}
                     </p>
-                    <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100 mt-auto">
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100 mt-auto">
                       <span
-                        className="text-[22px] font-bold leading-none shrink-0"
+                        className="text-[18px] font-bold leading-none shrink-0"
                         style={{
                           color: style.colors.primary,
                           fontFamily: style.typography.headlineFont,
@@ -161,15 +161,15 @@ function StyleCarousel({
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <div
-                        className="text-[9px] font-semibold text-white px-1.5 py-0.5 rounded"
+                        className="text-[8px] font-semibold text-white px-1.5 py-0.5 rounded"
                         style={{ backgroundColor: style.colors.primary }}
                       >
                         Primary
                       </div>
                       <div
-                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded border"
+                        className="text-[8px] font-semibold px-1.5 py-0.5 rounded border"
                         style={{
                           color: style.colors.secondary,
                           borderColor: style.colors.secondary,
@@ -795,292 +795,248 @@ export function DesignUI(props: StepUIProps) {
   const prdInterrupted =
     steps.prd?.status === "running" && !steps.prd?.content;
 
+  // ── Phase navigation helpers ──────────────────────────────────────────────
+  const goToPrevPhase = useCallback(() => {
+    if (phase === "style") props.onNavigate("prd" as StepId);
+    else if (phase === "spec") setPhase("style");
+    else setPhase("spec");
+  }, [phase, props]);
+
+  const goToNextPhase = useCallback(() => {
+    if (phase === "style") {
+      handleGenerateDesignDoc();
+    } else if (phase === "spec") {
+      setPhase("stitch");
+    } else {
+      if (stitchNextStep) props.onNavigate(stitchNextStep);
+    }
+  }, [phase, handleGenerateDesignDoc, stitchNextStep, props]);
+
+  const hasDesignSpec = !!steps.design?.content;
+  const hasStitchResult = !!stitchResult;
+  const showLeftArrow = phase !== "style";
+  const showRightArrow =
+    (phase === "style" && hasDesignSpec) ||
+    (phase === "spec" && hasStitchResult);
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden">
-      {/* ── Phase nav bar (replaces breadcrumb) ── */}
-      <div className="shrink-0 bg-white border-b border-[#e2e8f0] px-6 py-2 flex items-center justify-between">
-        {/* Prev */}
-        <button
-          onClick={() => {
-            if (phase === "style") props.onNavigate("prd" as StepId);
-            else if (phase === "spec") setPhase("style");
-            else setPhase("spec");
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-        >
-          <ArrowLeft size={13} />
-          {phase === "style" ? "PRD" : phase === "spec" ? "Style" : "Design Spec"}
-        </button>
-
-        {/* Current phase label */}
-        <span className="text-[12px] font-semibold text-slate-500">
-          {phase === "style" ? "1 · Style" : phase === "spec" ? "2 · Design Spec" : "3 · Stitch Design"}
+      {/* ── Top center step navigation ── */}
+      <div className="shrink-0 flex items-center justify-center gap-4 py-3 border-b border-[#e2e8f0] bg-white">
+        {showLeftArrow && (
+          <button
+            onClick={goToPrevPhase}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm hover:bg-slate-50 hover:border-[#712ae2] transition-all"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+        )}
+        <span className="text-[13px] font-semibold text-slate-600 min-w-[100px] text-center select-none">
+          {phase === "style" ? "Style" : phase === "spec" ? "Design Spec" : "Stitch Design"}
         </span>
-
-        {/* Next */}
-        <button
-          onClick={() => {
-            if (phase === "style") {
-              handleGenerateDesignDoc();
-            } else if (phase === "spec") {
-              setPhase("stitch");
-            } else {
-              if (stitchNextStep) props.onNavigate(stitchNextStep);
-            }
-          }}
-          disabled={
-            (phase === "style" && (
-              (designSourceMode === "ai" && !selectedStyleId) ||
-              (designSourceMode === "custom" && customFiles.length === 0) ||
-              isDesignRunning
-            )) ||
-            (phase === "spec" && isDesignRunning)
-          }
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {phase === "style"
-            ? isDesignDone ? "Design Spec" : "Generate Spec"
-            : phase === "spec" ? "Stitch Design"
-            : "Next Step"}
-          <ArrowRight size={13} />
-        </button>
+        {showRightArrow && (
+          <button
+            onClick={goToNextPhase}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm hover:bg-slate-50 hover:border-[#712ae2] transition-all"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        )}
       </div>
 
       {/* ── Main Content ── */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-16">
         {/* ══ Phase 1: Style Selection ══ */}
         {phase === "style" && (
           <>
-            {/* ── Mode selector ── */}
-            <div className="px-8 pt-6 pb-2">
-              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-                <button
-                  onClick={() => setDesignSourceMode("ai")}
-                  className={`px-4 py-1.5 text-[13px] font-medium rounded-md transition-all ${
-                    designSourceMode === "ai"
-                      ? "bg-white text-[#712ae2] shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  AI Generated
-                </button>
-                <button
-                  onClick={() => setDesignSourceMode("custom")}
-                  className={`px-4 py-1.5 text-[13px] font-medium rounded-md transition-all ${
-                    designSourceMode === "custom"
-                      ? "bg-white text-[#712ae2] shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  Custom Upload
-                </button>
-              </div>
-            </div>
-
-            {/* ── AI mode: Style carousel ── */}
-            {designSourceMode === "ai" && (
-              <>
-                {designStylesLoading && (
-                  <div className="flex items-center justify-center h-full">
-                    <Loading
-                      size="lg"
-                      text="Analyzing PRD and generating design styles…"
-                    />
+            <div className="py-8 flex flex-col gap-6">
+              <div className="flex flex-row gap-6 items-stretch">
+              {/* ── Card 1: AI Generated (radio + carousel inline) ── */}
+              <div
+                onClick={() => setDesignSourceMode("ai")}
+                className={`w-2/3 flex gap-4 rounded-xl border-2 p-5 cursor-pointer transition-all ${
+                  designSourceMode === "ai"
+                    ? "border-[#712ae2] bg-[rgba(113,42,226,0.04)]"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="w-5 shrink-0 pt-0.5">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    designSourceMode === "ai" ? "border-[#712ae2]" : "border-slate-300"
+                  }`}>
+                    {designSourceMode === "ai" && (
+                      <div className="w-2 h-2 rounded-full bg-[#712ae2]" />
+                    )}
                   </div>
-                )}
-                {!designStylesLoading && designStyles && (
-                  <div className="p-8 flex flex-col gap-8">
-                    <div>
-                      <h2 className="text-[22px] font-bold text-slate-900 mb-1">
-                        Choose a Design Style
-                      </h2>
-                      <p className="text-slate-500 text-[13px]">
-                        Select the style that best fits your product vision.
-                      </p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-[14px] font-bold text-slate-900">AI Generated</h3>
+                    <span className="text-[11px] text-slate-400">AI analyzes PRD to generate styles</span>
+                  </div>
+
+                  {/* AI Content */}
+                  {designStylesLoading && (
+                    <div className="flex items-center justify-center py-6">
+                      <Loading size="md" text="Generating design styles…" />
                     </div>
+                  )}
+                  {!designStylesLoading && designStyles && (
                     <StyleCarousel
                       styles={designStyles}
                       selectedId={selectedStyleId}
                       onSelect={setSelectedStyleId}
                     />
-                  </div>
-                )}
-                {!designStylesLoading && !designStyles && (
-                  <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400">
-                    {designStylesError ? (
-                      <>
-                        <p className="text-sm text-red-500">
-                          Failed to generate design styles: {designStylesError}
-                        </p>
-                        <button
-                          onClick={() => {
-                            setDesignStylesLoading(true);
-                            setDesignStylesError(null);
-                            generateDesignStyles(prdContent).then((result) => {
-                              setDesignStylesLoading(false);
-                              if (result.error) {
-                                setDesignStylesError(result.error);
-                              } else {
-                                setDesignStyles(result.styles);
-                              }
-                            });
-                          }}
-                          className="px-4 py-2 text-[13px] font-medium text-white bg-[#712ae2] rounded-lg hover:bg-[#6b24da] transition-colors"
-                        >
-                          Retry
-                        </button>
-                      </>
-                    ) : prdInterrupted ? (
-                      <>
-                        <p className="text-sm">
-                          PRD generation was interrupted. Go back to PRD to
-                          complete it.
-                        </p>
-                        <button
-                          onClick={() => props.onNavigate("prd" as StepId)}
-                          className="px-4 py-2 text-[13px] font-medium text-white bg-[#712ae2] rounded-lg hover:bg-[#6b24da] transition-colors"
-                        >
-                          Go to PRD
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-sm">
-                        Waiting for PRD to generate styles…
-                      </p>
+                  )}
+                  {!designStylesLoading && !designStyles && (
+                    <div className="flex flex-col items-center justify-center py-6 gap-3 text-slate-400">
+                      {designStylesError ? (
+                        <>
+                          <p className="text-sm text-red-500">Failed to generate design styles: {designStylesError}</p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDesignStylesLoading(true);
+                              setDesignStylesError(null);
+                              generateDesignStyles(prdContent).then((result) => {
+                                setDesignStylesLoading(false);
+                                if (result.error) {
+                                  setDesignStylesError(result.error);
+                                } else {
+                                  setDesignStyles(result.styles);
+                                }
+                              });
+                            }}
+                            className="px-4 py-2 text-[13px] font-medium text-white bg-[#712ae2] rounded-lg hover:bg-[#6b24da] transition-colors"
+                          >
+                            Retry
+                          </button>
+                        </>
+                      ) : prdInterrupted ? (
+                        <>
+                          <p className="text-sm">PRD generation was interrupted. Go back to PRD to complete it.</p>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); props.onNavigate("prd" as StepId); }}
+                            className="px-4 py-2 text-[13px] font-medium text-white bg-[#712ae2] rounded-lg hover:bg-[#6b24da] transition-colors"
+                          >
+                            Go to PRD
+                          </button>
+                        </>
+                      ) : (
+                        <p className="text-sm">Waiting for PRD to generate styles…</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Card 2: Custom Upload (radio + upload inline) ── */}
+              <div
+                onClick={() => setDesignSourceMode("custom")}
+                className={`w-1/3 flex gap-4 rounded-xl border-2 p-5 cursor-pointer transition-all ${
+                  designSourceMode === "custom"
+                    ? "border-[#712ae2] bg-[rgba(113,42,226,0.04)]"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="w-5 shrink-0 pt-0.5">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    designSourceMode === "custom" ? "border-[#712ae2]" : "border-slate-300"
+                  }`}>
+                    {designSourceMode === "custom" && (
+                      <div className="w-2 h-2 rounded-full bg-[#712ae2]" />
                     )}
                   </div>
-                )}
-              </>
-            )}
-
-            {/* ── Custom mode: File upload ── */}
-            {designSourceMode === "custom" && (
-              <div className="p-8 flex flex-col gap-6">
-                <div>
-                  <h2 className="text-[22px] font-bold text-slate-900 mb-1">
-                    Upload Design References
-                  </h2>
-                  <p className="text-slate-500 text-[13px]">
-                    Upload images or HTML documents as a reference for
-                    generating your design spec.
-                  </p>
                 </div>
-
-                {/* Drop zone */}
-                <div
-                  onDragEnter={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragLeave={() => setDragActive(false)}
-                  onDrop={handleDrop}
-                  className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 transition-colors ${
-                    dragActive
-                      ? "border-[#712ae2] bg-[rgba(113,42,226,0.04)]"
-                      : "border-slate-300 bg-slate-50"
-                  }`}
-                >
-                  <Upload
-                    size={28}
-                    className={
-                      dragActive ? "text-[#712ae2]" : "text-slate-400"
-                    }
-                  />
-                  <div className="text-center">
-                    <p className="text-[13px] text-slate-600 font-medium">
-                      Drop files here or{" "}
-                      <label className="text-[#712ae2] cursor-pointer hover:underline">
-                        browse
-                        <input
-                          type="file"
-                          accept={[
-                            ...ACCEPTED_IMAGE_MIMES,
-                            ...ACCEPTED_HTML_MIMES,
-                            ...IMAGE_EXTS,
-                            ...HTML_EXTS,
-                          ].join(",")}
-                          multiple
-                          onChange={handleFileInput}
-                          className="hidden"
-                        />
-                      </label>
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Supports .png, .jpg, .webp, .gif, .html files
-                    </p>
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <div className="flex flex-col mb-3">
+                    <h3 className="text-[14px] font-bold text-slate-900">Custom Upload</h3>
+                    <span className="text-[11px] text-slate-400">Upload images or HTML as reference</span>
                   </div>
-                </div>
 
-                {/* File list */}
-                {customFiles.length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Uploaded files ({customFiles.length})
+                  {/* Custom Content: Drop zone */}
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={handleDrop}
+                    className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 transition-colors flex-1 ${
+                      dragActive
+                        ? "border-[#712ae2] bg-[rgba(113,42,226,0.04)]"
+                        : "border-slate-300 bg-slate-50"
+                    }`}
+                  >
+                    <Upload size={24} className={dragActive ? "text-[#712ae2]" : "text-slate-400"} />
+                    <div className="text-center">
+                      <p className="text-[12px] text-slate-600 font-medium">
+                        Drop files here or{" "}
+                        <label className="text-[#712ae2] cursor-pointer hover:underline">
+                          browse
+                          <input
+                            type="file"
+                            accept={[...ACCEPTED_IMAGE_MIMES, ...ACCEPTED_HTML_MIMES, ...IMAGE_EXTS, ...HTML_EXTS].join(",")}
+                            multiple
+                            onChange={handleFileInput}
+                            className="hidden"
+                          />
+                        </label>
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">Supports .png, .jpg, .webp, .gif, .html</p>
                     </div>
-                    {customFiles.map((f) => (
-                      <div
-                        key={f.key}
-                        className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3"
-                      >
-                        {/* Preview */}
-                        {f.kind === "image" && f.previewUrl ? (
-                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={f.previewUrl}
-                              alt={f.file.name}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="h-14 w-14 shrink-0 flex items-center justify-center rounded-lg border border-amber-200 bg-linear-to-br from-amber-50 to-orange-50">
-                            {f.kind === "html" ? (
-                              <Code size={20} className="text-amber-600" />
-                            ) : (
-                              <FileImage size={20} className="text-sky-600" />
-                            )}
-                          </div>
-                        )}
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[12.5px] font-medium text-slate-800 truncate">
-                              {f.file.name}
-                            </span>
-                            <span
-                              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
-                                f.kind === "html"
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-sky-100 text-sky-700"
-                              }`}
-                            >
-                              {f.kind}
-                            </span>
-                          </div>
-                          <div className="text-[10.5px] text-slate-500">
-                            {(f.file.size / 1024).toFixed(1)} KB
-                            {f.loading && " · Reading file…"}
-                            {!f.loading && " · Ready"}
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => removeCustomFile(f.key)}
-                          className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
                   </div>
-                )}
+
+                  {/* File list */}
+                  {customFiles.length > 0 && (
+                    <div className="flex flex-col gap-2 mt-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Uploaded files ({customFiles.length})
+                      </div>
+                      {customFiles.map((f) => (
+                        <div key={f.key} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3" onClick={(e) => e.stopPropagation()}>
+                          {f.kind === "image" && f.previewUrl ? (
+                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={f.previewUrl} alt={f.file.name} className="h-full w-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="h-14 w-14 shrink-0 flex items-center justify-center rounded-lg border border-amber-200 bg-linear-to-br from-amber-50 to-orange-50">
+                              {f.kind === "html" ? <Code size={20} className="text-amber-600" /> : <FileImage size={20} className="text-sky-600" />}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[12.5px] font-medium text-slate-800 truncate">{f.file.name}</span>
+                              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${f.kind === "html" ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700"}`}>{f.kind}</span>
+                            </div>
+                            <div className="text-[10.5px] text-slate-500">{(f.file.size / 1024).toFixed(1)} KB{f.loading ? " · Reading file…" : " · Ready"}</div>
+                          </div>
+                          <button onClick={() => removeCustomFile(f.key)} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><X size={16} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+              </div>
+
+              {/* ── Bottom center next button ── */}
+              <div className="flex justify-center">
+                <button
+                  onClick={handleGenerateDesignDoc}
+                  disabled={
+                    (designSourceMode === "ai" && !selectedStyleId) ||
+                    (designSourceMode === "custom" && customFiles.length === 0) ||
+                    isDesignRunning
+                  }
+                  className="flex items-center gap-2 px-6 py-2.5 bg-[#712ae2] text-white text-[14px] font-semibold rounded-lg hover:bg-[#6b24da] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                >
+                  {isDesignDone ? "Continue to Design Spec" : "Generate Design Spec"}
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
           </>
         )}
 

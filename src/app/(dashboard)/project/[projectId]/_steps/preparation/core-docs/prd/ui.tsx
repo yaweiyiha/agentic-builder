@@ -219,7 +219,7 @@ export function PrdUI(props: StepUIProps) {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {prdHistoryRef.current.length > 1 && <button onClick={() => setShowDiff(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-[#712ae2] bg-[rgba(113,42,226,0.07)] hover:bg-[rgba(113,42,226,0.13)] transition-colors mr-1" title="View version history & diff"><History size={13} />{prdHistoryRef.current.length} versions</button>}
-                <button onClick={handleDownloadPdf} disabled={!isDone || isPrinting} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="Download PDF">{isPrinting ? <SpinnerIcon /> : <DownloadIcon />}{isPrinting ? "Preparing…" : "Download PDF"}</button>
+                <button onClick={handleDownloadPdf} disabled={!isDone || isPrinting} className="flex items-center justify-center p-1.5 rounded-md text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="Download PDF">{isPrinting ? <SpinnerIcon /> : <DownloadIcon />}</button>
               </div>
             </div>
             <div className="p-8">
