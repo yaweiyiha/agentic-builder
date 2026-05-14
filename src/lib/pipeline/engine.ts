@@ -241,9 +241,8 @@ export class PipelineEngine {
       if (run.status === "failed") return run;
 
       run = this.attachPrdSpecGateToPrdStep(run);
-      run = await this.attachPrdStructuredSpec(run);
-      this.emitPrdStepCompleteRefresh(run);
 
+      // Edit-only mode always pauses — emit done immediately
       this.emit({
         type: "pipeline_complete",
         runId: run.id,
@@ -304,12 +303,8 @@ export class PipelineEngine {
     }
 
     run = this.attachPrdSpecGateToPrdStep(run);
-    run = await this.attachPrdStructuredSpec(run);
-    this.emitPrdStepCompleteRefresh(run);
 
-    const prdContent = run.steps.prd?.content ?? "";
-
-    // Pause after PRD for user review/refinement (HITL gate)
+    // Pause after PRD — emit done immediately, skip async spec extraction
     if (options.pauseAfterPrd) {
       this.emit({
         type: "pipeline_complete",
@@ -335,6 +330,12 @@ export class PipelineEngine {
       run.updatedAt = new Date().toISOString();
       return run;
     }
+
+    // Full pipeline: extract structured spec before continuing
+    run = await this.attachPrdStructuredSpec(run);
+    this.emitPrdStepCompleteRefresh(run);
+
+    const prdContent = run.steps.prd?.content ?? "";
 
     if (fast) {
       const existingDocs = await this.readExistingDocsFromOutput(outputRoot);

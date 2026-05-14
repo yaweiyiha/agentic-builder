@@ -147,7 +147,6 @@ export function PrdUI(props: StepUIProps) {
   const [showDiff, setShowDiff] = useState(false);
   const prdHistoryRef = useRef<PrdSnapshot[]>(_prdHistoryStore);
   const prevIsDoneRef = useRef(false);
-  const wasRunningRef = useRef(false);
   const autoStartedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -165,6 +164,10 @@ export function PrdUI(props: StepUIProps) {
   const isThisRunning = isRunning && currentStep === "prd";
   const content = isThisRunning ? streamingContent : (step?.content ?? "");
   const isDone = step?.status === "completed";
+
+  // Track whether this session freshly executed the step (vs restored from hydration)
+  const wasRunningRef = useRef(false);
+  if (isThisRunning) wasRunningRef.current = true;
 
   // Auto-scroll to bottom during SSE streaming
   useEffect(() => {
@@ -185,11 +188,6 @@ export function PrdUI(props: StepUIProps) {
     prevIsDoneRef.current = isDone;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDone]);
-
-  // Track whether a fresh execution ran in this session (vs restored from hydration)
-  useEffect(() => {
-    if (isRunning) wasRunningRef.current = true;
-  }, [isRunning]);
 
   // ── Persist PRD.md to disk immediately on completion ──────────────────
   useEffect(() => {
