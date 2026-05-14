@@ -17,10 +17,10 @@
         "method": "POST",
         "endpoint": "/api/auth/register",
         "audience": "user",
-        "prdJustification": "POST /api/auth/register creates a user, auto-logs in, and returns the current user/session context"
+        "prdJustification": "POST /api/auth/register creates a user, auto-logs in, and returns the current user/session context."
       },
       "prdJustified": true,
-      "reason": "prdJustification-quote-found"
+      "reason": "prd-keyword-hit:auth"
     },
     {
       "case": "frontend-wiring-missing",
@@ -28,7 +28,7 @@
         "method": "POST",
         "endpoint": "/api/auth/login",
         "audience": "user",
-        "prdJustification": "POST /api/auth/login verifies credentials and establishes a session"
+        "prdJustification": "POST /api/auth/login verifies credentials and establishes a session."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:auth"
@@ -39,7 +39,7 @@
         "method": "POST",
         "endpoint": "/api/auth/logout",
         "audience": "user",
-        "prdJustification": "POST /api/auth/logout invalidates the session and clears the cookie"
+        "prdJustification": "POST /api/auth/logout invalidates the session and clears the cookie."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:auth"
@@ -50,7 +50,7 @@
         "method": "GET",
         "endpoint": "/api/auth/me",
         "audience": "user",
-        "prdJustification": "GET /api/auth/me returns the authenticated user or 401"
+        "prdJustification": "GET /api/auth/me returns the authenticated user or 401."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:auth"
@@ -61,7 +61,7 @@
         "method": "PATCH",
         "endpoint": "/api/users/me",
         "audience": "user",
-        "prdJustification": "PATCH /api/users/me updates display name and/or password"
+        "prdJustification": "PATCH /api/users/me updates display name and/or password."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:users"
@@ -72,7 +72,7 @@
         "method": "DELETE",
         "endpoint": "/api/users/me",
         "audience": "user",
-        "prdJustification": "DELETE /api/users/me deletes the account and its owned tasks as per retention policy"
+        "prdJustification": "DELETE /api/users/me deletes the account and its owned tasks as per retention policy."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:users"
@@ -83,18 +83,7 @@
         "method": "GET",
         "endpoint": "/api/tasks",
         "audience": "user",
-        "prdJustification": "GET /api/tasks returns all tasks for the current user, sorted newest-first by default"
-      },
-      "prdJustified": true,
-      "reason": "prd-keyword-hit:tasks"
-    },
-    {
-      "case": "frontend-wiring-missing",
-      "contract": {
-        "method": "GET",
-        "endpoint": "/api/tasks/:id",
-        "audience": "user",
-        "prdJustification": "GET /api/tasks/:id returns a single owned task"
+        "prdJustification": "GET /api/tasks returns all tasks for the current user, sorted newest-first by default."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:tasks"
@@ -105,7 +94,18 @@
         "method": "POST",
         "endpoint": "/api/tasks",
         "audience": "user",
-        "prdJustification": "POST /api/tasks creates a task with title required"
+        "prdJustification": "POST /api/tasks creates a task with title required."
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:tasks"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/tasks/:id",
+        "audience": "user",
+        "prdJustification": "GET /api/tasks/:id returns a single owned task."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:tasks"
@@ -116,7 +116,7 @@
         "method": "PUT",
         "endpoint": "/api/tasks/:id",
         "audience": "user",
-        "prdJustification": "PUT /api/tasks/:id updates any field of an owned task"
+        "prdJustification": "PUT /api/tasks/:id updates any field of an owned task."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:tasks"
@@ -127,7 +127,7 @@
         "method": "DELETE",
         "endpoint": "/api/tasks/:id",
         "audience": "user",
-        "prdJustification": "DELETE /api/tasks/:id deletes an owned task after confirmation in the UI"
+        "prdJustification": "DELETE /api/tasks/:id deletes an owned task after confirmation in the UI."
       },
       "prdJustified": true,
       "reason": "prd-keyword-hit:tasks"
@@ -138,7 +138,7 @@
         "method": "GET",
         "endpoint": "/api/health/live",
         "audience": "admin",
-        "prdJustification": "HealthService provides Liveness/readiness checks"
+        "prdJustification": "GET /live"
       },
       "prdJustified": true,
       "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
@@ -149,7 +149,7 @@
         "method": "GET",
         "endpoint": "/api/health/ready",
         "audience": "admin",
-        "prdJustification": "HealthService provides Liveness/readiness checks"
+        "prdJustification": "GET /ready"
       },
       "prdJustified": true,
       "reason": "audience=admin — internal endpoint, frontend call coverage is not required"

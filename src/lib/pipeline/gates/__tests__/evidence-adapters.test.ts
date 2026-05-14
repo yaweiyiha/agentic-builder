@@ -201,7 +201,7 @@ describe("evidenceFromRulesValidation", () => {
       ok: false,
       ruleCount: 2,
       ruleTypes: ["piecewise-linear"],
-      warnings: [{ code: "UNKNOWN_TYPE", message: "x", path: "y" }],
+      warnings: [{ code: "unknown-rule-type", message: "x" }],
     });
     expect(e.passed).toBe(false);
     expect(e.details?.warningCount).toBe(1);
@@ -228,7 +228,7 @@ describe("evidenceFromDagValidation", () => {
       pipelineCount: 1,
       nodeCount: 3,
       servicesReferenced: [],
-      warnings: [{ code: "DANGLING_DEP", message: "x", path: "y" }],
+      warnings: [{ code: "cycle-detected", message: "x" }],
     });
     expect(e.passed).toBe(false);
   });
