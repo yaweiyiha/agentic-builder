@@ -399,8 +399,13 @@ export const useStepStore = create<StepStoreState>()(
             emitState: (update: Partial<import("@/app/(dashboard)/project/[projectId]/_steps/_shared/types").StepAgentState>) => {
               if (update.streamingContent !== undefined) {
                 const current = get().streamingContent;
-                const delta = update.streamingContent.slice(current.length);
-                if (delta) get().setStepStreaming(stepId, delta);
+                if (update.streamingContent.length <= current.length) {
+                  // Clearing or replacing — sync zustand store directly without touching step content
+                  set({ streamingContent: update.streamingContent });
+                } else {
+                  const delta = update.streamingContent.slice(current.length);
+                  if (delta) get().setStepStreaming(stepId, delta);
+                }
               }
               if (update.streamingThinking !== undefined) {
                 set({ streamingThinking: update.streamingThinking });

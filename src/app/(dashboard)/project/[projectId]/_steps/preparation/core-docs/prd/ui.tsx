@@ -143,6 +143,7 @@ export function PrdUI(props: StepUIProps) {
 
   const [editInput, setEditInput] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSavingDoc, setIsSavingDoc] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const prdHistoryRef = useRef<PrdSnapshot[]>(_prdHistoryStore);
   const prevIsDoneRef = useRef(false);
@@ -181,6 +182,30 @@ export function PrdUI(props: StepUIProps) {
       }
     }
     prevIsDoneRef.current = isDone;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone]);
+
+  // ── Persist PRD.md to disk immediately on completion ──────────────────
+  useEffect(() => {
+    if (!isDone || !step?.content) return;
+    console.log("[PrdUI] PRD step completed. Saving PRD.md to generated-code...", {
+      contentLength: step.content.length,
+      codeOutputDir: useStepStore.getState().codeOutputDir,
+    });
+    setIsSavingDoc(true);
+    const codeOutputDir = useStepStore.getState().codeOutputDir;
+    fetch("/api/agents/save-doc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ docId: "prd", content: step.content, codeOutputDir }),
+    })
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((data) => { console.log("[PrdUI] PRD.md saved to generated-code", data); })
+      .catch((err) => { console.error("[PrdUI] Failed to save PRD.md", err); })
+      .finally(() => {
+        console.log("[PrdUI] PRD.md save complete, re-enabling Confirm PRD button");
+        setIsSavingDoc(false);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDone]);
 
@@ -237,7 +262,7 @@ export function PrdUI(props: StepUIProps) {
         value={editInput} onChange={setEditInput}
         onSubmit={() => { const instruction = editInput.trim(); if (!instruction || isThisRunning) return; setEditInput(""); setShowDiff(false); void executeStep("prd", instruction); }}
         placeholder="Ask AgenticBuilder to edit this PRD…" disabled={isThisRunning}
-        actions={<div className="flex items-center gap-3 shrink-0"><button onClick={() => { if (nextStep) props.onNavigate(nextStep); }} className="flex items-center gap-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95">Confirm PRD<ArrowRight size={16} color="white" /></button></div>}
+        actions={<div className="flex items-center gap-3 shrink-0"><button disabled={isThisRunning || isSavingDoc} onClick={() => { if (nextStep) props.onNavigate(nextStep); }} className="flex items-center gap-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg h-10 px-4 shrink-0 text-sm font-semibold shadow-md hover:shadow-indigo-200 hover:shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100">{isSavingDoc ? "Saving PRD…" : "Confirm PRD"}{!isSavingDoc && <ArrowRight size={16} color="white" />}</button></div>}
       />
     </div>
   );

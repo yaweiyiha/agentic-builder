@@ -10,6 +10,7 @@ export const prdAgent: StepAgent = createPipelineSseAgent({
     featureBrief: ctx.featureBrief,
     codeOutputDir: ctx.codeOutputDir,
     sessionId: ctx.sessionId,
+    pauseAfterPrd: true,
     ...(ctx.editInstruction ? {
       prdEditInstruction: ctx.editInstruction,
       existingPrd: ctx.previousSteps.prd?.content ?? "",

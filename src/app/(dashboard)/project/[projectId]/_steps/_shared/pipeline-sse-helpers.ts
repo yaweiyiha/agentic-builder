@@ -110,6 +110,11 @@ export function createPipelineSseAgent(options: PipelineSseOptions): StepAgent {
             if (handled) return;
           }
 
+          // Only process events for this agent's stepId
+          if (stepId && (type === "step_stream" || type === "step_complete" || type === "step_start") && event.stepId && event.stepId !== stepId) {
+            return;
+          }
+
           switch (type) {
             case "step_start":
               ctx.emitState({ streamingContent: "", streamingThinking: "" });
@@ -133,7 +138,7 @@ export function createPipelineSseAgent(options: PipelineSseOptions): StepAgent {
               resultContent = (data.content as string) || resultContent;
               resultCost = (data.costUsd as number) || resultCost;
               resultDuration = (data.durationMs as number) || resultDuration;
-              ctx.emitState({ streamingContent: "", streamingThinking: "" });
+              ctx.emitState({ isRunning: false, streamingContent: "", streamingThinking: "" });
               break;
             }
 
