@@ -147,6 +147,7 @@ export function PrdUI(props: StepUIProps) {
   const [showDiff, setShowDiff] = useState(false);
   const prdHistoryRef = useRef<PrdSnapshot[]>(_prdHistoryStore);
   const prevIsDoneRef = useRef(false);
+  const wasRunningRef = useRef(false);
   const autoStartedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -185,9 +186,19 @@ export function PrdUI(props: StepUIProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDone]);
 
+  // Track whether a fresh execution ran in this session (vs restored from hydration)
+  useEffect(() => {
+    if (isRunning) wasRunningRef.current = true;
+  }, [isRunning]);
+
   // ── Persist PRD.md to disk immediately on completion ──────────────────
   useEffect(() => {
     if (!isDone || !step?.content) return;
+    // Only save when this session actually ran the step (not on mount with old data)
+    if (!wasRunningRef.current) {
+      console.log("[PrdUI] Skipping save-doc — step was already completed before mount (restored from previous session).");
+      return;
+    }
     console.log("[PrdUI] PRD step completed. Saving PRD.md to generated-code...", {
       contentLength: step.content.length,
       codeOutputDir: useStepStore.getState().codeOutputDir,
