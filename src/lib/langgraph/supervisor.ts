@@ -68,6 +68,9 @@ import { triagePrebuiltArchitectTasks } from "./architect-triage";
 import {
   getRepairEmitter,
   runContractUsageCoverage,
+  runContractTaskCoverage,
+  formatContractTaskGapBlock,
+  formatPreviousRuntimeSmokeBlock,
   runRuntimeIntegrationAudit,
   formatRuntimeAuditBlock,
   runRuntimeSmokeGate,
@@ -82,7 +85,7 @@ import {
 import { readResourceRequirements } from "@/lib/pipeline/resource-requirements";
 import { recordCodingSessionLlmUsage } from "@/lib/pipeline/coding-session-report";
 import { runTddRuntimePhase } from "@/lib/pipeline/tdd-runtime-executor";
-import { runTddTestWriter } from "@/lib/pipeline/tdd-test-writer";
+import { runTddTestWriterWithRetry } from "@/lib/pipeline/tdd-test-writer";
 import { reviewTddTests } from "@/lib/pipeline/tdd-reviewer";
 import { formatTddRepairBlock } from "@/lib/pipeline/tdd-diagnostics-block";
 import { pickRelevantSections } from "./doc-section-picker";
@@ -6557,7 +6560,7 @@ async function tddTestWriterAndRed(
   state: SupervisorState,
 ): Promise<Partial<SupervisorState>> {
   const emitter = getRepairEmitter(state.sessionId);
-  const writer = await runTddTestWriter({
+  const writer = await runTddTestWriterWithRetry({
     outputDir: state.outputDir,
     tasks: state.tasks,
     projectContext: state.projectContext,
@@ -7990,6 +7993,35 @@ async function integrationVerifyAndFix(
     );
   }
 
+  // ── Contract → task coverage gap audit ─────────────────────────────────
+  // Detects contract endpoints with no coding task assigned to implement
+  // them (task list was frozen before contracts were generated). The
+  // resulting block goes into the verify-fix prompt as deterministic
+  // "MUST IMPLEMENT NOW" instructions with file path suggestions.
+  let contractTaskCoverageResult: Awaited<
+    ReturnType<typeof runContractTaskCoverage>
+  > | null = null;
+  try {
+    contractTaskCoverageResult = await runContractTaskCoverage({
+      outputDir: state.outputDir,
+      tasks: state.tasks,
+      emitter: getRepairEmitter(state.sessionId),
+      sessionId: state.sessionId,
+    });
+    if (contractTaskCoverageResult.gaps.length > 0) {
+      console.log(
+        `${label}: contract-task-coverage detected ${contractTaskCoverageResult.gaps.length} contract endpoint(s) with no owning task: ${contractTaskCoverageResult.gaps
+          .slice(0, 4)
+          .map((g) => `${g.method} ${g.endpoint}`)
+          .join(", ")}${contractTaskCoverageResult.gaps.length > 4 ? ", …" : ""}.`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `${label}: contract-task-coverage skipped — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   // ── Migration coverage → repair tasks ──────────────────────────────────
   // Reads `.ralph/migration-coverage.json` written per-task by the
   // worker hook and converts each "model touched without migration" gap
@@ -8485,8 +8517,28 @@ async function integrationVerifyAndFix(
     const { totals, pruned, pendingRepairTasks } = coverageResult;
     const noiseFree =
       pruned.length === 0 && pendingRepairTasks.length === 0;
+    // Strong signal: frontend exists in the project (we have ≥5 user-facing
+    // contract entries) but the audit found ZERO frontend API calls. This
+    // means `services.ts` is empty/mock and no UI can ever exercise the
+    // backend. Treat as P0 HARD FAIL and surface it at the top of the
+    // verify-fix prompt — the legacy block buries this fact under headings.
+    const frontendWiringHardFail =
+      totals.frontendCalls === 0 &&
+      totals.contractEntries - totals.adminSkipped >= 5;
     if (!noiseFree) {
       const lines: string[] = ["", "## Contract usage coverage"];
+      if (frontendWiringHardFail) {
+        lines.push(
+          "**P0 HARD FAIL — frontend services.ts is not wired to ANY backend endpoint.**",
+        );
+        lines.push(
+          `Detected ${totals.contractEntries - totals.adminSkipped} user-facing contract endpoint(s) but 0 frontend API calls. The frontend currently cannot exercise the backend at all — no list page, detail page, or form will work end-to-end.`,
+        );
+        lines.push(
+          "BEFORE doing any other work in this loop you MUST: (a) read \`frontend/src/api/client.ts\` and \`API_CONTRACTS.json\`, (b) populate \`frontend/src/api/services.ts\` with one typed function per contract entry that calls the canonical \`apiClient\`, (c) wire each function into the page/component that should call it (per PRD user flows). Do NOT call \`report_done(pass)\` while \`frontendCalls\` is 0.",
+        );
+        lines.push("");
+      }
       lines.push(
         `Totals: contractEntries=${totals.contractEntries}, frontendCalls=${totals.frontendCalls}, consistent=${totals.consistent}, surplus=${totals.surplus} (pruned), wiring-missing=${totals.frontendWiringMissing}, contract-gap=${totals.contractGap}, rogue=${totals.frontendRogue}, admin-skipped=${totals.adminSkipped}.`,
       );
@@ -8572,13 +8624,21 @@ async function integrationVerifyAndFix(
   const migrationCoverageBlock = migrationCoverageResult
     ? formatMigrationCoverageBlock(migrationCoverageResult)
     : "";
+  const contractTaskGapBlock = contractTaskCoverageResult
+    ? formatContractTaskGapBlock(contractTaskCoverageResult)
+    : "";
+  const previousSmokeBlock = await formatPreviousRuntimeSmokeBlock(
+    state.outputDir,
+  ).catch(() => "");
   const tddRepairBlock = await formatTddRepairBlock(state.outputDir);
 
   const openingUserContent = [
     `Project directory: ${state.outputDir}`,
     `Package manager: ${pm}`,
     prdBlock,
+    previousSmokeBlock,
     coverageBlock,
+    contractTaskGapBlock,
     migrationCoverageBlock,
     runtimeAuditBlock,
     tddRepairBlock,

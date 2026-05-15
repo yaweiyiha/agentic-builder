@@ -25,10 +25,43 @@ export interface ProjectClassification {
   durationMs: number;
 }
 
+/**
+ * Returns true when an L-tier classification should be silently downgraded
+ * to M-tier across the entire pipeline (scaffold copy, task breakdown,
+ * coding context, etc.). Default: ON.
+ *
+ * Rationale: the L-tier scaffold (pnpm monorepo + Next.js + Fastify +
+ * shared package) ships only empty shells and exercises rarely-tested
+ * codegen paths. The M-tier scaffold (frontend + backend split) is the
+ * battle-tested default and produces drastically more reliable results
+ * for the kind of full-stack PoC projects this builder targets.
+ *
+ * Set `BLUEPRINT_ALLOW_L_TIER=1` (or `=true`) to restore native L-tier
+ * routing once the L scaffold has been hardened.
+ */
+function isLToMDowngradeEnabled(): boolean {
+  const v = process.env.BLUEPRINT_ALLOW_L_TIER?.trim().toLowerCase();
+  if (v === "1" || v === "true" || v === "yes" || v === "on") return false;
+  return true;
+}
+
 export function normalizeProjectTier(tier?: string | null): ProjectTier {
   const t = (tier ?? "M").toUpperCase();
-  if (t === "S" || t === "M" || t === "L") return t as ProjectTier;
-  return "M";
+  let normalized: ProjectTier;
+  if (t === "S" || t === "M" || t === "L") {
+    normalized = t as ProjectTier;
+  } else {
+    normalized = "M";
+  }
+  if (normalized === "L" && isLToMDowngradeEnabled()) {
+    if (process.env.NODE_ENV !== "test") {
+      console.log(
+        "[ProjectClassifier] tier=L detected → downgrading to M (set BLUEPRINT_ALLOW_L_TIER=1 to keep L)",
+      );
+    }
+    return "M";
+  }
+  return normalized;
 }
 
 const CLASSIFIER_PROMPT = `You are a project complexity classifier. Given a feature brief, classify the project into one of three tiers.

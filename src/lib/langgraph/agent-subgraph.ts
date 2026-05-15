@@ -101,6 +101,15 @@ const CODEGEN_MULTI_ROUND_MAX_ROUNDS = (() => {
 const DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS = 1;
 const DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP = 1;
 const DEFAULT_WORKER_TSC_ERROR_CONTEXT_MAX_CHARS = 3000;
+/**
+ * P2: file-plan failures (task didn't actually create/modify files it
+ * promised) used to share the tsc fix budget — which collapses to 1 in
+ * ralph mode, often resulting in zero fix attempts when the budget was
+ * spent on tsc errors. We give file-plan failures their own floor so a
+ * task that promised but failed to write a file ALWAYS gets at least one
+ * targeted fix pass before being abandoned. Override via env.
+ */
+const DEFAULT_WORKER_FILE_PLAN_FIX_MIN_ATTEMPTS = 2;
 
 function readPositiveIntEnv(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
@@ -114,6 +123,7 @@ function getWorkerTscFixConfig(): {
   maxFixAttempts: number;
   maxFixAttemptsRalphCap: number;
   errorContextMaxChars: number;
+  filePlanMinAttempts: number;
 } {
   return {
     maxFixAttempts: readPositiveIntEnv(
@@ -127,6 +137,10 @@ function getWorkerTscFixConfig(): {
     errorContextMaxChars: readPositiveIntEnv(
       "WORKER_TSC_ERROR_CONTEXT_MAX_CHARS",
       DEFAULT_WORKER_TSC_ERROR_CONTEXT_MAX_CHARS,
+    ),
+    filePlanMinAttempts: readPositiveIntEnv(
+      "WORKER_FILE_PLAN_FIX_MIN_ATTEMPTS",
+      DEFAULT_WORKER_FILE_PLAN_FIX_MIN_ATTEMPTS,
     ),
   };
 }
@@ -2570,15 +2584,23 @@ function routeAfterVerify(state: WorkerState): string {
   // `task_done` with warnings (unchanged legacy behaviour).
   if (!isWorkerFixEligibleError(state.verifyErrors)) return "task_done";
   const cfg = getWorkerTscFixConfig();
-  const maxFix = state.ralphConfig.enabled
+  const isFilePlan = TASK_FILE_PLAN_UNFULFILLED_REGEX.test(state.verifyErrors);
+  const tscMaxFix = state.ralphConfig.enabled
     ? Math.min(
         state.ralphConfig.maxIterationsPerTask,
         cfg.maxFixAttemptsRalphCap,
       )
     : cfg.maxFixAttempts;
+  // P2: file-plan unfulfilled gets its own floor so it ALWAYS gets at
+  // least N targeted fix attempts (default 2), even when ralph mode caps
+  // tsc fixes at 1. A task that promised but didn't write a file should
+  // never silently slip through with `fixAttempts: 0`.
+  const maxFix = isFilePlan
+    ? Math.max(tscMaxFix, cfg.filePlanMinAttempts)
+    : tscMaxFix;
   if (state.fixAttempts >= maxFix) {
     console.log(
-      `[Worker:${state.workerLabel}] Per-task fix: max attempts (${maxFix}) reached, continuing with warnings.`,
+      `[Worker:${state.workerLabel}] Per-task ${isFilePlan ? "file-plan" : "tsc"} fix: max attempts (${maxFix}) reached, continuing with warnings.`,
     );
     return "task_done";
   }

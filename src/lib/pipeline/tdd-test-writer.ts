@@ -311,13 +311,25 @@ export async function runTddTestWriter(input: {
   const summary =
     finalSummary ||
     `TDD Test Writer wrote ${writtenFiles.size}/${missingTests.length} missing test file(s).`;
+
+  // P1: when the writer claimed it ran but produced ZERO files, that is
+  // never a healthy outcome. Emit a distinct telemetry event so the
+  // session report flags it, and let the caller decide whether to retry
+  // (current default: caller retries once via TDD_TEST_WRITER_RETRY_ON_EMPTY).
+  const noFilesWritten = writtenFiles.size === 0 && missingTests.length > 0;
   input.emitter?.({
     stage: "tdd-test-writer",
-    event: "tdd_tests_written",
+    event: noFilesWritten ? "tdd_tests_write_empty" : "tdd_tests_written",
     details: {
       requested: missingTests.length,
       writtenFiles: [...writtenFiles],
       costUsd,
+      ...(noFilesWritten
+        ? {
+            reason:
+              "writer completed but produced zero test files — typically the LLM called report_done without writing.",
+          }
+        : {}),
     },
   });
 
@@ -327,5 +339,37 @@ export async function runTddTestWriter(input: {
     writtenFiles: [...writtenFiles],
     summary,
     costUsd,
+  };
+}
+
+/**
+ * Best-effort wrapper around `runTddTestWriter` that retries ONCE when the
+ * first attempt produced zero files but tests were requested. We do not
+ * retry indefinitely — a second consecutive empty run almost always means
+ * the LLM is misreading the manifest, not a transient flake.
+ *
+ * Set `TDD_TEST_WRITER_RETRY_ON_EMPTY=0` to disable the retry.
+ */
+export async function runTddTestWriterWithRetry(input: {
+  outputDir: string;
+  tasks: CodingTask[];
+  projectContext: string;
+  sessionId: string;
+  emitter?: RepairEmitter;
+}): Promise<TddTestWriterResult> {
+  const retryOnEmpty =
+    (process.env.TDD_TEST_WRITER_RETRY_ON_EMPTY ?? "1").trim() !== "0";
+  const first = await runTddTestWriter(input);
+  if (!retryOnEmpty) return first;
+  if (!first.attempted) return first;
+  if (first.writtenFiles.length > 0) return first;
+
+  console.warn(
+    "[TDD Test Writer] First attempt produced zero files — retrying once with the same manifest.",
+  );
+  const second = await runTddTestWriter(input);
+  return {
+    ...second,
+    costUsd: first.costUsd + second.costUsd,
   };
 }

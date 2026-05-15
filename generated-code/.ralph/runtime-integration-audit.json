@@ -1,31 +1,15 @@
 {
-  "generatedAt": "2026-05-07T08:09:08.586Z",
-  "sessionId": "77db6cd6-d801-4b91-9526-4092d5c61532",
+  "generatedAt": "2026-05-14T22:56:30.426Z",
+  "sessionId": "fa1b0eeb-ced6-4702-8738-3c9d7e90df8a",
   "appliedOptionalFeatures": [],
   "declaredEnvKeys": [
     "COINGECKO_API_KEY"
   ],
-  "findings": [
-    {
-      "id": "bg-job-clear-stale-runs|backend/src/api/modules/spri/spri.routes.ts|42",
-      "ruleId": "bg-job-clear-stale-runs",
-      "scope": "backend",
-      "severity": "warn",
-      "file": "backend/src/api/modules/spri/spri.routes.ts",
-      "line": 42,
-      "snippet": "ingestionStatus);\n  router.post(\"/ingestion/refresh\", refreshIngestion);\n\n  // ── SSE stream ───────────────────────────────────────────────────\n  router.get(\"/scores/stream\", stre",
-      "reason": "This route kicks off a background aggregation but never clears stale `running` rows. A crashed previous run leaves the user with `ALREADY_RUNNING` errors forever.",
-      "directive": "Implement a `clearActiveRunsForUser(userId)` helper in the matching service file that updates every `status='running'` row for the user to `failed` (with `completed_at = new Date()`), and call it as the FIRST line of this refresh handler — before `enqueueXxx`."
-    }
-  ],
-  "byRule": {
-    "bg-job-clear-stale-runs": 1
-  },
-  "bySeverity": {
-    "warn": 1
-  },
+  "findings": [],
+  "byRule": {},
+  "bySeverity": {},
   "hasError": false,
-  "clean": false,
+  "clean": true,
   "disabledRules": [
     {
       "ruleId": "external-id-vs-db-pk",

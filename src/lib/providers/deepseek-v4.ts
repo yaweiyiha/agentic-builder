@@ -73,7 +73,7 @@ export async function chatCompletionsDeepSeekV4(
   const enableThinking =
     options.thinking === false
       ? false
-      : isTruthyEnvFlag(process.env.DEEPSEEK_V4_ENABLE_THINKING ?? "true");
+      : isTruthyEnvFlag(process.env.DEEPSEEK_V4_ENABLE_THINKING ?? "false");
   const reasoningEffort = (
     process.env.DEEPSEEK_V4_REASONING_EFFORT?.trim() || "high"
   ) as "low" | "medium" | "high";

@@ -53,6 +53,15 @@ export type {
   CoveragePolicy,
 } from "./contract-usage-coverage";
 export {
+  runContractTaskCoverage,
+  formatContractTaskGapBlock,
+} from "./contract-task-coverage";
+export type {
+  ContractTaskCoverageInput,
+  ContractTaskCoverageResult,
+  ContractTaskGap,
+} from "./contract-task-coverage";
+export {
   runRuntimeIntegrationAudit,
   formatRuntimeAuditBlock,
 } from "./runtime-integration-audit";
@@ -72,6 +81,7 @@ export type {
   RuntimeSmokeGateResult,
   RuntimeSmokeSuccess,
 } from "./runtime-smoke-gate";
+export { formatPreviousRuntimeSmokeBlock } from "./runtime-smoke-block";
 export { runTscDiagnosticsAsTasks } from "./tsc-diagnostics-as-tasks";
 export type {
   TscDiagnosticTask,

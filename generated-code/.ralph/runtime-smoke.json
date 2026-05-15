@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-07T08:14:03.111Z",
-  "sessionId": "77db6cd6-d801-4b91-9526-4092d5c61532",
+  "generatedAt": "2026-05-14T22:56:10.795Z",
+  "sessionId": "fa1b0eeb-ced6-4702-8738-3c9d7e90df8a",
   "pass": false,
   "bootFailed": true,
   "failures": [
@@ -8,7 +8,7 @@
       "code": "backend_did_not_start",
       "target": "_boot",
       "directive": "Backend `pnpm dev` did not reach a listening state. Inspect the stderr tail in `evidence` — common causes: missing PORT/DATABASE_URL/PRIVY_APP_ID in `backend/.env`, Sequelize model init throwing, or a TS error that crashed `tsx`.",
-      "evidence": "Backend did not become ready within 30000ms. tail=al/streams/readable:392:5)\u001b[39m\n  \u001b[90m    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)\u001b[39m {\n    length: \u001b[33m198\u001b[39m,\n    severity: \u001b[32m'ERROR'\u001b[39m,\n    code: \u001b[32m'0A000'\u001b[39m,\n    detail: \u001b[90mundefined\u001b[39m,\n    hint: \u001b[32m'The extension must first be installed on the system where PostgreSQL is running.'\u001b[39m,\n    position: \u001b[90mundefined\u001b[39m,\n    internalPosition: \u001b[90mundefined\u001b[39m,\n    internalQuery: \u001b[90mundefined\u001b[39m,\n    where: \u001b[90mundefined\u001b[39m,\n    schema: \u001b[90mundefined\u001b[39m,\n    table: \u001b[90mundefined\u001b[39m,\n    column: \u001b[90mundefined\u001b[39m,\n    dataType: \u001b[90mundefined\u001b[39m,\n    constraint: \u001b[90mundefined\u001b[39m,\n    file: \u001b[32m'extension.c'\u001b[39m,\n    line: \u001b[32m'673'\u001b[39m,\n    routine: \u001b[32m'parse_extension_control_file'\u001b[39m,\n    sql: \u001b[32m'CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;'\u001b[39m,\n    parameters: \u001b[90mundefined\u001b[39m\n  },\n  sql: \u001b[32m'CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;'\u001b[39m,\n  parameters: {}\n}\n\nNode.js v22.16.0\n"
+      "evidence": "Backend did not become ready within 30000ms. tail=ser: \u001b[32m'blueprint'\u001b[39m,\n            password: \u001b[32m'blueprint_password'\u001b[39m,\n            host: \u001b[32m'127.0.0.1'\u001b[39m,\n            port: \u001b[32m'5432'\u001b[39m,\n            database: \u001b[32m'srpi'\u001b[39m\n          },\n          port: \u001b[32m'5432'\u001b[39m\n        },\n        config: {\n          database: \u001b[32m'srpi'\u001b[39m,\n          username: \u001b[32m'blueprint'\u001b[39m,\n          password: \u001b[32m'blueprint_password'\u001b[39m,\n          host: \u001b[32m'127.0.0.1'\u001b[39m,\n          port: \u001b[32m'5432'\u001b[39m,\n          pool: { max: \u001b[33m5\u001b[39m, min: \u001b[33m0\u001b[39m, acquire: \u001b[33m30000\u001b[39m, idle: \u001b[33m10000\u001b[39m },\n          protocol: \u001b[32m'tcp'\u001b[39m,\n          native: \u001b[33mfalse\u001b[39m,\n          ssl: \u001b[90mundefined\u001b[39m,\n          replication: \u001b[33mfalse\u001b[39m,\n          dialectModule: \u001b[1mnull\u001b[22m,\n          dialectModulePath: \u001b[1mnull\u001b[22m,\n          keepDefaultTimezone: \u001b[90mundefined\u001b[39m,\n          dialectOptions: {\n            ssl: \u001b[33mfalse\u001b[39m,\n            user: \u001b[32m'blueprint'\u001b[39m,\n            password: \u001b[32m'b"
     }
   ],
   "successes": [],

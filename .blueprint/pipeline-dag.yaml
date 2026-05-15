@@ -1,11 +1,13 @@
 version: 1
 pipelines:
   - id: scoring-cycle
-    description: "5-minute stablecoin risk scoring run"
-    schedule: { cron: "*/5 * * * *" }
-    failure: { strategy: continue, retries: 0 }
+    description: "Scheduled stablecoin scoring run with freshness handling and alert generation."
+    schedule: { cron: "*/60 * * * *" }
+    failure: { strategy: retry-3, retries: 3, compensation: skip-cycle }
     nodes:
-      - { id: collect,   service: DataAdapterService,   function: fetchAllMetrics }
-      - { id: normalize, service: NormalizationService, function: executeNormalization,   dependsOn: [collect] }
-      - { id: score,     service: ScoringEngine,        function: calculateComposite,      dependsOn: [normalize] }
-      - { id: alert,     service: AlertService,          function: generateAlerts,         dependsOn: [score] }
+      - { id: collect, service: Ingestion Service, function: collectRawMetrics }
+      - { id: review-check, service: Review Service, function: resolveApprovedReserveValues, dependsOn: [collect] }
+      - { id: normalize, service: Scoring Service, function: computeVariableScores, dependsOn: [review-check] }
+      - { id: composite, service: Scoring Service, function: computeCompositeScores, dependsOn: [normalize] }
+      - { id: alerts, service: Alert Service, function: detectRapidMoversAndRiskTransitions, dependsOn: [composite] }
+      - { id: persist, service: History Service, function: writeSnapshotHistory, dependsOn: [alerts] }

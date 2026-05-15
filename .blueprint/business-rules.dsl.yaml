@@ -1,46 +1,31 @@
 version: 1
 rules:
-  # Risk Level Classification — enforced on every composite score
-  - id: RISK-LEVEL-1
-    name: "Composite score to risk level"
-    description: "Deterministic mapping from composite score (0-100) to risk label."
+  - id: SCORE-1
+    name: "Composite score mapping to risk level"
+    description: "Maps composite score into the four risk bands used by the dashboard and detail views."
     type: decision-table
     inputs:
       - { name: compositeScore, type: number }
     output: { name: riskLevel, type: string }
     cases:
-      - when: { compositeScore: "<=25" }
+      - when: { compositeScore: ">=0", compositeScore_max: 25 }
         then: "Normal"
-      - when: { compositeScore: "<=50" }
+      - when: { compositeScore: ">=26", compositeScore_max: 50 }
         then: "Elevated"
-      - when: { compositeScore: "<=75" }
-        then: "High-Risk"
-      - when: { }
+      - when: { compositeScore: ">=51", compositeScore_max: 75 }
+        then: "High Risk"
+      - when: { compositeScore: ">=76", compositeScore_max: 100 }
         then: "Critical"
-
-  # Rapid Mover Detection — evaluated per variable per cycle
-  - id: RAPID-MOVER-1
-    name: "Rapid mover flag"
-    description: "If a variable's normalized score increases by >= 25 points from the previous cycle, flag as rapid mover."
+  - id: SCORE-2
+    name: "Rapid mover detection"
+    description: "Flags a variable as rapid mover when its normalized score increases by at least 25 points versus the previous scoring cycle."
     type: decision-table
     inputs:
-      - { name: scoreDelta, type: number }
-    output: { name: isRapidMover, type: boolean }
+      - { name: previousNormalizedScore, type: number }
+      - { name: currentNormalizedScore, type: number }
+    output: { name: isRapidMover, type: string }
     cases:
-      - when: { scoreDelta: ">=25" }
-        then: true
+      - when: { previousNormalizedScore: "any", currentNormalizedScore: ">= previousNormalizedScore + 25" }
+        then: "true"
       - when: { }
-        then: false
-
-  # NOTE: Variable normalization rules (e.g., NORM-V1 through NORM-V9) must be added
-  # from the scoring specification. Each will be a piecewise-linear rule mapping
-  # raw value to normalized 0-100 score. Example placeholder:
-  # - id: NORM-V1
-  #   name: "Price deviation for USDC"
-  #   description: "Maps absolute deviation from $1 (pips) to risk score."
-  #   type: piecewise-linear
-  #   inputUnit: "pips"
-  #   outputRange: [0, 100]
-  #   segments:
-  #     - { from: 0, to: 5,  outputFrom: 0,  outputTo: 10 }
-  #     - { from: 5, to: 100, outputFrom: 10, outputTo: 100 }
+        then: "false"

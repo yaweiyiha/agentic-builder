@@ -655,7 +655,10 @@ async function resolveTier(
   projectTier: string | undefined,
   outputRoot: string,
 ): Promise<ScaffoldTier> {
-  if (projectTier) return projectTier.toUpperCase() as ScaffoldTier;
+  // Always run through normalizeProjectTier so the L → M downgrade applies
+  // even when the caller passes an explicit "L" via the request body or
+  // when the PRD.md badge says L.
+  if (projectTier) return normalizeProjectTier(projectTier) as ScaffoldTier;
   try {
     const prdPath = path.join(outputRoot, "PRD.md");
     const prdContent = await fs.readFile(prdPath, "utf-8");

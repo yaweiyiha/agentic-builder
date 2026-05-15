@@ -46,21 +46,30 @@ import type { CodingTask } from "@/lib/pipeline/types";
 
 /**
  * Default per-task character budget for `projectContext` after trimming.
- * 30K chars ≈ 7.5K tokens at the typical 4-chars-per-token ratio. Leaves
- * plenty of headroom for the rest of the worker prompt (convention card,
- * skeleton contracts, API contracts list, relevant files, etc.).
+ *
+ * Two-tier auto-detection (when `WORKER_CONTEXT_BUDGET_CHARS` is unset):
+ *   - Large-window providers (DeepSeek V4 Pro 1M, Gemini 1M+): default
+ *     150,000 chars (~37K tokens). With a 1M-token window we can afford
+ *     to keep the bulk of PRD + ImplementationGuide + SystemDesign and
+ *     stop forcing workers to grep their way back to context they should
+ *     have seen up-front.
+ *   - Standard providers (OpenRouter chains, 128K–200K windows): keep
+ *     the legacy 30,000-char budget to avoid prompt-size errors.
  *
  * Override at runtime via `WORKER_CONTEXT_BUDGET_CHARS` env var.
  *
  * Hard cap is 1,000,000 chars (~250K tokens). When using DeepSeek V4 Pro
  * (1M token window) a budget of 400,000–800,000 chars is safe.
- * When OpenRouter fallback models are in play (128K–200K windows) keep the
- * budget at ≤200,000 chars to avoid exceeding their limits.
  */
 export const DEFAULT_WORKER_CONTEXT_BUDGET_CHARS = (() => {
   const raw = Number(process.env.WORKER_CONTEXT_BUDGET_CHARS ?? "");
-  if (!Number.isFinite(raw) || raw <= 0) return 30_000;
-  return Math.max(6_000, Math.min(Math.floor(raw), 1_000_000));
+  if (Number.isFinite(raw) && raw > 0) {
+    return Math.max(6_000, Math.min(Math.floor(raw), 1_000_000));
+  }
+  const hasLargeWindowProvider =
+    Boolean(process.env.DEEPSEEK_API_KEY?.trim()) ||
+    Boolean(process.env.GEMINI_API_KEY?.trim());
+  return hasLargeWindowProvider ? 150_000 : 30_000;
 })();
 
 /**

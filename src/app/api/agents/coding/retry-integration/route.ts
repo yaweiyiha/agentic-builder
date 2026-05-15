@@ -10,6 +10,7 @@ import {
   listScaffoldTemplateRelativePaths,
   type ScaffoldTier,
 } from "@/lib/pipeline/scaffold-copy";
+import { normalizeProjectTier } from "@/lib/agents/shared/project-classifier";
 import {
   getTierScaffoldSpecForCodingContext,
   writeScaffoldSpecFile,
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
   };
 
   const outputRoot = resolveCodeOutputRoot(process.cwd(), codeOutputDir);
-  const tier = (projectTier ?? "M").toUpperCase() as ScaffoldTier;
+  const tier = normalizeProjectTier(projectTier ?? "M") as ScaffoldTier;
   const scaffoldProtectedPaths = await listScaffoldTemplateRelativePaths(tier);
 
   try {

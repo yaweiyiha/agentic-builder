@@ -257,8 +257,10 @@ export type CodegenOpenRouterVariant = "codeGen" | "codeFix";
 
 /**
  * Provider priority for codegen:
- *   1. DEEPSEEK_API_KEY set  → DeepSeek V4 Pro direct (up to 3 attempts)
- *                               if all 3 fail → fall through to OpenRouter chain
+ *   1. codeGen + DEEPSEEK_API_KEY set  → always try DeepSeek V4 Pro direct first
+ *      (even when LLM_PROVIDER=openrouter), then fall through to OpenRouter chain on failure
+ *   2. other variants + DEEPSEEK_API_KEY set + not forced openrouter
+ *      → DeepSeek V4 Pro direct first, then fall through to OpenRouter chain
  *   2. CODEGEN_API_KEY set   → custom OpenAI-compatible endpoint (no fallback)
  *   3. otherwise             → OpenRouter model chain (MODEL_CONFIG[variant])
  */
@@ -274,9 +276,13 @@ export async function invokeCodegenOrOpenRouter(
 ): Promise<OpenRouterResponse> {
   const key = options.openRouterVariant ?? "codeGen";
   const reasoningOptions = buildCodegenReasoningOptions(key);
+  const shouldTryDeepSeekFirst =
+    key === "codeGen"
+      ? isDeepSeekV4Provider()
+      : isDeepSeekV4Provider() && !shouldForceOpenRouter();
 
   // ── Priority 1: DeepSeek V4 Pro direct API ──────────────────────────────
-  if (isDeepSeekV4Provider() && !shouldForceOpenRouter()) {
+  if (shouldTryDeepSeekFirst) {
     const dsModel =
       process.env.DEEPSEEK_V4_MODEL?.trim() || DEEPSEEK_V4_DEFAULT_MODEL;
     const dsBase =
