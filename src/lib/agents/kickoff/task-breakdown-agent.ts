@@ -1,52 +1,119 @@
 import { BaseAgent } from "../shared/base-agent";
 import type { ProjectTier } from "../shared/project-classifier";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import { chatCompletionWithFallback, resolveModel } from "@/lib/openrouter";
+import { resolveModelChain } from "@/lib/model-config";
+import type { OpenRouterOptions } from "@/lib/llm-types";
 
-const TIER_TASK_LIMITS: Record<
-  ProjectTier,
-  { min: number; max: number; guidance: string }
-> = {
-  S: {
-    min: 3,
-    max: 6,
-    guidance:
-      "This is a SIMPLE project. Keep the task list minimal — only the essential scaffolding, core feature, and a basic smoke test. Merge related work into fewer, broader tasks. Do NOT over-engineer.",
-  },
-  M: {
-    min: 5,
-    max: 10,
-    guidance:
-      "This is a MEDIUM (**M**) project on a **pnpm monorepo** scaffold (`apps/web` Vite, `apps/api` Express, `packages/shared`). STRICTLY **5–10** tasks. Keep backend/data broad, but split frontend by page when there are multiple pages: first one route-shell/layout task, then page-level frontend tasks. Create an early contracts/client task so API contracts and frontend client stay aligned with PRD requirement IDs. **Scaffolding** must not redo the whole monorepo — only small alignment (env, scripts) if the PRD demands it.",
-  },
-  L: {
-    min: 15,
-    max: 30,
-    guidance:
-      "This is a LARGE project. Create thorough tasks across all phases — scaffolding, data layer, auth, backend services, frontend, integration, testing, and infrastructure.",
-  },
+type ReasoningEffort = "low" | "medium" | "high";
+type ThinkingVerbosity = "low" | "medium" | "high";
+
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+}
+
+function parseEffort(value: string | undefined): ReasoningEffort {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "low" || normalized === "high") return normalized;
+  return "medium";
+}
+
+function parseVerbosity(value: string | undefined): ThinkingVerbosity {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "low" || normalized === "high") return normalized;
+  return "medium";
+}
+
+function buildTaskBreakdownReasoningOptions(): Pick<
+  OpenRouterOptions,
+  "reasoning" | "thinking"
+> {
+  const enableReasoning = isTruthyEnvFlag(
+    process.env.TASK_BREAKDOWN_ENABLE_REASONING,
+  );
+  const enableThinking = isTruthyEnvFlag(
+    process.env.TASK_BREAKDOWN_ENABLE_THINKING,
+  );
+
+  const out: Pick<OpenRouterOptions, "reasoning" | "thinking"> = {};
+  if (enableReasoning) {
+    out.reasoning = {
+      enabled: true,
+      effort: parseEffort(process.env.TASK_BREAKDOWN_REASONING_EFFORT),
+    };
+  }
+  if (enableThinking) {
+    out.thinking = {
+      thinking_effort: parseEffort(process.env.TASK_BREAKDOWN_THINKING_EFFORT),
+      verbosity: parseVerbosity(process.env.TASK_BREAKDOWN_THINKING_VERBOSITY),
+    };
+  }
+  return out;
+}
+
+/**
+ * Tier affects *how* to shape tasks (breadth, monorepo conventions), not how many tasks to emit.
+ * Task count must be derived from PRD/TRD scope — see system prompt "Task count" section.
+ */
+const TIER_CODING_STYLE: Record<ProjectTier, string> = {
+  S: `Pipeline tier **S** (small scope): prefer **fewer, broader** tasks when the PRD is thin — scaffolding + core feature. Merge related work; do not pad with filler tasks to "look busy".`,
+
+  M: `Pipeline tier **M** (split frontend/backend app): stack is \`frontend/\` (**Vite + React + React Router + Ant Design**, NOT Next.js) plus \`backend/\` (**Koa + Sequelize + PostgreSQL**). **NEVER use Next.js for M-tier.** The scaffold is prebuilt and already copied; **do not plan a Scaffolding task that recreates the repo structure**. Keep backend/data tasks reasonably broad; split **frontend by page or major flow** when the PRD lists multiple surfaces — first an **app shell/layout** task, then page-level tasks. Add an **early contracts/client** task so API shapes and the web client stay aligned with PRD requirement IDs. Coding tasks should implement pages, API modules, and middleware files, but final registration closure is handled later by \`integrationVerifyAndFix\` in \`frontend/src/router.tsx\`, \`backend/src/api/modules/index.ts\`, and \`backend/src/app.ts\`.`,
+
+  L: `Pipeline tier **L** (broad product): expect **thorough** coverage across phases the PRD actually requires — scaffolding, data, auth, backend services, frontend, integration, infrastructure — but **only** where the documents call for them; still derive *how many* tasks from requirement breadth, not from a quota.`,
 };
 
 function mTierPhaseGuide(): string {
   return `
 
-## Tier M — phases and task shape (STRICT)
-Use **few, wide** tasks (5–10). Typical **phase** labels (merge if empty):
-- **Scaffolding** — Only if the PRD needs **extra** tooling not already in the template; otherwise **omit** or fold into **Integration**. Never plan \"greenfield\" recreation of \`pnpm-workspace.yaml\`, \`apps/web\`, or \`apps/api\`.
-- **Data Layer** — Prefer **one** broad task: shared DTOs, validation, DB schema/client in \`packages/shared\` and related persistence.
-- **Backend Services** — Prefer **one** broad task for \`apps/api\` (all routes, middleware, domain logic), unless API is unusually large.
-- **Integration (contracts/client)** — Add an **early** task that defines/aligns API contracts + frontend API client with PRD IDs before page implementation.
-- **Frontend** — First create **one** route shell/layout task, then split into **page-level** tasks (one task per page/flow, not per tiny component).
-  - Route shell/layout task must explicitly include apps/web/src/App.tsx (or src/routes.tsx) route registration and "/" homepage navigation entry links.
-- **Integration** — **Optional** single task: base URL, CORS, auth headers, error handling between web and api.
-- **Testing** — **One** task: Vitest (and e2e only if PRD requires) across the workspaces you touched.
+## Tier M — phases and task shape
+Use **coarse-grained** tasks unless the PRD forces more splits. Typical **phase** labels (merge if empty):
+- **Scaffolding** — Only if the PRD needs **extra** tooling not already in the template; otherwise **omit** or fold into **Integration**. Never plan \"greenfield\" recreation of \`frontend/\` or \`backend/\`.
+- **Data Layer** — Prefer **one** broad task: Sequelize models, migrations/bootstrap SQL if needed, request validation, and persistence wiring in \`backend/src\`.
+  - Data-layer subSteps MUST explicitly cover cross-file consistency between ORM model fields, request DTO/types, validation schemas, and service/controller create/update payloads.
+  - System-generated fields (e.g. \`id\`, \`createdAt\`, \`updatedAt\`, timestamp aliases, slugs generated by the server) must be identified as server-managed unless the PRD explicitly says the client supplies them.
+  - For M-tier Sequelize projects, use exactly one canonical DB entry file: \`backend/src/db.ts\`. Do not plan a second database bootstrap file such as \`backend/src/config/database.ts\` or \`backend/src/database/connection.ts\` unless you are MODIFYING the existing canonical file.
+  - HARD SPLIT RULE: Do **NOT** combine backend model/bootstrap work with frontend API client generation in the same task. If both are needed, emit separate tasks.
+- **Backend Services** — **REQUIRED for full-stack.** Prefer **one** broad task for \`backend/src\` (Koa routes, controllers, services, domain logic), unless the API surface is unusually large. This task implements the actual feature code — the scaffold only ships a starter Koa app.
+  - **EXCEPTION (HARD)**: If a backend feature is a **multi-step pipeline that integrates more than 3 external HTTP APIs / third-party services** (e.g. news aggregator hitting HackerNews + Google News + Jina + OpenAI + multiple market venues; a scanner combining Twitter API + Jina + OpenAI + Polymarket + HyperLiquid + Deribit), it MUST NOT be a single task. Split it into at least 3 tasks: (a) external-API client layer, (b) pipeline orchestration / business logic, (c) HTTP routes + SSE/queue wiring. See "External API complexity split (HARD RULE)" below for the full specification.
+- **Integration (contracts/client)** — Add an **early** task that defines/aligns API contracts + frontend API client in \`frontend/src/api\` with PRD IDs before page implementation.
+  - HARD SPLIT RULE: If the task would create files in both \`backend/src\` and \`frontend/src\`, keep it limited to shared contract/type alignment plus client bindings. Do not also bundle root infra files like \`.env\` or \`docker-compose.yml\` into that same task.
+- **Frontend** — First create **one** app shell/layout task, then split into **page-level** tasks (one task per page/flow, not per tiny component).
+  - Coding tasks should build the shell, navigation UI, and pages, but **must not** do the final route registration in \`frontend/src/router.tsx\`; that closure is handled by \`integrationVerifyAndFix\`.
+  - **MANDATORY for every page-level frontend task**: the task \`description\` and at least one \`subStep\` MUST explicitly list every backend API endpoint the page reads from or writes to (e.g. \`GET /api/projects\`, \`POST /api/projects\`, \`DELETE /api/projects/:id\`). Derive these from the PRD and the Backend Services task's file list. If no endpoint applies (e.g. a static layout task), state "no API calls required" explicitly.
+  - **FORBIDDEN in frontend tasks**: any subStep that says "use mock data", "hardcode data", or "TODO: replace with API". All data must come from real API calls via the frontend API client.
+- **Integration** — **Optional** single task: Vite proxy assumptions, Koa CORS/auth headers, frontend API client error handling, and env/config alignment between frontend and backend.
+- **Testing** — **Do not** add separate tasks with phase "Testing". Instead, every P0/P1 implementation task MUST include an embedded \`tddPlan.tests[]\` array so Test Writer / Runtime Executor can create RED/GREEN evidence for that task.
 
-**Bad for M:** separate tasks per endpoint or per tiny UI component, or \"create package.json for web\".
-**Good for M:** one contracts/client task, one route-shell/layout task, then page-level tasks like \"Implement Timer page\" and \"Implement History page\".
+**Bad for M:**
+- separate tasks per endpoint or per tiny UI component, or \"create frontend/package.json from scratch\";
+- bundling a multi-venue / multi-API pipeline (e.g. \"Implement feed aggregation pipeline and APIs\" doing HackerNews + Google News + Jina + OpenAI + Polymarket + HyperLiquid + Deribit + BullMQ + SSE + REST routes all in one task — this MUST be split, see External API complexity split rule).
+
+**Good for M:**
+- one contracts/client task, one app-shell/layout task, one broad backend services task, then page-level tasks like "Implement Dashboard view" and "Implement Project detail flow";
+- when a multi-API pipeline exists, split it into 3 tasks like "Build external API clients for {services}", "Implement {pipeline-name} orchestration", "Add {pipeline-name} HTTP routes + SSE streaming".
+
+## Tier M — scaffold utilities are CANONICAL (do not re-plan)
+The M-tier scaffold already provides the following files. NEVER plan a task whose subSteps create or "redesign" these — feature tasks must \`reads\` / \`modifies\` them only.
+- \`frontend/src/api/client.ts\` — the ONLY HTTP client. Never plan \`frontend/src/utils/apiClient.ts\`, \`frontend/src/utils/api.ts\`, \`frontend/src/lib/http.ts\`, or any other parallel HTTP wrapper.
+- \`backend/src/types/koa.d.ts\` — global \`koa\` module augmentation that types \`ctx.request.body\`. Never plan a duplicate augmentation file in feature scope.
+- \`backend/src/utils/jwt.ts\` — canonical \`signJwt\` / \`verifyJwt\`. Never plan a custom JWT helper file in feature tasks.
+- \`backend/src/utils/narrow.ts\` — \`parseEnumLiteral\` / \`asRecord\` helpers. Reference these instead of planning ad-hoc narrowing utilities.
+- \`backend/src/middlewares/errorHandler.ts\`, \`backend/src/middlewares/cors.ts\` — already wired in \`backend/src/app.ts\`.
+
+When a task needs JWT, body parsing, narrowing, or HTTP requests, list the relevant scaffold path under \`files.reads\` and have the subStep say "import from existing scaffold utility" rather than "create a new utility module".
 `;
 }
 
 function buildSystemPrompt(tier: ProjectTier, scaffoldBlock?: string): string {
-  const limits = TIER_TASK_LIMITS[tier];
+  const tierStyle = TIER_CODING_STYLE[tier];
   const mGuide = tier === "M" ? mTierPhaseGuide() : "";
   const scaffoldSection =
     scaffoldBlock && scaffoldBlock.trim().length > 0
@@ -63,24 +130,135 @@ Each task MUST include detailed implementation sub-steps and token usage estimat
 ## CRITICAL: Determine Project Type FIRST
 Before generating tasks, analyze the PRD to determine the project type:
 
-1. **Frontend-only** — The PRD says "no backend", "no API", "no database", "no server", "single-page app",
-   "client-side only", "localStorage", etc. OR the project clearly has no server-side requirements
-   (e.g. a timer app, calculator, static dashboard, game).
+1. **Frontend-only** — ONLY when the PRD **explicitly** states one or more of: "no backend", "no API", "no database",
+   "no server", "single-page app", "client-side only", "localStorage only", or the described product is inherently
+   compute-only with zero data persistence (e.g. a pure offline timer, offline calculator, static game with no scores).
+   **Do NOT classify as frontend-only** just because the PRD describes a simple or small product — if there is any
+   mention of saving data, user accounts, multi-user access, notifications, or any server-side feature, it is full-stack.
    → Use **React + Vite + TypeScript + Tailwind CSS**. NEVER use Next.js.
-   → Allowed phases: "Scaffolding", "Frontend", "Testing" ONLY.
+   → Allowed phases: "Scaffolding", "Frontend" ONLY (do NOT use phase "Testing").
    → Do NOT generate "Data Layer", "Backend Services", "Auth & Gateway", "Infrastructure", or "Integration" tasks.
    → Do NOT use Prisma, API routes, Docker, Kubernetes, or any server-side technology.
 
 2. **Full-stack with SSR/API** — The PRD explicitly requires server-side rendering, API routes, or Next.js features.
-   → Use **Next.js + TypeScript + Tailwind CSS**.
+   → **This type is ONLY allowed for L-tier projects.** For S-tier and M-tier, ALWAYS use type 3 below instead.
+   → Use **Next.js + TypeScript + Tailwind CSS** (L-tier only).
    → All phases are allowed.
 
-3. **Full-stack with separate backend** — The PRD requires a separate backend (Express, Fastify, NestJS, etc.).
-   → Use appropriate tech stack.
-   → All phases are allowed.
+3. **Full-stack with separate backend** — The PRD requires persistence, APIs, user data, or a separate backend service.
+   → **S-tier**: Vite + React frontend with Express/Node backend in a single repo.
+   → **M-tier**: **Koa + Sequelize** backend in \`backend/\`, **Vite + React** frontend in \`frontend/\`. **NEVER use Next.js for M-tier.** **NEVER use Prisma** — Prisma's binary footprint and separate migration runner are not supported here. All persistence goes through Sequelize models, associations, and migrations.
+   → **L-tier**: Falls here only if SSR is NOT required; otherwise use type 2.
+   → All phases are allowed except **Testing** (do not emit phase "Testing"). Backend Services phase is **mandatory** — see rule below.
 
-## Project Scale
-${limits.guidance}
+## CRITICAL: Mandatory phases for full-stack projects
+For any full-stack project (types 2 or 3 above), the output MUST contain:
+- At least **one task with phase "Backend Services"** — implementing the actual API routes, controllers, and domain logic in the backend source tree (\`backend/src\`, \`apps/api/src\`, or equivalent for the selected tier). The scaffold ships starter shells; your task adds the feature code.
+
+## CRITICAL: OAuth / social-login wiring (scaffold ships SDK; you wire it)
+The scaffold's optional-feature layer (\`scaffolds/<tier>/_optional/auth-*\`) is automatically copied into the project when the kickoff resource detector declares a matching trigger env (e.g. \`VITE_PRIVY_APP_ID\` → \`auth-privy\`). When applied, the scaffold has ALREADY shipped:
+
+- \`frontend/src/providers/PrivyProvider.tsx\` (or \`ClerkProvider\` etc.) — real SDK wrapper reading \`import.meta.env.VITE_PRIVY_APP_ID\`.
+- \`frontend/src/providers/AppProviders.tsx\` — overwrites base; mounts \`<PrivyAuthProvider>\` around \`<AuthProvider>\` so \`main.tsx\` is unchanged.
+- \`frontend/src/components/auth/LoginModal.tsx\` — overwrites base; uses \`usePrivy().login()\` and forwards Privy access token via \`onLogin?.(privyToken)\`.
+- \`frontend/src/hooks/usePrivyAuthBridge.ts\` — optional helper that auto-syncs Privy token into AuthContext.
+- \`backend/src/middlewares/privyAuth.ts\` + \`backend/src/privy/client.ts\` + \`backend/src/api/modules/auth/auth.routes.ts\` — token-verification middleware and a \`/auth/me\` route.
+- \`@privy-io/react-auth\` (frontend) and \`@privy-io/node\` (backend) added to \`dependencies\` automatically.
+
+You do NOT need to plan tasks that re-create any of those files. The auth-related task list MUST instead:
+
+1. **App-shell / layout task**: list whatever top-level component renders the router (e.g. \`frontend/src/App.tsx\` or the layout) in \`files.modifies\` with a subStep \"call \`usePrivyAuthBridge()\` once near the root so apiClient gets the Bearer token automatically\". DO NOT plan to modify \`AppProviders.tsx\` — it is already overwritten.
+2. **Landing / login page task**: list the landing page (e.g. \`frontend/src/views/LandingPage.tsx\`) in \`files.modifies\` with a subStep \"render \`<LoginModal>\` and pass \`onLogin={(privyToken) => useAuth().login(privyToken)}\`; do not re-implement the modal\". The token is then automatically attached as \`Authorization: Bearer <privyToken>\` by \`apiClient\`, and the backend \`privyAuthMiddleware\` (already shipped) verifies it on every request.
+3. **Backend user lookup**: any controller/service that consumes \`ctx.state.user.id\` MUST resolve the Privy DID to the internal DB UUID first (see the External Identity vs DB PK rule in the backend role prompt). This usually shows up as a 1-line subStep in EACH backend task that reads the current user.
+4. **DO NOT** plan a task whose subStep is \"install \`@privy-io/react-auth\`\" or \"replace placeholder LoginModal\" — both are already done by the optional scaffold.
+
+If the PRD describes a different OAuth provider that is NOT yet a registered \`_optional/auth-*\` feature (e.g. custom Auth0 setup), then you MAY plan a task that creates the SDK Provider + LoginModal — but flag it in the task description as \"scaffold optional feature missing for this provider; falling back to in-task implementation\".
+
+**Acceptance criterion** for any OAuth task: \"the LandingPage wires \`onLogin\` to \`useAuth().login(privyToken)\`; some top-level component calls \`usePrivyAuthBridge()\`; backend controllers do NOT call \`findByPk(ctx.state.user.id)\` directly — they resolve via \`privy_id\` first.\"
+
+This rule is **independent** of the External API split rule and the Background-job lifecycle rule below.
+
+## CRITICAL: Background-job task must include lifecycle deliverables
+Whenever a feature is implemented as a background job (queue, scheduler, worker, ingestion pipeline, anything that runs outside a user request), the SAME task description MUST include ALL of the following deliverables (do NOT split them across tasks — they are tightly coupled and break in surprising ways when shipped piecemeal):
+
+- explicit \`run_id\` produced by the enqueue function and threaded through worker → DB row → SSE / polling endpoint (the worker MUST NOT call \`randomUUID()\` to overwrite it);
+- in-process fallback that runs the job synchronously when the queue backend (Redis/BullMQ) is unavailable — controlled by an env flag like \`USE_REDIS_QUEUE\`. Default = in-process so the demo works without Redis;
+- a \`clearActiveRunsForUser(userId)\` helper invoked by the public refresh endpoint BEFORE starting a new run, so a crashed previous run never blocks the user with \`ALREADY_RUNNING\`;
+- structured file logging at every step (start, external-call, success, fail, complete) at \`<backend>/logs/<feature>.log\`;
+- the public SSE / status endpoint MUST accept BOTH UUID run-ids (DB-backed) and \`inproc:<scope>:<ts>\` run-ids (memory-backed) without 5xx — typically via an \`isUuid(runId)\` branch;
+- when the pipeline returns zero rows from all upstream sources, the run completes with \`status="completed"\` + \`item_count=0\` (NOT \`status="failed"\`); the frontend treats this as an empty state, not an error.
+
+**Concrete subStep example for a feed/aggregation task:**
+- \"Implement \`enqueueFeedAggregation(userId)\` in \`backend/src/utils/queue.ts\` returning \`run_id\`. Default branch: in-process Promise that calls the worker on next tick. Behind \`USE_REDIS_QUEUE=1\` flag: route through BullMQ.\"
+- \"Implement \`clearActiveRunsForUser\` in \`feed.service.ts\` and call it at the top of \`POST /api/feed/refresh\` (in \`feed.controller.ts\`).\"
+- \"Implement \`runFeedAggregation\` in \`feedAggregator.ts\` with structured logging to \`backend/logs/feed-aggregation.log\` at every step.\"
+- \"Empty feed = success: when both HN and Google News return 0 stories, mark run \`completed\` with \`story_count=0\` and clear user feed; do NOT throw \`NO_SOURCES\`.\"
+- \"In \`/api/feed/stream\`: detect \`inproc:\` prefix and subscribe to the in-memory event emitter; for UUID run-ids, query \`FeedAggregationRun.findByPk\`. NEVER call \`findByPk\` on an \`inproc:\` id — Postgres will throw \`invalid input syntax for type uuid\`.\"
+
+This rule is **independent** of the External API split rule (which governs splitting upstream-API client code from the orchestration code). A typical feed-aggregator task list ends up looking like:
+
+- T-x \"Build external API clients for HN / Google News / ...\" (External API split rule)
+- T-y \"Implement Feed aggregation pipeline + lifecycle (enqueue + worker + clear-stale + logging + empty-feed handling)\" (this rule — note all 6 deliverables in one task)
+- T-z \"Add Feed REST + SSE streaming routes (UUID + inproc: run-id branches)\" (External API split rule + this rule's SSE branch)
+
+Tasks T-y and T-z share the lifecycle contract. T-y owns the queue impl; T-z owns the HTTP surface.
+
+## CRITICAL: External API pipeline must be split (overrides "prefer one broad task")
+This rule **takes priority over** any "prefer one broad task" guidance below.
+
+If the PRD describes a backend pipeline that integrates **more than 3 distinct external HTTP APIs or third-party services** in one logical flow (typical examples: news/feed aggregators, market scanners, content-extraction pipelines, data ingestion pipelines), you MUST NOT emit it as a single task. The required split is:
+
+1. **External API client layer task** — wrappers/helpers for each external service (HTTP clients, auth headers, retry/timeout, typed responses). Files like \`backend/src/services/externalApis.ts\`, \`backend/src/services/twitterApi.ts\`, \`backend/src/services/jinaClient.ts\`, etc.
+2. **Pipeline orchestration task** — the multi-step business logic that calls those clients (e.g. \`backend/src/services/feedAggregator.ts\`, \`backend/src/services/marketScanner.ts\`). Reads the client files; does NOT recreate them.
+3. **HTTP / streaming layer task** — Koa controller, routes, SSE / BullMQ wiring (e.g. \`feed.controller.ts\`, \`feed.routes.ts\`, \`feedAggregationWorker.ts\`).
+
+Each split task should typically create **2–4 files**. Use \`dependencies\` to express order: orchestration depends on the client layer; the routes/streaming task depends on orchestration. \`coversRequirementIds\` should be distributed across the three tasks so coverage is preserved.
+
+**Concrete example — Capacitr-style PRD (do not literally output, but follow this shape):**
+- BAD: one task \"Implement feed aggregation pipeline and APIs\" creating \`feedAggregator.ts\` + \`externalApis.ts\` + \`feedAggregationWorker.ts\` + \`feed.controller.ts\` + \`feed.routes.ts\` + \`feed.service.ts\` + \`queue.ts\`.
+- GOOD:
+  - T-x \"Build external API clients for HackerNews / Google News / Jina / Polymarket / HyperLiquid / Deribit\" → creates \`externalApis.ts\` (or a small folder of one file per service).
+  - T-y \"Implement Feed aggregation 10-step orchestration\" → creates \`feedAggregator.ts\`, \`feedAggregationWorker.ts\`, \`queue.ts\`. Reads the client files from T-x.
+  - T-z \"Add Feed REST + SSE streaming routes\" → creates \`feed.controller.ts\`, \`feed.routes.ts\`, \`feed.service.ts\`. Reads orchestration files from T-y.
+
+The same split applies to the Markets scanner pipeline (Twitter API + Jina + OpenAI + 3 venues). If both Feed and Markets pipelines exist in the PRD, the **client layer task can be shared** between them (one task creates the clients, both pipeline tasks read them).
+
+**The scaffold does NOT implement your features.** The scaffold only provides the project skeleton (package.json, tsconfig, app shell). Every endpoint, every business rule, every page must be coded in Backend Services or Frontend tasks. Do not omit Backend Services because the scaffold already has \`backend/\`, \`frontend/\`, \`apps/api\`, or \`apps/web\` — those are starter shells, not implemented features.
+
+## TDD seed plan — REQUIRED for P0/P1 tasks
+Do not emit standalone testing tasks. Instead, embed a \`tddPlan\` object in each P0/P1 task:
+- Backend route/API tasks MUST include at least one \`api-contract\` test.
+- Frontend API client tasks MUST include at least one \`frontend-service\` test.
+- Page/route tasks MUST include at least one \`route-smoke\` test proving the route renders the real page and triggers real API hooks (not a placeholder).
+- Runtime/dependency tasks MUST include at least one \`runtime-smoke\` test for local startup/fallback behavior.
+- Each test MUST state the exact test file path, command, expected RED failure, and expected GREEN result.
+
+Example \`tddPlan\`:
+\`\`\`json
+"tddPlan": {
+  "tests": [
+    {
+      "id": "TDD-AUTH-LOGIN-001",
+      "type": "api-contract",
+      "priority": "P0",
+      "file": "backend/src/api/modules/auth/auth.routes.test.ts",
+      "command": "cd backend && pnpm test auth.routes.test.ts",
+      "expectedRed": "POST /api/v1/auth/login returns 404 or not implemented before route exists",
+      "expectedGreen": "valid email/password returns 200 with accessToken, refreshToken and user role"
+    }
+  ]
+}
+\`\`\`
+
+## Task count — derive from PRD (no fixed quota)
+- **Do not** target a predetermined number of tasks. The **only** driver for how many tasks to output is **document scope**: user flows, pages, APIs, data stores, integrations, and **coverage of every AC/FR (and PAGE-*/CMP-* if listed)** via \`coversRequirementIds\`.
+- **Derive** the list by: (1) enumerating what must exist in code to satisfy the PRD; (2) grouping into tasks that respect dependencies and parallelizable units; (3) **merging** work that belongs in one deliverable; **splitting** only when dependency order or review boundaries require it.
+- **Fewer tasks** for narrow PRDs; **more tasks** only when the PRD truly implies many separable surfaces (many pages, many services, strict phases). Never add filler tasks to match an imagined count.
+- **ProjectTier** (S/M/L) below is a **style and stack hint** — it does **not** set a minimum or maximum number of tasks.
+- **HARD LIMIT — S-tier**: Simple frontend projects MUST NOT exceed **4 tasks total**. If generating more than 4 tasks for S-tier, merge related work until at or below 4. Typical breakdown: (1) Scaffolding + project setup, (2) Core feature(s), (3) UI polish + integration, (4) optional infra — collapse further for thin-scope PRDs.
+
+## Project tier hint (style only — not task count)
+${tierStyle}
 ${mGuide}${scaffoldSection}
 ## Output Format — strict JSON array
 
@@ -94,7 +272,11 @@ Each element has this shape:
   "description": "Setup package.json with Vite, vite.config.ts, index.html, src/main.tsx, Tailwind CSS config.",
   "estimatedHours": 2,
   "executionKind": "ai_autonomous",
-  "files": ["package.json", "vite.config.ts", "tsconfig.json", "index.html", "src/main.tsx"],
+  "files": {
+    "creates": ["package.json", "vite.config.ts", "tsconfig.json", "index.html", "src/main.tsx"],
+    "modifies": [],
+    "reads": []
+  },
   "dependencies": [],
   "priority": "P0",
   "subSteps": [
@@ -113,75 +295,164 @@ Each element has this shape:
     "npm run build succeeds",
     "npm run dev starts the dev server on localhost"
   ],
-  "coversRequirementIds": ["AC-01", "FR-FE01", "F-01"]
+  "coversRequirementIds": ["AC-01", "FR-FE01", "F-01"],
+  "tddPlan": {
+    "tests": [
+      {
+        "id": "TDD-T-001-001",
+        "type": "runtime-smoke",
+        "priority": "P0",
+        "file": "tests/runtime/startup.test.ts",
+        "command": "pnpm test tests/runtime/startup.test.ts",
+        "expectedRed": "startup smoke fails before the feature wiring exists",
+        "expectedGreen": "startup smoke passes with the generated app booting cleanly"
+      }
+    ]
+  }
 }
 
 Field rules:
 - **id**: sequential T-001, T-002, ... (string)
 - **phase**: one of "Scaffolding", "Frontend", "Data Layer", "Auth & Gateway", "Backend Services",
-  "Integration", "Testing", "Infrastructure" (string).
-  For frontend-only projects, use ONLY "Scaffolding", "Frontend", "Testing".
+  "Integration", "Infrastructure" (string).
+  **Never** use phase "Testing" — TDD is embedded in implementation tasks via \`tddPlan.tests[]\`.
+  For frontend-only projects, use ONLY "Scaffolding", "Frontend".
 - **title**: short imperative sentence (< 80 chars)
 - **description**: 1-3 sentences explaining what to build, which files to touch, and
   any relevant FR-xxx / US-xx references from the PRD.
 - **estimatedHours**: integer, realistic hours for a senior full-stack engineer.
 - **executionKind**: "ai_autonomous" (AI can fully handle) or "human_confirm_after"
   (needs human review/approval after completion).
-- **files**: array of key file paths or patterns this task touches.
+- **files**: object with three sub-arrays:
+  - "creates": files this task creates from scratch. These files MUST NOT exist before this task runs.
+  - "modifies": files this task edits. These MUST already exist (created by a dependency task).
+  - "reads": files this task only imports or references without editing.
+  - CRITICAL: A file that appears in any other task's "creates" MUST appear in this task's "modifies" or "reads", NEVER in "creates" again. No file path may appear in "creates" across more than one task.
 - **dependencies**: array of task IDs that must be done first (e.g. ["T-001"]).
 - **priority**: "P0" (must have), "P1" (should have), "P2" (nice to have).
 - **subSteps**: array of 2-6 concrete implementation steps. Each step has:
   - "step": sequential number (1, 2, 3...)
   - "action": short imperative phrase (< 60 chars) describing WHAT to do
   - "detail": 1-2 sentences explaining HOW to do it, including specific APIs, patterns, or code structure
+  - Each step's "detail" MUST explicitly state whether the file is being CREATED or MODIFIED.
+  - If a file is listed in "modifies", the detail MUST say "MODIFY existing [filename]" and describe what to add/change. NEVER say "create" for a file in "modifies".
+  - If a file is listed in "creates", the detail MUST say "CREATE new file [filename]".
 - **tokenEstimate**: estimated LLM token usage for an AI agent to complete this task:
   - "inputTokens": tokens needed for context (project docs + task description + existing code), typically 1500-4000
   - "outputTokens": tokens the AI will generate (code output), estimate based on file count and complexity: config files ~500, components ~1500, services ~2000, complex pages ~3000
   - "totalTokens": inputTokens + outputTokens
   - "estimatedCostUsd": totalTokens / 1000000 * 0 (Gemini is free) — set to 0 for now
 - **acceptanceCriteria**: 2-4 concrete, testable conditions that verify the task is done correctly.
+  - For **Frontend page tasks**: MUST include at least one criterion like "Page fetches [resource] from \`GET /api/[path]\` via the API client — no mock/hardcoded data". If the page has mutations, also include "Form submits to \`POST /api/[path]\` and reflects the server response".
 - **coversRequirementIds**: string array of PRD IDs this task fully or materially implements.
   Include **every** relevant **AC-***, **FR-*** (and **F-** if used in PRD) ID that this task addresses.
   Across all tasks, these IDs should cover as much of the PRD’s AC/FR list as possible (pipeline validates coverage).
+- **tddPlan.tests**: required for P0/P1 tasks. Each test MUST include \`id\`, \`type\`, \`priority\`, \`file\`, \`command\`, \`expectedRed\`, and \`expectedGreen\`. The command must be executable by the generated project, and RED/GREEN expectations must be specific enough for a runtime executor to validate.
+  Every \`tddPlan.tests[].file\` MUST also be listed in this task's \`files.creates\` or \`files.modifies\` so the worker produces the test file before/with the implementation.
 
-## Critical: Scaffolding task MUST include build tooling
-The FIRST task (T-001, phase "Scaffolding") MUST set up a COMPLETE, runnable project skeleton.
-This means it MUST explicitly include:
+## Critical: Scaffolding task behavior per tier
 
-### For frontend-only projects (DEFAULT — use this unless Next.js is explicitly required):
+### For M-tier and L-tier prebuilt projects:
+The scaffold is **already copied** from a prebuilt template before coding begins.
+- **Do NOT generate a Scaffolding task** that recreates the project from scratch — the skeleton already exists.
+- If a Scaffolding task is needed at all, it should ONLY make small alignment changes (e.g. add env files, adjust scripts) on top of the existing skeleton.
+- **M-tier** uses \`frontend/\` (**React + Vite**) and \`backend/\` (**Koa + Sequelize**). **NEVER use Next.js** for M-tier projects. **NEVER introduce Prisma** — use Sequelize models and migrations only.
+- **L-tier** uses **Next.js** for frontend and **Fastify** for backend in a pnpm monorepo.
+
+### For S-tier (single app) projects:
+The scaffold is also prebuilt (Vite + React + TypeScript + Tailwind CSS). If a Scaffolding task exists, it should only extend the existing template.
 - **Build tool**: Vite with @vitejs/plugin-react. NEVER use create-react-app, react-scripts, or Next.js.
-- **package.json**: Must have "type": "module", scripts: { "dev": "vite", "build": "vite build", "preview": "vite preview" }
-- **vite.config.ts**: with react plugin configured
-- **index.html**: Root HTML file in project root with <div id="root"> and <script type="module" src="/src/main.tsx">
-- **src/main.tsx**: React entry point with ReactDOM.createRoot
-- **tsconfig.json**: with jsx: "react-jsx", module: "ESNext", moduleResolution: "bundler"
-- **Tailwind CSS**: tailwind.config.ts, postcss.config.js, CSS file with @tailwind directives
+- **Import convention** (applies to ALL subsequent tasks): all cross-directory imports inside \`src/\` use \`@/\` alias (e.g. \`import Button from '@/components/Button'\`), never relative \`../\` paths.
 
-### For Next.js projects (ONLY when SSR or API routes are needed):
+### For Next.js projects (ONLY L-tier or when SSR is explicitly required):
 - **Build tool**: Next.js
 - **package.json**: scripts: { "dev": "next dev", "build": "next build", "start": "next start" }
 - **next.config.mjs** or **next.config.ts**
 - **src/app/layout.tsx** and **src/app/page.tsx** (App Router)
 - **Tailwind CSS**: setup with postcss
 
-The scaffolding task's acceptanceCriteria MUST include: "npm install && npm run build succeeds without errors" and "npm run dev starts the dev server".
+If a scaffolding task is generated, its acceptanceCriteria MUST include: "npm install && npm run build succeeds without errors" and "npm run dev starts the dev server".
+
+## CRITICAL: Route / Module / Middleware Registration Ownership
+Coding tasks should **implement feature files**, but they should **not** perform the final shared-entry registration closure.
+
+**Backend feature tasks:**
+- Do **NOT** require shared entry files such as \`backend/src/app.ts\` or \`backend/src/api/modules/index.ts\` in \`files.modifies\` just for route/middleware registration.
+- Create or modify the concrete feature files instead (e.g. \`backend/src/api/modules/*/*.routes.ts\`, controllers, services, validation, middleware implementation files).
+- acceptanceCriteria should verify that handlers/modules are implemented and ready for registration, not that the shared entrypoint is already wired.
+
+**Frontend page tasks:**
+- Do **NOT** require \`frontend/src/router.tsx\` in \`files.modifies\` for page registration.
+- Implement the page/view/component files and any local navigation UI, but defer final route registration to \`integrationVerifyAndFix\`.
+- acceptanceCriteria should verify the page/component implementation itself, not final path reachability through the global router.
+- **Directory convention (M-tier)**: All page-level view files MUST be placed under \`frontend/src/views/\` with a **flat** structure (e.g. \`frontend/src/views/LoginPage.tsx\`, \`frontend/src/views/DashboardPage.tsx\`). NEVER use \`frontend/src/pages/\` — that is a Next.js convention. NEVER nest into subdirectories like \`frontend/src/views/auth/\`; keep every page file directly under \`frontend/src/views/\`.
+
+**Final registration closure owner:**
+- \`integrationVerifyAndFix\` is responsible for scanning and registering:
+  - frontend pages from \`frontend/src/views\` into \`frontend/src/router.tsx\`
+  - backend module routes from \`backend/src/api/modules\` into \`backend/src/api/modules/index.ts\`
+  - backend middlewares from \`backend/src/middlewares\` into \`backend/src/app.ts\`
+
+## CRITICAL: Database & Infrastructure
+Scan the PRD for any persistence requirement (database, file storage, cache, queues). If found:
+
+1. The first backend task OR a dedicated "Infrastructure" phase task MUST include in its \`files.creates\`:
+   - \`docker-compose.yml\` — with the required database/cache service(s) and correct ports.
+   - \`.env\` — required keys (DATABASE_URL is written at coding scaffold when \`BLUEPRINT_GENERATED_DATABASE_URL\` is set in Agentic Builder; tasks must still declare REDIS_URL, PORT, JWT_SECRET, etc. as needed).
+   - A DB init/migration file if needed (e.g. \`backend/src/database/migrations/*.ts\` or \`scripts/init-db.sql\`).
+   - For M-tier Sequelize projects, the runtime env/bootstrap chain must remain single-source: use \`backend/src/db.ts\` for DB connection and ensure startup loads \`.env\` before reading env vars.
+   - Never invent localhost PostgreSQL credentials such as \`postgres:postgres@localhost\` unless the same task also provisions that exact user via \`docker-compose.yml\` or documented setup. Prefer the provided generated DATABASE_URL or align with the actual local role/database bootstrap strategy.
+
+2. If the project uses **Sequelize** (the M-tier default; Prisma is NOT supported):
+   - Define models as ES modules under \`backend/src/models/*.ts\` with explicit \`Model.init(...)\` and \`.hasMany\` / \`.belongsTo\` associations wired in \`backend/src/models/index.ts\`.
+   - For schema changes, include Sequelize migration files under \`backend/src/database/migrations/*.ts\` (or \`.js\`). Do NOT introduce \`prisma/schema.prisma\`, \`@prisma/client\`, or \`npx prisma ...\` commands — they are explicitly disallowed.
+   - Add a subStep: \`"Run: npx sequelize-cli db:migrate (or an equivalent \`sequelize.sync()\` bootstrap in backend/src/db.ts) to apply the schema."\`
+   - acceptanceCriteria MUST include: \`"Sequelize models load and migrations/sync complete without errors"\`.
+
+3. If the project uses **SQLite** (e.g. better-sqlite3, sql.js):
+   - The init subStep must create the DB file and execute \`CREATE TABLE\` statements on app startup.
+   - No docker-compose needed, but \`.env\` must still define \`DATABASE_PATH\`.
+
+4. **In-memory storage** is only acceptable for small-scope (S-tier) projects with no persistence requirement in the PRD.
+   - If used, the task description MUST explicitly state: \`"Uses in-memory store; data does not persist across restarts"\`.
 
 ## Rules
 - If the prompt includes **Pipeline coding tier** and template paths, the **scaffold is already copied before coding** — do not plan tasks that duplicate that layout; implement features on top of it.
-- Generate EXACTLY **${limits.min}–${limits.max} tasks**. NEVER exceed ${limits.max}. If you generate more than ${limits.max} tasks, your output will be REJECTED.
+- **Task count** follows the **Task count — derive from PRD** section above — never optimize for a fixed number; optimize for **full PRD coverage** and sensible dependency order.
 - Sequence tasks so cross-task context is stable:
   - Add an early **contracts/client** task (phase can be "Data Layer" or "Integration") that aligns request/response schemas, shared types, and frontend API client with PRD IDs.
+  - For backend persistence flows, this contracts/client task or the early data-layer task MUST also align ORM-required fields with validation and service payloads so system fields are not accidentally treated as client input.
+  - Do not split backend env/bootstrap ownership across multiple files. If a task touches backend runtime config, it must MODIFY the canonical startup/database files instead of creating parallel alternatives.
   - Ensure this contracts/client task appears before backend endpoint implementation and before page-level frontend tasks.
+- **Task size cap (HARD RULE)**:
+  - If a task would create more than **8 files**, split it into multiple tasks unless the extra files are tiny same-scope siblings (e.g. one controller/routes/service trio).
+  - If a task would create files across **root infra** (\`.env\`, \`docker-compose.yml\`), **backend/src**, and **frontend/src**, it MUST be split into at least two tasks.
+  - For M-tier full-stack projects, prefer this early sequence: **(1) backend data/model task**, **(2) contracts/frontend API client task**, **(3) infra/env task if needed** rather than one mega bootstrap task.
+- **External API complexity split (HARD RULE)**:
+  - If a single task would integrate **more than 3 distinct external HTTP APIs or third-party services** within the same pipeline (e.g. HackerNews + Google News + Jina + OpenAI + Polymarket + HyperLiquid + Deribit all in one task), it MUST be split into at least two tasks. This includes background job pipelines, scanner pipelines, and aggregation pipelines. Suggested split strategy for such pipeline tasks:
+    - **Task A — External API client layer**: wrappers/helpers for each external service (HTTP clients, auth headers, timeout handling, typed response shapes). These files are reused by all pipeline tasks.
+    - **Task B — Pipeline orchestration**: step-by-step coordination logic, error classification (fatal vs. non-fatal), deduplication, and ranking.
+    - **Task C — API endpoint + streaming layer**: SSE/polling controller, routes, BullMQ job wiring, and queue setup.
+  - The rule applies regardless of how many files the task creates — integration complexity alone is sufficient grounds for a split.
+- **Single-task file creates cap (SOFT RULE)**:
+  - Prefer tasks that create **≤ 4 files** in \`files.creates\`. Tasks with 5–8 creates are acceptable only if all files belong to the same narrow domain (e.g. a controller + routes + service + validation quartet for one module). If a task would create 5+ files spanning multiple domains (e.g. a job worker + external API clients + an SSE controller + a DB model), split it.
 - Frontend task granularity:
-  - Create one **route shell/layout** frontend task first (routing table, app shell, navigation/layout wiring).
-  - Route shell/layout task must include explicit edits to apps/web/src/App.tsx (or src/routes.tsx imported by App) and ensure "/" has real navigation entries.
+  - Create one **app shell/layout** frontend task first (app shell, navigation/layout wiring).
+  - Do not assign final edits to shared route registries (\`frontend/src/router.tsx\`, \`apps/web/src/App.tsx\`, or \`src/routes.tsx\`) to Coding tasks; \`integrationVerifyAndFix\` handles final registration closure.
   - Then split frontend implementation by **page/flow** (one task per page), not by tiny component.
+- **Frontend API binding (CRITICAL)**: Every frontend page task that renders data from the backend MUST:
+  1. List in its \`description\` the specific API endpoints it consumes (e.g. \`GET /api/users\`, \`POST /api/orders\`).
+  2. Include a \`subStep\` that explicitly says: "Call \`[METHOD] /api/[path]\` via the API client to load/submit data".
+  3. Include in \`acceptanceCriteria\` a criterion asserting no mock/hardcoded data is used.
+  This information allows the AI coding agent to know which real endpoints to call instead of inventing mock data.
 - Merge related work aggressively for backend/data: combine multiple API endpoints and models into broader tasks unless scale clearly requires more split.
 - Order tasks by execution sequence (respecting dependencies).
 - Focus on CODING tasks — skip pure planning, meeting, or documentation-only items.
 - Reference PRD feature IDs (FR-xxx) and user stories (US-xx) where applicable.
 - Tasks that involve security, payment, or auth MUST be "human_confirm_after".
 - Every task MUST have subSteps (2-6 steps), tokenEstimate, acceptanceCriteria, and coversRequirementIds (non-empty when PRD lists AC/FR ids).
+- Every file path across all tasks must be assigned to exactly one task's "files.creates". All other tasks that touch the same file must list it under "files.modifies" or "files.reads".
+- Before writing subSteps for a task, check its "dependencies" array. Any file listed in a dependency task's "files.creates" is already on disk — reference it via "modifies" or "reads", never recreate it.
 - Output ONLY the JSON array. No other text.`;
 }
 
@@ -189,6 +460,10 @@ export class TaskBreakdownAgent extends BaseAgent {
   private tier: ProjectTier;
 
   constructor(tier: ProjectTier = "L", scaffoldBlock?: string) {
+    const modelChain = resolveModelChain(
+      MODEL_CONFIG.taskBreakdown,
+      resolveModel,
+    );
     super({
       name: "Task Breakdown Agent",
       role: "Engineering Lead",
@@ -196,6 +471,14 @@ export class TaskBreakdownAgent extends BaseAgent {
       defaultModel: MODEL_CONFIG.taskBreakdown,
       temperature: 0.3,
       maxTokens: 16384,
+      customChatCompletion: async (messages, opts) => {
+        const { model: _ignoredModel, ...rest } = opts;
+        const reasoningOptions = buildTaskBreakdownReasoningOptions();
+        return chatCompletionWithFallback(messages, modelChain, {
+          ...rest,
+          ...reasoningOptions,
+        });
+      },
     });
     this.tier = tier;
   }
@@ -209,6 +492,10 @@ export class TaskBreakdownAgent extends BaseAgent {
       designSpec?: string;
       /** Formatted structured PRD spec (pages + component IDs). Injected for coverage. */
       prdSpecText?: string;
+      /** User-selected guidance from task breakdown review pass. */
+      improvementNotes?: string[];
+      /** Pre-formatted markdown block describing user-uploaded design references. */
+      designReferencesBlock?: string;
     },
     sessionId?: string,
   ) {
@@ -231,6 +518,9 @@ export class TaskBreakdownAgent extends BaseAgent {
     if (documents.designSpec) {
       sections.push("## Design Spec\n\n" + documents.designSpec);
     }
+    if (documents.designReferencesBlock) {
+      sections.push(documents.designReferencesBlock);
+    }
 
     const context = sections.slice(1).join("\n\n---\n\n");
 
@@ -241,16 +531,110 @@ export class TaskBreakdownAgent extends BaseAgent {
         ? "Focus on the Structured PRD Spec — every PAGE-*, CMP-* ID listed must be implemented; add each covered ID to coversRequirementIds."
         : "Focus on the PRD requirements and Design Spec components.";
 
+    const referencesHint = documents.designReferencesBlock
+      ? ` The user attached design reference screenshots (see the **Design references** section below) — for every frontend task whose scope matches a screenshot's target/label, cite the reference path in the task description so coding agents consult it.`
+      : "";
+
     const userMessage =
       `Analyze all provided documents and generate a coding task breakdown as a JSON array. ` +
       `Respect the **ProjectTier** and any **Pipeline coding tier** / scaffold section in the system prompt. ` +
-      `${focusHint}\n\n` +
+      `${focusHint}${referencesHint}` +
+      (documents.improvementNotes && documents.improvementNotes.length > 0
+        ? `\n\nApply these selected improvement suggestions while regenerating:\n- ${documents.improvementNotes.join("\n- ")}`
+        : "") +
+      `\n\n` +
       sections[0];
 
     return this.run(
       userMessage,
       context.length > 0 ? context : undefined,
       "step-task-breakdown",
+      sessionId,
+    );
+  }
+
+  /**
+   * Supplementary task generation used by the Coverage Gate self-heal loop.
+   *
+   * Given the set of PRD requirement IDs that were not covered by the
+   * original task breakdown, plus a short summary of tasks already emitted,
+   * this asks the model for ADDITIONAL tasks — never re-numbering or
+   * replacing existing ones — whose `coversRequirementIds` collectively
+   * cover the missing ids.
+   *
+   * The agent must stay aligned with the tier/scaffold conventions from the
+   * original system prompt; no prompt re-derivation is needed because we
+   * reuse `this.run`.
+   */
+  async generateSupplementaryTasks(
+    params: {
+      missingIds: string[];
+      existingTaskSummary: Array<{
+        id: string;
+        phase?: string;
+        title: string;
+      }>;
+      startingTaskId: string;
+      prd: string;
+      trd?: string;
+      sysDesign?: string;
+      implGuide?: string;
+      prdSpecText?: string;
+    },
+    sessionId?: string,
+  ) {
+    const summaryLines = params.existingTaskSummary
+      .map((t) => `- \`${t.id}\`${t.phase ? ` (${t.phase})` : ""}: ${t.title}`)
+      .join("\n");
+
+    const contextSections: string[] = [];
+    contextSections.push("## PRD (authoritative)\n\n" + params.prd);
+    if (params.prdSpecText) contextSections.push(params.prdSpecText);
+    if (params.trd) contextSections.push("## TRD\n\n" + params.trd);
+    if (params.sysDesign)
+      contextSections.push("## System Design\n\n" + params.sysDesign);
+    if (params.implGuide)
+      contextSections.push("## Implementation Guide\n\n" + params.implGuide);
+
+    const userMessage = [
+      "## Supplementary task generation (self-heal)",
+      "",
+      "The previous task breakdown did NOT cover every PRD requirement ID.",
+      "Produce ADDITIONAL tasks — one JSON array, no prose — that cover the",
+      "missing ids below. Rules:",
+      "",
+      "1. **Do NOT** regenerate, renumber, or modify any task already present.",
+      "2. Every new task's `coversRequirementIds` MUST include at least one",
+      "   id from the missing list.",
+      "3. Number new tasks starting from `" +
+        params.startingTaskId +
+        "` and increment sequentially.",
+      "4. Use the SAME phase vocabulary and tier conventions as the original",
+      "   system prompt (Scaffolding / Data Layer / Auth & Gateway /",
+      "   Backend Services / Integration / Frontend / Testing / Infrastructure).",
+      "5. For every new task declare `files.creates` / `files.modifies` that",
+      "   do NOT collide with files already created by earlier tasks.",
+      "6. Dependencies may reference earlier task ids from the summary.",
+      "7. Output strict JSON: an array of task objects. No markdown fencing.",
+      "",
+      "## Missing requirement IDs (" + params.missingIds.length + ")",
+      "",
+      params.missingIds.map((id) => `- ${id}`).join("\n"),
+      "",
+      "## Existing tasks (summary — do not touch these)",
+      "",
+      summaryLines.length > 0 ? summaryLines : "(none)",
+    ].join("\n");
+
+    const context =
+      contextSections.length > 0
+        ? contextSections.join("\n\n---\n\n")
+        : undefined;
+
+    return this.run(
+      userMessage,
+      context,
+      "step-task-breakdown-supplementary",
       sessionId,
     );
   }

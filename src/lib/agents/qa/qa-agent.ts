@@ -1,5 +1,9 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import {
+  docGenerationThinking,
+  resolveDocMaxTokens,
+} from "../shared/doc-agent-settings";
 
 const SYSTEM_PROMPT = `You are a senior QA Agent for 57Blocks Agentic Builder Pod.
 
@@ -73,21 +77,26 @@ export class QAAgent extends BaseAgent {
       systemPrompt: SYSTEM_PROMPT,
       defaultModel: MODEL_CONFIG.qa,
       temperature: 0.3,
-      maxTokens: 8192,
+      maxTokens: resolveDocMaxTokens("QA_DOC_MAX_TOKENS", {
+        deepseek: 24576,
+        openrouter: 8192,
+      }),
+      thinking: docGenerationThinking(),
     });
   }
 
   async generateAudit(
     prdContent: string,
     designContent: string,
-    sessionId?: string
+    sessionId?: string,
+    /** When provided, switches to streaming mode and calls onChunk for each content delta. */
+    onChunk?: (chunk: string) => void,
   ) {
     const context = `## PRD Document\n${prdContent}\n\n## Design Specification\n${designContent}`;
-    return this.run(
-      "Analyze the PRD and Design specification. Generate a comprehensive audit report (AUDIT.json) and test plan.",
-      context,
-      "step-3-qa",
-      sessionId
-    );
+    const message = "Analyze the PRD and Design specification. Generate a comprehensive audit report (AUDIT.json) and test plan.";
+    if (onChunk) {
+      return this.streamRun(message, (chunk) => onChunk(chunk), context, "step-3-qa", sessionId);
+    }
+    return this.run(message, context, "step-3-qa", sessionId);
   }
 }

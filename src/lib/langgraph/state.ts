@@ -3,7 +3,10 @@ import type {
   CodingAgentRole,
   CodingTask,
   KickoffWorkItem,
+  TaskSubStep,
 } from "@/lib/pipeline/types";
+import { type RalphConfig, DEFAULT_RALPH_CONFIG } from "@/lib/ralph";
+import type { PrdSpec } from "@/lib/requirements/prd-spec-types";
 
 // ─── Shared types ───
 
@@ -18,8 +21,29 @@ export interface ApiContract {
   service: string;
   endpoint: string;
   method: string;
+  /** TypeScript type literal for the request body/params, e.g. "{ email: string; password: string }" */
+  requestFields?: string;
+  /** TypeScript type literal for the success response body */
+  responseFields?: string;
+  /** "none" | "bearer" | "session" */
+  authType: string;
+  description?: string;
+  /** Legacy: kept for backward compat, prefer requestFields + responseFields */
   schema: string;
   generatedBy: string;
+  /**
+   * Verbatim PRD line / section that justifies this endpoint's existence.
+   * Required when emitted by `generate_api_contracts` after the v2 scope
+   * rule (see CODEGEN_HARDENING_PLAN.md §7.1). Optional here for back-compat
+   * with older contract files persisted before the schema upgrade.
+   */
+  prdJustification?: string;
+  /**
+   * "user" — called by the consumer-facing frontend (covered by usage audit).
+   * "admin" — internal / admin UI / cron / webhook (skipped by usage audit
+   * because the consumer is not in `frontend/src/api/**`).
+   */
+  audience?: "user" | "admin";
 }
 
 export interface TaskResult {
@@ -36,6 +60,7 @@ export interface TaskResult {
   verifyPassed: boolean;
   fixCycles: number;
   warnings?: string[];
+  subSteps?: TaskSubStep[];
 }
 
 export interface PhaseResult {
@@ -141,6 +166,50 @@ export const SupervisorStateAnnotation = Annotation.Root({
     reducer: (_prev, next) => next,
     default: () => 0,
   }),
+
+  runtimeVerifyErrors: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+  runtimeVerifyAttempts: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+
+  e2eVerifyErrors: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+  e2eVerifyAttempts: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+
+  /** RALPH loop configuration. Passed down to every worker. */
+  ralphConfig: Annotation<RalphConfig>({
+    reducer: (_prev, next) => next,
+    default: () => ({ ...DEFAULT_RALPH_CONFIG }),
+  }),
+
+  /**
+   * Session id for this coding run. Used by self-heal code to look up the
+   * correct `RepairEmitter` via `getRepairEmitter(sessionId)` without having
+   * to pass the function through LangGraph state (which is JSON-serialised).
+   */
+  sessionId: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+
+  /**
+   * Structured PRD spec (pages + interactive components) — forwarded from
+   * the kickoff engine via `.blueprint/PRD_SPEC.json`. Frontend workers
+   * use it to turn PAGE / CMP ids into concrete view/component outputs.
+   */
+  prdSpec: Annotation<PrdSpec | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
+  }),
 });
 
 export type SupervisorState = typeof SupervisorStateAnnotation.State;
@@ -242,6 +311,56 @@ export const WorkerStateAnnotation = Annotation.Root({
   currentTaskLastError: Annotation<string>({
     reducer: (_prev, next) => next,
     default: () => "",
+  }),
+  /** RALPH: raw LLM output for the current task (used to check completion promise). */
+  currentTaskLastRawContent: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+
+  /** RALPH: config propagated from supervisor. */
+  ralphConfig: Annotation<RalphConfig>({
+    reducer: (_prev, next) => next,
+    default: () => ({ ...DEFAULT_RALPH_CONFIG }),
+  }),
+  /** Dynamic sub-steps planned by the worker for the current task. */
+  currentTaskSubSteps: Annotation<TaskSubStep[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+
+  /** RALPH: cumulative estimated prompt tokens in this worker session (for context rotation). */
+  estimatedContextTokens: Annotation<number>({
+    reducer: (prev, next) => prev + next,
+    default: () => 0,
+  }),
+  /** RALPH: set true when context window exceeds rotation threshold. */
+  contextRotationNeeded: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
+
+  /** Session id propagated from supervisor — used to look up the RepairEmitter. */
+  sessionId: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => "",
+  }),
+
+  /**
+   * Snapshot of sha256 hashes for every file in the current task's
+   * `files.modifies` list, captured at task start. The file-plan verifier
+   * diffs these against post-generation hashes to detect "modified" files
+   * that were never actually touched.
+   */
+  currentTaskModifiesSnapshot: Annotation<Record<string, string>>({
+    reducer: (_prev, next) => next,
+    default: () => ({}),
+  }),
+
+  /** Structured PRD spec forwarded from supervisor — shared with workers. */
+  prdSpec: Annotation<PrdSpec | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
   }),
 });
 

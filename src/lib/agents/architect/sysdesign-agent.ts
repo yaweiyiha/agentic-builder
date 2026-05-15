@@ -1,5 +1,9 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import {
+  docGenerationThinking,
+  resolveDocMaxTokens,
+} from "../shared/doc-agent-settings";
 
 const SYSTEM_PROMPT = `You are a senior Systems Design Architect Agent.
 
@@ -76,7 +80,11 @@ export class SysDesignAgent extends BaseAgent {
       systemPrompt: SYSTEM_PROMPT,
       defaultModel: MODEL_CONFIG.sysdesign,
       temperature: 0.5,
-      maxTokens: 16384,
+      maxTokens: resolveDocMaxTokens("SYSDESIGN_DOC_MAX_TOKENS", {
+        deepseek: 49152,
+        openrouter: 16384,
+      }),
+      thinking: docGenerationThinking(),
     });
   }
 

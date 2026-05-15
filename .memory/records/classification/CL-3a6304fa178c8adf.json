@@ -1,0 +1,31 @@
+{
+  "id": "CL-3a6304fa178c8adf",
+  "layer": "L1",
+  "kind": "classification",
+  "title": "Classification · M · app",
+  "tags": [
+    "classifier",
+    "tier:M",
+    "type:app",
+    "promptVersion:v1-2026-04-28"
+  ],
+  "source": "cache",
+  "refs": {},
+  "createdAt": 1778228521424,
+  "updatedAt": 1778228521424,
+  "schemaVersion": 1,
+  "body": {
+    "tier": "M",
+    "type": "app",
+    "needsBackend": true,
+    "needsDatabase": true,
+    "needsAuth": true,
+    "needsMultipleServices": false,
+    "reasoning": "The task app requires a backend with a database for user management and task storage, and includes authentication, fitting it into the medium complexity tier.",
+    "costUsd": 0.000108,
+    "durationMs": 2708,
+    "briefHash": "3a6304fa178c8adf",
+    "promptVersion": "v1-2026-04-28",
+    "modelUsed": "openai/gpt-4o-mini"
+  }
+}

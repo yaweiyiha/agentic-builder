@@ -1,0 +1,31 @@
+{
+  "id": "CL-2cc22fb06bef2e64",
+  "layer": "L1",
+  "kind": "classification",
+  "title": "Classification · M · app",
+  "tags": [
+    "classifier",
+    "tier:M",
+    "type:app",
+    "promptVersion:v1-2026-04-28"
+  ],
+  "source": "cache",
+  "refs": {},
+  "createdAt": 1778229802981,
+  "updatedAt": 1778229802981,
+  "schemaVersion": 1,
+  "body": {
+    "tier": "M",
+    "type": "app",
+    "needsBackend": true,
+    "needsDatabase": true,
+    "needsAuth": false,
+    "needsMultipleServices": false,
+    "reasoning": "The task app requires a backend and database to manage tasks, similar to Jira, but does not involve complex business logic or multiple services.",
+    "costUsd": 0.00010185,
+    "durationMs": 3193,
+    "briefHash": "2cc22fb06bef2e64",
+    "promptVersion": "v1-2026-04-28",
+    "modelUsed": "openai/gpt-4o-mini"
+  }
+}

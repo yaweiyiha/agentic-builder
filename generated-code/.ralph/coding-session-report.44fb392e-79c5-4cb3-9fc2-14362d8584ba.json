@@ -1,0 +1,5532 @@
+{
+  "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+  "startedAt": "2026-04-29T09:55:57.821Z",
+  "endedAt": "2026-04-29T11:58:24.061Z",
+  "status": "fail",
+  "terminalSummary": "Timeout/terminated: Integration verify gate failed.\nNo report_done received from IntegrationVerifyFix.\n\nFinal scoped validation gates failed:\n\nbackend_smoke: pass\n\nfrontend_tsc failed:\nsrc/components/markets/MarketSection.tsx(1,10): error TS2305: Module '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\nsrc/components/markets/ResultMarketCard.tsx(1,10): error TS2305: Module '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\nsrc/components/markets/ScannerLog.tsx(1,10): error TS1484: 'ScanStep' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.\nsrc/components/markets/ScannerLog.tsx(25,45): error TS2339: Property 'result' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(26,54): error TS2339: Property 'result' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(64,21): error TS2339: Property 'errorMessage' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(66,25): error TS2339: Property 'errorMessage' does not exist on type 'ScanStep'.\nsrc/components/markets/ScanResults.tsx(1,10): error TS1484: 'ScanResult' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.\nsrc/components/markets/ScanResults.tsx(20,28): error TS2339: Property 'perps' does not exist on type 'ScanResult'.\nsrc/components/markets/ScanResults.tsx(38,21): error TS2339: Property 'summary' does not exist on type 'ScanResult'.\nsrc/components/markets/ScanResults.tsx(128,25): error TS2339: Property 'perps' does not exist on type 'ScanResult'.\nsrc/components/onboarding/StyleResultCard.tsx(26,26): error TS5076: '||' and '??' operations cannot be mixed without parentheses.\nsrc/components/onboarding/StyleResultCard.tsx(27,30): error TS5076: '||' and '??' operations cannot be mixed without parentheses.\nsrc/components/profile/StyleSection.tsx(2,10): error TS2724: '\"lucide-react\"' has no exported member named 'QuestionMark'. Did you mean 'FileQuestionMark'?\nsrc/hooks/useMarketScanner.ts(157,13): error TS2367: This comparison appears to be unintentional because the types '\"results\" | \"error\" | \"idle\"' and '\"sc\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/components/markets/MarketSection.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2305: \u001b[0mModule '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\n\n\u001b[7m1\u001b[0m import { MarketMatch } from \"../../hooks/useMarketScanner\";\n\u001b[7m \u001b[0m \u001b[91m         ~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ResultMarketCard.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2305: \u001b[0mModule '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\n\n\u001b[7m1\u001b[0m import { MarketMatch } from \"../../hooks/useMarketScanner\";\n\u001b[7m \u001b[0m \u001b[91m         ~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ScannerLog.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS1484: \u001b[0m'ScanStep' is a type and must be im\n\nE2E verify gate failed.\nE2E has failures but none are deterministic — auto-repair skipped.\n\ntriage: 0 deterministic, 0 flaky, 0 infra (0 self-healed on retry)\n\nSee .ralph/e2e-triage.md for the full report.\n\n\n\n\n\n\u001b[1A\u001b[2K[24/25] [chromium] › tests/e2e/generated/e2e-002-interests-onboarding-enforces-minimum-se.spec.ts:180:3 › E2E-002 — Interests onboarding enforces minimum selection before continue › Step 4 — Click CONTINUE sends PUT /api/users/me/interests and routes to /onboarding/style\n\u001b[1A\u001b[2K\u001b[31m  23) [chromium] › tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts:215:3 › E2E-006 — Feed infinite scroll, load-more retry, and end-of-list footer › Step 3 — Terminal footer renders when end of list is reached \u001b[39m\n\n    Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\n    Locator: getByText('Infinite Story 15')\n    Expected: visible\n    Timeout: 10000ms\n    Error: element(s) not found\n\n    Call log:\n    \u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n    \u001b[2m  - waiting for getByText('Infinite Story 15')\u001b[22m\n\n\n    \u001b[0m \u001b[90m 246 |\u001b[39m     }\n     \u001b[90m 247 |\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 248 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m\"Infinite Story 15\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10\u001b[39m_000 })\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                                                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 249 |\u001b[39m\n     \u001b[90m 250 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\n     \u001b[90m 251 |\u001b[39m       page\u001b[0m\n    \u001b[2m    at /Users/57block/code/AgenticBuilder/generated-code/frontend/tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts:248:55\u001b[22m\n\n\u001b[2m    attachment #1: \u001b[1mscreenshot\u001b[2m (image/png) \u001b[2m──────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/generated-e2e-006-feed-inf-14ac5-when-end-of-list-is-reached-chromium/test-failed-1.png\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    Error Context: test-results/generated-e2e-006-feed-inf-14ac5-when-end-of-list-is-reached-chromium/error-context.md\u001b[22m",
+  "fatalError": "Timeout/terminated: Integration verify gate failed.\nNo report_done received from IntegrationVerifyFix.\n\nFinal scoped validation gates failed:\n\nbackend_smoke: pass\n\nfrontend_tsc failed:\nsrc/components/markets/MarketSection.tsx(1,10): error TS2305: Module '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\nsrc/components/markets/ResultMarketCard.tsx(1,10): error TS2305: Module '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\nsrc/components/markets/ScannerLog.tsx(1,10): error TS1484: 'ScanStep' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.\nsrc/components/markets/ScannerLog.tsx(25,45): error TS2339: Property 'result' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(26,54): error TS2339: Property 'result' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(64,21): error TS2339: Property 'errorMessage' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(66,25): error TS2339: Property 'errorMessage' does not exist on type 'ScanStep'.\nsrc/components/markets/ScanResults.tsx(1,10): error TS1484: 'ScanResult' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.\nsrc/components/markets/ScanResults.tsx(20,28): error TS2339: Property 'perps' does not exist on type 'ScanResult'.\nsrc/components/markets/ScanResults.tsx(38,21): error TS2339: Property 'summary' does not exist on type 'ScanResult'.\nsrc/components/markets/ScanResults.tsx(128,25): error TS2339: Property 'perps' does not exist on type 'ScanResult'.\nsrc/components/onboarding/StyleResultCard.tsx(26,26): error TS5076: '||' and '??' operations cannot be mixed without parentheses.\nsrc/components/onboarding/StyleResultCard.tsx(27,30): error TS5076: '||' and '??' operations cannot be mixed without parentheses.\nsrc/components/profile/StyleSection.tsx(2,10): error TS2724: '\"lucide-react\"' has no exported member named 'QuestionMark'. Did you mean 'FileQuestionMark'?\nsrc/hooks/useMarketScanner.ts(157,13): error TS2367: This comparison appears to be unintentional because the types '\"results\" | \"error\" | \"idle\"' and '\"sc\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/components/markets/MarketSection.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2305: \u001b[0mModule '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\n\n\u001b[7m1\u001b[0m import { MarketMatch } from \"../../hooks/useMarketScanner\";\n\u001b[7m \u001b[0m \u001b[91m         ~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ResultMarketCard.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2305: \u001b[0mModule '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\n\n\u001b[7m1\u001b[0m import { MarketMatch } from \"../../hooks/useMarketScanner\";\n\u001b[7m \u001b[0m \u001b[91m         ~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ScannerLog.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS1484: \u001b[0m'ScanStep' is a type and must be im\n\nE2E verify gate failed.\nE2E has failures but none are deterministic — auto-repair skipped.\n\ntriage: 0 deterministic, 0 flaky, 0 infra (0 self-healed on retry)\n\nSee .ralph/e2e-triage.md for the full report.\n\n\n\n\n\n\u001b[1A\u001b[2K[24/25] [chromium] › tests/e2e/generated/e2e-002-interests-onboarding-enforces-minimum-se.spec.ts:180:3 › E2E-002 — Interests onboarding enforces minimum selection before continue › Step 4 — Click CONTINUE sends PUT /api/users/me/interests and routes to /onboarding/style\n\u001b[1A\u001b[2K\u001b[31m  23) [chromium] › tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts:215:3 › E2E-006 — Feed infinite scroll, load-more retry, and end-of-list footer › Step 3 — Terminal footer renders when end of list is reached \u001b[39m\n\n    Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\n    Locator: getByText('Infinite Story 15')\n    Expected: visible\n    Timeout: 10000ms\n    Error: element(s) not found\n\n    Call log:\n    \u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n    \u001b[2m  - waiting for getByText('Infinite Story 15')\u001b[22m\n\n\n    \u001b[0m \u001b[90m 246 |\u001b[39m     }\n     \u001b[90m 247 |\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 248 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m\"Infinite Story 15\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10\u001b[39m_000 })\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                                                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 249 |\u001b[39m\n     \u001b[90m 250 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\n     \u001b[90m 251 |\u001b[39m       page\u001b[0m\n    \u001b[2m    at /Users/57block/code/AgenticBuilder/generated-code/frontend/tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts:248:55\u001b[22m\n\n\u001b[2m    attachment #1: \u001b[1mscreenshot\u001b[2m (image/png) \u001b[2m──────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/generated-e2e-006-feed-inf-14ac5-when-end-of-list-is-reached-chromium/test-failed-1.png\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    Error Context: test-results/generated-e2e-006-feed-inf-14ac5-when-end-of-list-is-reached-chromium/error-context.md\u001b[22m",
+  "generatorGitSha": "152bab8",
+  "scaffoldFixAttempts": 50,
+  "integrationFixAttempts": 1,
+  "score": {
+    "score": 34,
+    "grade": "F",
+    "reasons": [
+      "Score formula: 100 − 20(fail) − 10(integration) − 20(e2e:blocking errors) − 8(trunc:23) − 8(plan-unfulfilled:10) = 34",
+      "Run status is fail.",
+      "Integration verification still has blocking errors.",
+      "E2E verification still has blocking errors.",
+      "Context truncation happened 23 time(s).",
+      "Task plan/file-plan mismatches happened 10 time(s)."
+    ]
+  },
+  "gateErrors": {
+    "integrationErrors": "No report_done received from IntegrationVerifyFix.\n\nFinal scoped validation gates failed:\n\nbackend_smoke: pass\n\nfrontend_tsc failed:\nsrc/components/markets/MarketSection.tsx(1,10): error TS2305: Module '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\nsrc/components/markets/ResultMarketCard.tsx(1,10): error TS2305: Module '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\nsrc/components/markets/ScannerLog.tsx(1,10): error TS1484: 'ScanStep' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.\nsrc/components/markets/ScannerLog.tsx(25,45): error TS2339: Property 'result' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(26,54): error TS2339: Property 'result' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(64,21): error TS2339: Property 'errorMessage' does not exist on type 'ScanStep'.\nsrc/components/markets/ScannerLog.tsx(66,25): error TS2339: Property 'errorMessage' does not exist on type 'ScanStep'.\nsrc/components/markets/ScanResults.tsx(1,10): error TS1484: 'ScanResult' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.\nsrc/components/markets/ScanResults.tsx(20,28): error TS2339: Property 'perps' does not exist on type 'ScanResult'.\nsrc/components/markets/ScanResults.tsx(38,21): error TS2339: Property 'summary' does not exist on type 'ScanResult'.\nsrc/components/markets/ScanResults.tsx(128,25): error TS2339: Property 'perps' does not exist on type 'ScanResult'.\nsrc/components/onboarding/StyleResultCard.tsx(26,26): error TS5076: '||' and '??' operations cannot be mixed without parentheses.\nsrc/components/onboarding/StyleResultCard.tsx(27,30): error TS5076: '||' and '??' operations cannot be mixed without parentheses.\nsrc/components/profile/StyleSection.tsx(2,10): error TS2724: '\"lucide-react\"' has no exported member named 'QuestionMark'. Did you mean 'FileQuestionMark'?\nsrc/hooks/useMarketScanner.ts(157,13): error TS2367: This comparison appears to be unintentional because the types '\"results\" | \"error\" | \"idle\"' and '\"sc\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/components/markets/MarketSection.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2305: \u001b[0mModule '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\n\n\u001b[7m1\u001b[0m import { MarketMatch } from \"../../hooks/useMarketScanner\";\n\u001b[7m \u001b[0m \u001b[91m         ~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ResultMarketCard.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2305: \u001b[0mModule '\"../../hooks/useMarketScanner\"' has no exported member 'MarketMatch'.\n\n\u001b[7m1\u001b[0m import { MarketMatch } from \"../../hooks/useMarketScanner\";\n\u001b[7m \u001b[0m \u001b[91m         ~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ScannerLog.tsx\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m10\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS1484: \u001b[0m'ScanStep' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.\n\n\u001b[7m1\u001b[0m import { ScanStep } from \"../../hooks/useMarketScanner\";\n\u001b[7m \u001b[0m \u001b[91m         ~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ScannerLog.tsx\u001b[0m:\u001b[93m25\u001b[0m:\u001b[93m45\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2339: \u001b[0mProperty 'result' does not exist on type 'ScanStep'.\n\n\u001b[7m25\u001b[0m     if (step.status === \"completed\" && step.result) {\n\u001b[7m  \u001b[0m \u001b[91m                                            ~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ScannerLog.tsx\u001b[0m:\u001b[93m26\u001b[0m:\u001b[93m54\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2339: \u001b[0mProperty 'result' does not exist on type 'ScanStep'.\n\n\u001b[7m26\u001b[0m       return <span className=\"text-[#00aa00]\">[{step.result}]</span>;\n\u001b[7m  \u001b[0m \u001b[91m                                                     ~~~~~~\u001b[0m\n\n\u001b[96msrc/components/markets/ScannerLog.tsx\u001b[0m:\u001b[93m64\u001b[0m:\u001b[93m21\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2339: \u001b[0mProperty 'errorMessage' does not exist on type 'ScanStep'.\n\n\u001b[7m64\u001b[0m               {step.errorMess",
+    "runtimeVerifyErrors": "",
+    "e2eVerifyErrors": "E2E has failures but none are deterministic — auto-repair skipped.\n\ntriage: 0 deterministic, 0 flaky, 0 infra (0 self-healed on retry)\n\nSee .ralph/e2e-triage.md for the full report.\n\n\n\n\n\n\u001b[1A\u001b[2K[24/25] [chromium] › tests/e2e/generated/e2e-002-interests-onboarding-enforces-minimum-se.spec.ts:180:3 › E2E-002 — Interests onboarding enforces minimum selection before continue › Step 4 — Click CONTINUE sends PUT /api/users/me/interests and routes to /onboarding/style\n\u001b[1A\u001b[2K\u001b[31m  23) [chromium] › tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts:215:3 › E2E-006 — Feed infinite scroll, load-more retry, and end-of-list footer › Step 3 — Terminal footer renders when end of list is reached \u001b[39m\n\n    Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\n    Locator: getByText('Infinite Story 15')\n    Expected: visible\n    Timeout: 10000ms\n    Error: element(s) not found\n\n    Call log:\n    \u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n    \u001b[2m  - waiting for getByText('Infinite Story 15')\u001b[22m\n\n\n    \u001b[0m \u001b[90m 246 |\u001b[39m     }\n     \u001b[90m 247 |\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 248 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m\"Infinite Story 15\"\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10\u001b[39m_000 })\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                                                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 249 |\u001b[39m\n     \u001b[90m 250 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\n     \u001b[90m 251 |\u001b[39m       page\u001b[0m\n    \u001b[2m    at /Users/57block/code/AgenticBuilder/generated-code/frontend/tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts:248:55\u001b[22m\n\n\u001b[2m    attachment #1: \u001b[1mscreenshot\u001b[2m (image/png) \u001b[2m──────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\u001b[2m    test-results/generated-e2e-006-feed-inf-14ac5-when-end-of-list-is-reached-chromium/test-failed-1.png\u001b[22m\n\u001b[2m    \u001b[2m────────────────────────────────────────────────────────────────────────────────────────────────\u001b[2m\u001b[22m\n\n\u001b[2m    Error Context: test-results/generated-e2e-006-feed-inf-14ac5-when-end-of-list-is-reached-chromium/error-context.md\u001b[22m"
+  },
+  "gateStates": {
+    "integrationVerify": "fail_continued",
+    "runtimeVerify": "skipped",
+    "e2eVerify": "fail",
+    "featureAudit": "pass"
+  },
+  "taskResults": [
+    {
+      "id": "T-001",
+      "title": "Implement Sequelize models and database schema",
+      "coversRequirementIds": [
+        "AC-01",
+        "AC-04",
+        "AC-05",
+        "AC-08",
+        "AC-11",
+        "AC-49"
+      ],
+      "generatedFiles": [
+        "backend/src/models/User.ts",
+        "backend/src/models/UserInterest.ts",
+        "backend/src/models/StyleAssessmentAnswer.ts",
+        "backend/src/models/TrendingTopic.ts",
+        "backend/src/models/CachedMarket.ts",
+        "backend/src/models/TopicMarketMatch.ts",
+        "backend/src/models/FeedItem.ts",
+        "backend/src/models/FeedAggregationRun.ts",
+        "backend/src/models/index.ts",
+        "backend/src/database/migrations/001-initial-schema.ts",
+        "backend/src/db.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-002",
+      "title": "Set up Docker Compose and environment configuration",
+      "coversRequirementIds": [
+        "AC-01",
+        "AC-11"
+      ],
+      "generatedFiles": [
+        ".env.example",
+        ".env",
+        "backend/src/config/env.ts",
+        "docker-compose.yml"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-003",
+      "title": "Create API contracts and frontend client",
+      "coversRequirementIds": [
+        "AC-02",
+        "AC-04",
+        "AC-11",
+        "AC-21"
+      ],
+      "generatedFiles": [
+        "backend/src/types/responses.ts",
+        "frontend/src/types/models.ts",
+        "backend/src/types/api.ts",
+        "frontend/src/types/api.ts",
+        "backend/src/types/requests.ts",
+        "frontend/src/api/client.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-004",
+      "title": "Build external API clients for news sources and market venues",
+      "coversRequirementIds": [
+        "AC-11",
+        "AC-20",
+        "AC-25",
+        "AC-33"
+      ],
+      "generatedFiles": [
+        "backend/src/config/env.ts",
+        "backend/src/services/externalApis/hackerNews.ts",
+        "backend/src/services/externalApis/googleNews.ts",
+        "backend/src/services/externalApis/jinaReader.ts",
+        "backend/src/services/externalApis/twitterApi.ts",
+        "backend/src/services/externalApis/polymarket.ts",
+        "backend/src/services/externalApis/hyperLiquid.ts",
+        "backend/src/services/externalApis/deribit.ts",
+        "backend/src/services/externalApis/quotient.ts",
+        "backend/src/services/externalApis/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-005",
+      "title": "Implement Feed aggregation pipeline with lifecycle management",
+      "coversRequirementIds": [
+        "AC-11",
+        "AC-12",
+        "AC-17",
+        "AC-20",
+        "AC-25",
+        "AC-49"
+      ],
+      "generatedFiles": [
+        "backend/logs/.gitkeep",
+        "backend/src/utils/queue.ts",
+        "backend/src/services/feedAggregator.ts",
+        "backend/src/services/feedAggregation.service.ts",
+        "backend/src/services/llmService.ts",
+        "backend/src/workers/feedAggregationWorker.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-006",
+      "title": "Implement Markets scanner pipeline orchestration",
+      "coversRequirementIds": [
+        "AC-21",
+        "AC-22",
+        "AC-25",
+        "AC-27",
+        "AC-28",
+        "AC-29",
+        "AC-31"
+      ],
+      "generatedFiles": [
+        "backend/src/utils/tickerMapping.ts",
+        "backend/src/services/marketScanner.ts",
+        "backend/src/services/marketScanning.service.ts",
+        "backend/src/utils/inputClassifier.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-007",
+      "title": "Add Feed and Markets HTTP routes with SSE streaming",
+      "coversRequirementIds": [
+        "AC-15",
+        "AC-17",
+        "AC-25",
+        "AC-29",
+        "AC-36"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/feed/feed.controller.ts",
+        "backend/src/api/modules/feed/feed.routes.ts",
+        "backend/src/api/modules/markets/markets.controller.ts",
+        "backend/src/api/modules/markets/markets.routes.ts",
+        "backend/src/api/modules/stream/stream.controller.ts",
+        "backend/src/api/modules/stream/stream.routes.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-008",
+      "title": "Implement authentication and user management APIs",
+      "coversRequirementIds": [
+        "AC-02",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-08",
+        "AC-09",
+        "AC-47",
+        "AC-49"
+      ],
+      "generatedFiles": [
+        "backend/src/utils/styleAssessment.ts",
+        "backend/src/api/modules/auth/auth.controller.ts",
+        "backend/src/services/users.service.ts",
+        "backend/src/api/modules/users/users.controller.ts",
+        "backend/src/api/modules/users/users.routes.ts",
+        "backend/src/services/auth.service.ts",
+        "backend/src/api/modules/auth/auth.routes.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-009",
+      "title": "Create app shell and navigation layout",
+      "coversRequirementIds": [
+        "AC-52",
+        "AC-53",
+        "AC-54"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useAuth.ts",
+        "frontend/src/App.tsx",
+        "frontend/src/components/layout/AppShell.tsx",
+        "frontend/src/components/layout/TopBar.tsx",
+        "frontend/src/components/layout/Sidebar.tsx",
+        "frontend/src/components/layout/StatusBar.tsx",
+        "frontend/src/components/common/Avatar.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-010",
+      "title": "Implement Landing page with Privy authentication",
+      "coversRequirementIds": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-53"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/auth/AuthGuard.tsx",
+        "frontend/src/providers/PrivyProvider.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/views/LandingPage.tsx",
+        "frontend/src/components/auth/LoginModal.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-011",
+      "title": "Build onboarding interests selection flow",
+      "coversRequirementIds": [
+        "AC-05",
+        "AC-47",
+        "AC-49",
+        "AC-53"
+      ],
+      "generatedFiles": [
+        "frontend/src/constants/interests.ts",
+        "frontend/src/components/onboarding/InterestCard.tsx",
+        "frontend/src/views/OnboardingInterestsPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-012",
+      "title": "Build style assessment quiz flow",
+      "coversRequirementIds": [
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10"
+      ],
+      "generatedFiles": [
+        "frontend/src/constants/styleQuestions.ts",
+        "frontend/src/constants/styleTags.ts",
+        "frontend/src/components/onboarding/QuestionCard.tsx",
+        "frontend/src/components/onboarding/StyleResultCard.tsx",
+        "frontend/src/views/OnboardingStylePage.tsx",
+        "frontend/src/views/OnboardingStyleResultPage.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/views/OnboardingInterestsPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-013",
+      "title": "Implement Feed page with agent log and infinite scroll",
+      "coversRequirementIds": [
+        "AC-11",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15",
+        "AC-16",
+        "AC-17",
+        "AC-18",
+        "AC-19",
+        "AC-20"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useSSEStream.ts",
+        "frontend/src/hooks/useFeedData.ts",
+        "frontend/src/components/feed/StatusStrip.tsx",
+        "frontend/src/components/feed/AgentLogPanel.tsx",
+        "frontend/src/components/feed/FeedCard.tsx",
+        "frontend/src/views/FeedPage.tsx",
+        "frontend/src/components/feed/MarketCard.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-014",
+      "title": "Build Markets scanner page with live pipeline",
+      "coversRequirementIds": [
+        "AC-21",
+        "AC-22",
+        "AC-23",
+        "AC-25",
+        "AC-26",
+        "AC-27",
+        "AC-28",
+        "AC-29",
+        "AC-30",
+        "AC-31",
+        "AC-32",
+        "AC-33",
+        "AC-34",
+        "AC-35",
+        "AC-36",
+        "AC-37",
+        "AC-38"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useMarketScanner.ts",
+        "frontend/src/components/markets/ScannerInput.tsx",
+        "frontend/src/components/markets/ScannerLog.tsx",
+        "frontend/src/components/markets/ResultMarketCard.tsx",
+        "frontend/src/components/markets/MarketSection.tsx",
+        "frontend/src/components/markets/ScanResults.tsx",
+        "frontend/src/views/MarketsPage.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-015",
+      "title": "Create Profile and Settings pages",
+      "coversRequirementIds": [
+        "AC-39",
+        "AC-40",
+        "AC-41",
+        "AC-42",
+        "AC-43",
+        "AC-44",
+        "AC-45",
+        "AC-46",
+        "AC-47",
+        "AC-48",
+        "AC-49",
+        "AC-50",
+        "AC-51"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useUserProfile.ts",
+        "frontend/src/components/profile/IdentitySection.tsx",
+        "frontend/src/components/profile/InterestsSection.tsx",
+        "frontend/src/components/profile/StyleSection.tsx",
+        "frontend/src/views/ProfilePage.tsx",
+        "frontend/src/views/SettingsPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-016",
+      "title": "Implement chip click behavior documentation and functionality",
+      "coversRequirementIds": [
+        "AC-24",
+        "FR-M-03"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/markets/ChipBehaviorDocs.md",
+        "frontend/src/views/MarketsPage.tsx",
+        "frontend/src/hooks/useMarketScanner.ts",
+        "frontend/src/components/markets/ScannerInput.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-017",
+      "title": "Add universal market data disclaimer footer",
+      "coversRequirementIds": [
+        "AC-55"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/common/MarketDataDisclaimer.tsx",
+        "frontend/src/views/FeedPage.tsx",
+        "frontend/src/views/MarketsPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-001",
+      "title": "Set up Playwright E2E harness",
+      "coversRequirementIds": [],
+      "generatedFiles": [
+        "frontend/e2e/fixtures.ts",
+        "frontend/e2e/utils.ts",
+        "frontend/playwright.config.ts",
+        "frontend/tests/e2e/fixtures.ts",
+        "frontend/tests/e2e/utils.ts",
+        "frontend/package.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-002",
+      "title": "Implement PRD browser journeys",
+      "coversRequirementIds": [
+        "PAGE-001",
+        "FR-F-01",
+        "FR-F-02",
+        "FR-F-03",
+        "FR-F-04",
+        "CMP-001",
+        "FR-F-08",
+        "FR-F-09",
+        "FR-F-12",
+        "CMP-002",
+        "FR-F-05",
+        "FR-F-06",
+        "FR-F-07",
+        "CMP-003",
+        "CMP-004",
+        "FR-F-10",
+        "FR-F-11",
+        "PAGE-002",
+        "CMP-005",
+        "CMP-007",
+        "CMP-008",
+        "CMP-009",
+        "CMP-006"
+      ],
+      "generatedFiles": [
+        "frontend/tests/e2e/generated/e2e-001-landing-page-auth-entry-and-privy-provid.spec.ts",
+        "frontend/tests/e2e/generated/e2e-002-interests-onboarding-enforces-minimum-se.spec.ts",
+        "frontend/tests/e2e/generated/e2e-003-style-assessment-submits-6-answers-and-r.spec.ts",
+        "frontend/tests/e2e/generated/e2e-004-feed-auth-guard-and-cached-populated-ren.spec.ts",
+        "frontend/tests/e2e/generated/e2e-005-feed-refresh-enters-aggregating-mode-rat.spec.ts",
+        "frontend/tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts"
+      ],
+      "status": "completed"
+    }
+  ],
+  "fileRegistryCount": 227,
+  "llmUsageEvents": [
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 16396,
+      "completionTokens": 2454,
+      "totalTokens": 18850,
+      "timestamp": "2026-04-29T09:57:30.927Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 17960,
+      "completionTokens": 1192,
+      "totalTokens": 19152,
+      "timestamp": "2026-04-29T09:58:09.422Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 18976,
+      "completionTokens": 895,
+      "totalTokens": 19871,
+      "timestamp": "2026-04-29T09:58:45.438Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20060,
+      "completionTokens": 948,
+      "totalTokens": 21008,
+      "timestamp": "2026-04-29T09:59:26.466Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 21199,
+      "completionTokens": 3195,
+      "totalTokens": 24394,
+      "timestamp": "2026-04-29T10:01:44.739Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24326,
+      "completionTokens": 477,
+      "totalTokens": 24803,
+      "timestamp": "2026-04-29T10:02:07.919Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24744,
+      "completionTokens": 661,
+      "totalTokens": 25405,
+      "timestamp": "2026-04-29T10:02:37.288Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25250,
+      "completionTokens": 584,
+      "totalTokens": 25834,
+      "timestamp": "2026-04-29T10:03:05.031Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 16445,
+      "completionTokens": 1236,
+      "totalTokens": 17681,
+      "timestamp": "2026-04-29T10:04:00.977Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 17340,
+      "completionTokens": 1600,
+      "totalTokens": 18940,
+      "timestamp": "2026-04-29T10:04:52.391Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 18715,
+      "completionTokens": 330,
+      "totalTokens": 19045,
+      "timestamp": "2026-04-29T10:05:10.350Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "generate_api_contracts",
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "costUsd": 0,
+      "promptTokens": 7357,
+      "completionTokens": 1650,
+      "totalTokens": 9007,
+      "timestamp": "2026-04-29T10:05:32.990Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 17868,
+      "completionTokens": 3870,
+      "totalTokens": 21738,
+      "timestamp": "2026-04-29T10:07:35.431Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19552,
+      "completionTokens": 5842,
+      "totalTokens": 25394,
+      "timestamp": "2026-04-29T10:08:33.812Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19824,
+      "completionTokens": 2269,
+      "totalTokens": 22093,
+      "timestamp": "2026-04-29T10:08:53.541Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20508,
+      "completionTokens": 616,
+      "totalTokens": 21124,
+      "timestamp": "2026-04-29T10:09:45.469Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.061579,
+      "promptTokens": 24108,
+      "completionTokens": 1385,
+      "totalTokens": 25493,
+      "timestamp": "2026-04-29T10:09:55.946Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20831,
+      "completionTokens": 2460,
+      "totalTokens": 23291,
+      "timestamp": "2026-04-29T10:10:52.356Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 26176,
+      "completionTokens": 2471,
+      "totalTokens": 28647,
+      "timestamp": "2026-04-29T10:11:07.336Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22500,
+      "completionTokens": 1417,
+      "totalTokens": 23917,
+      "timestamp": "2026-04-29T10:11:33.773Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 28389,
+      "completionTokens": 1043,
+      "totalTokens": 29432,
+      "timestamp": "2026-04-29T10:11:40.056Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.025704,
+      "promptTokens": 4880,
+      "completionTokens": 1226,
+      "totalTokens": 6106,
+      "timestamp": "2026-04-29T10:11:50.949Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.04306575000000001,
+      "promptTokens": 4473,
+      "completionTokens": 2517,
+      "totalTokens": 6990,
+      "timestamp": "2026-04-29T10:12:06.752Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 18441,
+      "completionTokens": 399,
+      "totalTokens": 18840,
+      "timestamp": "2026-04-29T10:12:07.168Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19014,
+      "completionTokens": 124,
+      "totalTokens": 19138,
+      "timestamp": "2026-04-29T10:12:15.399Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19342,
+      "completionTokens": 84,
+      "totalTokens": 19426,
+      "timestamp": "2026-04-29T10:12:21.816Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19665,
+      "completionTokens": 144,
+      "totalTokens": 19809,
+      "timestamp": "2026-04-29T10:12:29.580Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20452,
+      "completionTokens": 3396,
+      "totalTokens": 23848,
+      "timestamp": "2026-04-29T10:13:52.976Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20004,
+      "completionTokens": 5147,
+      "totalTokens": 25151,
+      "timestamp": "2026-04-29T10:15:06.471Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20452,
+      "completionTokens": 2669,
+      "totalTokens": 23121,
+      "timestamp": "2026-04-29T10:15:15.148Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24872,
+      "completionTokens": 382,
+      "totalTokens": 25254,
+      "timestamp": "2026-04-29T10:15:20.560Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22448,
+      "completionTokens": 1795,
+      "totalTokens": 24243,
+      "timestamp": "2026-04-29T10:16:03.566Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24012,
+      "completionTokens": 2051,
+      "totalTokens": 26063,
+      "timestamp": "2026-04-29T10:17:06.824Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 26128,
+      "completionTokens": 1449,
+      "totalTokens": 27577,
+      "timestamp": "2026-04-29T10:17:52.283Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25171,
+      "completionTokens": 6480,
+      "totalTokens": 31651,
+      "timestamp": "2026-04-29T10:18:34.053Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Test Engineer",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 31599,
+      "completionTokens": 125,
+      "totalTokens": 31724,
+      "timestamp": "2026-04-29T10:18:42.630Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 27366,
+      "completionTokens": 1911,
+      "totalTokens": 29277,
+      "timestamp": "2026-04-29T10:18:52.013Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Test Engineer",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.10441375,
+      "promptTokens": 5785,
+      "completionTokens": 6735,
+      "totalTokens": 12520,
+      "timestamp": "2026-04-29T10:19:50.317Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 21395,
+      "completionTokens": 2977,
+      "totalTokens": 24372,
+      "timestamp": "2026-04-29T10:20:26.865Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23225,
+      "completionTokens": 9024,
+      "totalTokens": 32249,
+      "timestamp": "2026-04-29T10:27:34.808Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 31250,
+      "completionTokens": 3080,
+      "totalTokens": 34330,
+      "timestamp": "2026-04-29T10:29:13.442Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22228,
+      "completionTokens": 2646,
+      "totalTokens": 24874,
+      "timestamp": "2026-04-29T10:30:25.134Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24774,
+      "completionTokens": 1255,
+      "totalTokens": 26029,
+      "timestamp": "2026-04-29T10:31:14.419Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24930,
+      "completionTokens": 464,
+      "totalTokens": 25394,
+      "timestamp": "2026-04-29T10:31:32.944Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25094,
+      "completionTokens": 213,
+      "totalTokens": 25307,
+      "timestamp": "2026-04-29T10:31:43.701Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25251,
+      "completionTokens": 257,
+      "totalTokens": 25508,
+      "timestamp": "2026-04-29T10:31:53.657Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25435,
+      "completionTokens": 342,
+      "totalTokens": 25777,
+      "timestamp": "2026-04-29T10:32:05.448Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25605,
+      "completionTokens": 7269,
+      "totalTokens": 32874,
+      "timestamp": "2026-04-29T10:35:45.921Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 31920,
+      "completionTokens": 1109,
+      "totalTokens": 33029,
+      "timestamp": "2026-04-29T10:36:21.572Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0260295,
+      "promptTokens": 4074,
+      "completionTokens": 1350,
+      "totalTokens": 5424,
+      "timestamp": "2026-04-29T10:36:37.833Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22426,
+      "completionTokens": 5665,
+      "totalTokens": 28091,
+      "timestamp": "2026-04-29T10:39:29.435Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22426,
+      "completionTokens": 5244,
+      "totalTokens": 27670,
+      "timestamp": "2026-04-29T10:42:10.502Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22426,
+      "completionTokens": 782,
+      "totalTokens": 23208,
+      "timestamp": "2026-04-29T10:42:37.118Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23261,
+      "completionTokens": 733,
+      "totalTokens": 23994,
+      "timestamp": "2026-04-29T10:42:59.507Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23529,
+      "completionTokens": 223,
+      "totalTokens": 23752,
+      "timestamp": "2026-04-29T10:43:08.555Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23797,
+      "completionTokens": 243,
+      "totalTokens": 24040,
+      "timestamp": "2026-04-29T10:43:17.951Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24120,
+      "completionTokens": 1065,
+      "totalTokens": 25185,
+      "timestamp": "2026-04-29T10:43:54.319Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24370,
+      "completionTokens": 1948,
+      "totalTokens": 26318,
+      "timestamp": "2026-04-29T10:44:54.588Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25257,
+      "completionTokens": 199,
+      "totalTokens": 25456,
+      "timestamp": "2026-04-29T10:45:03.382Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25471,
+      "completionTokens": 369,
+      "totalTokens": 25840,
+      "timestamp": "2026-04-29T10:45:17.131Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0549465,
+      "promptTokens": 3758,
+      "completionTokens": 3455,
+      "totalTokens": 7213,
+      "timestamp": "2026-04-29T10:45:55.195Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22418,
+      "completionTokens": 2108,
+      "totalTokens": 24526,
+      "timestamp": "2026-04-29T10:47:05.168Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22870,
+      "completionTokens": 3629,
+      "totalTokens": 26499,
+      "timestamp": "2026-04-29T10:48:41.349Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 26097,
+      "completionTokens": 3421,
+      "totalTokens": 29518,
+      "timestamp": "2026-04-29T10:50:26.830Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 29356,
+      "completionTokens": 613,
+      "totalTokens": 29969,
+      "timestamp": "2026-04-29T10:50:47.461Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 29658,
+      "completionTokens": 497,
+      "totalTokens": 30155,
+      "timestamp": "2026-04-29T10:51:05.712Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 29960,
+      "completionTokens": 1354,
+      "totalTokens": 31314,
+      "timestamp": "2026-04-29T10:51:43.862Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Backend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 30966,
+      "completionTokens": 1313,
+      "totalTokens": 32279,
+      "timestamp": "2026-04-29T10:52:21.015Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Backend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.013270249999999999,
+      "promptTokens": 5207,
+      "completionTokens": 297,
+      "totalTokens": 5504,
+      "timestamp": "2026-04-29T10:52:24.819Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00270725,
+      "promptTokens": 987,
+      "completionTokens": 70,
+      "totalTokens": 1057,
+      "timestamp": "2026-04-29T10:52:34.137Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.002758,
+      "promptTokens": 1096,
+      "completionTokens": 60,
+      "totalTokens": 1156,
+      "timestamp": "2026-04-29T10:52:39.664Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00646975,
+      "promptTokens": 2257,
+      "completionTokens": 180,
+      "totalTokens": 2437,
+      "timestamp": "2026-04-29T10:52:56.702Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.00476525,
+      "promptTokens": 2371,
+      "completionTokens": 44,
+      "totalTokens": 2415,
+      "timestamp": "2026-04-29T10:52:59.394Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.009885749999999999,
+      "promptTokens": 3985,
+      "completionTokens": 208,
+      "totalTokens": 4193,
+      "timestamp": "2026-04-29T10:53:04.071Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0105105,
+      "promptTokens": 4334,
+      "completionTokens": 209,
+      "totalTokens": 4543,
+      "timestamp": "2026-04-29T10:53:08.216Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0103635,
+      "promptTokens": 5490,
+      "completionTokens": 54,
+      "totalTokens": 5544,
+      "timestamp": "2026-04-29T10:53:11.870Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.012633249999999999,
+      "promptTokens": 6475,
+      "completionTokens": 93,
+      "totalTokens": 6568,
+      "timestamp": "2026-04-29T10:53:14.645Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.015203999999999999,
+      "promptTokens": 7608,
+      "completionTokens": 135,
+      "totalTokens": 7743,
+      "timestamp": "2026-04-29T10:53:18.421Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01699075,
+      "promptTokens": 9045,
+      "completionTokens": 83,
+      "totalTokens": 9128,
+      "timestamp": "2026-04-29T10:53:21.440Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.018273499999999998,
+      "promptTokens": 9618,
+      "completionTokens": 103,
+      "totalTokens": 9721,
+      "timestamp": "2026-04-29T10:53:24.479Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.023212,
+      "promptTokens": 10840,
+      "completionTokens": 303,
+      "totalTokens": 11143,
+      "timestamp": "2026-04-29T10:53:30.800Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.024044999999999997,
+      "promptTokens": 12660,
+      "completionTokens": 135,
+      "totalTokens": 12795,
+      "timestamp": "2026-04-29T10:53:34.795Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.027643,
+      "promptTokens": 13556,
+      "completionTokens": 280,
+      "totalTokens": 13836,
+      "timestamp": "2026-04-29T10:53:44.504Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.027471500000000003,
+      "promptTokens": 13610,
+      "completionTokens": 261,
+      "totalTokens": 13871,
+      "timestamp": "2026-04-29T10:53:51.341Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.029497999999999996,
+      "promptTokens": 14632,
+      "completionTokens": 278,
+      "totalTokens": 14910,
+      "timestamp": "2026-04-29T10:53:57.745Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02813475,
+      "promptTokens": 14733,
+      "completionTokens": 168,
+      "totalTokens": 14901,
+      "timestamp": "2026-04-29T10:54:03.875Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.026997249999999997,
+      "promptTokens": 14811,
+      "completionTokens": 77,
+      "totalTokens": 14888,
+      "timestamp": "2026-04-29T10:54:06.592Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.029624,
+      "promptTokens": 14952,
+      "completionTokens": 247,
+      "totalTokens": 15199,
+      "timestamp": "2026-04-29T10:54:12.995Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0276885,
+      "promptTokens": 15166,
+      "completionTokens": 82,
+      "totalTokens": 15248,
+      "timestamp": "2026-04-29T10:54:16.011Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0324485,
+      "promptTokens": 16246,
+      "completionTokens": 287,
+      "totalTokens": 16533,
+      "timestamp": "2026-04-29T10:54:25.291Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.04000325,
+      "promptTokens": 20291,
+      "completionTokens": 321,
+      "totalTokens": 20612,
+      "timestamp": "2026-04-29T10:54:31.049Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01838725,
+      "promptTokens": 9067,
+      "completionTokens": 180,
+      "totalTokens": 9247,
+      "timestamp": "2026-04-29T10:54:34.951Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0198205,
+      "promptTokens": 10214,
+      "completionTokens": 139,
+      "totalTokens": 10353,
+      "timestamp": "2026-04-29T10:54:43.623Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.01915375,
+      "promptTokens": 10465,
+      "completionTokens": 60,
+      "totalTokens": 10525,
+      "timestamp": "2026-04-29T10:54:46.783Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.021740249999999996,
+      "promptTokens": 12079,
+      "completionTokens": 43,
+      "totalTokens": 12122,
+      "timestamp": "2026-04-29T10:54:49.400Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.024328499999999996,
+      "promptTokens": 12646,
+      "completionTokens": 157,
+      "totalTokens": 12803,
+      "timestamp": "2026-04-29T10:54:52.773Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.023640750000000002,
+      "promptTokens": 12741,
+      "completionTokens": 96,
+      "totalTokens": 12837,
+      "timestamp": "2026-04-29T10:54:58.423Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0267575,
+      "promptTokens": 12818,
+      "completionTokens": 309,
+      "totalTokens": 13127,
+      "timestamp": "2026-04-29T10:55:05.177Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0233135,
+      "promptTokens": 13018,
+      "completionTokens": 38,
+      "totalTokens": 13056,
+      "timestamp": "2026-04-29T10:55:07.217Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.027072500000000003,
+      "promptTokens": 14094,
+      "completionTokens": 172,
+      "totalTokens": 14266,
+      "timestamp": "2026-04-29T10:55:14.123Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.027587,
+      "promptTokens": 15180,
+      "completionTokens": 73,
+      "totalTokens": 15253,
+      "timestamp": "2026-04-29T10:55:19.349Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.028344750000000002,
+      "promptTokens": 15245,
+      "completionTokens": 119,
+      "totalTokens": 15364,
+      "timestamp": "2026-04-29T10:55:24.784Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02968175,
+      "promptTokens": 16361,
+      "completionTokens": 75,
+      "totalTokens": 16436,
+      "timestamp": "2026-04-29T10:55:30.346Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.030969750000000004,
+      "promptTokens": 16785,
+      "completionTokens": 114,
+      "totalTokens": 16899,
+      "timestamp": "2026-04-29T10:55:36.592Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.034158249999999994,
+      "promptTokens": 17879,
+      "completionTokens": 205,
+      "totalTokens": 18084,
+      "timestamp": "2026-04-29T10:55:45.252Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.033334,
+      "promptTokens": 18016,
+      "completionTokens": 129,
+      "totalTokens": 18145,
+      "timestamp": "2026-04-29T10:55:49.928Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.036407,
+      "promptTokens": 19172,
+      "completionTokens": 204,
+      "totalTokens": 19376,
+      "timestamp": "2026-04-29T10:55:56.495Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.011675999999999999,
+      "promptTokens": 6232,
+      "completionTokens": 55,
+      "totalTokens": 6287,
+      "timestamp": "2026-04-29T10:55:59.488Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.016121,
+      "promptTokens": 7308,
+      "completionTokens": 238,
+      "totalTokens": 7546,
+      "timestamp": "2026-04-29T10:56:05.938Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.024402,
+      "promptTokens": 11680,
+      "completionTokens": 283,
+      "totalTokens": 11963,
+      "timestamp": "2026-04-29T10:56:10.471Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.031209499999999998,
+      "promptTokens": 15826,
+      "completionTokens": 251,
+      "totalTokens": 16077,
+      "timestamp": "2026-04-29T10:56:20.614Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03058125,
+      "promptTokens": 15987,
+      "completionTokens": 186,
+      "totalTokens": 16173,
+      "timestamp": "2026-04-29T10:56:24.888Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.0352835,
+      "promptTokens": 19578,
+      "completionTokens": 73,
+      "totalTokens": 19651,
+      "timestamp": "2026-04-29T10:56:27.430Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.037464,
+      "promptTokens": 20664,
+      "completionTokens": 93,
+      "totalTokens": 20757,
+      "timestamp": "2026-04-29T10:56:32.690Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.039439749999999996,
+      "promptTokens": 21761,
+      "completionTokens": 97,
+      "totalTokens": 21858,
+      "timestamp": "2026-04-29T10:56:38.105Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.013135500000000001,
+      "promptTokens": 5466,
+      "completionTokens": 255,
+      "totalTokens": 5721,
+      "timestamp": "2026-04-29T10:56:41.727Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02377025,
+      "promptTokens": 9511,
+      "completionTokens": 509,
+      "totalTokens": 10020,
+      "timestamp": "2026-04-29T10:56:51.549Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.028747249999999995,
+      "promptTokens": 13883,
+      "completionTokens": 318,
+      "totalTokens": 14201,
+      "timestamp": "2026-04-29T10:56:57.839Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.034023500000000005,
+      "promptTokens": 17954,
+      "completionTokens": 186,
+      "totalTokens": 18140,
+      "timestamp": "2026-04-29T10:57:06.306Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "extract_real_contracts",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.03241525,
+      "promptTokens": 5443,
+      "completionTokens": 1635,
+      "totalTokens": 7078,
+      "timestamp": "2026-04-29T10:57:30.350Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19538,
+      "completionTokens": 3904,
+      "totalTokens": 23442,
+      "timestamp": "2026-04-29T10:59:32.271Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.05755225,
+      "promptTokens": 19615,
+      "completionTokens": 1659,
+      "totalTokens": 21274,
+      "timestamp": "2026-04-29T11:01:42.006Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 21867,
+      "completionTokens": 1733,
+      "totalTokens": 23600,
+      "timestamp": "2026-04-29T11:02:40.209Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23034,
+      "completionTokens": 1824,
+      "totalTokens": 24858,
+      "timestamp": "2026-04-29T11:03:31.065Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19871,
+      "completionTokens": 5536,
+      "totalTokens": 25407,
+      "timestamp": "2026-04-29T11:06:22.871Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 21448,
+      "completionTokens": 3168,
+      "totalTokens": 24616,
+      "timestamp": "2026-04-29T11:07:49.145Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23372,
+      "completionTokens": 1958,
+      "totalTokens": 25330,
+      "timestamp": "2026-04-29T11:08:53.339Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 24406,
+      "completionTokens": 3558,
+      "totalTokens": 27964,
+      "timestamp": "2026-04-29T11:10:45.698Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 26262,
+      "completionTokens": 1684,
+      "totalTokens": 27946,
+      "timestamp": "2026-04-29T11:11:40.741Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.02799125,
+      "promptTokens": 3963,
+      "completionTokens": 1504,
+      "totalTokens": 5467,
+      "timestamp": "2026-04-29T11:11:58.870Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19288,
+      "completionTokens": 327,
+      "totalTokens": 19615,
+      "timestamp": "2026-04-29T11:12:12.937Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19675,
+      "completionTokens": 53,
+      "totalTokens": 19728,
+      "timestamp": "2026-04-29T11:12:18.670Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19835,
+      "completionTokens": 43,
+      "totalTokens": 19878,
+      "timestamp": "2026-04-29T11:12:22.229Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 19992,
+      "completionTokens": 47,
+      "totalTokens": 20039,
+      "timestamp": "2026-04-29T11:12:27.223Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20157,
+      "completionTokens": 102,
+      "totalTokens": 20259,
+      "timestamp": "2026-04-29T11:12:32.411Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20336,
+      "completionTokens": 55,
+      "totalTokens": 20391,
+      "timestamp": "2026-04-29T11:12:36.135Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20496,
+      "completionTokens": 129,
+      "totalTokens": 20625,
+      "timestamp": "2026-04-29T11:12:41.889Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20681,
+      "completionTokens": 72,
+      "totalTokens": 20753,
+      "timestamp": "2026-04-29T11:12:46.551Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Frontend Dev",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.055161749999999996,
+      "promptTokens": 2121,
+      "completionTokens": 3675,
+      "totalTokens": 5796,
+      "timestamp": "2026-04-29T11:13:25.254Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 20884,
+      "completionTokens": 3056,
+      "totalTokens": 23940,
+      "timestamp": "2026-04-29T11:15:00.497Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23211,
+      "completionTokens": 2617,
+      "totalTokens": 25828,
+      "timestamp": "2026-04-29T11:16:20.956Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25721,
+      "completionTokens": 2493,
+      "totalTokens": 28214,
+      "timestamp": "2026-04-29T11:17:40.202Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 28268,
+      "completionTokens": 3394,
+      "totalTokens": 31662,
+      "timestamp": "2026-04-29T11:19:23.269Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22468,
+      "completionTokens": 659,
+      "totalTokens": 23127,
+      "timestamp": "2026-04-29T11:19:51.473Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 22933,
+      "completionTokens": 300,
+      "totalTokens": 23233,
+      "timestamp": "2026-04-29T11:20:05.111Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23154,
+      "completionTokens": 87,
+      "totalTokens": 23241,
+      "timestamp": "2026-04-29T11:20:09.822Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23406,
+      "completionTokens": 62,
+      "totalTokens": 23468,
+      "timestamp": "2026-04-29T11:20:13.493Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 23633,
+      "completionTokens": 3186,
+      "totalTokens": 26819,
+      "timestamp": "2026-04-29T11:21:53.634Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "costUsd": 0,
+      "promptTokens": 25629,
+      "completionTokens": 2127,
+      "totalTokens": 27756,
+      "timestamp": "2026-04-29T11:22:54.250Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 25888,
+      "completionTokens": 2347,
+      "totalTokens": 28235,
+      "timestamp": "2026-04-29T11:24:19.915Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 28427,
+      "completionTokens": 2951,
+      "totalTokens": 31378,
+      "timestamp": "2026-04-29T11:25:50.708Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 6247,
+      "completionTokens": 1782,
+      "totalTokens": 8029,
+      "timestamp": "2026-04-29T11:26:42.517Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codefix",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 6247,
+      "completionTokens": 2483,
+      "totalTokens": 8730,
+      "timestamp": "2026-04-29T11:28:07.500Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 22301,
+      "completionTokens": 3877,
+      "totalTokens": 26178,
+      "timestamp": "2026-04-29T11:30:29.334Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 26376,
+      "completionTokens": 3819,
+      "totalTokens": 30195,
+      "timestamp": "2026-04-29T11:32:21.423Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 30395,
+      "completionTokens": 2026,
+      "totalTokens": 32421,
+      "timestamp": "2026-04-29T11:33:53.728Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 32620,
+      "completionTokens": 2573,
+      "totalTokens": 35193,
+      "timestamp": "2026-04-29T11:35:45.179Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 22293,
+      "completionTokens": 1034,
+      "totalTokens": 23327,
+      "timestamp": "2026-04-29T11:36:22.930Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 23502,
+      "completionTokens": 1962,
+      "totalTokens": 25464,
+      "timestamp": "2026-04-29T11:37:49.985Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 25640,
+      "completionTokens": 3365,
+      "totalTokens": 29005,
+      "timestamp": "2026-04-29T11:39:31.844Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 22160,
+      "completionTokens": 3635,
+      "totalTokens": 25795,
+      "timestamp": "2026-04-29T11:42:07.388Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 25913,
+      "completionTokens": 2461,
+      "totalTokens": 28374,
+      "timestamp": "2026-04-29T11:43:24.568Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 22179,
+      "completionTokens": 1917,
+      "totalTokens": 24096,
+      "timestamp": "2026-04-29T11:44:48.882Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "worker_codegen",
+      "label": "Frontend Dev",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 24212,
+      "completionTokens": 2081,
+      "totalTokens": 26293,
+      "timestamp": "2026-04-29T11:46:12.542Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 1637,
+      "completionTokens": 74,
+      "totalTokens": 1711,
+      "timestamp": "2026-04-29T11:46:40.673Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 1780,
+      "completionTokens": 77,
+      "totalTokens": 1857,
+      "timestamp": "2026-04-29T11:46:56.482Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 3024,
+      "completionTokens": 68,
+      "totalTokens": 3092,
+      "timestamp": "2026-04-29T11:47:20.592Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 4800,
+      "completionTokens": 53,
+      "totalTokens": 4853,
+      "timestamp": "2026-04-29T11:47:34.578Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 5823,
+      "completionTokens": 81,
+      "totalTokens": 5904,
+      "timestamp": "2026-04-29T11:47:49.322Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 6986,
+      "completionTokens": 69,
+      "totalTokens": 7055,
+      "timestamp": "2026-04-29T11:48:04.643Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 8138,
+      "completionTokens": 75,
+      "totalTokens": 8213,
+      "timestamp": "2026-04-29T11:48:20.749Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 8576,
+      "completionTokens": 175,
+      "totalTokens": 8751,
+      "timestamp": "2026-04-29T11:48:42.004Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 9400,
+      "completionTokens": 1496,
+      "totalTokens": 10896,
+      "timestamp": "2026-04-29T11:49:19.655Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 10928,
+      "completionTokens": 70,
+      "totalTokens": 10998,
+      "timestamp": "2026-04-29T11:49:32.279Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 11912,
+      "completionTokens": 72,
+      "totalTokens": 11984,
+      "timestamp": "2026-04-29T11:49:45.100Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 12296,
+      "completionTokens": 91,
+      "totalTokens": 12387,
+      "timestamp": "2026-04-29T11:49:58.960Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 13144,
+      "completionTokens": 72,
+      "totalTokens": 13216,
+      "timestamp": "2026-04-29T11:50:11.321Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 14480,
+      "completionTokens": 81,
+      "totalTokens": 14561,
+      "timestamp": "2026-04-29T11:50:22.896Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 15765,
+      "completionTokens": 254,
+      "totalTokens": 16019,
+      "timestamp": "2026-04-29T11:50:40.376Z"
+    },
+    {
+      "sessionId": "44fb392e-79c5-4cb3-9fc2-14362d8584ba",
+      "stage": "phase_verify_fix",
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "costUsd": 0,
+      "promptTokens": 16136,
+      "completionTokens": 60,
+      "totalTokens": 16196,
+      "timestamp": "2026-04-29T11:50:51.697Z"
+    }
+  ],
+  "modelUsage": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 61,
+      "costUsd": 1.6800069999999994,
+      "promptTokens": 689820,
+      "completionTokens": 33773,
+      "totalTokens": 723593,
+      "stages": [
+        "worker_codegen:Backend Dev",
+        "worker_codefix:Test Engineer",
+        "worker_codefix:Backend Dev",
+        "phase_verify_fix",
+        "extract_real_contracts",
+        "worker_codegen:Frontend Dev",
+        "worker_codefix:Frontend Dev"
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "calls": 87,
+      "costUsd": 0,
+      "promptTokens": 2005105,
+      "completionTokens": 159932,
+      "totalTokens": 2165037,
+      "stages": [
+        "worker_codegen:Architect",
+        "worker_codegen:Test Engineer",
+        "worker_codegen:Backend Dev",
+        "worker_codegen:Frontend Dev"
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "calls": 31,
+      "costUsd": 0,
+      "promptTokens": 489225,
+      "completionTokens": 41181,
+      "totalTokens": 530406,
+      "stages": [
+        "worker_codegen:Frontend Dev",
+        "worker_codefix:Frontend Dev",
+        "phase_verify_fix"
+      ]
+    },
+    {
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "calls": 1,
+      "costUsd": 0,
+      "promptTokens": 7357,
+      "completionTokens": 1650,
+      "totalTokens": 9007,
+      "stages": [
+        "generate_api_contracts"
+      ]
+    }
+  ],
+  "modelPerformance": [
+    {
+      "model": "deepseek/deepseek-v4-pro-20260423",
+      "calls": 87,
+      "promptTokens": 2005105,
+      "completionTokens": 159932,
+      "totalTokens": 2165037,
+      "costUsd": 0,
+      "stages": [
+        "worker_codegen"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 61,
+      "promptTokens": 689820,
+      "completionTokens": 33773,
+      "totalTokens": 723593,
+      "costUsd": 1.6800069999999994,
+      "stages": [
+        "worker_codegen",
+        "worker_codefix",
+        "phase_verify_fix",
+        "extract_real_contracts"
+      ],
+      "score": 91.5,
+      "grade": "A",
+      "reasons": [
+        "Earlier phase verify/fix did not fully prevent later integration failures."
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-v3.2-20251201",
+      "calls": 31,
+      "promptTokens": 489225,
+      "completionTokens": 41181,
+      "totalTokens": 530406,
+      "costUsd": 0,
+      "stages": [
+        "worker_codegen",
+        "worker_codefix",
+        "phase_verify_fix"
+      ],
+      "score": 97.2,
+      "grade": "A",
+      "reasons": [
+        "Earlier phase verify/fix did not fully prevent later integration failures."
+      ]
+    },
+    {
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "calls": 1,
+      "promptTokens": 7357,
+      "completionTokens": 1650,
+      "totalTokens": 9007,
+      "costUsd": 0,
+      "stages": [
+        "generate_api_contracts"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    }
+  ],
+  "stageUsage": [
+    {
+      "stage": "architect-triage",
+      "startAt": "2026-04-29T09:55:57.875Z",
+      "endAt": "2026-04-29T09:55:57.878Z",
+      "durationMs": 3,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-context",
+      "startAt": "2026-04-29T09:55:58.048Z",
+      "endAt": "2026-04-29T11:51:38.631Z",
+      "durationMs": 6940583,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 44,
+      "score": 76,
+      "grade": "C",
+      "reasons": [
+        "Context was truncated 23 time(s)."
+      ]
+    },
+    {
+      "stage": "worker_codegen",
+      "startAt": "2026-04-29T09:57:30.927Z",
+      "endAt": "2026-04-29T11:46:12.542Z",
+      "durationMs": 6521615,
+      "llmCalls": 102,
+      "promptTokens": 2380734,
+      "completionTokens": 197024,
+      "totalTokens": 2577758,
+      "costUsd": 0.11913125,
+      "models": [
+        "deepseek/deepseek-v4-pro-20260423",
+        "openai/gpt-5.3-codex-20260224",
+        "deepseek/deepseek-v3.2-20251201"
+      ],
+      "labels": [
+        "Architect",
+        "Test Engineer",
+        "Backend Dev",
+        "Frontend Dev"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "task",
+      "startAt": "2026-04-29T10:03:05.137Z",
+      "endAt": "2026-04-29T11:46:12.564Z",
+      "durationMs": 6187427,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 19,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "generate_api_contracts",
+      "startAt": "2026-04-29T10:05:32.990Z",
+      "endAt": "2026-04-29T10:05:33.004Z",
+      "durationMs": 14,
+      "llmCalls": 1,
+      "promptTokens": 7357,
+      "completionTokens": 1650,
+      "totalTokens": 9007,
+      "costUsd": 0,
+      "models": [
+        "anthropic/claude-4-sonnet-20250522"
+      ],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-contract-completeness",
+      "startAt": "2026-04-29T10:05:33.015Z",
+      "endAt": "2026-04-29T11:51:38.615Z",
+      "durationMs": 6365600,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 3,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-verify",
+      "startAt": "2026-04-29T10:11:33.789Z",
+      "endAt": "2026-04-29T11:26:42.528Z",
+      "durationMs": 4508739,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 10,
+      "score": 68,
+      "grade": "D",
+      "reasons": [
+        "Task/file plan mismatches happened 10 time(s)."
+      ]
+    },
+    {
+      "stage": "worker_codefix",
+      "startAt": "2026-04-29T10:11:50.949Z",
+      "endAt": "2026-04-29T11:28:07.500Z",
+      "durationMs": 4576551,
+      "llmCalls": 10,
+      "promptTokens": 46755,
+      "completionTokens": 25024,
+      "totalTokens": 71779,
+      "costUsd": 0.35058275,
+      "models": [
+        "openai/gpt-5.3-codex-20260224",
+        "deepseek/deepseek-v3.2-20251201"
+      ],
+      "labels": [
+        "Test Engineer",
+        "Backend Dev",
+        "Frontend Dev"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-convention-fix",
+      "startAt": "2026-04-29T10:52:25.213Z",
+      "endAt": "2026-04-29T11:46:12.931Z",
+      "durationMs": 3227718,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "phase_verify_fix",
+      "startAt": "2026-04-29T10:52:34.137Z",
+      "endAt": "2026-04-29T11:50:51.697Z",
+      "durationMs": 3497560,
+      "llmCalls": 66,
+      "promptTokens": 751218,
+      "completionTokens": 11203,
+      "totalTokens": 762421,
+      "costUsd": 1.1778777499999997,
+      "models": [
+        "openai/gpt-5.3-codex-20260224",
+        "deepseek/deepseek-v3.2-20251201"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 90,
+      "grade": "A",
+      "reasons": [
+        "Earlier phase verify/fix did not fully prevent later integration failures."
+      ]
+    },
+    {
+      "stage": "extract_real_contracts",
+      "startAt": "2026-04-29T10:57:30.350Z",
+      "endAt": "2026-04-29T10:57:30.350Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 5443,
+      "completionTokens": 1635,
+      "totalTokens": 7078,
+      "costUsd": 0.03241525,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-deps",
+      "startAt": "2026-04-29T11:51:30.248Z",
+      "endAt": "2026-04-29T11:51:30.248Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "preflight-route-audit",
+      "startAt": "2026-04-29T11:51:31.144Z",
+      "endAt": "2026-04-29T11:51:38.614Z",
+      "durationMs": 7470,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 4,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "integration-gate",
+      "startAt": "2026-04-29T11:52:10.341Z",
+      "endAt": "2026-04-29T11:52:40.360Z",
+      "durationMs": 30019,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 6,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "e2e-triage",
+      "startAt": "2026-04-29T11:58:23.826Z",
+      "endAt": "2026-04-29T11:58:23.829Z",
+      "durationMs": 3,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "post-gen-audit",
+      "startAt": "2026-04-29T11:58:23.844Z",
+      "endAt": "2026-04-29T11:58:24.057Z",
+      "durationMs": 213,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    }
+  ],
+  "repairSummary": {
+    "totalEvents": 96,
+    "byStage": {
+      "architect-triage": 2,
+      "worker-context": 44,
+      "task": 19,
+      "generate_api_contracts": 1,
+      "preflight-contract-completeness": 3,
+      "worker-verify": 10,
+      "preflight-convention-fix": 2,
+      "preflight-deps": 1,
+      "preflight-route-audit": 4,
+      "integration-gate": 6,
+      "e2e-triage": 2,
+      "post-gen-audit": 2
+    },
+    "byEvent": {
+      "task_forced_to_llm": 2,
+      "doc_truncated": 23,
+      "worker_context_trimmed": 21,
+      "snapshot_cleaned": 19,
+      "contract_completeness_snapshot": 3,
+      "contract_usage_coverage_audit": 2,
+      "task_plan_unfulfilled": 10,
+      "convention_autofix_applied": 2,
+      "import_gaps_installed": 1,
+      "runtime_integration_audit": 1,
+      "runtime_integration_audit_failure": 1,
+      "tsc_diagnostics_snapshot": 1,
+      "route_audit_snapshot": 2,
+      "route_registration_audit_failed": 1,
+      "frontend_api_client_uniqueness_snapshot": 1,
+      "runtime_smoke_snapshot": 1,
+      "missing_report_done": 1,
+      "triage_complete": 1,
+      "no_deterministic_failures": 1,
+      "audit_start": 1,
+      "audit_clean": 1
+    },
+    "entries": [
+      {
+        "stage": "architect-triage",
+        "event": "task_forced_to_llm",
+        "timestamp": "2026-04-29T09:55:57.875Z",
+        "details": {
+          "reason": "Task references 11 file(s) outside the scaffold's protected paths — real work must be generated.",
+          "title": "Implement Sequelize models and database schema",
+          "phase": "Data Layer"
+        },
+        "taskId": "T-001"
+      },
+      {
+        "stage": "architect-triage",
+        "event": "task_forced_to_llm",
+        "timestamp": "2026-04-29T09:55:57.878Z",
+        "details": {
+          "reason": "Task references 4 file(s) outside the scaffold's protected paths — real work must be generated.",
+          "title": "Set up Docker Compose and environment configuration",
+          "phase": "Infrastructure"
+        },
+        "taskId": "T-002"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T09:55:58.048Z",
+        "details": {
+          "label": "worker-codegen:Architect",
+          "keptSections": 27,
+          "droppedSections": 80,
+          "budgetChars": 30000,
+          "usedChars": 30017,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T09:55:58.111Z",
+        "details": {
+          "label": "worker-codegen:Architect",
+          "taskId": "T-001",
+          "taskTitle": "Implement Sequelize models and database schema",
+          "originalChars": 68235,
+          "keptChars": 31559,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-01",
+            "AC-04",
+            "AC-05",
+            "AC-08",
+            "AC-11",
+            "AC-49"
+          ],
+          "keywordCount": 23,
+          "fileHintCount": 11,
+          "availableSectionCount": 107
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:03:05.137Z",
+        "taskId": "T-001"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:03:05.215Z",
+        "details": {
+          "label": "worker-codegen:Architect",
+          "keptSections": 41,
+          "droppedSections": 66,
+          "budgetChars": 30000,
+          "usedChars": 30030,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:03:05.219Z",
+        "details": {
+          "label": "worker-codegen:Architect",
+          "taskId": "T-002",
+          "taskTitle": "Set up Docker Compose and environment configuration",
+          "originalChars": 68235,
+          "keptChars": 31572,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-01",
+            "AC-11"
+          ],
+          "keywordCount": 14,
+          "fileHintCount": 4,
+          "availableSectionCount": 107
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:05:10.374Z",
+        "taskId": "T-002"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:05:10.439Z",
+        "details": {
+          "label": "api-contract-generation",
+          "keptSections": 15,
+          "droppedSections": 93,
+          "budgetChars": 12000,
+          "usedChars": 12013,
+          "alwaysKeptSections": 0,
+          "forceKeptSections": 0,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "generate_api_contracts",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-29T10:05:33.004Z",
+        "details": {
+          "when": "post-generate",
+          "inferredRelationshipCount": 7,
+          "missingScopedEndpoints": []
+        }
+      },
+      {
+        "stage": "preflight-contract-completeness",
+        "event": "contract_usage_coverage_audit",
+        "timestamp": "2026-04-29T10:05:33.015Z",
+        "details": {
+          "phase": "post-contract",
+          "policy": "prune",
+          "totals": {
+            "contractEntries": 10,
+            "frontendCalls": 1,
+            "consistent": 1,
+            "surplus": 0,
+            "frontendWiringMissing": 9,
+            "contractGap": 0,
+            "frontendRogue": 0,
+            "adminSkipped": 0
+          },
+          "prunedCount": 0,
+          "pendingRepairTaskCount": 0,
+          "prunedSample": []
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:05:33.075Z",
+        "details": {
+          "label": "worker-codegen:Test Engineer",
+          "keptSections": 45,
+          "droppedSections": 63,
+          "budgetChars": 30000,
+          "usedChars": 30035,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 0,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:05:33.076Z",
+        "details": {
+          "label": "worker-codegen:Test Engineer",
+          "taskId": "T-E2E-001",
+          "taskTitle": "Set up Playwright E2E harness",
+          "originalChars": 68574,
+          "keptChars": 31577,
+          "budgetChars": 30000,
+          "requirementIds": [],
+          "keywordCount": 12,
+          "fileHintCount": 6,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:05:33.090Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 29,
+          "droppedSections": 79,
+          "budgetChars": 30000,
+          "usedChars": 30027,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:05:33.092Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-003",
+          "taskTitle": "Create API contracts and frontend client",
+          "originalChars": 68574,
+          "keptChars": 31569,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-02",
+            "AC-04",
+            "AC-11",
+            "AC-21"
+          ],
+          "keywordCount": 15,
+          "fileHintCount": 7,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T10:11:33.789Z",
+        "details": {
+          "missingCreates": [],
+          "unmodified": [
+            "frontend/package.json"
+          ],
+          "fixAttempts": 0
+        },
+        "taskId": "T-E2E-001"
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T10:11:40.069Z",
+        "details": {
+          "missingCreates": [],
+          "unmodified": [
+            "frontend/src/api/client.ts"
+          ],
+          "fixAttempts": 0
+        },
+        "taskId": "T-003"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:11:50.965Z",
+        "taskId": "T-E2E-001"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:11:51.000Z",
+        "details": {
+          "label": "worker-codegen:Test Engineer",
+          "keptSections": 35,
+          "droppedSections": 73,
+          "budgetChars": 30000,
+          "usedChars": 30024,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 6,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:11:51.003Z",
+        "details": {
+          "label": "worker-codegen:Test Engineer",
+          "taskId": "T-E2E-002",
+          "taskTitle": "Implement PRD browser journeys",
+          "originalChars": 68574,
+          "keptChars": 31566,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "PAGE-001",
+            "FR-F-01",
+            "FR-F-02",
+            "FR-F-03",
+            "FR-F-04",
+            "CMP-001",
+            "FR-F-08",
+            "FR-F-09",
+            "FR-F-12",
+            "CMP-002",
+            "FR-F-05",
+            "FR-F-06",
+            "FR-F-07",
+            "CMP-003",
+            "CMP-004",
+            "FR-F-10",
+            "FR-F-11",
+            "PAGE-002",
+            "CMP-005",
+            "CMP-007"
+          ],
+          "keywordCount": 24,
+          "fileHintCount": 9,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:12:06.768Z",
+        "taskId": "T-003"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:12:06.797Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 28,
+          "droppedSections": 80,
+          "budgetChars": 30000,
+          "usedChars": 30019,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:12:06.799Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-004",
+          "taskTitle": "Build external API clients for news sources and market venues",
+          "originalChars": 68574,
+          "keptChars": 31561,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-11",
+            "AC-20",
+            "AC-25",
+            "AC-33"
+          ],
+          "keywordCount": 24,
+          "fileHintCount": 10,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:13:52.998Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 28,
+          "droppedSections": 80,
+          "budgetChars": 30000,
+          "usedChars": 30019,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:13:52.999Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-004",
+          "taskTitle": "Build external API clients for news sources and market venues",
+          "originalChars": 68574,
+          "keptChars": 31561,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-11",
+            "AC-20",
+            "AC-25",
+            "AC-33"
+          ],
+          "keywordCount": 24,
+          "fileHintCount": 10,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T10:18:42.646Z",
+        "details": {
+          "missingCreates": [
+            "frontend/tests/e2e/generated/e2e-005-feed-refresh-enters-aggregating-mode-rat.spec.ts",
+            "frontend/tests/e2e/generated/e2e-006-feed-infinite-scroll-load-more-retry-and.spec.ts"
+          ],
+          "unmodified": [],
+          "fixAttempts": 0
+        },
+        "taskId": "T-E2E-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:18:52.041Z",
+        "taskId": "T-004"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:18:52.073Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 29,
+          "droppedSections": 79,
+          "budgetChars": 30000,
+          "usedChars": 30015,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 3,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:18:52.077Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-005",
+          "taskTitle": "Implement Feed aggregation pipeline with lifecycle management",
+          "originalChars": 68574,
+          "keptChars": 31557,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-11",
+            "AC-12",
+            "AC-17",
+            "AC-20",
+            "AC-25",
+            "AC-49"
+          ],
+          "keywordCount": 17,
+          "fileHintCount": 8,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:19:50.360Z",
+        "taskId": "T-E2E-002"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:29:13.464Z",
+        "taskId": "T-005"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:29:13.487Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 29,
+          "droppedSections": 79,
+          "budgetChars": 30000,
+          "usedChars": 30026,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:29:13.493Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-006",
+          "taskTitle": "Implement Markets scanner pipeline orchestration",
+          "originalChars": 68574,
+          "keptChars": 31568,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-21",
+            "AC-22",
+            "AC-25",
+            "AC-27",
+            "AC-28",
+            "AC-29",
+            "AC-31"
+          ],
+          "keywordCount": 22,
+          "fileHintCount": 6,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T10:36:21.584Z",
+        "details": {
+          "missingCreates": [
+            "backend/src/utils/inputClassifier.ts"
+          ],
+          "unmodified": [],
+          "fixAttempts": 0
+        },
+        "taskId": "T-006"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:36:37.850Z",
+        "taskId": "T-006"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:36:37.905Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 29,
+          "droppedSections": 79,
+          "budgetChars": 30000,
+          "usedChars": 30018,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:36:37.908Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-007",
+          "taskTitle": "Add Feed and Markets HTTP routes with SSE streaming",
+          "originalChars": 68574,
+          "keptChars": 31560,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-15",
+            "AC-17",
+            "AC-25",
+            "AC-29",
+            "AC-36"
+          ],
+          "keywordCount": 17,
+          "fileHintCount": 9,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:42:10.533Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 29,
+          "droppedSections": 79,
+          "budgetChars": 30000,
+          "usedChars": 30018,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:42:10.534Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-007",
+          "taskTitle": "Add Feed and Markets HTTP routes with SSE streaming",
+          "originalChars": 68574,
+          "keptChars": 31560,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-15",
+            "AC-17",
+            "AC-25",
+            "AC-29",
+            "AC-36"
+          ],
+          "keywordCount": 17,
+          "fileHintCount": 9,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T10:45:17.145Z",
+        "details": {
+          "missingCreates": [
+            "backend/src/api/modules/markets/markets.controller.ts",
+            "backend/src/api/modules/markets/markets.routes.ts",
+            "backend/src/api/modules/stream/stream.controller.ts",
+            "backend/src/api/modules/stream/stream.routes.ts"
+          ],
+          "unmodified": [],
+          "fixAttempts": 0
+        },
+        "taskId": "T-007"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:45:55.217Z",
+        "taskId": "T-007"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:45:55.271Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "keptSections": 35,
+          "droppedSections": 73,
+          "budgetChars": 30000,
+          "usedChars": 30025,
+          "alwaysKeptSections": 13,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:45:55.272Z",
+        "details": {
+          "label": "worker-codegen:Backend Dev",
+          "taskId": "T-008",
+          "taskTitle": "Implement authentication and user management APIs",
+          "originalChars": 68574,
+          "keptChars": 31567,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-02",
+            "AC-04",
+            "AC-05",
+            "AC-06",
+            "AC-08",
+            "AC-09",
+            "AC-47",
+            "AC-49"
+          ],
+          "keywordCount": 17,
+          "fileHintCount": 9,
+          "availableSectionCount": 108
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T10:52:21.035Z",
+        "details": {
+          "missingCreates": [],
+          "unmodified": [
+            "backend/src/api/modules/auth/auth.routes.ts"
+          ],
+          "fixAttempts": 0
+        },
+        "taskId": "T-008"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T10:52:24.835Z",
+        "taskId": "T-008"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-29T10:52:25.213Z",
+        "details": {
+          "phase": "backend",
+          "fixedFileCount": 17,
+          "fixedFiles": [
+            "_optional/auth-privy/frontend/src/hooks/usePrivyAuthBridge.ts",
+            "_optional/auth-privy/frontend/src/providers/AppProviders.tsx",
+            "frontend/src/hooks/usePrivyAuthBridge.ts",
+            "frontend/src/providers/AppProviders.tsx",
+            "_optional/auth-privy/backend/src/api/modules/auth/auth.routes.ts",
+            "_optional/auth-privy/backend/src/app.ts",
+            "backend/src/api/modules/auth/auth.controller.ts",
+            "backend/src/api/modules/auth/auth.routes.ts",
+            "backend/src/api/modules/feed/feed.routes.ts",
+            "backend/src/api/modules/markets/markets.routes.ts",
+            "backend/src/api/modules/stream/stream.routes.ts",
+            "backend/src/api/modules/users/users.controller.ts",
+            "backend/src/api/modules/users/users.routes.ts",
+            "backend/src/app.ts",
+            "backend/src/services/auth.service.ts",
+            "backend/src/services/users.service.ts",
+            "frontend/src/router.tsx"
+          ],
+          "notes": [
+            "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+            "  ↳ rewrote import paths in 4 file(s) to track the rename.",
+            "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+            "  ↳ rewrote import paths in 12 file(s) to track the rename.",
+            "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+            "  ↳ rewrote import paths in 1 file(s) to track the rename."
+          ],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T10:57:30.424Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 48,
+          "droppedSections": 84,
+          "budgetChars": 30000,
+          "usedChars": 30035,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T10:57:30.433Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-009",
+          "taskTitle": "Create app shell and navigation layout",
+          "originalChars": 75026,
+          "keptChars": 31578,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-52",
+            "AC-53",
+            "AC-54"
+          ],
+          "keywordCount": 18,
+          "fileHintCount": 9,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:03:31.089Z",
+        "taskId": "T-009"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:03:31.136Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 53,
+          "droppedSections": 79,
+          "budgetChars": 30000,
+          "usedChars": 30040,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:03:31.141Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-010",
+          "taskTitle": "Implement Landing page with Privy authentication",
+          "originalChars": 75026,
+          "keptChars": 31583,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-01",
+            "AC-02",
+            "AC-03",
+            "AC-53"
+          ],
+          "keywordCount": 23,
+          "fileHintCount": 5,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T11:11:40.758Z",
+        "details": {
+          "missingCreates": [],
+          "unmodified": [
+            "frontend/src/components/auth/LoginModal.tsx"
+          ],
+          "fixAttempts": 0
+        },
+        "taskId": "T-010"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:11:58.884Z",
+        "taskId": "T-010"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:11:58.915Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 45,
+          "droppedSections": 87,
+          "budgetChars": 30000,
+          "usedChars": 30041,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:11:58.918Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-011",
+          "taskTitle": "Build onboarding interests selection flow",
+          "originalChars": 75026,
+          "keptChars": 31584,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-05",
+            "AC-47",
+            "AC-49",
+            "AC-53"
+          ],
+          "keywordCount": 18,
+          "fileHintCount": 5,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T11:12:46.571Z",
+        "details": {
+          "missingCreates": [
+            "frontend/src/views/OnboardingInterestsPage.tsx",
+            "frontend/src/components/onboarding/InterestCard.tsx",
+            "frontend/src/constants/interests.ts"
+          ],
+          "unmodified": [],
+          "fixAttempts": 0
+        },
+        "taskId": "T-011"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:13:25.269Z",
+        "taskId": "T-011"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:13:25.296Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 38,
+          "droppedSections": 94,
+          "budgetChars": 30000,
+          "usedChars": 30035,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 0,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:13:25.297Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-012",
+          "taskTitle": "Build style assessment quiz flow",
+          "originalChars": 75026,
+          "keptChars": 31578,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-06",
+            "AC-07",
+            "AC-08",
+            "AC-09",
+            "AC-10"
+          ],
+          "keywordCount": 16,
+          "fileHintCount": 8,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:19:23.305Z",
+        "taskId": "T-012"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:19:23.327Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 38,
+          "droppedSections": 94,
+          "budgetChars": 30000,
+          "usedChars": 30028,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:19:23.329Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-013",
+          "taskTitle": "Implement Feed page with agent log and infinite scroll",
+          "originalChars": 75026,
+          "keptChars": 31571,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-11",
+            "AC-12",
+            "AC-13",
+            "AC-14",
+            "AC-15",
+            "AC-16",
+            "AC-17",
+            "AC-18",
+            "AC-19",
+            "AC-20"
+          ],
+          "keywordCount": 18,
+          "fileHintCount": 9,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T11:25:50.725Z",
+        "details": {
+          "missingCreates": [
+            "frontend/src/views/FeedPage.tsx",
+            "frontend/src/components/feed/MarketCard.tsx"
+          ],
+          "unmodified": [],
+          "fixAttempts": 0
+        },
+        "taskId": "T-013"
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-04-29T11:26:42.528Z",
+        "details": {
+          "missingCreates": [
+            "frontend/src/views/FeedPage.tsx",
+            "frontend/src/components/feed/MarketCard.tsx"
+          ],
+          "unmodified": [],
+          "fixAttempts": 1
+        },
+        "taskId": "T-013"
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:28:07.524Z",
+        "taskId": "T-013"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:28:07.552Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 31,
+          "droppedSections": 101,
+          "budgetChars": 30000,
+          "usedChars": 30022,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:28:07.554Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-014",
+          "taskTitle": "Build Markets scanner page with live pipeline",
+          "originalChars": 75026,
+          "keptChars": 31565,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-21",
+            "AC-22",
+            "AC-23",
+            "AC-25",
+            "AC-26",
+            "AC-27",
+            "AC-28",
+            "AC-29",
+            "AC-30",
+            "AC-31",
+            "AC-32",
+            "AC-33",
+            "AC-34",
+            "AC-35",
+            "AC-36",
+            "AC-37",
+            "AC-38"
+          ],
+          "keywordCount": 21,
+          "fileHintCount": 9,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:35:45.207Z",
+        "taskId": "T-014"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:35:45.235Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 44,
+          "droppedSections": 88,
+          "budgetChars": 30000,
+          "usedChars": 30034,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:35:45.237Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-015",
+          "taskTitle": "Create Profile and Settings pages",
+          "originalChars": 75026,
+          "keptChars": 31577,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-39",
+            "AC-40",
+            "AC-41",
+            "AC-42",
+            "AC-43",
+            "AC-44",
+            "AC-45",
+            "AC-46",
+            "AC-47",
+            "AC-48",
+            "AC-49",
+            "AC-50",
+            "AC-51"
+          ],
+          "keywordCount": 17,
+          "fileHintCount": 10,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:39:31.875Z",
+        "taskId": "T-015"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:39:31.916Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 30,
+          "droppedSections": 102,
+          "budgetChars": 30000,
+          "usedChars": 30021,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 2,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:39:31.918Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-016",
+          "taskTitle": "Implement chip click behavior documentation and functionality",
+          "originalChars": 75026,
+          "keptChars": 31564,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-24",
+            "FR-M-03"
+          ],
+          "keywordCount": 20,
+          "fileHintCount": 3,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:43:24.633Z",
+        "taskId": "T-016"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:43:24.704Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "keptSections": 30,
+          "droppedSections": 102,
+          "budgetChars": 30000,
+          "usedChars": 30023,
+          "alwaysKeptSections": 16,
+          "forceKeptSections": 1,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-04-29T11:43:24.707Z",
+        "details": {
+          "label": "worker-codegen:Frontend Dev",
+          "taskId": "T-017",
+          "taskTitle": "Add universal market data disclaimer footer",
+          "originalChars": 75026,
+          "keptChars": 31566,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "AC-55"
+          ],
+          "keywordCount": 21,
+          "fileHintCount": 4,
+          "availableSectionCount": 132
+        }
+      },
+      {
+        "stage": "task",
+        "event": "snapshot_cleaned",
+        "timestamp": "2026-04-29T11:46:12.564Z",
+        "taskId": "T-017"
+      },
+      {
+        "stage": "preflight-convention-fix",
+        "event": "convention_autofix_applied",
+        "timestamp": "2026-04-29T11:46:12.931Z",
+        "details": {
+          "phase": "frontend",
+          "fixedFileCount": 0,
+          "fixedFiles": [],
+          "notes": [],
+          "unfixable": []
+        }
+      },
+      {
+        "stage": "preflight-deps",
+        "event": "import_gaps_installed",
+        "timestamp": "2026-04-29T11:51:30.248Z",
+        "details": {
+          "totalPackages": 3,
+          "scopes": [
+            {
+              "scope": "backend",
+              "packages": [
+                "openai",
+                "bullmq"
+              ],
+              "exitCode": 0
+            },
+            {
+              "scope": "frontend",
+              "packages": [
+                "lucide-react"
+              ],
+              "exitCode": 0
+            }
+          ]
+        }
+      },
+      {
+        "stage": "preflight-contract-completeness",
+        "event": "contract_usage_coverage_audit",
+        "timestamp": "2026-04-29T11:51:30.812Z",
+        "details": {
+          "phase": "pre-integration",
+          "policy": "prune",
+          "totals": {
+            "contractEntries": 10,
+            "frontendCalls": 4,
+            "consistent": 3,
+            "surplus": 0,
+            "frontendWiringMissing": 7,
+            "contractGap": 0,
+            "frontendRogue": 0,
+            "adminSkipped": 0
+          },
+          "prunedCount": 0,
+          "pendingRepairTaskCount": 7,
+          "prunedSample": []
+        }
+      },
+      {
+        "stage": "preflight-route-audit",
+        "event": "runtime_integration_audit",
+        "timestamp": "2026-04-29T11:51:31.144Z",
+        "details": {
+          "clean": false,
+          "hasError": true,
+          "byRule": {
+            "bg-job-inproc-branch": 1,
+            "bg-job-worker-startup": 1,
+            "empty-results-not-failure": 1
+          },
+          "bySeverity": {
+            "error": 1,
+            "warn": 2
+          },
+          "disabledRules": [
+            {
+              "ruleId": "llm-client-abstraction",
+              "reason": "no LLM_* bundle declared on resource requirements — abstraction rule N/A."
+            }
+          ],
+          "findingCount": 3
+        }
+      },
+      {
+        "stage": "preflight-route-audit",
+        "event": "runtime_integration_audit_failure",
+        "timestamp": "2026-04-29T11:51:31.144Z",
+        "details": {
+          "byRule": {
+            "bg-job-inproc-branch": 1,
+            "bg-job-worker-startup": 1,
+            "empty-results-not-failure": 1
+          },
+          "bySeverity": {
+            "error": 1,
+            "warn": 2
+          },
+          "findingCount": 3
+        }
+      },
+      {
+        "stage": "preflight-route-audit",
+        "event": "tsc_diagnostics_snapshot",
+        "timestamp": "2026-04-29T11:51:38.576Z",
+        "details": {
+          "workspaces": [
+            {
+              "workspace": "backend",
+              "skipped": false,
+              "diagnosticCount": 19
+            },
+            {
+              "workspace": "frontend",
+              "skipped": false,
+              "diagnosticCount": 0
+            }
+          ],
+          "totalDiagnostics": 19,
+          "byCode": {
+            "TS2740": 3,
+            "TS2739": 4,
+            "TS2741": 1,
+            "TS2349": 1,
+            "TS2339": 5,
+            "TS2322": 1,
+            "TS2367": 1,
+            "TS2345": 1,
+            "TS2307": 2
+          }
+        }
+      },
+      {
+        "stage": "preflight-route-audit",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-29T11:51:38.614Z",
+        "details": {
+          "when": "preflight",
+          "hardFail": true,
+          "unregisteredModules": [
+            "backend/src/api/modules/feed/feed.routes.ts: exports \"registerFeedRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/markets/markets.routes.ts: exports \"registerMarketsRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/stream/stream.routes.ts: exports \"registerStreamRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/users/users.routes.ts: exports \"registerUsersRoutes\" but index.ts never calls it."
+          ],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "GET",
+              "endpoint": "/api/feed/stream"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/feed/status"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/scan"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/scan/stream"
+            }
+          ],
+          "undeclaredEndpointCount": 5
+        }
+      },
+      {
+        "stage": "preflight-contract-completeness",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-29T11:51:38.615Z",
+        "details": {
+          "when": "preflight",
+          "inferredRelationshipCount": 7,
+          "missingScopedEndpoints": []
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-04-29T11:51:38.631Z",
+        "details": {
+          "label": "integration-review",
+          "keptSections": 33,
+          "droppedSections": 75,
+          "budgetChars": 18000,
+          "usedChars": 18030,
+          "alwaysKeptSections": 0,
+          "forceKeptSections": 0,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "route_audit_snapshot",
+        "timestamp": "2026-04-29T11:52:10.341Z",
+        "details": {
+          "when": "final",
+          "hardFail": true,
+          "unregisteredModules": [
+            "backend/src/api/modules/feed/feed.routes.ts: exports \"registerFeedRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/markets/markets.routes.ts: exports \"registerMarketsRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/stream/stream.routes.ts: exports \"registerStreamRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/users/users.routes.ts: exports \"registerUsersRoutes\" but index.ts never calls it."
+          ],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "GET",
+              "endpoint": "/api/feed/stream"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/feed/status"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/scan"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/scan/stream"
+            }
+          ],
+          "undeclaredEndpointCount": 5
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "route_registration_audit_failed",
+        "timestamp": "2026-04-29T11:52:10.342Z",
+        "details": {
+          "unregisteredModules": [
+            "backend/src/api/modules/feed/feed.routes.ts: exports \"registerFeedRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/markets/markets.routes.ts: exports \"registerMarketsRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/stream/stream.routes.ts: exports \"registerStreamRoutes\" but index.ts never calls it.",
+            "backend/src/api/modules/users/users.routes.ts: exports \"registerUsersRoutes\" but index.ts never calls it."
+          ],
+          "unresolvedRegistrations": [],
+          "missingContractEndpoints": [
+            {
+              "method": "GET",
+              "endpoint": "/api/feed/stream"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/feed/status"
+            },
+            {
+              "method": "POST",
+              "endpoint": "/api/scan"
+            },
+            {
+              "method": "GET",
+              "endpoint": "/api/scan/stream"
+            }
+          ]
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "contract_completeness_snapshot",
+        "timestamp": "2026-04-29T11:52:10.342Z",
+        "details": {
+          "when": "final",
+          "hardFail": false,
+          "warnOnly": true,
+          "inferredRelationshipCount": 7,
+          "missingScopedEndpoints": [],
+          "warnOnlyEndpoints": [
+            {
+              "parent": "User",
+              "child": "UserInterest",
+              "expectedPath": "GET /api/{users}/:id/{userinterests}",
+              "reason": "Model relationship User.hasMany(UserInterest) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/userinterests pattern."
+            },
+            {
+              "parent": "User",
+              "child": "StyleAssessmentAnswer",
+              "expectedPath": "GET /api/{users}/:id/{styleassessmentanswers}",
+              "reason": "Model relationship User.hasMany(StyleAssessmentAnswer) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/styleassessmentanswers pattern."
+            },
+            {
+              "parent": "User",
+              "child": "FeedItem",
+              "expectedPath": "GET /api/{users}/:id/{feeditems}",
+              "reason": "Model relationship User.hasMany(FeedItem) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/feeditems pattern."
+            },
+            {
+              "parent": "User",
+              "child": "FeedAggregationRun",
+              "expectedPath": "GET /api/{users}/:id/{feedaggregationruns}",
+              "reason": "Model relationship User.hasMany(FeedAggregationRun) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/feedaggregationruns pattern."
+            },
+            {
+              "parent": "TrendingTopic",
+              "child": "FeedItem",
+              "expectedPath": "GET /api/{trendingtopics}/:id/{feeditems}",
+              "reason": "Model relationship TrendingTopic.hasMany(FeedItem) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/feeditems pattern."
+            },
+            {
+              "parent": "TrendingTopic",
+              "child": "TopicMarketMatch",
+              "expectedPath": "GET /api/{trendingtopics}/:id/{topicmarketmatchs}",
+              "reason": "Model relationship TrendingTopic.hasMany(TopicMarketMatch) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/topicmarketmatchs pattern."
+            },
+            {
+              "parent": "CachedMarket",
+              "child": "TopicMarketMatch",
+              "expectedPath": "GET /api/{cachedmarkets}/:id/{topicmarketmatchs}",
+              "reason": "Model relationship CachedMarket.hasMany(TopicMarketMatch) found in backend/src/models/index.ts, but parent has no flat /api list endpoint to derive the plural segment from. Consider adding a filtered endpoint or a /me/topicmarketmatchs pattern."
+            }
+          ]
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "frontend_api_client_uniqueness_snapshot",
+        "timestamp": "2026-04-29T11:52:10.342Z",
+        "details": {
+          "when": "final",
+          "hardFail": false,
+          "canonical": "frontend/src/api/client.ts",
+          "parallelClients": []
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "runtime_smoke_snapshot",
+        "timestamp": "2026-04-29T11:52:40.357Z",
+        "details": {
+          "when": "final",
+          "pass": false,
+          "bootFailed": true,
+          "port": 4000,
+          "failureCount": 1,
+          "endpointsProbed": 0,
+          "codes": {
+            "backend_did_not_start": 1
+          }
+        }
+      },
+      {
+        "stage": "integration-gate",
+        "event": "missing_report_done",
+        "timestamp": "2026-04-29T11:52:40.360Z",
+        "details": {
+          "reason": "IntegrationVerifyFix loop exhausted without report_done; compile/build gates alone cannot confirm feature completeness.",
+          "iterations": 1
+        }
+      },
+      {
+        "stage": "e2e-triage",
+        "event": "triage_complete",
+        "timestamp": "2026-04-29T11:58:23.826Z",
+        "details": {
+          "attempt": 1,
+          "deterministic": 0,
+          "flaky": 0,
+          "infra": 0,
+          "selfHealed": 0,
+          "retryExitCode": 1
+        }
+      },
+      {
+        "stage": "e2e-triage",
+        "event": "no_deterministic_failures",
+        "timestamp": "2026-04-29T11:58:23.829Z",
+        "details": {
+          "attempt": 1,
+          "flaky": 0,
+          "infra": 0,
+          "selfHealed": 0
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_start",
+        "timestamp": "2026-04-29T11:58:23.844Z",
+        "details": {
+          "totalIds": 55
+        }
+      },
+      {
+        "stage": "post-gen-audit",
+        "event": "audit_clean",
+        "timestamp": "2026-04-29T11:58:24.057Z",
+        "details": {
+          "totalChecked": 55,
+          "implemented": 55,
+          "partial": 0,
+          "missing": 0,
+          "softWarnings": 0
+        },
+        "missingIds": [],
+        "stillMissing": []
+      }
+    ]
+  },
+  "runtimeReadiness": {
+    "present": true,
+    "clean": false,
+    "hasError": true,
+    "findingsTotal": 3,
+    "errorCount": 1,
+    "warnCount": 2,
+    "byRule": {
+      "bg-job-inproc-branch": 1,
+      "bg-job-worker-startup": 1,
+      "empty-results-not-failure": 1
+    },
+    "topFindings": [
+      {
+        "ruleId": "bg-job-inproc-branch",
+        "severity": "error",
+        "file": "backend/src/services/feedAggregation.service.ts",
+        "line": 26
+      },
+      {
+        "ruleId": "bg-job-worker-startup",
+        "severity": "warn",
+        "file": "backend/src/workers/feedAggregationWorker.ts",
+        "line": 7
+      },
+      {
+        "ruleId": "empty-results-not-failure",
+        "severity": "warn",
+        "file": "backend/src/services/feedAggregator.ts",
+        "line": 185
+      }
+    ],
+    "disabledRules": [
+      {
+        "ruleId": "llm-client-abstraction",
+        "reason": "no LLM_* bundle declared on resource requirements — abstraction rule N/A."
+      }
+    ]
+  },
+  "preflightLedger": {
+    "conventionAutofix": {
+      "invocations": 2,
+      "totalFixedFiles": 17,
+      "totalUnfixable": 0,
+      "notes": [
+        "Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\".",
+        "  ↳ rewrote import paths in 4 file(s) to track the rename.",
+        "Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\".",
+        "  ↳ rewrote import paths in 12 file(s) to track the rename.",
+        "Renamed residual file \"frontend/src/views/NotFound.tsx\" → canonical \"frontend/src/views/NotFoundPage.tsx\".",
+        "  ↳ rewrote import paths in 1 file(s) to track the rename."
+      ],
+      "unfixable": []
+    },
+    "routeAudit": {
+      "preflight": {
+        "when": "preflight",
+        "hardFail": true,
+        "unregisteredModules": [
+          "backend/src/api/modules/feed/feed.routes.ts: exports \"registerFeedRoutes\" but index.ts never calls it.",
+          "backend/src/api/modules/markets/markets.routes.ts: exports \"registerMarketsRoutes\" but index.ts never calls it.",
+          "backend/src/api/modules/stream/stream.routes.ts: exports \"registerStreamRoutes\" but index.ts never calls it.",
+          "backend/src/api/modules/users/users.routes.ts: exports \"registerUsersRoutes\" but index.ts never calls it."
+        ],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [
+          {
+            "method": "GET",
+            "endpoint": "/api/feed/stream"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/feed/status"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/scan"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/scan/stream"
+          }
+        ],
+        "undeclaredEndpointCount": 5
+      },
+      "final": {
+        "when": "final",
+        "hardFail": true,
+        "unregisteredModules": [
+          "backend/src/api/modules/feed/feed.routes.ts: exports \"registerFeedRoutes\" but index.ts never calls it.",
+          "backend/src/api/modules/markets/markets.routes.ts: exports \"registerMarketsRoutes\" but index.ts never calls it.",
+          "backend/src/api/modules/stream/stream.routes.ts: exports \"registerStreamRoutes\" but index.ts never calls it.",
+          "backend/src/api/modules/users/users.routes.ts: exports \"registerUsersRoutes\" but index.ts never calls it."
+        ],
+        "unresolvedRegistrations": [],
+        "missingContractEndpoints": [
+          {
+            "method": "GET",
+            "endpoint": "/api/feed/stream"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/feed/status"
+          },
+          {
+            "method": "POST",
+            "endpoint": "/api/scan"
+          },
+          {
+            "method": "GET",
+            "endpoint": "/api/scan/stream"
+          }
+        ],
+        "undeclaredEndpointCount": 5
+      }
+    },
+    "importGapInstalls": {
+      "totalPackages": 3,
+      "scopes": [
+        {
+          "scope": "backend",
+          "packages": [
+            "openai",
+            "bullmq"
+          ],
+          "exitCode": 0
+        },
+        {
+          "scope": "frontend",
+          "packages": [
+            "lucide-react"
+          ],
+          "exitCode": 0
+        }
+      ]
+    },
+    "contractCompleteness": {
+      "postGenerate": {
+        "when": "post-generate",
+        "inferredRelationshipCount": 7,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      },
+      "preflight": {
+        "when": "preflight",
+        "inferredRelationshipCount": 7,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      },
+      "final": {
+        "when": "final",
+        "inferredRelationshipCount": 7,
+        "missingScopedEndpoints": [],
+        "hardFail": false
+      }
+    }
+  },
+  "defectCategories": [
+    {
+      "key": "dependency-sync",
+      "label": "Dependency sync",
+      "state": "warn",
+      "evidence": [
+        "Auto-installed 3 missing package(s) during preflight across 2 scope(s)."
+      ]
+    },
+    {
+      "key": "directory-dedup",
+      "label": "Directory / implementation dedup",
+      "state": "pass",
+      "evidence": [
+        "Convention auto-fix rewrote 17 file(s) across 2 invocation(s)."
+      ]
+    },
+    {
+      "key": "env-alignment",
+      "label": "Env variable alignment",
+      "state": "pass",
+      "evidence": [
+        "No env alignment signal — generator injected DATABASE_URL defaults and no gate flagged env drift."
+      ]
+    },
+    {
+      "key": "contract-consistency",
+      "label": "API contract consistency",
+      "state": "fail",
+      "evidence": [
+        "Preflight: 4 unregistered module(s), 4 missing contract endpoint(s), 0 dangling registration import(s).",
+        "Final gate: 4 unregistered, 4 missing contract, 0 dangling (HARD FAIL)."
+      ]
+    },
+    {
+      "key": "contract-completeness",
+      "label": "API contract completeness (ORM-derived)",
+      "state": "pass",
+      "evidence": [
+        "Post-generate: 7 ORM relationship(s), 0 scoped endpoint(s) missing.",
+        "Preflight: 7 relationship(s), 0 missing.",
+        "Final gate: 0 missing."
+      ]
+    },
+    {
+      "key": "build-verification",
+      "label": "Build & runtime verification",
+      "state": "fail",
+      "evidence": [
+        "15 TS error line(s) in integration output.",
+        "Build command reported failure during integration."
+      ]
+    }
+  ],
+  "finalAudit": {
+    "passed": true,
+    "entries": [
+      {
+        "id": "AC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 3 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:575 (AC-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:39 (AC-01)",
+          "frontend/tests/e2e/generated/e2e-001-landing-page-auth-entry-and-privy-provid.spec.ts:5 (AC-01)"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 3 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-008",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:576 (AC-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:91 (AC-02)",
+          "frontend/tests/e2e/generated/e2e-001-landing-page-auth-entry-and-privy-provid.spec.ts:5 (AC-02)"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 3 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:577 (AC-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:299 (AC-03)",
+          "frontend/tests/e2e/generated/e2e-001-landing-page-auth-entry-and-privy-provid.spec.ts:5 (AC-03)"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-003",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:578 (AC-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:39 (AC-04)"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 3 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-008",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:579 (AC-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:39 (AC-05)",
+          "frontend/tests/e2e/generated/e2e-002-interests-onboarding-enforces-minimum-se.spec.ts:4 (AC-05)"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:580 (AC-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:241 (AC-06)",
+          "frontend/test-results/generated-e2e-003-style-as-dfeed-t-wording-and-disabled-NEXT-chromium/error-context.md:75 (AC-06)",
+          "frontend/tests/e2e/generated/e2e-003-style-assessment-submits-6-answers-and-r.spec.ts:4 (AC-06)"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:581 (AC-07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:353 (AC-07)",
+          "frontend/test-results/generated-e2e-003-style-as-a190c-ministic-style-tag-returned-chromium/error-context.md:92 (AC-07)",
+          "frontend/test-results/generated-e2e-003-style-as-dfeed-t-wording-and-disabled-NEXT-chromium/error-context.md:75 (AC-07)",
+          "frontend/tests/e2e/generated/e2e-003-style-assessment-submits-6-answers-and-r.spec.ts:4 (AC-07)"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-008",
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:582 (AC-08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:39 (AC-08)",
+          "frontend/test-results/generated-e2e-003-style-as-a190c-ministic-style-tag-returned-chromium/error-context.md:196 (AC-08)",
+          "frontend/test-results/generated-e2e-003-style-as-ce3f4-TER-TERMINAL-routes-to-feed-chromium/error-context.md:108 (AC-08)",
+          "frontend/test-results/generated-e2e-003-style-as-dfeed-t-wording-and-disabled-NEXT-chromium/error-context.md:75 (AC-08)"
+        ]
+      },
+      {
+        "id": "AC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:583 (AC-09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:241 (AC-09)",
+          "frontend/test-results/generated-e2e-003-style-as-ce3f4-TER-TERMINAL-routes-to-feed-chromium/error-context.md:187 (AC-09)",
+          "frontend/test-results/generated-e2e-003-style-as-dfeed-t-wording-and-disabled-NEXT-chromium/error-context.md:75 (AC-09)",
+          "frontend/tests/e2e/generated/e2e-003-style-assessment-submits-6-answers-and-r.spec.ts:4 (AC-09)"
+        ]
+      },
+      {
+        "id": "AC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:584 (AC-10)",
+          "TASK_BREAKDOWN_ORIGINAL.md:353 (AC-10)"
+        ]
+      },
+      {
+        "id": "AC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-003",
+          "T-004",
+          "T-005",
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:589 (AC-11)",
+          "TASK_BREAKDOWN_ORIGINAL.md:39 (AC-11)"
+        ]
+      },
+      {
+        "id": "AC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:590 (AC-12)",
+          "TASK_BREAKDOWN_ORIGINAL.md:152 (AC-12)"
+        ]
+      },
+      {
+        "id": "AC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:591 (AC-13)",
+          "TASK_BREAKDOWN_ORIGINAL.md:385 (AC-13)"
+        ]
+      },
+      {
+        "id": "AC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:592 (AC-14)",
+          "TASK_BREAKDOWN_ORIGINAL.md:385 (AC-14)"
+        ]
+      },
+      {
+        "id": "AC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-007",
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:593 (AC-15)",
+          "TASK_BREAKDOWN_ORIGINAL.md:209 (AC-15)"
+        ]
+      },
+      {
+        "id": "AC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:594 (AC-16)",
+          "TASK_BREAKDOWN_ORIGINAL.md:385 (AC-16)"
+        ]
+      },
+      {
+        "id": "AC-17",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-007",
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:595 (AC-17)",
+          "TASK_BREAKDOWN_ORIGINAL.md:152 (AC-17)"
+        ]
+      },
+      {
+        "id": "AC-18",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:596 (AC-18)",
+          "TASK_BREAKDOWN_ORIGINAL.md:385 (AC-18)"
+        ]
+      },
+      {
+        "id": "AC-19",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:597 (AC-19)",
+          "TASK_BREAKDOWN_ORIGINAL.md:385 (AC-19)"
+        ]
+      },
+      {
+        "id": "AC-20",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-005",
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:598 (AC-20)",
+          "TASK_BREAKDOWN_ORIGINAL.md:122 (AC-20)"
+        ]
+      },
+      {
+        "id": "AC-21",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-006",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:603 (AC-21)",
+          "TASK_BREAKDOWN_ORIGINAL.md:91 (AC-21)"
+        ]
+      },
+      {
+        "id": "AC-22",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:604 (AC-22)",
+          "TASK_BREAKDOWN_ORIGINAL.md:179 (AC-22)"
+        ]
+      },
+      {
+        "id": "AC-23",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:605 (AC-23)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-23)"
+        ]
+      },
+      {
+        "id": "AC-24",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-016"
+        ],
+        "evidence": [
+          "PRD.md:606 (AC-24)",
+          "TASK_BREAKDOWN_ORIGINAL.md:455 (AC-24)"
+        ]
+      },
+      {
+        "id": "AC-25",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-005",
+          "T-006",
+          "T-007",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:607 (AC-25)",
+          "TASK_BREAKDOWN_ORIGINAL.md:122 (AC-25)"
+        ]
+      },
+      {
+        "id": "AC-26",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:608 (AC-26)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-26)"
+        ]
+      },
+      {
+        "id": "AC-27",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:609 (AC-27)",
+          "TASK_BREAKDOWN_ORIGINAL.md:179 (AC-27)"
+        ]
+      },
+      {
+        "id": "AC-28",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:610 (AC-28)",
+          "TASK_BREAKDOWN_ORIGINAL.md:179 (AC-28)"
+        ]
+      },
+      {
+        "id": "AC-29",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-007",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:611 (AC-29)",
+          "TASK_BREAKDOWN_ORIGINAL.md:179 (AC-29)"
+        ]
+      },
+      {
+        "id": "AC-30",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:612 (AC-30)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-30)"
+        ]
+      },
+      {
+        "id": "AC-31",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:613 (AC-31)",
+          "TASK_BREAKDOWN_ORIGINAL.md:179 (AC-31)"
+        ]
+      },
+      {
+        "id": "AC-32",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:614 (AC-32)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-32)"
+        ]
+      },
+      {
+        "id": "AC-33",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:615 (AC-33)",
+          "TASK_BREAKDOWN_ORIGINAL.md:122 (AC-33)"
+        ]
+      },
+      {
+        "id": "AC-34",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:616 (AC-34)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-34)"
+        ]
+      },
+      {
+        "id": "AC-35",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:617 (AC-35)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-35)"
+        ]
+      },
+      {
+        "id": "AC-36",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-007",
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:618 (AC-36)",
+          "TASK_BREAKDOWN_ORIGINAL.md:209 (AC-36)"
+        ]
+      },
+      {
+        "id": "AC-37",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:619 (AC-37)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-37)"
+        ]
+      },
+      {
+        "id": "AC-38",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-014"
+        ],
+        "evidence": [
+          "PRD.md:620 (AC-38)",
+          "TASK_BREAKDOWN_ORIGINAL.md:418 (AC-38)"
+        ]
+      },
+      {
+        "id": "AC-39",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:625 (AC-39)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-39)"
+        ]
+      },
+      {
+        "id": "AC-40",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:626 (AC-40)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-40)"
+        ]
+      },
+      {
+        "id": "AC-41",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:627 (AC-41)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-41)"
+        ]
+      },
+      {
+        "id": "AC-42",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 3 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:628 (AC-42)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-42)",
+          "backend/src/services/users.service.ts:47 (AC-42)"
+        ]
+      },
+      {
+        "id": "AC-43",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:629 (AC-43)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-43)"
+        ]
+      },
+      {
+        "id": "AC-44",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:630 (AC-44)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-44)"
+        ]
+      },
+      {
+        "id": "AC-45",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:631 (AC-45)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-45)"
+        ]
+      },
+      {
+        "id": "AC-46",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:632 (AC-46)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-46)"
+        ]
+      },
+      {
+        "id": "AC-47",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-011",
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:633 (AC-47)",
+          "TASK_BREAKDOWN_ORIGINAL.md:241 (AC-47)"
+        ]
+      },
+      {
+        "id": "AC-48",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:634 (AC-48)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-48)"
+        ]
+      },
+      {
+        "id": "AC-49",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-005",
+          "T-008",
+          "T-011",
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:635 (AC-49)",
+          "TASK_BREAKDOWN_ORIGINAL.md:39 (AC-49)"
+        ]
+      },
+      {
+        "id": "AC-50",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:636 (AC-50)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-50)"
+        ]
+      },
+      {
+        "id": "AC-51",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-015"
+        ],
+        "evidence": [
+          "PRD.md:637 (AC-51)",
+          "TASK_BREAKDOWN_ORIGINAL.md:450 (AC-51)"
+        ]
+      },
+      {
+        "id": "AC-52",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:642 (AC-52)",
+          "TASK_BREAKDOWN_ORIGINAL.md:273 (AC-52)"
+        ]
+      },
+      {
+        "id": "AC-53",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-009",
+          "T-010",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:643 (AC-53)",
+          "TASK_BREAKDOWN_ORIGINAL.md:273 (AC-53)"
+        ]
+      },
+      {
+        "id": "AC-54",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:644 (AC-54)",
+          "TASK_BREAKDOWN_ORIGINAL.md:273 (AC-54)"
+        ]
+      },
+      {
+        "id": "AC-55",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-017"
+        ],
+        "evidence": [
+          "PRD.md:645 (AC-55)",
+          "TASK_BREAKDOWN_ORIGINAL.md:478 (AC-55)",
+          "frontend/src/components/common/MarketDataDisclaimer.tsx:2 (AC-55)",
+          "frontend/src/views/FeedPage.tsx:18 (AC-55)",
+          "frontend/src/views/MarketsPage.tsx:220 (AC-55)"
+        ]
+      }
+    ],
+    "uncovered": [],
+    "hardUncovered": []
+  },
+  "suggestions": [
+    "Reduce context loss: improve section selection / budget allocation so critical PRD and implementation context is not truncated.",
+    "Tighten task-to-file planning: the worker should either write the planned files or immediately repair the missing file-plan deltas.",
+    "Improve final integration convergence: prioritize the highest-signal failing gate first and keep stagnation detection enabled to avoid read-only loops.",
+    "Improve end-to-end reliability: keep smoke/e2e scenarios aligned with PRD flows and feed deterministic failure context back into source repair.",
+    "Optimize model spend: reduce repeated high-cost iterations by improving preflight checks, duplicate-file cleanup, and stricter early gates."
+  ],
+  "codegenRetrofits": [
+    {
+      "id": "gate-cascade-skip",
+      "severity": "high",
+      "title": "Integration gate failure short-circuited runtime/E2E verification",
+      "evidence": [
+        "Integration verify: FAIL.",
+        "Runtime verify: SKIPPED.",
+        "E2E verify: PASS/FAIL (executed).",
+        "Skipped gates leave the report blind to whether the project actually starts and serves traffic."
+      ],
+      "recommendation": "Switch the orchestrator's gate policy from `graph_error` to `FAILED_BUT_CONTINUED`: integration FAIL records the failure but lets runtime + E2E + e2e-triage still run. Only runtime FAIL should block E2E (since the app can't serve traffic). Surface gates as PASS / FAIL / FAIL_CONTINUED / SKIPPED in the report.",
+      "planRef": "§7.3 (one gate FAIL ≠ pipeline halt)"
+    },
+    {
+      "id": "worker-context-truncation",
+      "severity": "medium",
+      "title": "PRD / implementation context was truncated for workers",
+      "evidence": [
+        "doc_truncated=23, truncation_detected=0, worker_context_trimmed=21."
+      ],
+      "recommendation": "Increase `WORKER_CONTEXT_BUDGET_CHARS` for large-window providers (DeepSeek V4 Pro 1M, Gemini 1M). Improve `doc-section-picker.ts` priority so contract-relevant sections + PRD user flows are never the ones dropped first. Consider per-role budgets (frontend gets API client + design spec; backend gets contract + ORM models).",
+      "planRef": null
+    },
+    {
+      "id": "task-plan-unfulfilled",
+      "severity": "medium",
+      "title": "Workers' file plans repeatedly diverged from the files they wrote",
+      "evidence": [
+        "task_plan_unfulfilled events: 10."
+      ],
+      "recommendation": "Tighten `task-file-plan-verifier`: after the worker emits its plan, gate the worker so it cannot complete until either every planned path was written OR an explicit `<plan-amendment>` block justifies the delta. This converts silent mismatches into a fast-fail loop instead of accumulating noise.",
+      "planRef": null
+    },
+    {
+      "id": "convention-baked-into-scaffold",
+      "severity": "low",
+      "title": "Workers wrote files using non-canonical paths; convention auto-fix had to rewrite them",
+      "evidence": [
+        "conventionAutofix: invocations=2, files rewritten=17, unfixable=0.",
+        "Sample notes: Renamed residual file \"frontend/src/context/AuthContext.tsx\" → canonical \"frontend/src/contexts/AuthContext.tsx\". |   ↳ rewrote import paths in 4 file(s) to track the rename. | Renamed residual directory \"backend/src/middlewares/\" → canonical \"backend/src/middleware/\"."
+      ],
+      "recommendation": "Promote the canonical paths the auto-fixer keeps writing back (e.g. `frontend/src/contexts/`, `backend/src/middleware/`) into `ROLE_PROMPTS` 'Project-specific conventions' as HARD RULES with explicit anti-patterns. Each canonical path that triggered ≥2 rewrites this session should become an example in the prompt.",
+      "planRef": "§4 (Worker prompt 'Project-specific conventions')"
+    },
+    {
+      "id": "missing-deps-auto-install",
+      "severity": "low",
+      "title": "Workers imported packages without declaring them in package.json",
+      "evidence": [
+        "Auto-installed 3 package(s) across 2 scope(s): backend:openai, backend:bullmq, frontend:lucide-react."
+      ],
+      "recommendation": "Either (a) add the well-known feature packages (the optional scaffold's `extraDeps`) so the dep is present from day one, or (b) inject a HARD RULE in worker prompts: 'before importing a package, ensure it appears in `package.json`; emit a separate `package.json` patch in the same response if missing'.",
+      "planRef": "§4.1 (Conditional scaffold extraDeps) + §4.10 (manifest)"
+    },
+    {
+      "id": "backend-route-registration-gap",
+      "severity": "medium",
+      "title": "Backend route registrars existed but weren't wired into the app router",
+      "evidence": [
+        "Unregistered modules: 4 (backend/src/api/modules/feed/feed.routes.ts: exports \"registerFeedRoutes\" but index.ts never calls it., backend/src/api/modules/markets/markets.routes.ts: exports \"registerMarketsRoutes\" but index.ts never calls it., backend/src/api/modules/stream/stream.routes.ts: exports \"registerStreamRoutes\" but index.ts never calls it.).",
+        "Dangling registration imports: 0 (—)."
+      ],
+      "recommendation": "Add to `ROLE_PROMPTS.backend` 'Project-specific conventions': **after** creating any `register<Domain>Routes()`, you MUST import + call it inside `apiRouter` (or the canonical aggregator) in the SAME response. Provide the exact aggregator file path in the Project Convention Card.",
+      "planRef": "§4.4 (Background jobs / route registration)"
+    },
+    {
+      "id": "repair-spend-imbalance",
+      "severity": "low",
+      "title": "Repair / verify stages cost as much (or more) than first-pass codegen",
+      "evidence": [
+        "worker_codegen cost=$0.1191.",
+        "integration_verify_fix=$0.0000, phase_verify_fix=$1.1779, worker_codefix=$0.3506.",
+        "Repair total / codegen ratio = 12.83."
+      ],
+      "recommendation": "Push fixes upstream: the cheapest dollar is the one not spent on repair. Strengthen preflight (route audit, contract completeness, dep audit) so issues fail fast at low cost; route the most common repair patterns (4-quadrant contract, missing routers) into deterministic codemods rather than LLM iteration.",
+      "planRef": "§3 (L4 Static Audit) + §7.1 + §7.2"
+    },
+    {
+      "id": "e2e-verify-failure",
+      "severity": "medium",
+      "title": "E2E verify still has failing scenarios",
+      "evidence": [
+        "E2E error blob (truncated): E2E has failures but none are deterministic — auto-repair skipped. |  | triage: 0 deterministic, 0 flaky, 0 infra (0 self-healed on retry)."
+      ],
+      "recommendation": "Pair e2e-triage output with the integration_verify_fix decision tree: deterministic failures should auto-dispatch a `worker_codefix` task scoped to the failing spec's surface area; flaky failures should be retried in isolation; infra-only failures should NOT count against the gate (already halved in scoring — keep that).",
+      "planRef": null
+    }
+  ]
+}

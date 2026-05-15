@@ -1,9 +1,25 @@
+export type VisionContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "auto" | "low" | "high" } };
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
   name?: string;
   tool_call_id?: string;
   tool_calls?: OpenRouterToolCall[];
+  /**
+   * DeepSeek V4 Pro thinking mode: the model returns this field in its response
+   * and requires it to be passed back verbatim in subsequent turns.
+   * Other providers ignore this field.
+   */
+  reasoning_content?: string;
+}
+
+/** A message whose content may be a mix of text and image parts (for vision models). */
+export interface VisionChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string | VisionContentPart[];
 }
 
 export interface OpenRouterToolFunction {
@@ -31,6 +47,18 @@ export interface OpenRouterImageConfig {
   image_size?: string;
 }
 
+export interface OpenRouterReasoningOptions {
+  enabled?: boolean;
+  effort?: "low" | "medium" | "high";
+  exclude?: boolean;
+  max_tokens?: number;
+}
+
+export interface OpenRouterThinkingOptions {
+  thinking_effort?: "low" | "medium" | "high";
+  verbosity?: "low" | "medium" | "high";
+}
+
 export interface OpenRouterOptions {
   model?: string;
   temperature?: number;
@@ -49,6 +77,17 @@ export interface OpenRouterOptions {
   response_format?:
     | { type: "json_object" }
     | { type: "json_schema"; json_schema: Record<string, unknown> };
+  /** Provider-specific reasoning config (e.g. OpenRouter reasoning-enabled models). */
+  reasoning?: OpenRouterReasoningOptions;
+  /** Provider-specific thinking config (e.g. GPT-5 gateway). */
+  thinking?: OpenRouterThinkingOptions | false;
+  /**
+   * Per-call request timeout in milliseconds.
+   * Overrides the global OPENROUTER_CHAT_TIMEOUT_MS env var.
+   * On timeout the call throws a ModelTimeoutError which chatCompletionWithFallback
+   * treats as a soft failure — it falls through to the next model in the chain.
+   */
+  timeoutMs?: number;
 }
 
 export interface OpenRouterUsage {

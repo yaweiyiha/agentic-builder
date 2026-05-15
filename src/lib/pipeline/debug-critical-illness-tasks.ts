@@ -288,7 +288,7 @@ export const DEBUG_CRITICAL_ILLNESS_KICKOFF_TASKS: KickoffWorkItem[] = [
     phase: "Infrastructure",
     title: "Environment template and local DB instructions",
     description:
-      ".env.example with DATABASE_URL, NEXTAUTH_SECRET or JWT_SECRET, and README section for prisma migrate and seed sample policy data.",
+      ".env with DATABASE_URL, NEXTAUTH_SECRET or JWT_SECRET, and README section for prisma migrate and seed sample policy data.",
     estimatedHours: 2,
     executionKind: "ai_autonomous",
     priority: "P1",

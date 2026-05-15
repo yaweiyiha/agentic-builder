@@ -1,0 +1,1871 @@
+{
+  "sessionId": "05231d7c-b20a-4b93-a052-abb96e447c80",
+  "startedAt": "2026-04-21T12:38:22.968Z",
+  "endedAt": "2026-04-21T13:21:19.776Z",
+  "status": "fail",
+  "terminalSummary": "Integration verify gate failed.\nIntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/views/DashboardPage.tsx(48,6): error TS2559: Type '{ children: Element; }' has no properties in common with type 'IntrinsicAttributes'.\nsrc/views/DashboardPage.tsx(58,38): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(63,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(66,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(69,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/ProjectDetailPage.tsx(321,34): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/TaskDetailPage.tsx(70,15): error TS2339: Property 'data' does not exist on type 'Task'.\nsrc/views/TaskDetailPage.tsx(88,24): error TS2339: Property 'data' does not exist on type 'ProjectListResponse'.\nsrc/views/TaskDetailPage.tsx(95,23): error TS2339: Property 'data' does not exist on type 'WorkspaceMembersResponse'.\nsrc/views/TaskDetailPage.tsx(141,67): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(60,15): error TS2339: Property 'data' does not exist on type 'TasksResponse'.\nsrc/views/TasksListPage.tsx(78,24): error TS2339: Property 'data' does not exist on type 'ProjectListResponse'.\nsrc/views/TasksListPage.tsx(85,23): error TS2339: Property 'data' does not exist on type 'WorkspaceMembersResponse'.\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m48\u001b[0m:\u001b[93m6\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2559: \u001b[0mType '{ children: Element; }' has no properties in common with type 'IntrinsicAttributes'.\n\n\u001b[7m48\u001b[0m     <MainLayout>\n\u001b[7m  \u001b[0m \u001b[91m     ~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m58\u001b[0m:\u001b[93m38\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\n\n\u001b[7m58\u001b[0m                 onClick={(): void => navigate(\"/tasks/new\")}\n\u001b[7m  \u001b[0m \u001b[91m                                     ~~~~~~~~~~~~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m63\u001b[0m:\u001b[93m44\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise\n\nFeature audit gate failed: 30 requirement id(s) still unresolved.\nIC-01, IC-02, IC-03, IC-04, IC-05, IC-06, IC-07, IC-08, IC-09, IC-10, IC-11, IC-12, IC-13, IC-14, IC-15, IC-16, IC-17, IC-18, IC-19, IC-20, IC-21, IC-22, IC-23, IC-24, IC-25, IC-26, IC-27, IC-28, IC-29, IC-30",
+  "fatalError": "Integration verify gate failed.\nIntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/views/DashboardPage.tsx(48,6): error TS2559: Type '{ children: Element; }' has no properties in common with type 'IntrinsicAttributes'.\nsrc/views/DashboardPage.tsx(58,38): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(63,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(66,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(69,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/ProjectDetailPage.tsx(321,34): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/TaskDetailPage.tsx(70,15): error TS2339: Property 'data' does not exist on type 'Task'.\nsrc/views/TaskDetailPage.tsx(88,24): error TS2339: Property 'data' does not exist on type 'ProjectListResponse'.\nsrc/views/TaskDetailPage.tsx(95,23): error TS2339: Property 'data' does not exist on type 'WorkspaceMembersResponse'.\nsrc/views/TaskDetailPage.tsx(141,67): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(60,15): error TS2339: Property 'data' does not exist on type 'TasksResponse'.\nsrc/views/TasksListPage.tsx(78,24): error TS2339: Property 'data' does not exist on type 'ProjectListResponse'.\nsrc/views/TasksListPage.tsx(85,23): error TS2339: Property 'data' does not exist on type 'WorkspaceMembersResponse'.\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m48\u001b[0m:\u001b[93m6\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2559: \u001b[0mType '{ children: Element; }' has no properties in common with type 'IntrinsicAttributes'.\n\n\u001b[7m48\u001b[0m     <MainLayout>\n\u001b[7m  \u001b[0m \u001b[91m     ~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m58\u001b[0m:\u001b[93m38\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\n\n\u001b[7m58\u001b[0m                 onClick={(): void => navigate(\"/tasks/new\")}\n\u001b[7m  \u001b[0m \u001b[91m                                     ~~~~~~~~~~~~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m63\u001b[0m:\u001b[93m44\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise\n\nFeature audit gate failed: 30 requirement id(s) still unresolved.\nIC-01, IC-02, IC-03, IC-04, IC-05, IC-06, IC-07, IC-08, IC-09, IC-10, IC-11, IC-12, IC-13, IC-14, IC-15, IC-16, IC-17, IC-18, IC-19, IC-20, IC-21, IC-22, IC-23, IC-24, IC-25, IC-26, IC-27, IC-28, IC-29, IC-30",
+  "score": {
+    "score": 19,
+    "grade": "F",
+    "reasons": [
+      "Run status is fail.",
+      "Integration verification still has blocking errors.",
+      "30 PRD requirement id(s) remain uncovered.",
+      "Context truncation happened 8 time(s).",
+      "Task plan/file-plan mismatches happened 9 time(s)."
+    ]
+  },
+  "gateErrors": {
+    "integrationErrors": "IntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/views/DashboardPage.tsx(48,6): error TS2559: Type '{ children: Element; }' has no properties in common with type 'IntrinsicAttributes'.\nsrc/views/DashboardPage.tsx(58,38): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(63,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(66,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/DashboardPage.tsx(69,44): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/ProjectDetailPage.tsx(321,34): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/TaskDetailPage.tsx(70,15): error TS2339: Property 'data' does not exist on type 'Task'.\nsrc/views/TaskDetailPage.tsx(88,24): error TS2339: Property 'data' does not exist on type 'ProjectListResponse'.\nsrc/views/TaskDetailPage.tsx(95,23): error TS2339: Property 'data' does not exist on type 'WorkspaceMembersResponse'.\nsrc/views/TaskDetailPage.tsx(141,67): error TS2322: Type 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(60,15): error TS2339: Property 'data' does not exist on type 'TasksResponse'.\nsrc/views/TasksListPage.tsx(78,24): error TS2339: Property 'data' does not exist on type 'ProjectListResponse'.\nsrc/views/TasksListPage.tsx(85,23): error TS2339: Property 'data' does not exist on type 'WorkspaceMembersResponse'.\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m48\u001b[0m:\u001b[93m6\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2559: \u001b[0mType '{ children: Element; }' has no properties in common with type 'IntrinsicAttributes'.\n\n\u001b[7m48\u001b[0m     <MainLayout>\n\u001b[7m  \u001b[0m \u001b[91m     ~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m58\u001b[0m:\u001b[93m38\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\n\n\u001b[7m58\u001b[0m                 onClick={(): void => navigate(\"/tasks/new\")}\n\u001b[7m  \u001b[0m \u001b[91m                                     ~~~~~~~~~~~~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m63\u001b[0m:\u001b[93m44\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\n\n\u001b[7m63\u001b[0m               <Button onClick={(): void => navigate(\"/tasks\")} className=\"rounded-[8px]\">\n\u001b[7m  \u001b[0m \u001b[91m                                           ~~~~~~~~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m66\u001b[0m:\u001b[93m44\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\n\n\u001b[7m66\u001b[0m               <Button onClick={(): void => navigate(\"/calendar\")} className=\"rounded-[8px]\">\n\u001b[7m  \u001b[0m \u001b[91m                                           ~~~~~~~~~~~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/views/DashboardPage.tsx\u001b[0m:\u001b[93m69\u001b[0m:\u001b[93m44\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'void | Promise<void>' is not assignable to type 'void'.\n  Type 'Promise<void>' is not assignable to type 'void'.\n\n\u001b[7m69\u001b[0m               <Button onClick={(): void => navigate(\"/reports\")} className=\"rounded-[8px]\">\n\u001b[7m  \u001b[0m \u001b[91m                                  ",
+    "runtimeVerifyErrors": "",
+    "e2eVerifyErrors": ""
+  },
+  "taskResults": [
+    {
+      "id": "T-001",
+      "title": "Setup database models and API contracts",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-PR01",
+        "FR-TA01",
+        "FR-TA02"
+      ],
+      "generatedFiles": [],
+      "status": "completed_with_warnings"
+    },
+    {
+      "id": "T-002",
+      "title": "Implement authentication and user management APIs",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU03",
+        "FR-AU04",
+        "FR-AU05",
+        "AC-01",
+        "AC-02"
+      ],
+      "generatedFiles": [],
+      "status": "completed_with_warnings"
+    },
+    {
+      "id": "T-003",
+      "title": "Implement project management APIs",
+      "coversRequirementIds": [
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "FR-PR05",
+        "FR-PR06",
+        "AC-04",
+        "AC-05"
+      ],
+      "generatedFiles": [
+        "backend/src/middleware/auth.ts",
+        "backend/src/validation/schemas.ts",
+        "backend/src/db.ts",
+        "backend/src/models/Project.ts",
+        "backend/src/models/ProjectMember.ts",
+        "backend/src/models/User.ts",
+        "backend/src/models/index.ts",
+        "backend/src/api/modules/projects/projects.service.ts",
+        "backend/src/api/modules/projects/projects.controller.ts",
+        "backend/src/api/modules/projects/projects.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-004",
+      "title": "Implement task management APIs",
+      "coversRequirementIds": [
+        "FR-TA01",
+        "FR-TA02",
+        "FR-TA03",
+        "FR-TA04",
+        "FR-TA05",
+        "FR-TA06",
+        "FR-TA07",
+        "FR-TA08",
+        "FR-TA09",
+        "FR-TA10",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/tasks/tasks.service.ts",
+        "backend/src/api/modules/tasks/tasks.controller.ts",
+        "backend/src/api/modules/tasks/tasks.routes.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-005",
+      "title": "Implement dashboard and admin APIs",
+      "coversRequirementIds": [
+        "FR-DA01",
+        "FR-DA02",
+        "FR-SE02",
+        "FR-SE03",
+        "AC-03",
+        "AC-15",
+        "AC-16"
+      ],
+      "generatedFiles": [
+        "backend/src/models/Task.ts",
+        "backend/src/models/WorkspaceMember.ts",
+        "backend/src/validation/schemas.ts",
+        "backend/src/api/modules/dashboard/dashboard.service.ts",
+        "backend/src/api/modules/dashboard/dashboard.controller.ts",
+        "backend/src/api/modules/dashboard/dashboard.routes.ts",
+        "backend/src/api/modules/admin/admin.service.ts",
+        "backend/src/api/modules/admin/admin.controller.ts",
+        "backend/src/api/modules/admin/admin.routes.ts",
+        "backend/src/models/index.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-006",
+      "title": "Create app shell and navigation layout",
+      "coversRequirementIds": [
+        "FR-AU03"
+      ],
+      "generatedFiles": [
+        "frontend/src/utils/auth.ts",
+        "frontend/src/contexts/AuthContext.tsx",
+        "frontend/src/hooks/useAuth.ts",
+        "frontend/src/components/Layout/TopNavigation.tsx",
+        "frontend/src/components/Layout/Sidebar.tsx",
+        "frontend/src/components/Layout/Footer.tsx",
+        "frontend/src/components/Layout/MainLayout.tsx",
+        "frontend/src/providers/AppProviders.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/App.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-007",
+      "title": "Implement authentication pages",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU04",
+        "AC-01",
+        "AC-02",
+        "AC-11"
+      ],
+      "generatedFiles": [
+        "frontend/src/types/api.ts",
+        "frontend/src/components/Auth/AuthForm.tsx",
+        "frontend/src/views/LoginPage.tsx",
+        "frontend/src/views/LandingPage.tsx",
+        "frontend/src/views/SignupPage.tsx",
+        "frontend/src/views/ForgotPasswordPage.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-008",
+      "title": "Implement dashboard page",
+      "coversRequirementIds": [
+        "FR-DA01",
+        "FR-DA02",
+        "FR-DA03",
+        "AC-03",
+        "AC-12"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/Dashboard/TaskSummaryCards.tsx",
+        "frontend/src/components/Dashboard/DueSoonList.tsx",
+        "frontend/src/views/DashboardPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-009",
+      "title": "Implement projects list and detail pages",
+      "coversRequirementIds": [
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "AC-04",
+        "AC-05",
+        "AC-12"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/Projects/ProjectCard.tsx",
+        "frontend/src/components/Projects/CreateEditProjectModal.tsx",
+        "frontend/src/views/ProjectsListPage.tsx",
+        "frontend/src/components/Projects/ProjectHeader.tsx",
+        "frontend/src/views/ProjectDetailPage.tsx",
+        "frontend/src/api/client.ts",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-010",
+      "title": "Implement tasks list and detail pages",
+      "coversRequirementIds": [
+        "FR-TA03",
+        "FR-TA04",
+        "FR-TA05",
+        "FR-TA06",
+        "FR-TA07",
+        "FR-TA08",
+        "FR-TA09",
+        "FR-TA10",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/Dashboard/DueSoonList.tsx",
+        "frontend/src/components/Projects/CreateEditProjectModal.tsx",
+        "frontend/src/router.tsx",
+        "frontend/src/types/api.ts",
+        "frontend/src/components/Tasks/FilterToolbar.tsx",
+        "frontend/src/components/Tasks/TaskHeader.tsx",
+        "frontend/src/components/Tasks/TaskTable.tsx",
+        "frontend/src/components/Tasks/CreateEditTaskModal.tsx",
+        "frontend/src/views/TasksListPage.tsx",
+        "frontend/src/views/TaskDetailPage.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-011",
+      "title": "Implement settings and admin pages",
+      "coversRequirementIds": [
+        "FR-SE01",
+        "FR-SE02",
+        "FR-SE03",
+        "AC-10",
+        "AC-16"
+      ],
+      "generatedFiles": [
+        "frontend/src/router.tsx",
+        "frontend/src/components/Common/ConfirmationDialog.tsx",
+        "frontend/src/views/SettingsPage.tsx",
+        "frontend/src/views/AdminMembersPage.tsx",
+        "frontend/src/components/Settings/ProfileForm.tsx",
+        "frontend/src/components/Settings/PasswordForm.tsx",
+        "frontend/src/components/Admin/MembersTable.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-001",
+      "title": "Set up Playwright E2E harness",
+      "coversRequirementIds": [],
+      "generatedFiles": [
+        "frontend/playwright.config.ts",
+        "frontend/tests/e2e/utils.ts",
+        "frontend/tests/e2e/fixtures.ts",
+        "frontend/package.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-002",
+      "title": "Implement PRD browser journeys",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "PAGE-001",
+        "PAGE-003",
+        "CMP-001",
+        "CMP-011",
+        "FR-AU02",
+        "FR-AU04",
+        "PAGE-002",
+        "PAGE-004",
+        "CMP-006",
+        "CMP-007",
+        "CMP-014",
+        "CMP-015",
+        "FR-DA01",
+        "FR-DA02",
+        "FR-DA03",
+        "PAGE-005",
+        "CMP-016",
+        "CMP-017",
+        "CMP-018",
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "PAGE-006",
+        "PAGE-007",
+        "PAGE-012",
+        "CMP-020",
+        "CMP-021",
+        "FR-PR04",
+        "FR-PR05",
+        "FR-PR06",
+        "CMP-022",
+        "CMP-023",
+        "FR-TA01",
+        "FR-TA02",
+        "FR-TA04",
+        "FR-TA05",
+        "FR-TA06",
+        "PAGE-009",
+        "PAGE-013",
+        "CMP-024",
+        "CMP-025",
+        "CMP-031",
+        "CMP-032",
+        "FR-TA03",
+        "FR-TA08",
+        "FR-TA09",
+        "FR-TA10",
+        "PAGE-008",
+        "CMP-026",
+        "CMP-027",
+        "CMP-028",
+        "FR-TA07",
+        "PAGE-014",
+        "CMP-033",
+        "CMP-034",
+        "FR-SE01",
+        "FR-AU05",
+        "FR-AU03",
+        "PAGE-010",
+        "CMP-035",
+        "CMP-036",
+        "FR-SE02",
+        "FR-SE03",
+        "PAGE-011",
+        "CMP-037",
+        "CMP-038",
+        "CMP-039"
+      ],
+      "generatedFiles": [
+        "frontend/tests/e2e/generated/e2e-001-landing-to-signup-creates-account-and-en.spec.ts",
+        "frontend/tests/e2e/generated/e2e-002-login-error-forgot-password-request-then.spec.ts",
+        "frontend/tests/e2e/generated/e2e-003-dashboard-shows-metrics-due-soon-links-a.spec.ts",
+        "frontend/tests/e2e/generated/e2e-004-create-project-from-projects-list-and-op.spec.ts",
+        "frontend/tests/e2e/generated/e2e-005-project-admin-edits-metadata-manages-mem.spec.ts",
+        "frontend/tests/e2e/generated/e2e-006-create-task-in-project-and-edit-task-det.spec.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-REPAIR-BACKEND",
+      "title": "Backfill uncovered features (backend): US-01, US-02, US-03, US-04 …+2",
+      "coversRequirementIds": [
+        "US-01",
+        "US-02",
+        "US-03",
+        "US-04",
+        "US-05",
+        "US-06"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/tasks/tasks.routes.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-REPAIR-FRONTEND",
+      "title": "Backfill uncovered features (frontend): IC-01, IC-02, IC-03, IC-04 …+26",
+      "coversRequirementIds": [
+        "IC-01",
+        "IC-02",
+        "IC-03",
+        "IC-04",
+        "IC-05",
+        "IC-06",
+        "IC-07",
+        "IC-08",
+        "IC-09",
+        "IC-10",
+        "IC-11",
+        "IC-12",
+        "IC-13",
+        "IC-14",
+        "IC-15",
+        "IC-16",
+        "IC-17",
+        "IC-18",
+        "IC-19",
+        "IC-20",
+        "IC-21",
+        "IC-22",
+        "IC-23",
+        "IC-24",
+        "IC-25",
+        "IC-26",
+        "IC-27",
+        "IC-28",
+        "IC-29",
+        "IC-30"
+      ],
+      "generatedFiles": [],
+      "status": "completed_with_warnings"
+    }
+  ],
+  "fileRegistryCount": 102,
+  "modelUsage": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 98,
+      "costUsd": 0,
+      "promptTokens": 1357161,
+      "completionTokens": 72199,
+      "totalTokens": 1429360,
+      "stages": [
+        "worker_codegen:Test Engineer",
+        "phase_verify_fix",
+        "worker_codegen:Frontend Dev",
+        "worker_codefix:Frontend Dev",
+        "integration_verify_fix"
+      ]
+    },
+    {
+      "model": "qwen/qwen3.6-plus-04-02",
+      "calls": 22,
+      "costUsd": 0,
+      "promptTokens": 374197,
+      "completionTokens": 82700,
+      "totalTokens": 456897,
+      "stages": [
+        "worker_codegen:Architect",
+        "generate_api_contracts",
+        "worker_codegen:Backend Dev",
+        "worker_codegen:Test Engineer",
+        "worker_codefix:Test Engineer",
+        "worker_codefix:Backend Dev",
+        "extract_real_contracts",
+        "worker_codegen:Frontend Dev",
+        "worker_codefix:Frontend Dev",
+        "worker_codegen:Audit Backfill (backend)",
+        "worker_codegen:Audit Backfill (frontend)"
+      ]
+    }
+  ],
+  "repairSummary": {
+    "totalEvents": 120,
+    "byStage": {
+      "coverage-gate": 9,
+      "architect-triage": 4,
+      "task": 55,
+      "worker-context": 8,
+      "worker-verify": 9,
+      "post-gen-audit": 23,
+      "integration-gate": 11,
+      "task-breakdown": 1
+    },
+    "byEvent": {
+      "repair_start": 3,
+      "repair_done": 3,
+      "repair_final_state": 3,
+      "task_forced_to_llm": 4,
+      "snapshot_cleaned": 55,
+      "doc_truncated": 8,
+      "task_plan_unfulfilled": 9,
+      "audit_start": 6,
+      "uncovered_detected": 5,
+      "repair_dispatch_start": 3,
+      "repair_dispatch_role_done": 5,
+      "repair_dispatch_done": 3,
+      "stagnation_warning": 11,
+      "audit_clean": 1,
+      "truncation_detected": 1
+    }
+  },
+  "finalAudit": {
+    "passed": false,
+    "entries": [
+      {
+        "id": "IC-01",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-02",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-03",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-04",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-05",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-06",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-07",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-08",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-09",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-10",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-11",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-12",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-13",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-14",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-15",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-16",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-17",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-18",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-19",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-20",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-21",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-22",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-23",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-24",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-25",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-26",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-27",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-28",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-29",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-30",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "AC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-007"
+        ],
+        "evidence": [
+          "PRD.md:626 (AC-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:74 (AC-01)"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-007"
+        ],
+        "evidence": [
+          "PRD.md:627 (AC-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:74 (AC-02)"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:628 (AC-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:164 (AC-03)"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:629 (AC-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:102 (AC-04)"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:630 (AC-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:102 (AC-05)"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:631 (AC-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (AC-06)"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:632 (AC-07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (AC-07)"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:633 (AC-08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (AC-08)"
+        ]
+      },
+      {
+        "id": "AC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:634 (AC-09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (AC-09)"
+        ]
+      },
+      {
+        "id": "AC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:635 (AC-10)",
+          "TASK_BREAKDOWN_ORIGINAL.md:342 (AC-10)"
+        ]
+      },
+      {
+        "id": "AC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-007"
+        ],
+        "evidence": [
+          "PRD.md:636 (AC-11)",
+          "TASK_BREAKDOWN_ORIGINAL.md:226 (AC-11)"
+        ]
+      },
+      {
+        "id": "AC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-009",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:637 (AC-12)",
+          "TASK_BREAKDOWN_ORIGINAL.md:252 (AC-12)"
+        ]
+      },
+      {
+        "id": "AC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:638 (AC-13)",
+          "TASK_BREAKDOWN_ORIGINAL.md:312 (AC-13)"
+        ]
+      },
+      {
+        "id": "AC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:639 (AC-14)",
+          "TASK_BREAKDOWN_ORIGINAL.md:312 (AC-14)"
+        ]
+      },
+      {
+        "id": "AC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:640 (AC-15)",
+          "TASK_BREAKDOWN_ORIGINAL.md:164 (AC-15)"
+        ]
+      },
+      {
+        "id": "AC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:641 (AC-16)",
+          "TASK_BREAKDOWN_ORIGINAL.md:164 (AC-16)"
+        ]
+      },
+      {
+        "id": "FR-AU01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:32 (FR-AU01)",
+          "PRD_E2E_SPEC.json:23 (FR-AU01)",
+          "PRD_E2E_SPEC.md:8 (FR-AU01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:41 (FR-AU01)",
+          "frontend/tests/e2e/generated/e2e-001-landing-to-signup-creates-account-and-en.spec.ts:3 (FR-AU01)"
+        ]
+      },
+      {
+        "id": "FR-AU02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:33 (FR-AU02)",
+          "PRD_E2E_SPEC.json:59 (FR-AU02)",
+          "PRD_E2E_SPEC.md:17 (FR-AU02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:41 (FR-AU02)",
+          "frontend/tests/e2e/generated/e2e-002-login-error-forgot-password-request-then.spec.ts:4 (FR-AU02)"
+        ]
+      },
+      {
+        "id": "FR-AU03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:34 (FR-AU03)",
+          "PRD_E2E_SPEC.json:360 (FR-AU03)",
+          "PRD_E2E_SPEC.md:86 (FR-AU03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:74 (FR-AU03)"
+        ]
+      },
+      {
+        "id": "FR-AU04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:35 (FR-AU04)",
+          "PRD_E2E_SPEC.json:60 (FR-AU04)",
+          "PRD_E2E_SPEC.md:17 (FR-AU04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:74 (FR-AU04)",
+          "frontend/tests/e2e/generated/e2e-002-login-error-forgot-password-request-then.spec.ts:4 (FR-AU04)"
+        ]
+      },
+      {
+        "id": "FR-AU05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:36 (FR-AU05)",
+          "PRD_E2E_SPEC.json:359 (FR-AU05)",
+          "PRD_E2E_SPEC.md:86 (FR-AU05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:74 (FR-AU05)"
+        ]
+      },
+      {
+        "id": "FR-DA01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-008",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:39 (FR-DA01)",
+          "PRD_E2E_SPEC.json:103 (FR-DA01)",
+          "PRD_E2E_SPEC.md:27 (FR-DA01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:164 (FR-DA01)",
+          "frontend/tests/e2e/generated/e2e-003-dashboard-shows-metrics-due-soon-links-a.spec.ts:4 (FR-DA01)"
+        ]
+      },
+      {
+        "id": "FR-DA02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-008",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:40 (FR-DA02)",
+          "PRD_E2E_SPEC.json:104 (FR-DA02)",
+          "PRD_E2E_SPEC.md:27 (FR-DA02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:164 (FR-DA02)",
+          "frontend/tests/e2e/generated/e2e-003-dashboard-shows-metrics-due-soon-links-a.spec.ts:4 (FR-DA02)"
+        ]
+      },
+      {
+        "id": "FR-DA03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:41 (FR-DA03)",
+          "PRD_E2E_SPEC.json:105 (FR-DA03)",
+          "PRD_E2E_SPEC.md:27 (FR-DA03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:252 (FR-DA03)",
+          "frontend/tests/e2e/generated/e2e-003-dashboard-shows-metrics-due-soon-links-a.spec.ts:4 (FR-DA03)"
+        ]
+      },
+      {
+        "id": "FR-PR01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-003",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:44 (FR-PR01)",
+          "PRD_E2E_SPEC.json:145 (FR-PR01)",
+          "PRD_E2E_SPEC.md:37 (FR-PR01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:41 (FR-PR01)",
+          "frontend/tests/e2e/generated/e2e-004-create-project-from-projects-list-and-op.spec.ts:4 (FR-PR01)"
+        ]
+      },
+      {
+        "id": "FR-PR02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:45 (FR-PR02)",
+          "PRD_E2E_SPEC.json:146 (FR-PR02)",
+          "PRD_E2E_SPEC.md:37 (FR-PR02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:102 (FR-PR02)",
+          "frontend/tests/e2e/generated/e2e-004-create-project-from-projects-list-and-op.spec.ts:4 (FR-PR02)"
+        ]
+      },
+      {
+        "id": "FR-PR03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:46 (FR-PR03)",
+          "PRD_E2E_SPEC.json:147 (FR-PR03)",
+          "PRD_E2E_SPEC.md:37 (FR-PR03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:102 (FR-PR03)",
+          "frontend/tests/e2e/generated/e2e-004-create-project-from-projects-list-and-op.spec.ts:4 (FR-PR03)"
+        ]
+      },
+      {
+        "id": "FR-PR04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:47 (FR-PR04)",
+          "PRD_E2E_SPEC.json:184 (FR-PR04)",
+          "PRD_E2E_SPEC.md:46 (FR-PR04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:102 (FR-PR04)",
+          "frontend/tests/e2e/generated/e2e-005-project-admin-edits-metadata-manages-mem.spec.ts:4 (FR-PR04)"
+        ]
+      },
+      {
+        "id": "FR-PR05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:48 (FR-PR05)",
+          "PRD_E2E_SPEC.json:185 (FR-PR05)",
+          "PRD_E2E_SPEC.md:46 (FR-PR05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:102 (FR-PR05)",
+          "frontend/tests/e2e/generated/e2e-005-project-admin-edits-metadata-manages-mem.spec.ts:4 (FR-PR05)"
+        ]
+      },
+      {
+        "id": "FR-PR06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:49 (FR-PR06)",
+          "PRD_E2E_SPEC.json:186 (FR-PR06)",
+          "PRD_E2E_SPEC.md:46 (FR-PR06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:102 (FR-PR06)",
+          "frontend/tests/e2e/generated/e2e-005-project-admin-edits-metadata-manages-mem.spec.ts:4 (FR-PR06)"
+        ]
+      },
+      {
+        "id": "FR-SE01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:64 (FR-SE01)",
+          "PRD_E2E_SPEC.json:358 (FR-SE01)",
+          "PRD_E2E_SPEC.md:86 (FR-SE01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:342 (FR-SE01)"
+        ]
+      },
+      {
+        "id": "FR-SE02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:65 (FR-SE02)",
+          "PRD_E2E_SPEC.json:400 (FR-SE02)",
+          "PRD_E2E_SPEC.md:96 (FR-SE02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:164 (FR-SE02)"
+        ]
+      },
+      {
+        "id": "FR-SE03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:66 (FR-SE03)",
+          "PRD_E2E_SPEC.json:401 (FR-SE03)",
+          "PRD_E2E_SPEC.md:96 (FR-SE03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:164 (FR-SE03)"
+        ]
+      },
+      {
+        "id": "FR-TA01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-004",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:52 (FR-TA01)",
+          "PRD_E2E_SPEC.json:226 (FR-TA01)",
+          "PRD_E2E_SPEC.md:56 (FR-TA01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:41 (FR-TA01)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-in-project-and-edit-task-det.spec.ts:4 (FR-TA01)"
+        ]
+      },
+      {
+        "id": "FR-TA02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-004",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:53 (FR-TA02)",
+          "PRD_E2E_SPEC.json:227 (FR-TA02)",
+          "PRD_E2E_SPEC.md:56 (FR-TA02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:41 (FR-TA02)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-in-project-and-edit-task-det.spec.ts:4 (FR-TA02)"
+        ]
+      },
+      {
+        "id": "FR-TA03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:54 (FR-TA03)",
+          "PRD_E2E_SPEC.json:274 (FR-TA03)",
+          "PRD_E2E_SPEC.md:66 (FR-TA03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA03)"
+        ]
+      },
+      {
+        "id": "FR-TA04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:55 (FR-TA04)",
+          "PRD_E2E_SPEC.json:228 (FR-TA04)",
+          "PRD_E2E_SPEC.md:56 (FR-TA04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA04)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-in-project-and-edit-task-det.spec.ts:4 (FR-TA04)"
+        ]
+      },
+      {
+        "id": "FR-TA05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:56 (FR-TA05)",
+          "PRD_E2E_SPEC.json:229 (FR-TA05)",
+          "PRD_E2E_SPEC.md:56 (FR-TA05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA05)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-in-project-and-edit-task-det.spec.ts:4 (FR-TA05)"
+        ]
+      },
+      {
+        "id": "FR-TA06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:57 (FR-TA06)",
+          "PRD_E2E_SPEC.json:230 (FR-TA06)",
+          "PRD_E2E_SPEC.md:56 (FR-TA06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA06)",
+          "frontend/tests/e2e/generated/e2e-006-create-task-in-project-and-edit-task-det.spec.ts:4 (FR-TA06)"
+        ]
+      },
+      {
+        "id": "FR-TA07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:58 (FR-TA07)",
+          "PRD_E2E_SPEC.json:318 (FR-TA07)",
+          "PRD_E2E_SPEC.md:76 (FR-TA07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA07)"
+        ]
+      },
+      {
+        "id": "FR-TA08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:59 (FR-TA08)",
+          "PRD_E2E_SPEC.json:275 (FR-TA08)",
+          "PRD_E2E_SPEC.md:66 (FR-TA08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA08)"
+        ]
+      },
+      {
+        "id": "FR-TA09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:60 (FR-TA09)",
+          "PRD_E2E_SPEC.json:276 (FR-TA09)",
+          "PRD_E2E_SPEC.md:66 (FR-TA09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA09)"
+        ]
+      },
+      {
+        "id": "FR-TA10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:61 (FR-TA10)",
+          "PRD_E2E_SPEC.json:277 (FR-TA10)",
+          "PRD_E2E_SPEC.md:66 (FR-TA10)",
+          "TASK_BREAKDOWN_ORIGINAL.md:133 (FR-TA10)"
+        ]
+      },
+      {
+        "id": "US-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:615 (US-01)"
+        ]
+      },
+      {
+        "id": "US-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:616 (US-02)"
+        ]
+      },
+      {
+        "id": "US-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:617 (US-03)"
+        ]
+      },
+      {
+        "id": "US-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:618 (US-04)"
+        ]
+      },
+      {
+        "id": "US-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:619 (US-05)"
+        ]
+      },
+      {
+        "id": "US-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:620 (US-06)"
+        ]
+      }
+    ],
+    "uncovered": [
+      {
+        "id": "IC-01",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-02",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-03",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-04",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-05",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-06",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-07",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-08",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-09",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-10",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-11",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-12",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-13",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-14",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-15",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-16",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-17",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-18",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-19",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-20",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-21",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-22",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-23",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-24",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-25",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-26",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-27",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-28",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-29",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "IC-30",
+        "verdict": "missing",
+        "layer": "l1",
+        "reason": "Tasks T-REPAIR-FRONTEND declared coverage but produced no files.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": []
+      }
+    ]
+  },
+  "suggestions": [
+    "Strengthen requirement coverage closure: improve task breakdown coverage and keep feature audit as a hard pass gate until uncovered ids reach zero.",
+    "Reduce context loss: improve section selection / budget allocation so critical PRD and implementation context is not truncated.",
+    "Tighten task-to-file planning: the worker should either write the planned files or immediately repair the missing file-plan deltas.",
+    "Improve final integration convergence: prioritize the highest-signal failing gate first and keep stagnation detection enabled to avoid read-only loops."
+  ]
+}

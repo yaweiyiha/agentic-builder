@@ -1,25 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useCodingStore, type IntegrationVerifyState } from "@/store/coding-store";
+import {
+  useCodingStore,
+  type IntegrationVerifyState,
+  type E2EVerifyState,
+  type PendingHumanDecision,
+} from "@/store/coding-store";
+import { usePipelineStore } from "@/store/pipeline-store";
 import Loading from "@/components/Loading";
+import {
+  CodingLogLine,
+  type CodingLogDisplayEntry,
+} from "@/components/CodingLogLine";
+import CodingTaskTopologyView from "@/components/CodingTaskTopologyView";
+import SessionReportDialog from "@/components/SessionReportDialog";
+import { isCompletedTask, resolveTaskRole } from "@/lib/coding-task-ui";
 import type {
-  AgentLogEntry,
   CodingAgentInstance,
   CodingAgentRole,
   CodingTask,
-  TaskSubStep,
 } from "@/lib/pipeline/types";
 
-const STATUS_DOT: Record<string, string> = {
-  working: "bg-emerald-500 animate-pulse",
-  completed: "bg-emerald-500",
-  failed: "bg-red-500",
-  idle: "bg-zinc-300",
-};
-
-const ROLE_ORDER: CodingAgentRole[] = ["architect", "backend", "frontend", "test"];
+/** Roles shown in task topology and agent progress. */
+const TASK_UI_ROLE_ORDER: CodingAgentRole[] = [
+  "architect",
+  "backend",
+  "frontend",
+  "test",
+];
 
 const ROLE_META: Record<
   CodingAgentRole,
@@ -91,20 +101,6 @@ const ROLE_META: Record<
   },
 };
 
-const PHASE_TO_ROLE: Record<string, CodingAgentRole> = {
-  Scaffolding: "architect",
-  "Data Layer": "architect",
-  Infrastructure: "architect",
-  "Auth & Gateway": "backend",
-  "Backend Services": "backend",
-  Integration: "backend",
-  Frontend: "frontend",
-  Testing: "test",
-};
-
-type ExpandedRole = CodingAgentRole | "none" | null;
-type DisplayLogEntry = AgentLogEntry & { agentLabel?: string };
-
 type AgentGroup = {
   role: CodingAgentRole;
   label: string;
@@ -114,6 +110,15 @@ type AgentGroup = {
   failedCount: number;
   aggregateStatus: CodingAgentInstance["status"];
 };
+
+function logScopeSelectValue(
+  selectedAgent: CodingAgentInstance | null,
+  selectedRole: CodingAgentRole | null,
+): string {
+  if (selectedAgent) return `agent:${selectedAgent.id}`;
+  if (selectedRole) return `role:${selectedRole}`;
+  return "all";
+}
 
 function ProgressBar({
   completed,
@@ -158,68 +163,69 @@ function ProgressBar({
   );
 }
 
-function SubStepList({ subSteps, taskStatus }: { subSteps: TaskSubStep[]; taskStatus: string }) {
-  return (
-    <div className="flex flex-col gap-1 py-1.5 pl-8 pr-3">
-      {subSteps.map((step, idx) => {
-        const isDone = taskStatus === "completed" || (taskStatus === "in_progress" && idx === 0);
-        const isCurrent = taskStatus === "in_progress" && idx === 0;
-
-        return (
-          <div key={step.step} className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-              {isDone && !isCurrent ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-emerald-500">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : isCurrent ? (
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              ) : (
-                <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className={`text-[11px] ${isDone ? "text-zinc-700" : "text-zinc-400"}`}>
-                {step.action}
-              </p>
-              {step.detail && (
-                <p className="text-[10px] text-zinc-400">{step.detail}</p>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function CodingAgentGraph() {
-  const { status, agents, tasks, selectedAgentId, totalCostUsd, error, selectAgent, reset, integrationVerify } =
-    useCodingStore();
+  const {
+    status,
+    agents,
+    tasks,
+    selectedAgentId,
+    totalCostUsd,
+    error,
+    selectAgent,
+    reset,
+    retryIntegrationVerify,
+    retryE2eVerify,
+    integrationVerify,
+    e2eVerify,
+    supervisorLogs,
+    pendingHumanDecision,
+    submitHumanDecision,
+  } = useCodingStore();
+  const codeOutputDir = usePipelineStore((s) => s.codeOutputDir);
+  const intentStep = usePipelineStore((s) => s.steps.intent);
+  const kickoffStep = usePipelineStore((s) => s.steps.kickoff);
 
-  const [selectedRole, setSelectedRole] = useState<CodingAgentRole | null>(null);
-  const [expandedRole, setExpandedRole] = useState<ExpandedRole>(null);
-  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<CodingAgentRole | null>(
+    null,
+  );
+  const [topologySelectedTaskId, setTopologySelectedTaskId] = useState<
+    string | null
+  >(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
-  const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) ?? null;
+  const selectedAgent =
+    agents.find((agent) => agent.id === selectedAgentId) ?? null;
 
   const agentById = useMemo(
     () => new Map(agents.map((agent) => [agent.id, agent] as const)),
     [agents],
   );
 
+  const visibleTasks = useMemo(() => tasks, [tasks]);
+
   const groups = useMemo<AgentGroup[]>(() => {
-    return ROLE_ORDER.map((role) => {
+    return TASK_UI_ROLE_ORDER.map((role) => {
       const roleAgents = agents.filter((agent) => agent.role === role);
       if (roleAgents.length === 0) return null;
 
-      const roleTasks = tasks.filter((task) => resolveTaskRole(task, agentById) === role);
-      const doneCount = roleTasks.filter((task) => isCompletedTask(task)).length;
-      const failedCount = roleTasks.filter((task) => task.codingStatus === "failed").length;
+      const roleTasks = visibleTasks.filter(
+        (task) => resolveTaskRole(task, agentById) === role,
+      );
+      const doneCount = roleTasks.filter((task) =>
+        isCompletedTask(task),
+      ).length;
+      const failedCount = roleTasks.filter(
+        (task) => task.codingStatus === "failed",
+      ).length;
       const hasWorking = roleAgents.some((agent) => agent.status === "working");
-      const hasFailed = roleAgents.some((agent) => agent.status === "failed") || failedCount > 0;
+      const hasFailed =
+        roleAgents.some((agent) => agent.status === "failed") ||
+        failedCount > 0;
       const allCompleted =
-        roleTasks.length > 0 && doneCount === roleTasks.length && !hasWorking && !hasFailed;
+        roleTasks.length > 0 &&
+        doneCount === roleTasks.length &&
+        !hasWorking &&
+        !hasFailed;
 
       return {
         role,
@@ -237,250 +243,133 @@ export default function CodingAgentGraph() {
               : "idle",
       } satisfies AgentGroup;
     }).filter((group): group is AgentGroup => group !== null);
-  }, [agentById, agents, tasks]);
+  }, [agentById, agents, visibleTasks]);
 
-  const defaultExpandedRole = groups.find((group) => group.agents.length > 1)?.role ?? null;
-  const effectiveExpandedRole =
-    expandedRole === "none"
-      ? null
-      : expandedRole ?? selectedAgent?.role ?? selectedRole ?? defaultExpandedRole;
+  useEffect(() => {
+    if (
+      topologySelectedTaskId &&
+      !visibleTasks.some((t) => t.id === topologySelectedTaskId)
+    ) {
+      setTopologySelectedTaskId(null);
+    }
+  }, [topologySelectedTaskId, visibleTasks]);
 
-  const visibleTasks = useMemo(() => {
+  const visibleLogs = useMemo<CodingLogDisplayEntry[]>(() => {
     if (selectedAgent) {
-      return tasks.filter((task) => task.assignedAgentId === selectedAgent.id);
+      return selectedAgent.logs.map((log) => ({
+        ...log,
+        agentLabel: selectedAgent.label,
+      }));
     }
     if (selectedRole) {
-      return tasks.filter((task) => resolveTaskRole(task, agentById) === selectedRole);
+      return agents
+        .filter((agent) => agent.role === selectedRole)
+        .flatMap((agent) =>
+          agent.logs.map((log) => ({ ...log, agentLabel: agent.label })),
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
     }
-    return tasks;
-  }, [agentById, selectedAgent, selectedRole, tasks]);
-
-  const visibleLogs = useMemo<DisplayLogEntry[]>(() => {
-    if (selectedAgent) return selectedAgent.logs;
-    if (!selectedRole) return [];
-
-    return agents
-      .filter((agent) => agent.role === selectedRole)
-      .flatMap((agent) => agent.logs.map((log) => ({ ...log, agentLabel: agent.label })))
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  }, [agents, selectedAgent, selectedRole]);
-
-  const selectedGroup = selectedRole ? groups.find((group) => group.role === selectedRole) ?? null : null;
-
-  const scopeLabel = selectedAgent
-    ? `${selectedAgent.label} — ${visibleTasks.length} tasks`
-    : selectedGroup
-      ? `${selectedGroup.label} — all workers · ${visibleTasks.length} tasks`
-      : `All agents · ${visibleTasks.length} tasks`;
+    // "All workers" view: merge agent logs + supervisor logs
+    const agentLogs = agents.flatMap((agent) =>
+      agent.logs.map((log) => ({ ...log, agentLabel: agent.label })),
+    );
+    const sysLogs: CodingLogDisplayEntry[] = supervisorLogs.map((log) => ({
+      ...log,
+      agentLabel: "Supervisor",
+    }));
+    return [...agentLogs, ...sysLogs].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
+  }, [agents, selectedAgent, selectedRole, supervisorLogs]);
 
   const logPanelLabel = selectedAgent
     ? selectedAgent.label
-    : selectedGroup
-      ? `${selectedGroup.label} · All workers`
-      : null;
+    : selectedRole
+      ? `${ROLE_META[selectedRole]?.label ?? selectedRole} · merged`
+      : `All workers · ${supervisorLogs.length > 0 ? `${supervisorLogs.length} supervisor events` : "no supervisor events yet"}`;
 
-  const completedTasks = tasks.filter((task) => isCompletedTask(task)).length;
-  const failedTasks = tasks.filter((task) => task.codingStatus === "failed").length;
-  const verifyingTasks = tasks.filter(
+  const logScopeValue = logScopeSelectValue(selectedAgent, selectedRole);
+
+  const onLogScopeChange = (value: string) => {
+    if (value === "all") {
+      selectAgent(null);
+      setSelectedRole(null);
+      return;
+    }
+    if (value.startsWith("role:")) {
+      selectAgent(null);
+      setSelectedRole(value.slice(5) as CodingAgentRole);
+      return;
+    }
+    if (value.startsWith("agent:")) {
+      const id = value.slice(6);
+      const agent = agents.find((a) => a.id === id);
+      selectAgent(id);
+      if (agent) setSelectedRole(agent.role);
+    }
+  };
+
+  const completedTasks = visibleTasks.filter((task) =>
+    isCompletedTask(task),
+  ).length;
+  const failedTasks = visibleTasks.filter(
+    (task) => task.codingStatus === "failed",
+  ).length;
+  const verifyingTasks = visibleTasks.filter(
     (task) =>
       task.codingStatus === "in_progress" && task.progressStage === "verifying",
   ).length;
-  const fixingTasks = tasks.filter(
+  const fixingTasks = visibleTasks.filter(
     (task) =>
       task.codingStatus === "in_progress" && task.progressStage === "fixing",
   ).length;
-  const totalTasks = tasks.length;
+  const totalTasks = visibleTasks.length;
+  const projectTier = (
+    intentStep?.metadata as { classification?: { tier?: string } } | undefined
+  )?.classification?.tier;
+  const retryRunId =
+    typeof kickoffStep?.metadata?.runId === "string"
+      ? kickoffStep.metadata.runId
+      : `integration-retry-${Date.now()}`;
 
   if (status === "idle") {
     return (
       <div className="flex h-full min-h-[300px] items-center justify-center">
-        <p className="text-sm text-zinc-400">Confirm the task breakdown to start multi-agent coding.</p>
+        <p className="text-sm text-zinc-400">
+          Confirm the task breakdown to start multi-agent coding.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full">
-      {/* ── Sidebar ── */}
-      <aside className="flex w-[260px] flex-shrink-0 flex-col gap-2.5 border-r border-zinc-200 p-3.5">
-        <p className="text-xs font-semibold text-zinc-500">Agents</p>
-
-        {groups.map((group) => {
-          const meta = ROLE_META[group.role];
-          const isRoleSelected = selectedRole === group.role && !selectedAgent;
-          const isExpanded = effectiveExpandedRole === group.role && group.agents.length > 1;
-          const groupStatusLabel = formatGroupStatus(group);
-
-          return (
-            <div key={group.role} className="rounded-xl border border-zinc-200 bg-white">
-              <div className="flex items-stretch overflow-hidden rounded-xl">
-                <div className={`w-1 ${meta.stripe}`} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    selectAgent(null);
-                    setSelectedRole((current) => (current === group.role && !selectedAgent ? null : group.role));
-                    if (group.agents.length > 1) setExpandedRole(group.role);
-                  }}
-                  className={`flex flex-1 items-center justify-between px-3 py-2.5 text-left transition-colors ${
-                    isRoleSelected
-                      ? `${meta.selectedBg} ring-1 ${meta.selectedRing}`
-                      : `${meta.tint} ${meta.hoverBg}`
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold text-zinc-900">{group.label}</p>
-                    <p
-                      className={`font-mono text-[10px] ${
-                        group.aggregateStatus === "completed"
-                          ? "text-emerald-600"
-                          : group.aggregateStatus === "working"
-                            ? "text-zinc-900"
-                            : group.aggregateStatus === "failed"
-                              ? "text-red-500"
-                              : meta.tintText
-                      }`}
-                    >
-                      {groupStatusLabel}
-                    </p>
-                  </div>
-                  <div className="ml-3 flex shrink-0 items-center gap-2">
-                    {group.agents.length > 1 && (
-                      <span className={`font-mono text-[10px] ${meta.tintText}`}>
-                        {group.agents.length} workers
-                      </span>
-                    )}
-                    {group.agents.length === 1 && (
-                      <span className="font-mono text-[10px] text-zinc-400">All tasks</span>
-                    )}
-                  </div>
-                </button>
-                {group.agents.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExpandedRole((current) => (current === group.role ? "none" : group.role));
-                    }}
-                    className={`flex w-9 items-center justify-center border-l border-zinc-200 ${meta.tint} ${meta.hoverBg}`}
-                    aria-label={`${isExpanded ? "Collapse" : "Expand"} ${group.label}`}
-                  >
-                    <motion.span
-                      animate={{ rotate: isExpanded ? 180 : 0 }}
-                      transition={{ duration: 0.16 }}
-                      className={`text-xs ${meta.tintText}`}
-                    >
-                      ▾
-                    </motion.span>
-                  </button>
-                )}
-              </div>
-
-              {/* Group progress bar */}
-              {group.tasks.length > 0 && (
-                <ProgressBar
-                  completed={group.doneCount}
-                  failed={group.failedCount}
-                  total={group.tasks.length}
-                  barColorClass={meta.barColor}
-                  className="px-3 pb-2"
-                />
-              )}
-
-              <AnimatePresence initial={false}>
-                {group.agents.length > 1 && isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <div className="flex flex-col gap-1 border-t border-zinc-200 bg-zinc-50 px-2 py-2">
-                      {group.agents.map((agent) => {
-                        const isAgentSelected = selectedAgent?.id === agent.id;
-                        const agentTasks = tasks.filter((task) => task.assignedAgentId === agent.id);
-                        const doneCount = agentTasks.filter(
-                          (task) => isCompletedTask(task),
-                        ).length;
-
-                        return (
-                          <button
-                            key={agent.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedRole(group.role);
-                              selectAgent(isAgentSelected ? null : agent.id);
-                              setExpandedRole(group.role);
-                            }}
-                            className={`flex items-center justify-between rounded-lg border px-2.5 py-2 text-left transition-colors ${
-                              isAgentSelected
-                                ? `${meta.subSelectedBg} ${meta.subSelectedBorder} ring-1 ${meta.selectedRing}`
-                                : `border-zinc-200 bg-white ${meta.subHoverBg}`
-                            }`}
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span
-                                className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[agent.status] ?? STATUS_DOT.idle}`}
-                              />
-                              <div className="min-w-0">
-                                <p className="truncate text-[11px] font-semibold text-zinc-900">
-                                  {agent.label}
-                                </p>
-                                <p className="font-mono text-[10px] text-zinc-500">
-                                  {formatWorkerStatus(agent, agentTasks.length, doneCount)}
-                                </p>
-                              </div>
-                            </div>
-                            <span
-                              className={`ml-2 shrink-0 text-[10px] font-medium ${
-                                isAgentSelected ? meta.tintText : "text-zinc-400"
-                              }`}
-                            >
-                              {isAgentSelected ? "Selected" : "Open"}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
-
+    <div className="flex h-full min-h-0 flex-col">
+      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-5">
+        {error && (
+          <div className="shrink-0 rounded-md border border-red-200 bg-red-50 p-2">
+            <p className="text-[10px] text-red-600">{error}</p>
+          </div>
+        )}
         {status === "running" && agents.length === 0 && (
-          <div className="flex items-center justify-center py-6">
+          <div className="flex shrink-0 justify-center py-4">
             <Loading size="sm" text="Allocating..." />
           </div>
         )}
 
-        {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-2">
-            <p className="text-[10px] text-red-600">{error}</p>
-          </div>
-        )}
-
-        <div className="mt-auto" />
-
-        {status === "completed" && (
-          <button
-            onClick={reset}
-            className="rounded-md border border-zinc-200 px-2 py-1.5 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
-          >
-            Reset
-          </button>
-        )}
-      </aside>
-
-      {/* ── Main panel ── */}
-      <main className="flex flex-1 flex-col gap-4 overflow-hidden p-5">
         {/* Header + overall progress */}
-        <div className="flex flex-col gap-2">
+        <div className="flex shrink-0 flex-col gap-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[15px] font-semibold text-zinc-900">Task Progress</p>
-              <p className="mt-0.5 text-[11px] text-zinc-400">{scopeLabel}</p>
+              <p className="text-[15px] font-semibold text-zinc-900">
+                Task Progress
+              </p>
+              <p className="mt-0.5 text-[11px] text-zinc-400">
+                All agents · {totalTasks} tasks
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 rounded-[10px] bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-600">
@@ -499,11 +388,30 @@ export default function CodingAgentGraph() {
                   {failedTasks} failed
                 </span>
               )}
-              <span className="font-mono text-[11px] text-emerald-600">${totalCostUsd.toFixed(4)}</span>
+              <span className="font-mono text-[11px] text-emerald-600">
+                ${totalCostUsd.toFixed(4)}
+              </span>
+              {(status === "completed" || status === "failed") && (
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(true)}
+                  className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-600 transition-colors hover:bg-indigo-100"
+                >
+                  View Report
+                </button>
+              )}
+              {status === "completed" && (
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-zinc-50"
+                >
+                  Reset
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Overall progress bar */}
           {totalTasks > 0 && (
             <ProgressBar
               completed={completedTasks}
@@ -514,307 +422,114 @@ export default function CodingAgentGraph() {
           )}
         </div>
 
-        {/* Task list */}
-        <div className="flex flex-col gap-1 overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-200 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
-          {visibleTasks.length === 0 ? (
-            <div className="flex min-h-[160px] items-center justify-center rounded-lg bg-zinc-50">
-              <p className="text-sm text-zinc-400">No tasks in this scope yet.</p>
-            </div>
-          ) : (
-            visibleTasks.map((task) => {
-              const isRunning = task.codingStatus === "in_progress";
-              const isDone = isCompletedTask(task);
-              const isWarning = task.codingStatus === "completed_with_warnings";
-              const isFailed = task.codingStatus === "failed";
-              const agent = task.assignedAgentId ? agentById.get(task.assignedAgentId) ?? null : null;
-              const role = resolveTaskRole(task, agentById);
-              const meta = ROLE_META[role];
-              const hasSubSteps = task.subSteps && task.subSteps.length > 0;
-              const isTaskExpanded = expandedTaskId === task.id;
-
-              const taskSubStepTotal = task.subSteps?.length ?? 0;
-              const taskSubStepDone = isDone
-                ? taskSubStepTotal
-                : isRunning
-                  ? 1
-                  : 0;
-
-              return (
-                <div key={task.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (hasSubSteps) {
-                        setExpandedTaskId(isTaskExpanded ? null : task.id);
-                      }
-                    }}
-                    className={`flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-left transition-colors ${
-                      isRunning
-                        ? "bg-white ring-1 ring-zinc-900"
-                        : "bg-zinc-50 hover:bg-zinc-100/70"
-                    }`}
-                  >
-                    {isWarning ? (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-amber-500">
-                        <path d="M12 9v4" />
-                        <path d="M12 17h.01" />
-                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                      </svg>
-                    ) : isDone ? (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="flex-shrink-0 text-emerald-500">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                        <polyline points="22 4 12 14.01 9 11.01" />
-                      </svg>
-                    ) : isRunning ? (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 animate-spin text-zinc-900">
-                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                      </svg>
-                    ) : isFailed ? (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-red-500">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="15" y1="9" x2="9" y2="15" />
-                        <line x1="9" y1="9" x2="15" y2="15" />
-                      </svg>
-                    ) : (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="flex-shrink-0 text-zinc-300">
-                        <circle cx="12" cy="12" r="10" />
-                      </svg>
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p
-                          className={`truncate text-xs font-medium ${
-                            isDone || isRunning ? "text-zinc-900" : "text-zinc-400"
-                          }`}
-                        >
-                          {task.title}
-                        </p>
-                        {hasSubSteps && (
-                          <motion.span
-                            animate={{ rotate: isTaskExpanded ? 180 : 0 }}
-                            transition={{ duration: 0.12 }}
-                            className="shrink-0 text-[10px] text-zinc-400"
-                          >
-                            ▾
-                          </motion.span>
-                        )}
-                      </div>
-                      <p
-                        className={`font-mono text-[10px] ${taskMetaColorClass(task)}`}
-                      >
-                        {formatTaskMeta(task, agent?.label ?? meta.label, hasSubSteps ? `${taskSubStepDone}/${taskSubStepTotal} steps` : undefined)}
-                      </p>
-                      {isCompletedTask(task) && (
-                        <p className="mt-0.5 font-mono text-[10px] text-zinc-500">
-                          {formatTaskArtifacts(task)}
-                        </p>
-                      )}
-
-                      {/* Per-task progress bar */}
-                      {(isRunning || isDone) && taskSubStepTotal > 0 && (
-                        <ProgressBar
-                          completed={taskSubStepDone}
-                          failed={0}
-                          total={taskSubStepTotal}
-                          barColorClass={meta.barColor}
-                          className="mt-1.5"
-                        />
-                      )}
-                    </div>
-
-                    <span
-                      className={`shrink-0 font-mono text-[10px] ${
-                        isWarning
-                          ? "text-amber-600"
-                          : isDone
-                          ? "text-emerald-600"
-                          : isRunning
-                            ? task.progressStage === "fixing"
-                              ? "font-semibold text-amber-700"
-                              : "font-semibold text-zinc-900"
-                            : isFailed
-                              ? "text-red-500"
-                              : "text-zinc-400"
-                      }`}
-                    >
-                      {formatTaskStatus(task)}
-                    </span>
-                  </button>
-
-                  {/* Sub-steps expandable */}
-                  <AnimatePresence initial={false}>
-                    {isTaskExpanded && hasSubSteps && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-                        className="overflow-hidden"
-                      >
-                        <SubStepList subSteps={task.subSteps!} taskStatus={task.codingStatus} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })
-          )}
+        {/* Topology graph */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <CodingTaskTopologyView
+            tasks={visibleTasks}
+            agents={agents}
+            agentById={agentById}
+            selectedTaskId={topologySelectedTaskId}
+            onSelectTask={setTopologySelectedTaskId}
+          />
         </div>
 
         {/* Final Verification */}
         {integrationVerify && (
-          <IntegrationVerifyCard verify={integrationVerify} />
+          <IntegrationVerifyCard
+            verify={integrationVerify}
+            retrying={
+              status === "running" && integrationVerify.status !== "failed"
+            }
+            onRetry={() =>
+              retryIntegrationVerify(retryRunId, codeOutputDir, projectTier)
+            }
+          />
         )}
 
-        {/* Log panel */}
-        <AnimatePresence mode="wait">
-          {logPanelLabel && (
-            <motion.div
-              key={logPanelLabel}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.12 }}
-              className="flex min-h-[220px] flex-1 flex-col gap-2 overflow-y-auto rounded-lg bg-zinc-50 p-3.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-200 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-zinc-500">Agent Log</p>
-                <p className="font-mono text-[11px] text-zinc-900">{logPanelLabel}</p>
-              </div>
-              <div className="h-px bg-zinc-200" />
+        {e2eVerify && (
+          <E2EVerifyCard
+            verify={e2eVerify}
+            retrying={status === "running" && e2eVerify.status !== "failed"}
+            onRetry={() => retryE2eVerify(retryRunId, codeOutputDir, projectTier)}
+          />
+        )}
+
+        {/* Agent log panel */}
+        {agents.length > 0 && (
+          <div className="flex shrink-0 flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                Agent logs
+              </label>
+              <select
+                value={logScopeValue}
+                onChange={(e) => onLogScopeChange(e.target.value)}
+                className="max-w-[min(100%,420px)] rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 font-mono text-[10px] text-zinc-800 shadow-sm outline-none focus:ring-1 focus:ring-zinc-300"
+              >
+                <option value="all">All workers (merged)</option>
+                {groups.map((g) => (
+                  <optgroup key={g.role} label={g.label}>
+                    <option value={`role:${g.role}`}>All in {g.label}</option>
+                    {g.agents.map((a) => (
+                      <option key={a.id} value={`agent:${a.id}`}>
+                        {a.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <span className="font-mono text-[11px] text-zinc-900">
+                {logPanelLabel}
+              </span>
+            </div>
+            <div className="max-h-[220px] overflow-y-auto rounded-lg bg-zinc-50 p-3.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-200 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
               {visibleLogs.length === 0 ? (
-                <p className="font-mono text-[11px] text-zinc-400">No activity yet.</p>
+                <p className="font-mono text-[11px] text-zinc-400">
+                  No activity yet.
+                </p>
               ) : (
-                visibleLogs.map((log, index) => <LogLine key={`${log.timestamp}-${index}`} entry={log} />)
+                <div className="flex flex-col gap-1.5">
+                  {visibleLogs.map((log, index) => (
+                    <CodingLogLine
+                      key={`${log.timestamp}-${index}`}
+                      entry={log}
+                    />
+                  ))}
+                </div>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+        )}
       </main>
+      <SessionReportDialog
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        outputDir={codeOutputDir}
+      />
+
+      {/* Human-in-the-loop decision overlay */}
+      <AnimatePresence>
+        {pendingHumanDecision && (
+          <HumanDecisionOverlay
+            decision={pendingHumanDecision}
+            onSubmit={submitHumanDecision}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function resolveTaskRole(
-  task: CodingTask,
-  agentById: Map<string, CodingAgentInstance>,
-): CodingAgentRole {
-  if (task.assignedAgentId) {
-    const assignedAgent = agentById.get(task.assignedAgentId);
-    if (assignedAgent) return assignedAgent.role;
-  }
-  if (PHASE_TO_ROLE[task.phase]) return PHASE_TO_ROLE[task.phase];
 
-  const lower = `${task.phase} ${task.title} ${task.description}`.toLowerCase();
-  if (/test|spec|e2e|vitest|playwright|k6|coverage/.test(lower)) return "test";
-  if (/scaffold|infra|docker|helm|ci\/cd|deploy|config|schema|migrat/.test(lower)) {
-    return "architect";
-  }
-  if (/frontend|react|component|page|ui|css|tailwind|hook|store|next/.test(lower)) {
-    return "frontend";
-  }
-  return "backend";
-}
-
-function formatGroupStatus(group: AgentGroup): string {
-  if (group.aggregateStatus === "working") return "Working...";
-  if (group.aggregateStatus === "failed") {
-    return group.failedCount > 0 ? `${group.failedCount} failed` : "Failed";
-  }
-  if (group.tasks.length === 0) return "Idle";
-  return `${group.doneCount}/${group.tasks.length} done`;
-}
-
-function formatWorkerStatus(
-  agent: CodingAgentInstance,
-  totalTasks: number,
-  doneCount: number,
-): string {
-  if (agent.status === "working") return "Working...";
-  if (agent.status === "failed") return "Failed";
-  if (totalTasks === 0) return "Idle";
-  return `${doneCount}/${totalTasks} done`;
-}
-
-function isCompletedTask(task: CodingTask): boolean {
-  return (
-    task.codingStatus === "completed" ||
-    task.codingStatus === "completed_with_warnings"
-  );
-}
-
-function countTaskTsFiles(task: CodingTask): number {
-  return (task.generatedFiles ?? []).filter((file) => /\.(ts|tsx)$/.test(file))
-    .length;
-}
-
-function formatTaskMeta(
-  task: CodingTask,
-  agentLabel: string,
-  subStepSummary?: string,
-): string {
-  if (task.codingStatus === "failed") {
-    return `${agentLabel} · ${task.error ?? "Error"}`;
-  }
-
-  if (task.codingStatus === "in_progress") {
-    const tsFileCount = countTaskTsFiles(task);
-    if (task.progressStage === "fixing") {
-      return `${agentLabel} · verify failed · attempt ${task.fixAttempts ?? 1}/3 · ${tsFileCount} TS files`;
-    }
-    if (task.progressStage === "verifying") {
-      return `${agentLabel} · verifying${tsFileCount > 0 ? ` · ${tsFileCount} TS files` : ""}`;
-    }
-    return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""} · Generating...`;
-  }
-
-  if (task.codingStatus === "completed_with_warnings") {
-    return `${agentLabel} · completed with warnings${task.fixAttempts ? ` · ${task.fixAttempts} fix attempt${task.fixAttempts === 1 ? "" : "s"}` : ""}`;
-  }
-
-  if (task.codingStatus === "completed") {
-    const tokenText = task.tokenUsage?.totalTokens
-      ? ` · ${task.tokenUsage.totalTokens.toLocaleString()} tokens`
-      : "";
-    const costText =
-      task.taskCostUsd !== undefined ? ` · $${task.taskCostUsd.toFixed(4)}` : "";
-    return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""}${task.generatedFiles ? ` · ${task.generatedFiles.length} files` : ""}${tokenText}${costText}`;
-  }
-
-  return `${agentLabel}${subStepSummary ? ` · ${subStepSummary}` : ""} · Queued`;
-}
-
-function formatTaskArtifacts(task: CodingTask): string {
-  const files = task.modifiedFiles ?? task.generatedFiles ?? [];
-  const tokens = task.tokenUsage?.totalTokens ?? 0;
-  const cost = task.taskCostUsd;
-  const filesText = files.length > 0 ? `${files.length} files` : "0 files";
-  const tokenText = tokens > 0 ? `${tokens.toLocaleString()} tokens` : "0 tokens";
-  const costText = cost !== undefined ? `$${cost.toFixed(4)}` : "$0.0000";
-  return `${filesText} · ${tokenText} · ${costText}`;
-}
-
-function formatTaskStatus(task: CodingTask): string {
-  if (task.codingStatus === "completed_with_warnings") return "Warning";
-  if (task.codingStatus === "completed") return "Done";
-  if (task.codingStatus === "failed") return "Failed";
-  if (task.progressStage === "fixing") return "Fixing";
-  if (task.progressStage === "verifying") return "Verifying";
-  if (task.codingStatus === "in_progress") return "Running";
-  return "Pending";
-}
-
-function taskMetaColorClass(task: CodingTask): string {
-  if (task.codingStatus === "failed") return "text-red-500";
-  if (task.codingStatus === "completed_with_warnings") return "text-amber-600";
-  if (task.progressStage === "fixing") return "text-amber-700";
-  if (task.progressStage === "verifying") return "text-zinc-500";
-  if (task.codingStatus === "in_progress") return "text-zinc-500";
-  return "text-zinc-400";
-}
-
-function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
+function IntegrationVerifyCard({
+  verify,
+  retrying,
+  onRetry,
+}: {
+  verify: IntegrationVerifyState;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const statusConfig: Record<
@@ -823,7 +538,15 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
   > = {
     verifying: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin text-indigo-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="animate-spin text-indigo-500"
+        >
           <path d="M21 12a9 9 0 1 1-6.219-8.56" />
         </svg>
       ),
@@ -836,7 +559,15 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
     },
     fixing: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-amber-500"
+        >
           <path d="M12 9v4" />
           <path d="M12 17h.01" />
           <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -848,7 +579,15 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
     },
     passed: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="text-emerald-500"
+        >
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
@@ -862,7 +601,15 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
     },
     failed: {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-red-500"
+        >
           <circle cx="12" cy="12" r="10" />
           <line x1="15" y1="9" x2="9" y2="15" />
           <line x1="9" y1="9" x2="15" y2="15" />
@@ -905,6 +652,18 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
           </motion.span>
         )}
       </button>
+      {verify.status === "failed" && (
+        <div className="mt-2.5 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {retrying ? "Retrying..." : "Retry Final Verification"}
+          </button>
+        </div>
+      )}
       <AnimatePresence initial={false}>
         {expanded && verify.errors && (
           <motion.div
@@ -924,41 +683,292 @@ function IntegrationVerifyCard({ verify }: { verify: IntegrationVerifyState }) {
   );
 }
 
-function LogLine({ entry }: { entry: DisplayLogEntry }) {
-  const time = new Date(entry.timestamp).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-  const color =
-    entry.type === "task_error"
-      ? "text-red-500"
-      : entry.type === "task_fix"
-        ? "text-zinc-800"
-        : entry.type === "task_verify"
-          ? entry.message.includes("FAILED")
-            ? "text-red-600"
-            : entry.message.includes("passed")
-              ? "text-emerald-600"
-              : "text-zinc-500"
-          : entry.type === "task_complete"
-            ? "text-zinc-500"
-            : entry.type === "task_progress"
-              ? "text-zinc-500"
-              : "text-zinc-400";
+function E2EVerifyCard({
+  verify,
+  retrying,
+  onRetry,
+}: {
+  verify: E2EVerifyState;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusConfig: Record<
+    E2EVerifyState["status"],
+    { icon: React.ReactNode; label: string; bg: string; text: string }
+  > = {
+    verifying: {
+      icon: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="animate-spin text-purple-500"
+        >
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      ),
+      label: "Running E2E verification...",
+      bg: "border-purple-200 bg-purple-50/60",
+      text: "text-purple-800",
+    },
+    fixing: {
+      icon: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-amber-500"
+        >
+          <path d="M12 9v4" />
+          <path d="M12 17h.01" />
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        </svg>
+      ),
+      label: `${verify.errorCount ?? 0} issue(s) found — auto-fixing in E2E stage (attempt ${verify.fixAttempts}/${verify.maxFixAttempts})...`,
+      bg: "border-amber-200 bg-amber-50/60",
+      text: "text-amber-800",
+    },
+    passed: {
+      icon: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="text-emerald-500"
+        >
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      ),
+      label: `E2E passed${verify.fixAttempts > 0 ? ` after ${verify.fixAttempts} attempt${verify.fixAttempts === 1 ? "" : "s"}` : ""}`,
+      bg: "border-emerald-200 bg-emerald-50/60",
+      text: "text-emerald-800",
+    },
+    failed: {
+      icon: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-red-500"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+      ),
+      label: `E2E failed after ${verify.fixAttempts} attempt${verify.fixAttempts === 1 ? "" : "s"}`,
+      bg: "border-red-200 bg-red-50/60",
+      text: "text-red-800",
+    },
+  };
+
+  const cfg = statusConfig[verify.status];
 
   return (
-    <div className="space-y-1 rounded-md border border-zinc-200 bg-white px-2.5 py-2">
-      <p className="font-mono text-[11px]">
-        <span className="text-zinc-400">[{time}]</span>{" "}
-        {entry.agentLabel && <span className="text-zinc-500">[{entry.agentLabel}] </span>}
-        <span className={color}>{entry.message}</span>
-      </p>
-      {entry.details && (
-        <pre className="whitespace-pre-wrap break-words rounded bg-zinc-900 px-2 py-1.5 font-mono text-[10px] leading-5 text-zinc-200">
-          {entry.details}
-        </pre>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`rounded-xl border ${cfg.bg} px-4 py-3`}
+    >
+      <button
+        type="button"
+        onClick={() => verify.errors && setExpanded((v) => !v)}
+        className="flex w-full items-center gap-3 text-left"
+      >
+        {cfg.icon}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-zinc-900">
+            E2E Verification
+          </p>
+          <p className={`text-[11px] font-medium ${cfg.text}`}>{cfg.label}</p>
+        </div>
+        {verify.errors && (
+          <motion.span
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.12 }}
+            className="shrink-0 text-[10px] text-zinc-400"
+          >
+            ▾
+          </motion.span>
+        )}
+      </button>
+      {verify.status === "failed" && (
+        <div className="mt-2.5 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {retrying ? "Retrying..." : "Retry E2E Verification"}
+          </button>
+        </div>
       )}
-    </div>
+      <AnimatePresence initial={false}>
+        {expanded && verify.errors && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <pre className="mt-2.5 max-h-[200px] overflow-y-auto rounded-lg bg-zinc-900 p-3 font-mono text-[10px] leading-5 text-zinc-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
+              {verify.errors}
+            </pre>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ─── Human-in-the-loop decision overlay ───────────────────────────────────
+
+function HumanDecisionOverlay({
+  decision,
+  onSubmit,
+}: {
+  decision: PendingHumanDecision;
+  onSubmit: (decisionId: string) => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState(() =>
+    Math.max(0, Math.floor((new Date(decision.expiresAt).getTime() - Date.now()) / 1000)),
+  );
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const secs = Math.max(
+        0,
+        Math.floor((new Date(decision.expiresAt).getTime() - Date.now()) / 1000),
+      );
+      setRemaining(secs);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [decision.expiresAt]);
+
+  async function handlePick(id: string) {
+    setSubmitting(id);
+    await onSubmit(id);
+    setSubmitting(null);
+  }
+
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  const countdown = `${minutes}:${String(seconds).padStart(2, "0")}`;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 12 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-lg rounded-2xl border border-amber-500/30 bg-zinc-900 shadow-2xl"
+      >
+        <div className="flex items-start gap-3 border-b border-zinc-800 p-5">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-base text-amber-400">
+            ⚠
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-400">
+              Human decision needed
+            </p>
+            <h2 className="mt-0.5 text-sm font-semibold text-zinc-100">
+              Integration fix is stuck — please choose an action
+            </h2>
+          </div>
+          <span className="shrink-0 rounded-full bg-zinc-800 px-2.5 py-1 font-mono text-[11px] text-zinc-400">
+            {countdown}
+          </span>
+        </div>
+
+        <div className="border-b border-zinc-800 px-5 py-3">
+          <pre className="whitespace-pre-wrap font-mono text-[10px] leading-5 text-zinc-400">
+            {decision.context}
+          </pre>
+        </div>
+
+        <div className="flex flex-col gap-2 p-5">
+          {decision.options.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              disabled={submitting !== null}
+              onClick={() => handlePick(opt.id)}
+              className={[
+                "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all duration-150",
+                opt.id === "abort"
+                  ? "border-red-500/25 bg-red-950/30 hover:border-red-500/50 hover:bg-red-950/50"
+                  : "border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800",
+                submitting === opt.id ? "cursor-wait opacity-70" : "cursor-pointer",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <span
+                className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${opt.id === "abort" ? "bg-red-400" : "bg-sky-400"}`}
+              />
+              <div className="min-w-0">
+                <p
+                  className={`text-[12px] font-semibold ${opt.id === "abort" ? "text-red-300" : "text-zinc-100"}`}
+                >
+                  {opt.label}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-5 text-zinc-400">
+                  {opt.description}
+                </p>
+              </div>
+              {submitting === opt.id && (
+                <span className="ml-auto shrink-0">
+                  <svg
+                    className="h-4 w-4 animate-spin text-zinc-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      className="opacity-25"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      className="opacity-75"
+                    />
+                  </svg>
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,0 +1,55 @@
+{
+  "capturedAt": "2026-05-09T08:11:03.170Z",
+  "config": {
+    "intent": "openai/gpt-5.4",
+    "prd": "openai/gpt-5.4",
+    "prdInteractionImage": "alibaba/wan-2.6",
+    "prdSpecExtract": "openai/gpt-5.4",
+    "prdRefine": "openai/gpt-5.4",
+    "trd": "openai/gpt-5.4",
+    "sysdesign": "gpt-4o",
+    "implguide": "gpt-4o",
+    "design": "openai/gpt-5.4",
+    "pencil": "openai/gpt-5.4",
+    "pencilToolUse": "openai/gpt-5.4",
+    "mockup": "gpt-4o-mini",
+    "qa": "gpt-4o-mini",
+    "verify": "gpt-4o-mini",
+    "taskBreakdown": [
+      "claude-sonnet-4",
+      "openai/gpt-5.4"
+    ],
+    "taskBreakdownReview": [
+      "openai/gpt-5.4",
+      "claude-sonnet-4"
+    ],
+    "codeGen": [
+      "deepseek/deepseek-v4-pro",
+      "openai/gpt-5.3-codex",
+      "qwen/qwen3.6-plus",
+      "deepseek/deepseek-v3.2",
+      "moonshotai/kimi-k2.6",
+      "claude-sonnet"
+    ],
+    "codeFix": [
+      "openai/gpt-5.3-codex",
+      "claude-sonnet-4",
+      "qwen/qwen3.6-plus",
+      "claude-sonnet",
+      "deepseek/deepseek-v3.2"
+    ],
+    "phaseVerifyFix": [
+      "openai/gpt-5.3-codex",
+      "claude-sonnet-4",
+      "qwen/qwen3.6-plus",
+      "deepseek/deepseek-v3.2",
+      "gpt-4o"
+    ],
+    "e2eGen": [
+      "openai/gpt-5.3-codex",
+      "claude-sonnet-4",
+      "openai/gpt-5.4",
+      "openai/gpt-5.3-codex"
+    ]
+  }
+}

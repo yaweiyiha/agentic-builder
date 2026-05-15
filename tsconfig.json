@@ -33,10 +33,13 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next-b/types/**/*.ts",
+    ".next-b/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "electron"
+    "electron",
+    "generated-code"
   ]
 }

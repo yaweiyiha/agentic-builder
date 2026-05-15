@@ -1,0 +1,836 @@
+{
+  "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+  "startedAt": "2026-05-09T08:05:00.085Z",
+  "endedAt": "2026-05-09T08:11:03.039Z",
+  "status": "aborted",
+  "terminalSummary": "Client disconnected before the coding session completed.",
+  "fatalError": "Client disconnected before the coding session completed.",
+  "generatorGitSha": "1ca3d35",
+  "scaffoldFixAttempts": 0,
+  "integrationFixAttempts": 0,
+  "score": {
+    "score": 56,
+    "grade": "F",
+    "reasons": [
+      "Score formula: 100 − 30(aborted) − 10(tasks-unknown:14) − 2(trunc:1) − 2(plan-unfulfilled:1) = 56",
+      "Run status is aborted.",
+      "14 coding task(s) never produced a final status.",
+      "Context truncation happened 1 time(s).",
+      "Task plan/file-plan mismatches happened 1 time(s)."
+    ]
+  },
+  "gateErrors": {
+    "integrationErrors": "",
+    "runtimeVerifyErrors": "",
+    "e2eVerifyErrors": ""
+  },
+  "gateStates": {
+    "integrationVerify": "skipped",
+    "runtimeVerify": "skipped",
+    "e2eVerify": "skipped",
+    "featureAudit": "skipped"
+  },
+  "taskResults": [
+    {
+      "id": "T-001",
+      "title": "Setup database models and migrations for TaskFlow",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-TM01",
+        "FR-PR01",
+        "FR-CO01",
+        "AC-01",
+        "AC-05",
+        "AC-10",
+        "AC-12"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-002",
+      "title": "Create API contracts and frontend client",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-TM01",
+        "FR-TM02",
+        "FR-PR01",
+        "FR-CO01"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-003",
+      "title": "Implement authentication and user management APIs",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU03",
+        "FR-AU04",
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-004",
+      "title": "Implement task management APIs",
+      "coversRequirementIds": [
+        "FR-TM01",
+        "FR-TM02",
+        "FR-TM03",
+        "FR-TM04",
+        "FR-TM05",
+        "FR-TM06",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-005",
+      "title": "Implement project management and collaboration APIs",
+      "coversRequirementIds": [
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "FR-CO01",
+        "FR-CO02",
+        "FR-CO03",
+        "AC-10",
+        "AC-11",
+        "AC-12",
+        "AC-17",
+        "AC-18"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-006",
+      "title": "Create app shell and navigation layout",
+      "coversRequirementIds": [
+        "FR-DN02",
+        "AC-04"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-007",
+      "title": "Implement landing and authentication pages",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU03",
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-008",
+      "title": "Implement dashboard page with task summary",
+      "coversRequirementIds": [
+        "FR-DN01",
+        "FR-DN03",
+        "AC-04",
+        "AC-13"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-009",
+      "title": "Implement task management pages",
+      "coversRequirementIds": [
+        "FR-TM01",
+        "FR-TM02",
+        "FR-TM03",
+        "FR-TM04",
+        "FR-TM05",
+        "FR-TM06",
+        "FR-CO01",
+        "FR-CO02",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-14",
+        "AC-15",
+        "AC-16",
+        "AC-17"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-010",
+      "title": "Implement project management pages",
+      "coversRequirementIds": [
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "AC-10",
+        "AC-11",
+        "AC-18"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-011",
+      "title": "Implement settings and profile management page",
+      "coversRequirementIds": [
+        "FR-AU04",
+        "FR-SE01",
+        "FR-SE02",
+        "FR-SE03"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-012",
+      "title": "Configure CORS, environment variables, and API integration",
+      "coversRequirementIds": [
+        "FR-AU02",
+        "AC-02"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-E2E-001",
+      "title": "Set up Playwright E2E harness",
+      "coversRequirementIds": [],
+      "generatedFiles": [],
+      "status": "unknown"
+    },
+    {
+      "id": "T-E2E-002",
+      "title": "Implement PRD browser journeys",
+      "coversRequirementIds": [
+        "PAGE-001",
+        "CMP-001",
+        "CMP-002",
+        "CMP-003",
+        "CMP-004",
+        "CMP-005",
+        "FR-DN02",
+        "FR-AU01",
+        "FR-AU02",
+        "FR-DN01",
+        "PAGE-002",
+        "PAGE-005",
+        "CMP-007",
+        "CMP-008",
+        "CMP-009",
+        "CMP-010",
+        "CMP-022",
+        "FR-AU03",
+        "PAGE-003",
+        "PAGE-004",
+        "CMP-012",
+        "CMP-013",
+        "CMP-014",
+        "CMP-015",
+        "CMP-017",
+        "CMP-018",
+        "CMP-019",
+        "FR-DN03",
+        "FR-TM01",
+        "CMP-023",
+        "CMP-024",
+        "CMP-025",
+        "CMP-020",
+        "CMP-021",
+        "FR-TM03",
+        "FR-TM05",
+        "FR-TM06",
+        "PAGE-006",
+        "CMP-026",
+        "CMP-027",
+        "CMP-028",
+        "CMP-029",
+        "CMP-030",
+        "CMP-031",
+        "CMP-033",
+        "FR-TM02",
+        "FR-TM04",
+        "FR-CO01",
+        "FR-CO02",
+        "PAGE-007",
+        "CMP-035",
+        "CMP-036",
+        "CMP-037",
+        "CMP-038",
+        "CMP-039",
+        "FR-PR01",
+        "FR-PR02",
+        "PAGE-008",
+        "PAGE-009",
+        "CMP-041",
+        "CMP-042",
+        "CMP-040",
+        "FR-PR03",
+        "FR-PR04",
+        "FR-CO03",
+        "FR-AU04",
+        "FR-SE01",
+        "FR-SE02",
+        "FR-SE03",
+        "PAGE-010"
+      ],
+      "generatedFiles": [],
+      "status": "unknown"
+    }
+  ],
+  "fileRegistryCount": 0,
+  "llmUsageEvents": [
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 17099,
+      "completionTokens": 176,
+      "totalTokens": 17275,
+      "timestamp": "2026-05-09T08:05:07.010Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 17955,
+      "completionTokens": 88,
+      "totalTokens": 18043,
+      "timestamp": "2026-05-09T08:05:10.624Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 18341,
+      "completionTokens": 136,
+      "totalTokens": 18477,
+      "timestamp": "2026-05-09T08:05:15.696Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 21417,
+      "completionTokens": 164,
+      "totalTokens": 21581,
+      "timestamp": "2026-05-09T08:05:21.739Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 22447,
+      "completionTokens": 100,
+      "totalTokens": 22547,
+      "timestamp": "2026-05-09T08:05:25.847Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 25110,
+      "completionTokens": 944,
+      "totalTokens": 26054,
+      "timestamp": "2026-05-09T08:05:55.609Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 26683,
+      "completionTokens": 1290,
+      "totalTokens": 27973,
+      "timestamp": "2026-05-09T08:06:34.487Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 28251,
+      "completionTokens": 1162,
+      "totalTokens": 29413,
+      "timestamp": "2026-05-09T08:07:09.688Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 29671,
+      "completionTokens": 895,
+      "totalTokens": 30566,
+      "timestamp": "2026-05-09T08:07:32.645Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 30835,
+      "completionTokens": 1515,
+      "totalTokens": 32350,
+      "timestamp": "2026-05-09T08:08:17.459Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 32606,
+      "completionTokens": 1090,
+      "totalTokens": 33696,
+      "timestamp": "2026-05-09T08:08:50.177Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 33865,
+      "completionTokens": 965,
+      "totalTokens": 34830,
+      "timestamp": "2026-05-09T08:09:20.653Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 35071,
+      "completionTokens": 868,
+      "totalTokens": 35939,
+      "timestamp": "2026-05-09T08:09:47.952Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codegen",
+      "label": "Architect",
+      "model": "deepseek-v4-pro",
+      "costUsd": 0,
+      "promptTokens": 36206,
+      "completionTokens": 1784,
+      "totalTokens": 37990,
+      "timestamp": "2026-05-09T08:10:40.813Z"
+    },
+    {
+      "sessionId": "03c00a1d-0d78-4b82-8de1-6ed4cea6e926",
+      "stage": "worker_codefix",
+      "label": "Architect",
+      "model": "openai/gpt-5.3-codex-20260224",
+      "costUsd": 0.030590000000000003,
+      "promptTokens": 5048,
+      "completionTokens": 1554,
+      "totalTokens": 6602,
+      "timestamp": "2026-05-09T08:11:03.021Z"
+    }
+  ],
+  "modelUsage": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 1,
+      "costUsd": 0.030590000000000003,
+      "promptTokens": 5048,
+      "completionTokens": 1554,
+      "totalTokens": 6602,
+      "stages": [
+        "worker_codefix:Architect"
+      ]
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "calls": 14,
+      "costUsd": 0,
+      "promptTokens": 375557,
+      "completionTokens": 11177,
+      "totalTokens": 386734,
+      "stages": [
+        "worker_codegen:Architect"
+      ]
+    }
+  ],
+  "modelPerformance": [
+    {
+      "model": "deepseek-v4-pro",
+      "calls": 14,
+      "promptTokens": 375557,
+      "completionTokens": 11177,
+      "totalTokens": 386734,
+      "costUsd": 0,
+      "stages": [
+        "worker_codegen"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 1,
+      "promptTokens": 5048,
+      "completionTokens": 1554,
+      "totalTokens": 6602,
+      "costUsd": 0.030590000000000003,
+      "stages": [
+        "worker_codefix"
+      ],
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    }
+  ],
+  "stageUsage": [
+    {
+      "stage": "architect-triage",
+      "startAt": "2026-05-09T08:05:00.134Z",
+      "endAt": "2026-05-09T08:05:00.134Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-context",
+      "startAt": "2026-05-09T08:05:00.200Z",
+      "endAt": "2026-05-09T08:05:00.234Z",
+      "durationMs": 34,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 2,
+      "score": 94,
+      "grade": "A",
+      "reasons": [
+        "Context was truncated 1 time(s)."
+      ]
+    },
+    {
+      "stage": "worker_codegen",
+      "startAt": "2026-05-09T08:05:07.010Z",
+      "endAt": "2026-05-09T08:10:40.813Z",
+      "durationMs": 333803,
+      "llmCalls": 14,
+      "promptTokens": 375557,
+      "completionTokens": 11177,
+      "totalTokens": 386734,
+      "costUsd": 0,
+      "models": [
+        "deepseek-v4-pro"
+      ],
+      "labels": [
+        "Architect"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    },
+    {
+      "stage": "worker-verify",
+      "startAt": "2026-05-09T08:10:40.840Z",
+      "endAt": "2026-05-09T08:10:40.840Z",
+      "durationMs": 0,
+      "llmCalls": 0,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "costUsd": 0,
+      "models": [],
+      "labels": [],
+      "repairEvents": 1,
+      "score": 92,
+      "grade": "A",
+      "reasons": [
+        "Task/file plan mismatches happened 1 time(s)."
+      ]
+    },
+    {
+      "stage": "worker_codefix",
+      "startAt": "2026-05-09T08:11:03.021Z",
+      "endAt": "2026-05-09T08:11:03.021Z",
+      "durationMs": 0,
+      "llmCalls": 1,
+      "promptTokens": 5048,
+      "completionTokens": 1554,
+      "totalTokens": 6602,
+      "costUsd": 0.030590000000000003,
+      "models": [
+        "openai/gpt-5.3-codex-20260224"
+      ],
+      "labels": [
+        "Architect"
+      ],
+      "repairEvents": 0,
+      "score": 100,
+      "grade": "A",
+      "reasons": [
+        "No strong negative signal captured."
+      ]
+    }
+  ],
+  "repairSummary": {
+    "totalEvents": 4,
+    "byStage": {
+      "architect-triage": 1,
+      "worker-context": 2,
+      "worker-verify": 1
+    },
+    "byEvent": {
+      "task_forced_to_llm": 1,
+      "doc_truncated": 1,
+      "worker_context_trimmed": 1,
+      "task_plan_unfulfilled": 1
+    },
+    "entries": [
+      {
+        "stage": "architect-triage",
+        "event": "task_forced_to_llm",
+        "timestamp": "2026-05-09T08:05:00.134Z",
+        "details": {
+          "reason": "Task references 19 file(s) outside the scaffold's protected paths — real work must be generated.",
+          "title": "Setup database models and migrations for TaskFlow",
+          "phase": "Data Layer"
+        },
+        "taskId": "T-001"
+      },
+      {
+        "stage": "worker-context",
+        "event": "doc_truncated",
+        "timestamp": "2026-05-09T08:05:00.200Z",
+        "details": {
+          "label": "worker-codegen:Architect",
+          "keptSections": 37,
+          "droppedSections": 43,
+          "budgetChars": 30000,
+          "usedChars": 30031,
+          "alwaysKeptSections": 6,
+          "forceKeptSections": 9,
+          "overBudget": 0
+        }
+      },
+      {
+        "stage": "worker-context",
+        "event": "worker_context_trimmed",
+        "timestamp": "2026-05-09T08:05:00.234Z",
+        "details": {
+          "label": "worker-codegen:Architect",
+          "taskId": "T-001",
+          "taskTitle": "Setup database models and migrations for TaskFlow",
+          "originalChars": 47665,
+          "keptChars": 31397,
+          "budgetChars": 30000,
+          "requirementIds": [
+            "FR-AU01",
+            "FR-TM01",
+            "FR-PR01",
+            "FR-CO01",
+            "AC-01",
+            "AC-05",
+            "AC-10",
+            "AC-12"
+          ],
+          "keywordCount": 20,
+          "fileHintCount": 19,
+          "availableSectionCount": 80
+        }
+      },
+      {
+        "stage": "worker-verify",
+        "event": "task_plan_unfulfilled",
+        "timestamp": "2026-05-09T08:10:40.840Z",
+        "details": {
+          "missingCreates": [
+            "docker-compose.yml",
+            ".env"
+          ],
+          "unmodified": [
+            "backend/src/db.ts"
+          ],
+          "fixAttempts": 0
+        },
+        "taskId": "T-001"
+      }
+    ]
+  },
+  "runtimeReadiness": {
+    "present": true,
+    "clean": false,
+    "hasError": false,
+    "findingsTotal": 1,
+    "errorCount": 0,
+    "warnCount": 1,
+    "byRule": {
+      "bg-job-clear-stale-runs": 1
+    },
+    "topFindings": [
+      {
+        "ruleId": "bg-job-clear-stale-runs",
+        "severity": "warn",
+        "file": "backend/src/api/modules/spri/spri.routes.ts",
+        "line": 42
+      }
+    ],
+    "disabledRules": [
+      {
+        "ruleId": "external-id-vs-db-pk",
+        "reason": "no auth-* optional scaffold applied — no external user id to resolve."
+      },
+      {
+        "ruleId": "llm-client-abstraction",
+        "reason": "no LLM_* bundle declared on resource requirements — abstraction rule N/A."
+      }
+    ]
+  },
+  "preflightLedger": {
+    "conventionAutofix": {
+      "invocations": 0,
+      "totalFixedFiles": 0,
+      "totalUnfixable": 0,
+      "notes": [],
+      "unfixable": []
+    },
+    "routeAudit": {
+      "preflight": null,
+      "final": null
+    },
+    "importGapInstalls": {
+      "totalPackages": 0,
+      "scopes": []
+    },
+    "contractCompleteness": {
+      "postGenerate": null,
+      "preflight": null,
+      "final": null
+    }
+  },
+  "defectCategories": [
+    {
+      "key": "dependency-sync",
+      "label": "Dependency sync",
+      "state": "unknown",
+      "evidence": [
+        "No missing-import installs were needed."
+      ]
+    },
+    {
+      "key": "directory-dedup",
+      "label": "Directory / implementation dedup",
+      "state": "pass",
+      "evidence": [
+        "No convention violations needed to be auto-fixed."
+      ]
+    },
+    {
+      "key": "env-alignment",
+      "label": "Env variable alignment",
+      "state": "unknown",
+      "evidence": [
+        "No env alignment signal — generator injected DATABASE_URL defaults and no gate flagged env drift."
+      ]
+    },
+    {
+      "key": "contract-consistency",
+      "label": "API contract consistency",
+      "state": "unknown",
+      "evidence": [
+        "No route audit snapshots captured — either the project has no backend or integration verify did not run."
+      ]
+    },
+    {
+      "key": "contract-completeness",
+      "label": "API contract completeness (ORM-derived)",
+      "state": "unknown",
+      "evidence": [
+        "No ORM relationships detected (or no backend). Nothing to audit for scoped-list endpoints."
+      ]
+    },
+    {
+      "key": "build-verification",
+      "label": "Build & runtime verification",
+      "state": "unknown",
+      "evidence": [
+        "Integration and runtime gates produced no blocking output."
+      ]
+    }
+  ],
+  "finalAudit": null,
+  "suggestions": [
+    "Reduce context loss: improve section selection / budget allocation so critical PRD and implementation context is not truncated.",
+    "Tighten task-to-file planning: the worker should either write the planned files or immediately repair the missing file-plan deltas.",
+    "Optimize model spend: reduce repeated high-cost iterations by improving preflight checks, duplicate-file cleanup, and stricter early gates."
+  ],
+  "codegenRetrofits": [
+    {
+      "id": "worker-context-truncation",
+      "severity": "low",
+      "title": "PRD / implementation context was truncated for workers",
+      "evidence": [
+        "doc_truncated=1, truncation_detected=0, worker_context_trimmed=1."
+      ],
+      "recommendation": "Increase `WORKER_CONTEXT_BUDGET_CHARS` for large-window providers (DeepSeek V4 Pro 1M, Gemini 1M). Improve `doc-section-picker.ts` priority so contract-relevant sections + PRD user flows are never the ones dropped first. Consider per-role budgets (frontend gets API client + design spec; backend gets contract + ORM models).",
+      "planRef": null
+    }
+  ]
+}

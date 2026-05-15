@@ -1,46 +1,53 @@
 import { v4 as uuidv4 } from "uuid";
 import {
   chatCompletion,
-  estimateCost,
+  chatCompletionWithFallback,
+  streamChatCompletion,
   resolveModel,
-  type ChatMessage,
-  type ModelAlias,
-  type OpenRouterResponse,
+  estimateCost,
 } from "@/lib/openrouter";
-import {
-  createTrace,
-  logGeneration,
-  flushLangfuse,
-} from "@/lib/observability/langfuse";
+import type {
+  ChatMessage,
+  OpenRouterOptions,
+  OpenRouterResponse,
+  OpenRouterUsage,
+} from "@/lib/llm-types";
+import type { Evidence } from "@/lib/requirements/prd-spec-types";
+import { makeEvidence } from "@/lib/pipeline/gates/evidence-gate";
 
 export interface AgentConfig {
   name: string;
   role: string;
   systemPrompt: string;
-  defaultModel: ModelAlias | string;
+  defaultModel: string | readonly string[];
   temperature?: number;
   maxTokens?: number;
-  /**
-   * When set, `run()` uses this instead of OpenRouter `chatCompletion`.
-   * Used by `CodeGenAgent` to route to `CODEGEN_*` OpenAI-compatible endpoints.
-   */
+  thinking?: OpenRouterOptions["thinking"];
   customChatCompletion?: (
     messages: ChatMessage[],
-    options: { temperature: number; max_tokens: number },
+    opts: OpenRouterOptions,
   ) => Promise<OpenRouterResponse>;
+  /** When set, streamRun bypasses OpenRouter SSE and uses this implementation (e.g. Anthropic Messages API). */
+  customStreamRun?: (
+    messages: ChatMessage[],
+    opts: Omit<OpenRouterOptions, "stream">,
+    onChunk: (chunk: string, type: "thinking" | "content") => void,
+    ctx: { traceId: string },
+  ) => Promise<AgentResult>;
 }
 
 export interface AgentResult {
   content: string;
   model: string;
-  usage: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
   costUsd: number;
   durationMs: number;
-  traceId: string;
+  usage: OpenRouterUsage;
+  traceId?: string;
+  /** Optional evidence the agent self-attests to its own completion. The
+   *  evidence-gate will treat `llm-self-check` evidence as insufficient on
+   *  its own — pair it with at least one validator/command evidence
+   *  produced by the engine. */
+  evidence?: Evidence[];
 }
 
 export class BaseAgent {
@@ -50,95 +57,175 @@ export class BaseAgent {
     this.config = config;
   }
 
-  async run(
+  /**
+   * Build an Evidence record. Thin wrapper over `makeEvidence` exposed at
+   * the agent level so subclasses can call `this.produceEvidence(...)`
+   * instead of importing from the gates module directly.
+   */
+  protected produceEvidence(
+    partial: Omit<Evidence, "producedAt"> & { producedAt?: string },
+  ): Evidence {
+    return makeEvidence(partial);
+  }
+
+  protected buildMessages(
     userMessage: string,
-    context?: string,
-    pipelineStep?: string,
-    sessionId?: string
-  ): Promise<AgentResult> {
-    const traceId = uuidv4();
-    const model =
-      this.config.customChatCompletion && process.env.CODEGEN_API_KEY?.trim()
-        ? (process.env.CODEGEN_MODEL?.trim() || "claude-opus-4-6")
-        : resolveModel(this.config.defaultModel);
-
-    createTrace({
-      traceId,
-      sessionId,
-      agentName: this.config.name,
-      pipelineStep: pipelineStep ?? "standalone",
-      model,
-    });
-
+    additionalContext?: string,
+  ): ChatMessage[] {
     const messages: ChatMessage[] = [
       { role: "system", content: this.config.systemPrompt },
     ];
 
-    if (context) {
+    if (additionalContext?.trim()) {
       messages.push({
-        role: "system",
-        content: `## Additional Context\n${context}`,
+        role: "user",
+        content: `${additionalContext}\n\n${userMessage}`,
+      });
+    } else {
+      messages.push({ role: "user", content: userMessage });
+    }
+
+    return messages;
+  }
+
+  async run(
+    userMessage: string,
+    additionalContext?: string,
+    stepId?: string,
+    sessionId?: string,
+  ): Promise<AgentResult> {
+    const startTime = Date.now();
+    const traceId = `${stepId ?? "agent"}-${sessionId ?? uuidv4()}`;
+
+    const messages = this.buildMessages(userMessage, additionalContext);
+    const opts: OpenRouterOptions = {
+      temperature: this.config.temperature ?? 0.7,
+      max_tokens: this.config.maxTokens ?? 4096,
+      thinking: this.config.thinking,
+    };
+
+    let response: OpenRouterResponse;
+
+    if (this.config.customChatCompletion) {
+      const modelChain = Array.isArray(this.config.defaultModel)
+        ? (this.config.defaultModel as string[])
+        : [this.config.defaultModel as string];
+      response = await this.config.customChatCompletion(messages, {
+        ...opts,
+        model: modelChain[0],
+      });
+    } else if (Array.isArray(this.config.defaultModel)) {
+      const modelChain = (this.config.defaultModel as string[]).map(
+        resolveModel,
+      );
+      response = await chatCompletionWithFallback(messages, modelChain, opts);
+    } else {
+      const model = resolveModel(this.config.defaultModel as string);
+      response = await chatCompletion(messages, { ...opts, model });
+    }
+
+    const durationMs = Date.now() - startTime;
+    const content = response.choices[0]?.message?.content ?? "";
+    const model = response.model;
+    const usage: OpenRouterUsage = response.usage ?? {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    };
+    const costUsd = estimateCost(model, usage);
+
+    return { content, model, costUsd, durationMs, usage, traceId };
+  }
+
+  async streamRun(
+    userMessage: string,
+    onChunk: (chunk: string, type: "thinking" | "content") => void,
+    additionalContext?: string,
+    stepId?: string,
+    sessionId?: string,
+  ): Promise<AgentResult> {
+    const startTime = Date.now();
+    const traceId = `${stepId ?? "agent"}-${sessionId ?? uuidv4()}`;
+
+    const messages = this.buildMessages(userMessage, additionalContext);
+    const rawModel = Array.isArray(this.config.defaultModel)
+      ? (this.config.defaultModel as string[])[0]
+      : (this.config.defaultModel as string);
+
+    const streamOpts: Omit<OpenRouterOptions, "stream"> = {
+      model: rawModel,
+      temperature: this.config.temperature ?? 0.7,
+      max_tokens: this.config.maxTokens ?? 4096,
+      thinking: this.config.thinking,
+    };
+
+    if (this.config.customStreamRun) {
+      return this.config.customStreamRun(messages, streamOpts, onChunk, {
+        traceId,
       });
     }
 
-    messages.push({ role: "user", content: userMessage });
+    const model = resolveModel(rawModel);
 
-    const startTime = Date.now();
-    const temp = this.config.temperature ?? 0.7;
-    const maxTok = this.config.maxTokens ?? 4096;
-    const response: OpenRouterResponse = this.config.customChatCompletion
-      ? await this.config.customChatCompletion(messages, {
-          temperature: temp,
-          max_tokens: maxTok,
-        })
-      : await chatCompletion(messages, {
-          model: resolveModel(this.config.defaultModel),
-          temperature: temp,
-          max_tokens: maxTok,
-        });
-    const durationMs = Date.now() - startTime;
-
-    const content = response.choices[0]?.message?.content ?? "";
-    const usage = response.usage;
-    const modelUsed = response.model;
-    const costUsd = estimateCost(modelUsed, usage);
-
-    logGeneration({
-      traceId,
-      name: `${this.config.name}::${pipelineStep ?? "run"}`,
-      model: modelUsed,
-      input: messages,
-      output: content,
-      usage: {
-        promptTokens: usage.prompt_tokens,
-        completionTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens,
-      },
-      costUsd,
-      durationMs,
+    const stream = await streamChatCompletion(messages, {
+      ...streamOpts,
+      model,
     });
 
-    await flushLangfuse();
-
-    return {
-      content,
-      model: modelUsed,
-      usage: {
-        promptTokens: usage.prompt_tokens,
-        completionTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens,
-      },
-      costUsd,
-      durationMs,
-      traceId,
+    let fullContent = "";
+    let responseModel = model;
+    let usage: OpenRouterUsage = {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
     };
-  }
 
-  getName(): string {
-    return this.config.name;
-  }
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-  getRole(): string {
-    return this.config.role;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.model) responseModel = parsed.model;
+            if (parsed.usage) usage = parsed.usage;
+
+            const delta = parsed.choices?.[0]?.delta;
+            if (!delta) continue;
+
+            if (delta.reasoning_content) {
+              onChunk(delta.reasoning_content, "thinking");
+            }
+
+            if (delta.content) {
+              fullContent += delta.content;
+              onChunk(delta.content, "content");
+            }
+          } catch {
+            // skip malformed SSE lines
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const durationMs = Date.now() - startTime;
+    const costUsd = estimateCost(responseModel, usage);
+
+    return { content: fullContent, model: responseModel, costUsd, durationMs, usage, traceId };
   }
 }

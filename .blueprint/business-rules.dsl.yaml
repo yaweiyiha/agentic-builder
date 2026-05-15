@@ -1,0 +1,31 @@
+version: 1
+rules:
+  - id: SCORE-1
+    name: "Composite score mapping to risk level"
+    description: "Maps composite score into the four risk bands used by the dashboard and detail views."
+    type: decision-table
+    inputs:
+      - { name: compositeScore, type: number }
+    output: { name: riskLevel, type: string }
+    cases:
+      - when: { compositeScore: ">=0", compositeScore_max: 25 }
+        then: "Normal"
+      - when: { compositeScore: ">=26", compositeScore_max: 50 }
+        then: "Elevated"
+      - when: { compositeScore: ">=51", compositeScore_max: 75 }
+        then: "High Risk"
+      - when: { compositeScore: ">=76", compositeScore_max: 100 }
+        then: "Critical"
+  - id: SCORE-2
+    name: "Rapid mover detection"
+    description: "Flags a variable as rapid mover when its normalized score increases by at least 25 points versus the previous scoring cycle."
+    type: decision-table
+    inputs:
+      - { name: previousNormalizedScore, type: number }
+      - { name: currentNormalizedScore, type: number }
+    output: { name: isRapidMover, type: string }
+    cases:
+      - when: { previousNormalizedScore: "any", currentNormalizedScore: ">= previousNormalizedScore + 25" }
+        then: "true"
+      - when: { }
+        then: "false"

@@ -2,14 +2,22 @@ import {
   GPT5_MODEL_ID,
   gpt5ChatCompletion,
   gpt5StreamChatCompletion,
-} from "./gpt5";
+} from "./providers/gpt5";
+import {
+  chatCompletionsDeepSeekV4,
+  isDeepSeekV4Provider,
+  DEEPSEEK_V4_DEFAULT_BASE,
+  DEEPSEEK_V4_DEFAULT_MODEL,
+} from "./providers/deepseek-v4";
+import { streamChatCompletionsDeepSeekV4 } from "./providers/deepseek-v4-stream";
 import {
   isGeminiProvider,
   geminiChatCompletion,
   geminiStreamChatCompletion,
-} from "./gemini";
+} from "./providers/gemini";
 import type {
   ChatMessage,
+  VisionChatMessage,
   OpenRouterOptions,
   OpenRouterResponse,
   OpenRouterToolDefinition,
@@ -19,6 +27,8 @@ import type {
 
 export type {
   ChatMessage,
+  VisionContentPart,
+  VisionChatMessage,
   OpenRouterOptions,
   OpenRouterUsage,
   OpenRouterResponse,
@@ -27,8 +37,43 @@ export type {
 } from "./llm-types";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_CHAT_TIMEOUT_MS = Number(
+  process.env.OPENROUTER_CHAT_TIMEOUT_MS ?? "120000",
+);
+
+/**
+ * Thrown when our own AbortController fires due to per-call timeout.
+ * Distinct from user-initiated AbortError so chatCompletionWithFallback
+ * can fall through to the next model instead of re-throwing immediately.
+ */
+export class ModelTimeoutError extends Error {
+  constructor(model: string, timeoutMs: number) {
+    super(`Model ${model} timed out after ${timeoutMs}ms`);
+    this.name = "ModelTimeoutError";
+  }
+}
 
 const OPENROUTER_DEFAULT_MODEL = "openai/gpt-4o";
+
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on"
+  );
+}
+
+function shouldForceOpenRouter(): boolean {
+  const provider = process.env.LLM_PROVIDER?.trim().toLowerCase();
+  return (
+    provider === "openrouter" ||
+    isTruthyEnvFlag(process.env.USE_OPENROUTER) ||
+    isTruthyEnvFlag(process.env.FORCE_OPENROUTER)
+  );
+}
 
 function openRouterHeaders(apiKey: string): Record<string, string> {
   return {
@@ -63,6 +108,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> =
     [GPT5_MODEL_ID]: { input: 2.5, output: 10 },
     "openai/gpt-5.3-codex": { input: 1.75, output: 14 },
     "openai/gpt-5-mini": { input: 0.3, output: 1.2 },
+    "qwen/qwen3.6-plus": { input: 0.325, output: 1.95 },
     "anthropic/claude-sonnet-4": { input: 3, output: 15 },
     "anthropic/claude-opus-4": { input: 15, output: 75 },
     "openai/gpt-4o": { input: 2.5, output: 10 },
@@ -77,8 +123,20 @@ export function resolveModel(alias: ModelAlias | string): string {
   return (MODELS as Record<string, string>)[alias] ?? alias;
 }
 
+export function resolvePricedModelId(model: string): string {
+  if (MODEL_PRICING[model]) return model;
+  if (model.includes(":free")) return model;
+
+  const normalized = model
+    .replace(/-\d{8}$/, "")
+    .replace(/-\d{4}-\d{2}-\d{2}$/, "")
+    .replace(/-\d{2}-\d{2}$/, "");
+
+  return MODEL_PRICING[normalized] ? normalized : model;
+}
+
 export function estimateCost(model: string, usage: OpenRouterUsage): number {
-  const pricing = MODEL_PRICING[model];
+  const pricing = MODEL_PRICING[resolvePricedModelId(model)];
   if (!pricing) return 0;
   return (
     (usage.prompt_tokens / 1_000_000) * pricing.input +
@@ -92,7 +150,25 @@ export async function chatCompletion(
 ): Promise<OpenRouterResponse> {
   const requestedModel = options.model ?? OPENROUTER_DEFAULT_MODEL;
 
-  if (isGeminiProvider()) {
+  if (isDeepSeekV4Provider() && !shouldForceOpenRouter()) {
+    const dsModel =
+      process.env.DEEPSEEK_V4_MODEL?.trim() || DEEPSEEK_V4_DEFAULT_MODEL;
+    const dsBase =
+      process.env.DEEPSEEK_V4_BASE_URL?.trim() || DEEPSEEK_V4_DEFAULT_BASE;
+    console.log(
+      `[LLM] provider=deepseek-v4-direct  model=${dsModel}  base=${dsBase}  (requested=${requestedModel})`,
+    );
+    return chatCompletionsDeepSeekV4(messages, {
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.max_tokens ?? 4096,
+      tools: options.tools,
+      tool_choice: options.tool_choice,
+      response_format: options.response_format,
+      thinking: options.thinking,
+    });
+  }
+
+  if (isGeminiProvider() && !shouldForceOpenRouter()) {
     const geminiModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
     console.log(
       `[LLM] provider=gemini  model=${geminiModel}  (requested=${requestedModel})`,
@@ -105,6 +181,7 @@ export async function chatCompletion(
       temperature: options.temperature,
       max_tokens: options.max_tokens,
       response_format: options.response_format,
+      thinking: options.thinking,
     });
   }
   console.log(`[LLM] provider=openrouter  model=${requestedModel}`);
@@ -115,7 +192,9 @@ const FALLBACK_RETRY_DELAY_MS = 2_000;
 
 /**
  * Try an ordered list of models; on LLM-level failure (API error, timeout, empty response)
- * fall through to the next model. Non-LLM errors (e.g. AbortError) are re-thrown immediately.
+ * fall through to the next model.
+ * - ModelTimeoutError (our own per-call timeout) → treated as soft failure, falls to next model.
+ * - AbortError (external cancellation, e.g. user killed the request) → re-thrown immediately.
  */
 export async function chatCompletionWithFallback(
   messages: ChatMessage[],
@@ -130,14 +209,23 @@ export async function chatCompletionWithFallback(
       const resp = await chatCompletion(messages, { ...options, model });
 
       const content = resp.choices?.[0]?.message?.content ?? "";
-      if (!content.trim() && resp.choices?.[0]?.finish_reason !== "tool_calls") {
+      const finishReason = resp.choices?.[0]?.finish_reason;
+
+      if (!content.trim() && finishReason !== "tool_calls") {
         throw new Error(`Model ${model} returned empty content`);
+      }
+      // Output was cut off at token limit — treat as transient failure and try next model
+      if (finishReason === "length") {
+        throw new Error(
+          `Model ${model} hit max_tokens limit (output truncated)`,
+        );
       }
 
       return resp;
     } catch (err) {
       lastErr = err instanceof Error ? err : new Error(String(err));
 
+      // External cancellation (user/upstream abort) — stop immediately, do not try next model
       if (lastErr.name === "AbortError") throw lastErr;
 
       const isLast = i === modelChain.length - 1;
@@ -148,10 +236,15 @@ export async function chatCompletionWithFallback(
         throw lastErr;
       }
 
+      const reason =
+        lastErr.name === "ModelTimeoutError" ? "timeout" : "error";
       console.warn(
-        `[LLM Fallback] model=${model} failed (${lastErr.message.slice(0, 150)}), trying next: ${modelChain[i + 1]}`,
+        `[LLM Fallback] model=${model} ${reason} (${lastErr.message.slice(0, 150)}), trying next: ${modelChain[i + 1]}`,
       );
-      await new Promise((r) => setTimeout(r, FALLBACK_RETRY_DELAY_MS));
+      // Skip delay on timeout — the model already burned the wait time
+      if (lastErr.name !== "ModelTimeoutError") {
+        await new Promise((r) => setTimeout(r, FALLBACK_RETRY_DELAY_MS));
+      }
     }
   }
 
@@ -162,7 +255,25 @@ export async function streamChatCompletion(
   messages: ChatMessage[],
   options: Omit<OpenRouterOptions, "stream"> = {},
 ) {
-  if (isGeminiProvider()) {
+  if (isDeepSeekV4Provider() && !shouldForceOpenRouter()) {
+    const requestedModel = options.model ?? OPENROUTER_DEFAULT_MODEL;
+    const dsModel =
+      process.env.DEEPSEEK_V4_MODEL?.trim() || DEEPSEEK_V4_DEFAULT_MODEL;
+    const dsBase =
+      process.env.DEEPSEEK_V4_BASE_URL?.trim() || DEEPSEEK_V4_DEFAULT_BASE;
+    console.log(
+      `[LLM] provider=deepseek-v4-direct-stream  model=${dsModel}  base=${dsBase}  (requested=${requestedModel})`,
+    );
+    return streamChatCompletionsDeepSeekV4(messages, {
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.max_tokens ?? 4096,
+      tools: options.tools,
+      tool_choice: options.tool_choice,
+      response_format: options.response_format,
+      thinking: options.thinking,
+    });
+  }
+  if (isGeminiProvider() && !shouldForceOpenRouter()) {
     return geminiStreamChatCompletion(messages, options);
   }
   if (options.model === GPT5_MODEL_ID) {
@@ -193,24 +304,47 @@ export async function openRouterChatCompletion(
     modalities,
     image_config,
     response_format,
+    reasoning,
+    thinking,
+    timeoutMs: perCallTimeoutMs,
   } = options;
 
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: openRouterHeaders(apiKey),
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      max_tokens,
-      stream,
-      ...(tools?.length ? { tools } : {}),
-      ...(tool_choice ? { tool_choice } : {}),
-      ...(modalities?.length ? { modalities } : {}),
-      ...(image_config ? { image_config } : {}),
-      ...(response_format ? { response_format } : {}),
-    }),
-  });
+  const controller = new AbortController();
+  const globalTimeout =
+    Number.isFinite(OPENROUTER_CHAT_TIMEOUT_MS) && OPENROUTER_CHAT_TIMEOUT_MS > 0
+      ? OPENROUTER_CHAT_TIMEOUT_MS
+      : 120_000;
+  const timeoutMs = perCallTimeoutMs ?? globalTimeout;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: openRouterHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens,
+        stream,
+        ...(tools?.length ? { tools } : {}),
+        ...(tool_choice ? { tool_choice } : {}),
+        ...(modalities?.length ? { modalities } : {}),
+        ...(image_config ? { image_config } : {}),
+        ...(response_format ? { response_format } : {}),
+        ...(reasoning && reasoning.enabled !== false ? { reasoning } : {}),
+        ...(thinking ? { thinking } : {}),
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if ((error as { name?: string })?.name === "AbortError") {
+      throw new ModelTimeoutError(model, timeoutMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const raw = await response.text();
@@ -220,7 +354,13 @@ export async function openRouterChatCompletion(
     } catch {
       /* keep raw */
     }
-    throw new Error(`OpenRouter API error: ${response.status} - ${detail}`);
+    const creditHint =
+      response.status === 402
+        ? " If this mentions max_tokens vs credits: lower max_tokens in the caller (e.g. PENCIL_LIVE_COMPLETION_MAX_TOKENS for Pencil Live) or add credits at https://openrouter.ai/settings/credits"
+        : "";
+    throw new Error(
+      `OpenRouter API error: ${response.status} - ${detail}${creditHint}`,
+    );
   }
 
   const raw = await response.text();
@@ -231,6 +371,55 @@ export async function openRouterChatCompletion(
       `OpenRouter returned non-JSON response (${raw.length} chars): ${raw.slice(0, 300)}`,
     );
   }
+}
+
+/**
+ * Vision-aware completion — accepts messages with array content (text + image parts).
+ * Routes directly to OpenRouter; bypasses Gemini and GPT-5 gateways.
+ */
+export async function openRouterVisionChatCompletion(
+  messages: VisionChatMessage[],
+  options: OpenRouterOptions = {},
+): Promise<OpenRouterResponse> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
+  const {
+    model = OPENROUTER_DEFAULT_MODEL,
+    temperature = 0.7,
+    max_tokens = 4096,
+  } = options;
+  const controller = new AbortController();
+  const timeoutMs =
+    Number.isFinite(OPENROUTER_CHAT_TIMEOUT_MS) &&
+    OPENROUTER_CHAT_TIMEOUT_MS > 0
+      ? OPENROUTER_CHAT_TIMEOUT_MS
+      : 90_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: openRouterHeaders(apiKey),
+      body: JSON.stringify({ model, messages, temperature, max_tokens }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if ((error as { name?: string })?.name === "AbortError") {
+      throw new Error(
+        `OpenRouter vision request timeout after ${timeoutMs}ms (model=${model})`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(
+      `OpenRouter vision API error: ${response.status} - ${raw.slice(0, 300)}`,
+    );
+  }
+  return JSON.parse(await response.text()) as OpenRouterResponse;
 }
 
 export async function openRouterStreamChatCompletion(
@@ -255,6 +444,10 @@ export async function openRouterStreamChatCompletion(
       stream: true,
       ...(options.tools?.length ? { tools: options.tools } : {}),
       ...(options.tool_choice ? { tool_choice: options.tool_choice } : {}),
+      ...(options.reasoning && options.reasoning.enabled !== false
+        ? { reasoning: options.reasoning }
+        : {}),
+      ...(options.thinking ? { thinking: options.thinking } : {}),
     }),
   });
 

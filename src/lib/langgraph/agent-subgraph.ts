@@ -1,4 +1,5 @@
 import path from "path";
+import * as nodeFs from "fs/promises";
 import { StateGraph, START, END } from "@langchain/langgraph";
 import {
   WorkerStateAnnotation,
@@ -6,123 +7,440 @@ import {
   type GeneratedFile,
   type TaskResult,
 } from "./state";
-import { fsWrite, fsRead, shellExec, listFiles } from "./tools";
-import { estimateCost, type ChatMessage } from "@/lib/openrouter";
-import { invokeCodegenOrOpenRouter } from "@/lib/codegen-openai-compatible";
-import type { CodingAgentRole, CodingTask } from "@/lib/pipeline/types";
+import {
+  fsWrite,
+  fsRead,
+  shellExec,
+  listFiles,
+  detectPackageManager,
+  buildAddCommand,
+  isAutoInstallableNpmPackageName,
+} from "./tools";
+import {
+  estimateCost,
+  type ChatMessage,
+  chatCompletionWithFallback,
+} from "@/lib/openrouter";
+import { invokeCodegenOrOpenRouter } from "@/lib/providers/codegen";
+import { recallAndPrepareInject } from "@/lib/memory/recall-context";
+import { getInjectTokenBudgetForRole } from "@/lib/memory/recall-config";
+import { classifyFailureMode } from "@/lib/memory/distill/failure-mode";
+import { parseMemoryCites, recordMemoryCites } from "@/lib/memory/cite";
+import {
+  checkMigrationCoverage,
+  formatMigrationGapInstruction,
+} from "@/lib/pipeline/self-heal/migration-coverage";
+import { resolveModel } from "@/lib/openrouter";
+import { MODEL_CONFIG, resolveModelChain } from "@/lib/model-config";
+import type {
+  CodingAgentRole,
+  CodingTask,
+  TaskSubStep,
+} from "@/lib/pipeline/types";
+import type {
+  OpenRouterResponse,
+  OpenRouterToolDefinition,
+} from "@/lib/llm-types";
+import { ProgressTracker } from "@/lib/ralph";
+import {
+  snapshotModifiesFiles,
+  verifyTaskFilePlan,
+  formatUnfulfilledMessage,
+  TASK_FILE_PLAN_UNFULFILLED_REGEX,
+} from "./task-file-plan-verifier";
+import {
+  snapshotTask,
+  restoreTask,
+  discardTaskSnapshot,
+} from "./task-snapshot";
+import { pickPrdSpecEntriesForTask } from "./prd-spec-prompt";
+import { getRepairEmitter } from "@/lib/pipeline/self-heal";
+import { recordCodingSessionLlmUsage } from "@/lib/pipeline/coding-session-report";
+import { trimProjectContextForTask } from "./worker-context-trim";
 
-const MAX_OUTPUT_TOKENS = 16384;
+const DEFAULT_WORKER_CODEGEN_MAX_OUTPUT_TOKENS = 32768;
+const MAX_OUTPUT_TOKENS = (() => {
+  const raw = Number(process.env.WORKER_CODEGEN_MAX_OUTPUT_TOKENS ?? "");
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return DEFAULT_WORKER_CODEGEN_MAX_OUTPUT_TOKENS;
+  }
+  // Cap raised to 128K to support large-context models (e.g. DeepSeek V4 Pro).
+  return Math.min(Math.max(Math.floor(raw), 1024), 131_072);
+})();
 const MAX_TASK_GENERATION_RETRIES = 2;
-const MAX_FIX_ATTEMPTS = 1;
+const MAX_WORKER_TOOL_ITERATIONS = 10;
+const MAX_WORKER_TOOL_OUTPUT_CHARS = 12000;
+const WORKER_LLM_HEARTBEAT_MS = 10_000;
+// Raise the iteration ceiling so complex tasks have enough read rounds.
+// 10 rounds gives complex tasks (markets scanner, pipeline orchestrators, etc.)
+// enough budget while still bounding the worst case.
+// Anti read-only spiral: inject a nudge when the model has read for too long.
+// Set relative to MAX_WORKER_TOOL_ITERATIONS so the nudge happens near the end,
+// not in the middle — we don't want to cut short legitimate reads.
+const READ_STALL_NUDGE_AFTER = 5;        // nudge at round 5/10
+// Force tool_choice:"none" only when very close to the limit, as a last resort.
+// At this point the model has had ample reads; we'd rather get imperfect code
+// than throw an iteration-exceeded error.
+const READ_STALL_FORCE_WRITE_AFTER = 8;  // force-write at round 8/10
+const CODEGEN_MULTI_ROUND_ENABLED = (() => {
+  const raw = (process.env.CODEGEN_MULTI_ROUND_ENABLED ?? "1")
+    .trim()
+    .toLowerCase();
+  return raw !== "0" && raw !== "false" && raw !== "off";
+})();
+const CODEGEN_FILE_BATCH_SIZE = (() => {
+  const raw = Number(process.env.CODEGEN_FILE_BATCH_SIZE ?? "2");
+  if (!Number.isFinite(raw) || raw <= 0) return 2;
+  return Math.min(Math.max(Math.floor(raw), 1), 8);
+})();
+const CODEGEN_MULTI_ROUND_MAX_ROUNDS = (() => {
+  const raw = Number(process.env.CODEGEN_MULTI_ROUND_MAX_ROUNDS ?? "8");
+  if (!Number.isFinite(raw) || raw <= 0) return 8;
+  return Math.min(Math.max(Math.floor(raw), 1), 20);
+})();
+const DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS = 1;
+const DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP = 1;
+const DEFAULT_WORKER_TSC_ERROR_CONTEXT_MAX_CHARS = 3000;
+/**
+ * P2: file-plan failures (task didn't actually create/modify files it
+ * promised) used to share the tsc fix budget — which collapses to 1 in
+ * ralph mode, often resulting in zero fix attempts when the budget was
+ * spent on tsc errors. We give file-plan failures their own floor so a
+ * task that promised but failed to write a file ALWAYS gets at least one
+ * targeted fix pass before being abandoned. Override via env.
+ */
+const DEFAULT_WORKER_FILE_PLAN_FIX_MIN_ATTEMPTS = 2;
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.floor(n);
+}
+
+function getWorkerTscFixConfig(): {
+  maxFixAttempts: number;
+  maxFixAttemptsRalphCap: number;
+  errorContextMaxChars: number;
+  filePlanMinAttempts: number;
+} {
+  return {
+    maxFixAttempts: readPositiveIntEnv(
+      "WORKER_TSC_FIX_MAX_ATTEMPTS",
+      DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS,
+    ),
+    maxFixAttemptsRalphCap: readPositiveIntEnv(
+      "WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP",
+      DEFAULT_WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP,
+    ),
+    errorContextMaxChars: readPositiveIntEnv(
+      "WORKER_TSC_ERROR_CONTEXT_MAX_CHARS",
+      DEFAULT_WORKER_TSC_ERROR_CONTEXT_MAX_CHARS,
+    ),
+    filePlanMinAttempts: readPositiveIntEnv(
+      "WORKER_FILE_PLAN_FIX_MIN_ATTEMPTS",
+      DEFAULT_WORKER_FILE_PLAN_FIX_MIN_ATTEMPTS,
+    ),
+  };
+}
+
+/** Approximate maximum context window for context-rotation threshold calculations. */
+const MAX_CONTEXT_TOKENS = 200_000;
+
+/** The exact string the LLM must output to signal intentional task completion. */
+const RALPH_COMPLETE_TOKEN = "<promise>TASK_COMPLETE</promise>";
+const RALPH_FAILED_RE = /<promise>TASK_FAILED:\s*([\s\S]*?)<\/promise>/;
+
+/**
+ * Import path rules injected into frontend/test prompts.
+ * Some scaffolds configure `@` → `./src`, while others intentionally do not.
+ */
+const FRONTEND_IMPORT_RULES = `
+## Frontend import path rules
+- ALWAYS call \`read_file("frontend/vite.config.ts")\` before writing any import that uses the \`@/\` alias.
+- Only use \`@/\` imports if \`vite.config.ts\` already contains a \`resolve.alias\` block mapping \`@\` to \`./src\` (or similar).
+- If \`@/\` alias is NOT yet configured in \`vite.config.ts\`, you MUST add it before (or in the same write-batch as) any file that uses it:
+  \`\`\`ts
+  import path from "path";
+  // inside defineConfig:
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  \`\`\`
+  Also ensure \`tsconfig.app.json\` (or \`tsconfig.json\`) has \`"paths": { "@/*": ["src/*"] }\` under \`compilerOptions\`.
+- If no alias exists and you cannot update the config, fall back to relative imports and do NOT invent \`@/\`.
+- If the project includes a shared package, import it using the package name defined in its \`package.json\` (for example \`@project/shared\`), never via deep relative paths into another package.
+`;
+
+const TESTID_CONTRACT_RULES = `
+## data-testid contract (HARD RULE — required for E2E tests to pass)
+If a \`UI_CONTRACT.md\` file exists at the project root, read it BEFORE writing any component.
+It lists every required \`data-testid\` attribute and the exact DOM element it belongs to.
+
+Even without a contract file, follow these conventions unconditionally:
+- Every significant UI region (display area, keypad container, app title, footer hint, overlay) MUST carry \`data-testid\` on its outermost element.
+- Interactive elements (buttons, inputs) MUST carry \`data-testid\` derived from their visible label or id.
+- Button testids follow the pattern \`<feature>-btn-<label>\` using the **raw visible character** as label (e.g. \`calc-btn-.\` for the decimal button, NOT \`calc-btn-Decimal\`).
+- When a button's \`aria-label\` would differ from the visible symbol (e.g. "Decimal" vs "."), do NOT override with a word alias — keep \`aria-label\` equal to the symbol so role-based Playwright queries still work.
+- Do not remove or rename existing testids; only add new ones.
+`;
+
+const WORKER_READONLY_TOOLS_GUIDE = `
+## Available read-only tools
+- \`read_file(path)\`: read an existing file before editing or importing from it.
+- \`list_files(dir?)\`: inspect the current generated project tree when you need to locate files.
+- \`grep(pattern, path?)\`: search code/content across the generated project before making assumptions.
+- Use these tools whenever the task depends on existing files, exports, routes, or scaffold conventions not fully shown in context.
+`;
+
+const WORKER_READONLY_TOOLS: OpenRouterToolDefinition[] = [
+  {
+    type: "function",
+    function: {
+      name: "read_file",
+      description:
+        "Read a file by relative path from the generated project root.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Relative file path, e.g. frontend/src/router.tsx",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_files",
+      description:
+        "List files recursively under a directory relative to the generated project root.",
+      parameters: {
+        type: "object",
+        properties: {
+          dir: {
+            type: "string",
+            description:
+              "Directory relative to project root. Omit or use '.' for root.",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "grep",
+      description:
+        "Search for a pattern in project files and return matching lines with file paths.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: {
+            type: "string",
+            description: "Regex or literal text to search for.",
+          },
+          path: {
+            type: "string",
+            description:
+              "File or directory relative to project root. Defaults to '.'.",
+          },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+];
 
 const ROLE_PROMPTS: Record<CodingAgentRole, string> = {
   architect: `You are a Senior Software Architect Agent.
-Generate project scaffolding, configuration files, shared types, and foundational infrastructure code.
-Your output forms the base that frontend, backend, and test agents build upon.
+Generate scaffolding, config, and shared foundations for the assigned task.
 
-## Critical: Determine project type from context
-Read the project context and task description carefully to determine whether this is:
-- **Frontend-only**: No backend, no API, no database, single-page app, uses localStorage, etc.
-  → Use React + Vite + TypeScript + Tailwind CSS. NEVER use Next.js for frontend-only projects.
-- **Full-stack with SSR**: Needs server-side rendering, API routes, etc.
-  → Use Next.js.
+**Project-specific conventions (read the Project Convention Card in context for exact paths):**
+- Prefer extending existing files over creating duplicate structures.
+- If the project uses the \`@\` alias, wire it in both \`vite.config.ts\` and \`tsconfig.json\`.
+- API response DTOs must be narrow shapes — never alias \`type MeResponseDto = User\`.
+- Shared packages: import by package name from context, never invent \`@shared/*\`.
 
-## Critical: Scaffolding MUST be runnable
-The project MUST pass "npm install && npm run build && npm run dev" without errors.
+${FRONTEND_IMPORT_RULES}
+${WORKER_READONLY_TOOLS_GUIDE}
 
-### For React + Vite (DEFAULT for frontend-only projects):
-1. **package.json** — Must include:
-   - "type": "module"
-   - scripts: { "dev": "vite", "build": "vite build", "preview": "vite preview" }
-   - dependencies: react, react-dom (use latest versions like "^18.3.1" or "^19.0.0")
-   - devDependencies: vite, @vitejs/plugin-react, typescript, @types/react, @types/react-dom
-   - NO comments in JSON (comments make npm install fail)
-2. **vite.config.ts** — Must import @vitejs/plugin-react and configure plugins
-3. **tsconfig.json** — Must set jsx: "react-jsx", module: "ESNext", moduleResolution: "bundler", target: "ES2020"
-4. **tsconfig.node.json** — For vite.config.ts
-5. **index.html** — Root HTML in project root with <div id="root"> and <script type="module" src="/src/main.tsx">
-6. **src/main.tsx** — React entry point with ReactDOM.createRoot
-7. **src/App.tsx** — Root app component
-8. **src/vite-env.d.ts** — Vite client type reference: /// <reference types="vite/client" />
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
 
-### For Next.js (ONLY when SSR or API routes are required):
-1. **package.json** with next, react, react-dom and scripts (dev/build/start). NO comments in JSON.
-2. **next.config.mjs** or **next.config.ts**
-3. **tsconfig.json** with Next.js-compatible settings
-4. **src/app/layout.tsx** and **src/app/page.tsx** (App Router)
-
-### Rules:
-- NEVER use create-react-app or react-scripts — they are deprecated.
-- NEVER put comments (// ...) in package.json — it causes npm install to fail.
-- Default to Vite unless the project specifically requires Next.js (SSR, API routes, etc.)
-- Always include Tailwind CSS setup: tailwindcss, postcss, autoprefixer, tailwind.config.ts, postcss.config.js, and the @tailwind directives in a CSS file.
-- All file paths must be relative (no leading slash).
-
-### Monorepo shared package (when \`packages/shared\` exists)
-- Use the workspace package name from \`packages/shared/package.json\` (default \`@project/shared\`). Consumers import \`@project/shared/types/...\` and \`@project/shared/schemas/...\`. **Never** \`@shared/\` unless the repo already defines that alias.
-- Zod modules: \`export const registerSchema = z.object({...})\` and \`export type RegisterInput = z.infer<typeof registerSchema>\`. Do **not** export a type \`RegisterSchema\` (same stem as the schema with different capitalization).
-
-### Interactive shell (frontend / Vite apps)
-- App.tsx, routes, and layout must not ship dead controls: primary navigation and actions use React Router (Link, useNavigate) or real onClick with state updates — no empty handlers.
-
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.`,
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 
   frontend: `You are a Senior Frontend Engineer Agent.
-Generate production-quality React frontend code: components, pages, hooks, stores, and styles.
-Tech: React 18, TypeScript, Tailwind CSS, Zustand for state, TanStack Query for data fetching.
+Generate React + TypeScript + Tailwind code for the assigned task.
 
-### CRITICAL: Interactive UI must work
-- No dead buttons: every \`<button>\` MUST have an \`onClick\` handler or \`type="submit"\` inside a \`<form onSubmit>\`.
-- Links: use React Router \`<Link to="...">\` or \`useNavigate()\` — NEVER use empty \`href="#"\` or \`href=""\`.
-- Inputs, toggles, sliders, selects: controlled with \`useState\` + \`onChange\`/\`value\`.
-- Timers, counters, intervals: implement real \`useEffect\` + \`setInterval\` logic as described in the PRD.
-- Forms: implement real \`onSubmit\` with validation and state updates; NEVER leave forms without submit handling.
-- Modals/drawers: implement open/close state management; connect trigger buttons to state.
-- Every interactive component from the PRD spec (CMP-*) MUST be implemented with its specified interaction and effect.
+**Project-specific conventions (always read the Project Convention Card in context first):**
+- Page views → \`frontend/src/views/\` (flat, e.g. \`LoginPage.tsx\`). NEVER use \`src/pages/\` — this is Vite+React Router, not Next.js.
+- Route registration → \`frontend/src/router.tsx\`, import from \`./views/...\`.
+- API client → ONE canonical file at \`frontend/src/api/client.ts\`. Never create a parallel HTTP wrapper.
+- **API paths: the client base URL already includes \`/api\`. Pass paths WITHOUT that prefix** — use \`"/users/me"\` not \`"/api/users/me"\`. Read the client file before coding if unsure.
+- Design spec: when "Design Specification", "Pencil design", or "Codegen handoff" is in context, treat it as source of truth. Match colors, layout, and component hierarchy exactly using Tailwind arbitrary values (\`bg-[#0a0a0a]\`).
 
-### CRITICAL: Pencil Design Tokens adherence
-If the project context includes **Design Tokens**, you MUST faithfully reproduce the design:
+**Data & API rules:**
+- Every list/table/grid that shows backend data MUST fetch via the API client. No hardcoded arrays, no mock data, no \`useState([{ id: 1, ... }])\` placeholder initialization.
+- Use \`useEffect\` + loading/error state for all data fetching. Read \`frontend/src/api/client.ts\` first to confirm method signatures.
+- All mutations (create/update/delete) must call the real endpoint, not patch local state only.
+- Wrap awaited calls driving loading state with a min-duration helper (~400 ms) so spinners stay visible long enough for E2E assertions.
 
-1. **Screen → Route mapping**: each Screen section = a separate route or view. Create a React component for each.
-2. **Component tree**: the indented hierarchy under each Screen maps directly to your JSX nesting. Each named element (bold text in tokens) = a React element or component.
-3. **Colors (EXACT)**: use Tailwind arbitrary values for every color from the tokens: \`bg-[#1E293B]\`, \`text-[#F1F5F9]\`. Never approximate or substitute.
-4. **Sizing (EXACT)**: widths, heights, gaps, padding from tokens → Tailwind arbitrary values: \`w-[720px]\`, \`h-[64px]\`, \`gap-[24px]\`, \`p-[32px]\`, \`px-[24px]\`.
-5. **Typography (EXACT)**: font size and weight from tokens → \`text-[20px] font-bold\` etc.
-6. **Layout**: \`layout: horizontal\` → \`flex flex-row\`, \`layout: vertical\` → \`flex flex-col\`. Apply \`items-center\`, \`justify-between\` etc. per tokens.
-7. **Corner radius**: \`rounded-[16px]\`, \`rounded-[12px]\` etc.
-8. **Icons**: use Lucide React icons matching the icon names in tokens.
-9. **fill_container** → \`w-full\` / \`h-full\`; **fit_content** → \`w-fit\` / \`h-fit\`.
+**Framework pitfalls (must follow exactly — these are common production crashes):**
+- **\`useSyncExternalStore\` snapshot caching (HARD RULE):** When implementing a custom store consumed via \`useSyncExternalStore\`, \`getSnapshot()\` MUST return the SAME object reference until state actually changes. Build a \`cachedSnapshot\` variable inside the setter (the function that mutates state) and return it from \`getSnapshot()\`. Returning a fresh object on every call (\`return { isAuthenticated: !!token, accessToken: token }\`) triggers React's "Maximum update depth exceeded" loop because React sees a "new" snapshot on every render. Pattern:
+    \`\`\`ts
+    let snapshot = { isAuthenticated: false, accessToken: null };
+    function setStore(next: Partial<typeof snapshot>) {
+      snapshot = { ...snapshot, ...next };  // rebuild ONCE per real change
+      listeners.forEach((l) => l());
+    }
+    function getSnapshot() { return snapshot; }   // return cached ref
+    \`\`\`
+- **\`useBlocker\` requires a data router (HARD RULE):** \`useBlocker\` from \`react-router-dom\` only works inside \`createBrowserRouter\` (data router). If the project uses \`<BrowserRouter>\` (check \`frontend/src/main.tsx\` BEFORE importing \`useBlocker\`), DO NOT import \`useBlocker\` — it crashes with "useBlocker must be used within a data router". Implement unsaved-changes blocking with \`useState\` (\`pendingNavigation\` + \`requestNavigation\` callback) instead.
+- **Data-router-only hooks**: \`useLoaderData\`, \`useActionData\`, \`useFetcher\`, \`useRouteLoaderData\`, \`useNavigation\` are also data-router-only. Same check applies.
+- **\`useEffect\` cleanup typing**: Do NOT annotate effect callbacks with \`(): void =>\`. The callback may return a cleanup function so the type must be inferred. Write \`useEffect(() => { ... })\`.
 
-If token data is missing for a specific value, use the closest design-standard value from the Extracted Tokens section.
+**Auth state derivation (HARD RULE — applies to email+password AND OAuth projects):**
+- \`isAuthenticated\` is derived from the presence of an access token, NOT a separate boolean field that can drift. Same for \`hasCompletedOnboarding\` — derive from the user object's onboarding fields (e.g. \`!!user.style_tag\`), do NOT keep a parallel boolean state.
+- The backend is the source of truth for both fields. On \`/api/users/me\` response, set local state from the response — do NOT compute \`hasCompletedOnboarding\` from frontend-only signals.
+- \`AuthContext\` / auth store: read token from localStorage on mount, expose \`login(token, user?)\` / \`logout()\`. Never ship a no-op stub. When using a custom store + \`useSyncExternalStore\`, follow the snapshot caching pitfall above.
+- For OAuth projects (when \`scaffolds/<tier>/_optional/auth-privy\` etc. is applied — check \`.blueprint/scaffold-applied.json\` for the list): the scaffold has ALREADY shipped \`frontend/src/providers/PrivyProvider.tsx\`, an OAuth-aware \`AppProviders.tsx\`, an OAuth-aware \`LoginModal.tsx\`, and \`frontend/src/hooks/usePrivyAuthBridge.ts\`. Your job is ONLY to: (a) call \`usePrivyAuthBridge()\` once near the root (e.g. inside the top-level layout), and (b) pass \`onLogin={(token) => useAuth().login(token)}\` to \`<LoginModal>\` from the landing/login page. DO NOT re-implement these files.
+- For email+password projects (no \`auth-*\` optional applied): the base \`LoginModal.tsx\` is an email+password form. Implement \`POST /api/auth/login\` flow that returns a JWT and call \`useAuth().login(jwt)\` from the landing page.
 
-### Rules:
-- Import paths must match the project structure created by the architect (e.g. ./components/Foo, ../hooks/useBar).
-- All components must be TypeScript (.tsx). All utilities must be TypeScript (.ts).
-- Use functional components with hooks exclusively. No class components.
-- All file paths must be relative (no leading slash).
-- Monorepo: import shared types/schemas only as \`@project/shared/types/...\` and \`@project/shared/schemas/...\` (never \`@shared/\`). For Zod, import the schema object (\`registerSchema\`) for \`.parse\`; import **types** with \`import type { RegisterInput }\` from the same module — do not use a type named \`RegisterSchema\`.
-- For M-tier Vite web apps, use a single page root: \`apps/web/src/pages\` (or \`src/pages\` inside that package). Never generate pages under \`app/\` or \`src/app/\`.
-- Route registry is required: \`src/App.tsx\` (or a dedicated \`src/routes.tsx\` imported by App) MUST register React Router routes for generated pages.
-- Home route requirement: \`/\` must provide visible navigation entry points (Link/NavLink/button+useNavigate) to primary pages (at least one non-root route).
-- If \`src/pages/*\` exists, ensure those pages are actually reachable from the route registry.
+${FRONTEND_IMPORT_RULES}
+${TESTID_CONTRACT_RULES}
+${WORKER_READONLY_TOOLS_GUIDE}
 
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.`,
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
+
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 
   backend: `You are a Senior Backend Engineer Agent.
-Generate production-quality backend code: API endpoints, services, DB queries, business logic.
-Responsibilities: route handlers, service layer, ORM models, auth middleware, validation, event handlers.
-### Monorepo imports
-- When a shared package exists, import DTOs and zod schemas as \`@project/shared/types/...\` and \`@project/shared/schemas/...\` only (never \`@shared/\`). Define inferred types as \`*Input\` / \`*Dto\`, not \`*Schema\` types alongside \`*Schema\` zod exports.
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.`,
+Generate backend code (routes, services, domain logic) for the assigned task.
+
+**Project-specific conventions (always read the Project Convention Card in context first):**
+- Framework: read \`package.json\` + \`app.ts\` first and stick to whatever is already there (Koa/Express/Fastify).
+- Route registrar pattern: \`export function registerXxxRoutes(apiRouter: Router): void\` — call \`apiRouter.<verb>(...)\` directly so the route audit can detect bindings. ONE registrar per domain.
+- Middleware canonical path: \`backend/src/middlewares/\` (with the **s**). Do NOT create \`backend/src/middleware/\` (without).
+- Skeleton files: if a file already exists with \`throw new Error("Not implemented")\` stubs, read it and output a full replacement. Leave no stubs.
+- Shared packages: import by package name, never invent paths.
+
+**Sequelize consistency (for every create/update flow):**
+- System fields (\`id\`, \`createdAt\`, \`updatedAt\`, slugs) must NOT appear in request DTOs or validation schemas unless the PRD says the user submits them.
+- Keep these four layers aligned: request DTO ↔ validation schema ↔ service payload ↔ ORM model required fields.
+- Model class field declarations MUST use \`declare\`: \`declare id: number;\` — otherwise Sequelize accessors are shadowed.
+
+**M-tier specifics (Koa + Sequelize):**
+- Body access: \`const body = ctx.request.body;\` (the scaffold's \`koa.d.ts\` augments \`body\` as \`unknown\`). Never cast to \`any\`.
+- Validate body with Joi before consuming. Typed context: import \`AppKoaContext\` from \`backend/src/types/koa.ts\`.
+- \`validateBody(schema)\` only on POST/PUT/PATCH/DELETE — NEVER on GET routes.
+- JWT helpers: \`signJwt\` / \`verifyJwt\` from \`backend/src/utils/jwt.ts\`. Never call \`jsonwebtoken\` directly in feature code.
+- Every endpoint in \`API_CONTRACTS.json\` for this domain must be implemented and registered.
+
+**External identity vs database primary key (HARD RULE — when an OAuth provider is wired in):**
+When the project applies an \`_optional/auth-*\` scaffold (Privy, Clerk, Auth0, …), \`ctx.state.user.id\` is the EXTERNAL provider id (Privy DID like \`did:privy:cmoir...\`, Clerk userId, Auth0 sub) — NOT your database row's primary key. The User row stores it as a SEPARATE column (typically \`privy_id\` / \`clerk_id\` / \`external_id\`); the DB primary key is an internal UUID.
+
+In every controller / service that consumes \`ctx.state.user.id\`, ALWAYS resolve to the DB row first:
+\`\`\`ts
+const user = await User.findOne({ where: { privy_id: ctx.state.user.id } });
+if (!user) ctx.throw(404, "User not found");
+// from here, use \`user.id\` (UUID) for any FK queries.
+const items = await Feed.findAll({ where: { user_id: user.id } });
+\`\`\`
+NEVER pass the external id directly into Sequelize queries that expect a UUID FK — Postgres throws \`invalid input syntax for type uuid: "did:privy:..."\`. NEVER call \`User.findByPk(ctx.state.user.id)\` when \`ctx.state.user.id\` is an external id; \`findByPk\` looks up by primary key. Common pattern: extract a small helper \`async function resolveDbUser(ctx) { ... }\` per controller and call it at the top of every handler.
+
+**Background jobs (queue / worker / SSE) — must include lifecycle:**
+When implementing a background pipeline (feed aggregator, market scanner, ingestion job, scheduled digest), the SAME PR / task MUST include all of:
+
+1. \`enqueueXxx(userId)\` returns a \`run_id\`. Default impl is in-process (Promise-based) so the demo runs without Redis. Behind \`USE_REDIS_QUEUE=1\` flag, route through BullMQ. NEVER block on \`enqueueXxx\` for more than ~1.5s — wrap with a timeout and resolve early so the calling HTTP handler isn't held hostage by a missing Redis.
+2. The worker MUST use the same \`run_id\` end-to-end. Do NOT call \`randomUUID()\` inside the worker to overwrite the id; if you do, the SSE / status endpoint can't find the run.
+3. Public refresh endpoint MUST call \`clearActiveRunsForUser(userId)\` BEFORE starting a new run. \`clearActiveRunsForUser\` updates any existing \`status="running"\` rows for the user to \`failed\` with a \`completed_at\` timestamp. Without this, a crashed previous run blocks every retry with \`ALREADY_RUNNING\`.
+4. Status / stream endpoints MUST distinguish run-id formats:
+   \`\`\`ts
+   if (runId.startsWith("inproc:")) {
+     // memory-backed run: subscribe to in-process EventEmitter; do NOT touch DB
+   } else if (isUuid(runId)) {
+     const run = await XxxRun.findByPk(runId);
+     // ...
+   } else {
+     ctx.throw(400, "Invalid run_id format");
+   }
+   \`\`\`
+   Calling \`findByPk\` on an \`inproc:\` id throws \`invalid input syntax for type uuid\` and 5xxs the SSE stream.
+5. Structured file logging at every step (start / external-call / external-success / external-fail / step-N-success / complete / fail) at \`<backend>/logs/<feature>.log\`. Use a tiny \`appendLog(line)\` helper in the worker, not \`console.log\` — log files are how operators debug stalls.
+6. \`startXxxWorker()\` MUST be invoked from \`backend/src/server.ts\` on startup. Without this call the in-process queue has no consumer and \`enqueueXxx\` resolves with a \`run_id\` that NEVER advances → the user sees an indefinite spinner.
+
+**Empty results vs failure (HARD RULE for any aggregation / search pipeline):**
+When a multi-source aggregation pipeline returns zero rows from ALL upstream sources, the run MUST complete with \`status="completed"\` and an empty payload (e.g. \`story_count=0\`, clear the user's existing items). It MUST NOT throw \`NO_SOURCES\` / \`Zero stories\` / \`AGGREGATION_FAILED\`. Empty result is a normal user-visible state, NOT an error — the frontend renders an "empty feed" placeholder, the user gets a clear next-step ("try changing your topics"), and the run is recoverable. Throwing on empty turns a benign empty state into a hard failure that leaves stale \`running\` rows in the DB.
+
+**LLM client abstraction (HARD RULE when the project declares an \`LLM_*\` env bundle):**
+When the resource-detector emitted \`LLM_PROVIDER\` + \`LLM_API_KEY\` + \`LLM_BASE_URL\` + \`LLM_MODEL\` (check the External Resources block at the top of your task context), every LLM call MUST go through ONE provider-aware client at \`backend/src/services/llmService.ts\`:
+
+- The client reads \`LLM_PROVIDER\` (\`"openai" | "gemini" | "anthropic" | "openrouter"\`) and instantiates the matching adapter at module load.
+- Default model = \`process.env.LLM_MODEL\`. Default base URL = \`process.env.LLM_BASE_URL\` when set, else the provider's standard URL.
+- ALL feature code (ranking, summarisation, classification, embeddings) calls \`llmService.chat(messages, opts)\` / \`llmService.embed(text)\` — never instantiates \`new OpenAI(...)\` / Gemini SDK / Anthropic SDK directly.
+- NEVER hardcode \`"https://api.openai.com/v1"\` / \`"gpt-4o-mini"\` / a vendor-specific env var like \`OPENAI_API_KEY\` in feature files. Switching providers must be a one-line env change with zero source edits.
+
+If you're tempted to import \`OpenAI\` from \`"openai"\` inside a service file, STOP — go through \`llmService\` instead. The tests / repair gates check for direct vendor imports and will fail.
+
+**API routes manifest (HARD RULE — required whenever this task adds or changes HTTP routes):**
+After all your code files, emit ONE manifest declaring every endpoint you implemented in THIS task. Path: \`_meta/routes/<feature-slug>.json\` at the **project root** (NOT inside \`backend/\`). \`<feature-slug>\` is a kebab-case slug for your domain — pick \`auth.json\`, \`tasks-crud.json\`, \`feeds-stream.json\`, whatever uniquely identifies this task. Different tasks must use different slugs (collisions silently overwrite).
+
+The manifest is a JSON array; each entry:
+\`\`\`json
+{
+  "service": "auth",
+  "method": "POST",
+  "endpoint": "/api/auth/login",
+  "requestFields": "{ email: string; password: string }",
+  "responseFields": "{ token: string; user: { id: string; email: string } }",
+  "authType": "none",
+  "description": "log in with email + password"
+}
+\`\`\`
+- \`endpoint\` is the FULL path the frontend will call, including any \`/api\` mount prefix.
+- \`method\` is uppercase: \`GET\` | \`POST\` | \`PUT\` | \`PATCH\` | \`DELETE\`.
+- \`requestFields\` / \`responseFields\` are TypeScript type literals copied verbatim from your handler's actual types — NOT prose. Use \`"none"\` if the body / response is empty.
+- \`authType\` is \`"none"\` | \`"bearer"\` | \`"session"\`.
+- If the task implements zero HTTP routes (pure internal services), skip the manifest.
+
+The frontend agent reads this file as the source of truth for API calls. Declaring an endpoint you didn't implement → runtime 404. Implementing routes but skipping the manifest → frontend guesses paths and field names, usually wrong.
+
+${WORKER_READONLY_TOOLS_GUIDE}
+
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
+
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 
   test: `You are a Senior QA / Test Engineer Agent.
 Generate comprehensive test suites: unit, integration, e2e.
 Frameworks: Vitest, @testing-library/react, Playwright, k6.
-For each file output: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
-Output ONLY code blocks with the file: prefix. No explanatory text outside code blocks.`,
+
+Read the Project Convention Card in context for project-specific paths before writing any imports.
+
+**E2E selector rules (HARD RULE — selector mismatches cause every test to fail):**
+- Before writing any Playwright selector, check whether a \`UI_CONTRACT.md\` exists at the project root and read it.
+- Always use primary \`data-testid\` selectors (e.g. \`[data-testid='calc-btn-.']\`) as the first choice.
+- Role/text-based selectors are acceptable ONLY as secondary fallback via \`.or()\`, with the testid selector as primary.
+- If a required \`data-testid\` is missing from the component, ADD it to the component AND document it in \`UI_CONTRACT.md\` in the same task. Never write a test that relies on a testid that does not yet exist in the source.
+- Button testids follow the pattern \`<feature>-btn-<label>\` where label is the **raw visible character** (e.g. \`calc-btn-.\` for the decimal key). Do NOT use the word alias (e.g. \`calc-btn-Decimal\` is wrong).
+
+${FRONTEND_IMPORT_RULES}
+${WORKER_READONLY_TOOLS_GUIDE}
+
+You may write a brief plan (≤10 lines) before outputting files.
+For each file: \`\`\`file:<relative-path>\n<contents>\n\`\`\`
+
+When done: ${RALPH_COMPLETE_TOKEN}
+On failure: <promise>TASK_FAILED: <reason></promise>`,
 };
 
 // ─── Version constraint injection (prevent LLM from using deprecated APIs) ───
@@ -158,10 +476,11 @@ const KNOWN_BREAKING_CHANGES: Record<
       "Use `getServerSession(authOptions)` NOT `getSession()`.",
   },
   prisma: {
-    sinceVersion: "5.0.0",
+    sinceVersion: "7.0.0",
     notes:
-      "v5+: `findUnique` throws if not found when using `findUniqueOrThrow`. " +
-      "`rejectOnNotFound` option removed.",
+      'v5/6 (default for generated apps): `datasource db { provider = "postgresql" url = env("DATABASE_URL") }`. ' +
+      "v7+: `url`/`directUrl` may be omitted from schema; connection via prisma.config.ts — follow the version in package.json. " +
+      "v5+: `findUnique` throws if not found when using `findUniqueOrThrow`. `rejectOnNotFound` option removed.",
   },
   "framer-motion": {
     sinceVersion: "11.0.0",
@@ -177,7 +496,9 @@ const KNOWN_BREAKING_CHANGES: Record<
   },
 };
 
-export async function buildVersionConstraints(outputDir: string): Promise<string> {
+export async function buildVersionConstraints(
+  outputDir: string,
+): Promise<string> {
   const content = await fsRead("package.json", outputDir);
   if (content.startsWith("FILE_NOT_FOUND")) return "";
 
@@ -222,16 +543,698 @@ export async function buildVersionConstraints(outputDir: string): Promise<string
   ].join("\n");
 }
 
-function parseFileOutput(raw: string): Record<string, string> {
-  const files: Record<string, string> = {};
-  const regex = /```file:([^\n]+)\n([\s\S]*?)```/g;
-  let match;
-  while ((match = regex.exec(raw)) !== null) {
-    const filePath = match[1].trim();
-    const content = match[2];
-    if (filePath && content) files[filePath] = content;
+function getResponseUsageCounts(response: OpenRouterResponse): {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+} {
+  const usage = response.usage as
+    | {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+      }
+    | undefined;
+  const promptTokens = usage?.prompt_tokens ?? usage?.promptTokens ?? 0;
+  const completionTokens =
+    usage?.completion_tokens ?? usage?.completionTokens ?? 0;
+  const totalTokens =
+    usage?.total_tokens ??
+    usage?.totalTokens ??
+    promptTokens + completionTokens;
+  return { promptTokens, completionTokens, totalTokens };
+}
+
+function buildSearchMatcher(pattern: string): (line: string) => boolean {
+  try {
+    const regex = new RegExp(pattern, "i");
+    return (line: string) => regex.test(line);
+  } catch {
+    const lowered = pattern.toLowerCase();
+    return (line: string) => line.toLowerCase().includes(lowered);
   }
-  return files;
+}
+
+/**
+ * Dynamically scan the generated project and produce a concise "Project Convention Card"
+ * that tells every worker the key architectural facts they need before writing any code.
+ * This prevents systematic errors like double /api prefix, wrong directory names, etc.
+ */
+export async function buildProjectConventionCard(
+  outputDir: string,
+): Promise<string> {
+  const lines: string[] = ["## Project Convention Card (read before writing any code)"];
+
+  // ── Detect frontend API client base URL ──────────────────────────────────
+  const clientContent = await fsRead("frontend/src/api/client.ts", outputDir);
+  if (!clientContent.startsWith("FILE_NOT_FOUND") && !clientContent.startsWith("REJECTED")) {
+    const baseMatch =
+      clientContent.match(/VITE_API_BASE_URL[^|]*\|\|\s*["'`]([^"'`]+)["'`]/) ??
+      clientContent.match(/API_BASE\s*=\s*["'`]([^"'`]+)["'`]/) ??
+      clientContent.match(/baseURL.*?["'`]([^"'`]+)["'`]/);
+    const base = baseMatch ? baseMatch[1] : "/api";
+    lines.push(
+      `- **Frontend API client base URL**: \`${base}\` — pass paths WITHOUT this prefix.`,
+      `  ✅ \`apiClient.get("/users/me")\`  ❌ \`apiClient.get("${base}/users/me")\``,
+    );
+  }
+
+  // ── Detect package manager ────────────────────────────────────────────────
+  const pmLock = await fsRead("pnpm-lock.yaml", outputDir);
+  const pm = !pmLock.startsWith("FILE_NOT_FOUND") ? "pnpm" : "npm";
+  lines.push(`- **Package manager**: \`${pm}\``);
+
+  // ── Detect frontend framework / router convention ─────────────────────────
+  const frontendPkg = await fsRead("frontend/package.json", outputDir);
+  const hasVite =
+    !frontendPkg.startsWith("FILE_NOT_FOUND") && frontendPkg.includes('"vite"');
+  if (hasVite) {
+    lines.push(
+      "- **Frontend framework**: Vite + React + React Router (NOT Next.js)",
+      "- **Page views**: `frontend/src/views/` (flat, one file per page). NEVER use `src/pages/`.",
+      "- **Route registration**: `frontend/src/router.tsx`, import from `./views/...`",
+    );
+  }
+
+  // ── Detect middleware directory ───────────────────────────────────────────
+  const mwsFiles = await fsRead("backend/src/middlewares/auth.ts", outputDir);
+  const mwFiles  = await fsRead("backend/src/middleware/auth.ts",  outputDir);
+  const mwDir =
+    !mwsFiles.startsWith("FILE_NOT_FOUND") ? "backend/src/middlewares/" :
+    !mwFiles.startsWith("FILE_NOT_FOUND")  ? "backend/src/middleware/"  :
+    "backend/src/middlewares/";
+  lines.push(`- **Backend middleware directory**: \`${mwDir}\` (canonical — do not create a parallel directory)`);
+
+  // ── Detect backend framework ──────────────────────────────────────────────
+  const backendPkg = await fsRead("backend/package.json", outputDir);
+  if (!backendPkg.startsWith("FILE_NOT_FOUND")) {
+    const hasKoa  = backendPkg.includes('"koa"');
+    const hasExpress = backendPkg.includes('"express"');
+    const hasSequelize = backendPkg.includes('"sequelize"');
+    if (hasKoa)  lines.push("- **Backend framework**: Koa — use `ctx.request.body`, `AppKoaContext`, Joi validation");
+    if (hasExpress) lines.push("- **Backend framework**: Express — use `req.body`, `req.params`, `req.headers`");
+    if (hasSequelize) {
+      lines.push("- **ORM**: Sequelize — model field declarations MUST use `declare`. System fields (id, createdAt, updatedAt) must NOT be in request DTOs.");
+      lines.push(
+        "- **Sequelize migration RULE (CRITICAL)**: If your task modifies any " +
+          "file under `backend/src/models/` (add/remove column, change type, " +
+          "change association, change index), you MUST also write a NEW " +
+          "migration under `backend/src/database/migrations/NNNN_<short-desc>.ts`. " +
+          "NNNN is one greater than the highest existing migration number. " +
+          "Export both `async up({ context: queryInterface })` and " +
+          "`async down({ context: queryInterface })` covering every change. " +
+          "Do NOT modify existing migrations — always add a new file. The " +
+          "post-task migration-coverage check will flag missing migrations " +
+          "and create a repair task. The umzug runner in `src/database/runMigrations.ts` " +
+          "applies these on backend startup.",
+      );
+
+      // ── TimescaleDB safety RULE ─────────────────────────────────────────
+      // Fires when the project references TimescaleDB anywhere — db.ts
+      // helper, PRD/TRD mention, or existing migrations. Raw
+      // `CREATE EXTENSION timescaledb` in migrations is the single most
+      // common reason an M-tier backend won't start on a fresh Postgres.
+      const timescaleHelper = await fsRead(
+        "backend/src/utils/timescale.ts",
+        outputDir,
+      );
+      const dbInit = await fsRead("backend/src/db.ts", outputDir);
+      const usesTimescale =
+        (!timescaleHelper.startsWith("FILE_NOT_FOUND") &&
+          !timescaleHelper.startsWith("REJECTED")) ||
+        (!dbInit.startsWith("FILE_NOT_FOUND") &&
+          /timescale|TIMESCALE_DISABLED|hypertable/i.test(dbInit));
+      if (usesTimescale) {
+        lines.push(
+          "- **TimescaleDB safety RULE (CRITICAL)**: TimescaleDB is NOT part " +
+            "of stock PostgreSQL — Homebrew, Docker dev images, CI runners, " +
+            "and most cloud preview DBs do not have it. Calling " +
+            "`CREATE EXTENSION timescaledb` or `create_hypertable` directly " +
+            "in any migration's `up()` body will THROW and kill backend " +
+            "startup. Use the helpers in `backend/src/utils/timescale.ts` " +
+            "instead — they respect `TIMESCALE_DISABLED=1` (set in `.env.example`) " +
+            "and silently fall back to plain Postgres tables when the " +
+            "extension is unavailable. Specifically: " +
+            "(a) `enableTimescaleExtension(sequelize)` for CREATE EXTENSION; " +
+            "(b) `createHypertableIfPossible(queryInterface, 'table', 'time_col')` " +
+            "for hypertable conversion; " +
+            "(c) `runTimescaleQuery(sequelize, sql, 'description')` for " +
+            "compression / retention / continuous aggregate SQL. " +
+            "NEVER inline raw Timescale SQL in a migration's up() body.",
+        );
+      }
+    }
+  }
+
+  // ── Route registrar convention ────────────────────────────────────────────
+  const indexContent = await fsRead("backend/src/api/modules/index.ts", outputDir);
+  if (!indexContent.startsWith("FILE_NOT_FOUND")) {
+    lines.push(
+      "- **Route registrar pattern**: `export function registerXxxRoutes(apiRouter: Router): void` — one registrar per domain, call `apiRouter.<verb>(...)` directly",
+      "- **Module index**: `backend/src/api/modules/index.ts` — every registrar must be imported and called here",
+    );
+  }
+
+  // ── JWT helper ────────────────────────────────────────────────────────────
+  const jwtHelper = await fsRead("backend/src/utils/jwt.ts", outputDir);
+  if (!jwtHelper.startsWith("FILE_NOT_FOUND")) {
+    lines.push("- **JWT**: use `signJwt`/`verifyJwt` from `backend/src/utils/jwt.ts`. Never call `jsonwebtoken` directly in feature code.");
+  }
+
+  // ── Shared schema (TRD §6 product) ───────────────────────────────────────
+  // Detect either side: distributor writes both for M-tier; for S/L only one
+  // location applies. If found, instruct workers to import from it rather
+  // than re-declare any type whose name appears there.
+  const sharedSchemaCandidates = [
+    "frontend/src/shared/schema.ts",
+    "backend/src/shared/schema.ts",
+    "src/shared/schema.ts",
+    "packages/shared/src/schema.ts",
+  ];
+  const presentSchemas: string[] = [];
+  for (const p of sharedSchemaCandidates) {
+    const content = await fsRead(p, outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      presentSchemas.push(p);
+    }
+  }
+  if (presentSchemas.length > 0) {
+    lines.push(
+      `- **Shared schema (CANONICAL)**: ${presentSchemas.map((p) => `\`${p}\``).join(", ")} — TRD-frozen single source of truth for every type that crosses the API boundary. **Read it first.** Import the types you need; do NOT redefine any type whose name already appears there. The file is scaffold-protected — do NOT rewrite it.`,
+    );
+  }
+
+  // ── Workflow DAG (TRD §8 product) ────────────────────────────────────────
+  // When pipeline-dag.yaml exists, the project has multi-step deterministic
+  // service chains. Workers implementing those services MUST follow the
+  // declared order and failure strategy.
+  const dagContent = await fsRead(".blueprint/pipeline-dag.yaml", outputDir);
+  if (
+    !dagContent.startsWith("FILE_NOT_FOUND") &&
+    !dagContent.startsWith("REJECTED")
+  ) {
+    lines.push(
+      "- **Workflow DAG (CANONICAL)**: `.blueprint/pipeline-dag.yaml` defines " +
+        "ordered service chains. **Read it before implementing any service " +
+        "named in a node.** Call services in `dependsOn` order, honor the " +
+        "declared `failure.strategy` (abort / continue / retry-N), and do " +
+        "NOT invent a different chain. The file is scaffold-protected.",
+    );
+  }
+
+  // ── Playwright webServer & health route (E2E infra contract) ──────────────
+  const playwrightCfg = await fsRead("frontend/playwright.config.ts", outputDir);
+  if (!playwrightCfg.startsWith("FILE_NOT_FOUND") && !backendPkg.startsWith("FILE_NOT_FOUND")) {
+    lines.push(
+      "- **Playwright `webServer` (CRITICAL)**: `frontend/playwright.config.ts` MUST keep `webServer` as an ARRAY that starts BOTH the backend (`cd ../backend && pnpm dev`, health probe `http://localhost:4000/api/health`) AND the frontend (`pnpm dev` on :5173). Collapsing it to a single object causes every API-driven e2e test to fail with ECONNREFUSED — the supervisor will auto-rewrite it back. Do NOT remove the backend entry.",
+      "- **Backend `/api/health`**: `backend/src/api/modules/health/health.routes.ts` exposes `GET /health` and is registered in `backend/src/api/modules/index.ts` via `registerHealthRoutes(apiRouter)`. Do NOT delete this route — the Playwright `webServer` health probe depends on it.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
+async function executeWorkerReadonlyTool(
+  name: string,
+  args: Record<string, unknown>,
+  outputDir: string,
+): Promise<string> {
+  switch (name) {
+    case "read_file": {
+      const filePath = String(args.path ?? "").trim();
+      if (!filePath) return "Error: path is required";
+      const content = await fsRead(filePath, outputDir);
+      return content.slice(0, MAX_WORKER_TOOL_OUTPUT_CHARS);
+    }
+    case "list_files": {
+      const dir = String(args.dir ?? ".").trim() || ".";
+      const files = await listFiles(dir, outputDir);
+      return (files.join("\n") || "(no files found)").slice(
+        0,
+        MAX_WORKER_TOOL_OUTPUT_CHARS,
+      );
+    }
+    case "grep": {
+      const pattern = String(args.pattern ?? "").trim();
+      const searchPath = String(args.path ?? ".").trim() || ".";
+      if (!pattern) return "Error: pattern is required";
+
+      const matcher = buildSearchMatcher(pattern);
+      const filePaths: string[] = [];
+      const directFileContent = await fsRead(searchPath, outputDir);
+      if (
+        !directFileContent.startsWith("FILE_NOT_FOUND") &&
+        !directFileContent.startsWith("REJECTED")
+      ) {
+        filePaths.push(searchPath);
+      } else {
+        filePaths.push(...(await listFiles(searchPath, outputDir)));
+      }
+
+      const matches: string[] = [];
+      for (const relPath of filePaths) {
+        if (!/\.(ts|tsx|js|jsx|json|css|md)$/.test(relPath)) continue;
+        const content = await fsRead(relPath, outputDir);
+        if (
+          content.startsWith("FILE_NOT_FOUND") ||
+          content.startsWith("REJECTED")
+        ) {
+          continue;
+        }
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          if (!matcher(lines[i])) continue;
+          matches.push(`${relPath}:${i + 1}:${lines[i]}`);
+          if (matches.length >= 60) break;
+        }
+        if (matches.length >= 60) break;
+      }
+
+      return (matches.join("\n") || "No matches found.").slice(
+        0,
+        MAX_WORKER_TOOL_OUTPUT_CHARS,
+      );
+    }
+    default:
+      return `Error: unknown tool '${name}'`;
+  }
+}
+
+/**
+ * Context required for the worker loop to trigger a second-pass memory
+ * recall mid-task when a fresh error signal appears in tool output or
+ * model content. When omitted, second-pass recall is silently disabled
+ * (loop behaves identically to before).
+ */
+interface SecondaryRecallContext {
+  agent: string;
+  role?: string;
+  task: {
+    id?: string;
+    title?: string;
+    description?: string;
+    files?: string[];
+  };
+  projectRoot?: string;
+  kickoffId?: string;
+  layers?: ("L1" | "L2")[];
+  /** Patterns already injected by the primary recall — excluded from
+   *  second-pass candidates so we don't re-inject the same blocks. */
+  primaryInjectedIds: string[];
+  tokenBudget?: number;
+}
+
+async function runCodegenWorkerLoop(
+  messages: ChatMessage[],
+  outputDir: string,
+  sessionId?: string,
+  workerLabel?: string,
+  recallCtx?: SecondaryRecallContext,
+): Promise<{
+  content: string;
+  rawContent: string;
+  model: string;
+  costUsd: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** Pattern ids injected by the secondary recall (empty if not fired). */
+  secondaryInjectedIds: string[];
+}> {
+  let totalCostUsd = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let totalTokens = 0;
+  let consecutiveReadRounds = 0;
+  // Track second-pass recall state so we fire it at most once per worker
+  // run — otherwise a chatty model that mentions errors in every round
+  // would burn through the L1 store with redundant injects.
+  let didSecondaryRecall = false;
+  const primaryIds = new Set(recallCtx?.primaryInjectedIds ?? []);
+  const injectedIds = new Set(primaryIds);
+  const secondaryInjectedIds: string[] = [];
+
+  for (let i = 0; i < MAX_WORKER_TOOL_ITERATIONS; i++) {
+    // Anti-spiral: inject a nudge message after too many consecutive read rounds.
+    if (consecutiveReadRounds === READ_STALL_NUDGE_AFTER) {
+      console.log(
+        `[Worker] Read-stall nudge after ${consecutiveReadRounds} consecutive read-only rounds (loop=${i + 1})`,
+      );
+      messages.push({
+        role: "user",
+        content:
+          `You have spent ${consecutiveReadRounds} rounds reading files. ` +
+          `You now have enough context. STOP calling read tools. ` +
+          `Output your implementation NOW using \`\`\`file:path\`\`\` blocks. ` +
+          `Do not read any more files — write the code directly.`,
+      });
+    }
+
+    // Anti-spiral: after even more stall, force the model to output text (no tool calls).
+    const forceWrite = consecutiveReadRounds >= READ_STALL_FORCE_WRITE_AFTER;
+    if (forceWrite) {
+      console.log(
+        `[Worker] Forcing tool_choice=none after ${consecutiveReadRounds} consecutive read-only rounds (loop=${i + 1})`,
+      );
+    }
+
+    const callStartedAt = Date.now();
+    const heartbeat = setInterval(() => {
+      const waitedSec = Math.floor((Date.now() - callStartedAt) / 1000);
+      console.log(
+        `[Worker] codegen still waiting... loop=${i + 1}/${MAX_WORKER_TOOL_ITERATIONS} waited=${waitedSec}s`,
+      );
+    }, WORKER_LLM_HEARTBEAT_MS);
+    const response = await invokeCodegenOrOpenRouter(messages, {
+      temperature: 0.3,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      openRouterVariant: "codeGen",
+      // When forcing write, omit tools entirely so the model cannot call them.
+      tools: forceWrite ? undefined : WORKER_READONLY_TOOLS,
+      tool_choice: forceWrite ? "none" : "auto",
+    }).finally(() => {
+      clearInterval(heartbeat);
+    });
+    const choice = response.choices[0];
+    const finishReason = choice?.finish_reason ?? "stop";
+    const content = choice?.message?.content ?? "";
+    const toolCalls = choice?.message?.tool_calls ?? [];
+    const usage = getResponseUsageCounts(response);
+    totalCostUsd += estimateCost(response.model, response.usage);
+    promptTokens += usage.promptTokens;
+    completionTokens += usage.completionTokens;
+    totalTokens += usage.totalTokens;
+    if (sessionId) {
+      recordCodingSessionLlmUsage({
+        sessionId,
+        stage: "worker_codegen",
+        label: workerLabel,
+        model: response.model,
+        costUsd: estimateCost(response.model, response.usage),
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.totalTokens,
+      });
+    }
+
+    if (finishReason === "length") {
+      throw new Error(
+        `Worker codegen output truncated (finish_reason=length, model=${response.model})`,
+      );
+    }
+
+    const reasoningContent = choice?.message?.reasoning_content;
+    messages.push({
+      role: "assistant",
+      content,
+      // Omit tool_calls entirely when empty — DeepSeek V4 rejects [] with a 400.
+      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      // DeepSeek V4 thinking mode: echo reasoning_content back so the API
+      // doesn't reject the next turn with "must be passed back" error.
+      ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+    });
+
+    if (toolCalls.length === 0) {
+      return {
+        content,
+        rawContent: content,
+        model: response.model,
+        costUsd: totalCostUsd,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        secondaryInjectedIds,
+      };
+    }
+
+    // All tool calls in this round were read-only — increment the stall counter.
+    consecutiveReadRounds++;
+
+    const toolResultTexts: string[] = [];
+    for (const toolCall of toolCalls) {
+      let args: Record<string, unknown>;
+      try {
+        args = JSON.parse(toolCall.function.arguments || "{}") as Record<
+          string,
+          unknown
+        >;
+      } catch {
+        args = {};
+      }
+      const result = await executeWorkerReadonlyTool(
+        toolCall.function.name,
+        args,
+        outputDir,
+      );
+      messages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        name: toolCall.function.name,
+        content: result,
+      });
+      toolResultTexts.push(result);
+    }
+
+    // Second-pass memory recall: if the model's content or any tool result
+    // exposes a fresh error signal we haven't seen before, fetch memories
+    // tailored to that error and append them as a system message. Fired
+    // at most once per worker run — see didSecondaryRecall above.
+    if (recallCtx && !didSecondaryRecall) {
+      const errorSignal = detectErrorSignalForRecall(content, toolResultTexts);
+      if (errorSignal) {
+        didSecondaryRecall = true;
+        const recall = await recallAndPrepareInject({
+          agent: recallCtx.agent,
+          role: recallCtx.role,
+          task: {
+            ...recallCtx.task,
+            description:
+              `${recallCtx.task.description ?? ""}\n\n## Encountered error signal\n${errorSignal.snippet}`.trim(),
+          },
+          projectRoot: recallCtx.projectRoot,
+          kickoffId: recallCtx.kickoffId,
+          layers: recallCtx.layers,
+          tokenBudget: recallCtx.tokenBudget,
+          excludeIds: Array.from(injectedIds),
+          pass: "secondary",
+        });
+        if (recall.block) {
+          for (const r of recall.active) {
+            injectedIds.add(r.id);
+            if (!primaryIds.has(r.id)) secondaryInjectedIds.push(r.id);
+          }
+          messages.push({
+            role: "system",
+            content:
+              `## Memory · second-pass recall (failure-mode: ${errorSignal.mode})\n` +
+              recall.block,
+          });
+        }
+      }
+    }
+  }
+
+  throw new Error(
+    `Worker tool loop exceeded ${MAX_WORKER_TOOL_ITERATIONS} iterations without final code output.`,
+  );
+}
+
+/**
+ * Scan model output and tool results for a fresh failure-mode signal. We
+ * use the existing failure-mode classifier so the trigger language stays
+ * consistent with the metric bucketing.
+ *
+ * Returns the first non-"unknown" mode + a short snippet for the prompt
+ * augmentation, or null when nothing suspicious is present.
+ */
+export function detectErrorSignalForRecall(
+  modelContent: string,
+  toolResultTexts: string[],
+): { mode: string; snippet: string } | null {
+  const candidates: { source: "model" | "tool"; text: string }[] = [];
+  if (modelContent) candidates.push({ source: "model", text: modelContent });
+  for (const t of toolResultTexts) {
+    if (t) candidates.push({ source: "tool", text: t });
+  }
+
+  for (const c of candidates) {
+    const mode = classifyFailureMode(c.text);
+    if (mode === "unknown") continue;
+    // Keep the snippet short — enough to disambiguate the error in the
+    // recall query but not so long it dominates the description.
+    const snippet = c.text.slice(0, 400);
+    return { mode, snippet };
+  }
+  return null;
+}
+
+interface MalformedFileBlock {
+  filePath: string;
+  headerLine: number;
+  reason: string;
+}
+
+interface ParsedFileOutput {
+  files: Record<string, string>;
+  malformed: MalformedFileBlock[];
+  /** Total number of file-block headers we encountered (valid + malformed). */
+  headerCount: number;
+}
+
+/**
+ * State-machine file-block parser.
+ *
+ * Accepts any of the following header forms (case-insensitive, tolerant
+ * of leading whitespace):
+ *   ```file:path/to/foo.ts
+ *   ```ts file:path/to/foo.ts
+ *   ```typescript file:path/to/foo.ts
+ *   ````file:path/to/foo.ts      (4+ backticks)
+ *
+ * The closing fence must have the same run-length as the opener, which
+ * lets file content itself contain nested triple-backtick fences without
+ * confusing the parser.
+ *
+ * Any block that starts but never closes is recorded in `malformed` so the
+ * caller can surface a structured repair event rather than silently
+ * dropping file(s).
+ */
+function parseFileOutputRobust(raw: string): ParsedFileOutput {
+  const out: ParsedFileOutput = { files: {}, malformed: [], headerCount: 0 };
+  if (!raw) return out;
+
+  const lines = raw.split("\n");
+  // Match: optional leading whitespace, 3+ backticks, optional language word,
+  // the literal `file:`, and then the path (no internal whitespace allowed).
+  const HEADER = /^\s*(`{3,})\s*(?:[A-Za-z0-9_+-]+\s+)?file:(\S+?)\s*$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = HEADER.exec(lines[i]);
+    if (!m) continue;
+    out.headerCount += 1;
+
+    const fence = m[1];
+    const rawFilePath = m[2];
+    const filePath = rawFilePath.trim();
+    const headerLine = i + 1;
+
+    if (!filePath || isUnsafePath(filePath)) {
+      out.malformed.push({
+        filePath: rawFilePath,
+        headerLine,
+        reason: filePath ? "unsafe path (absolute or traversal)" : "empty path",
+      });
+      // Skip this block entirely but keep scanning for later ones.
+      const closer = findMatchingFence(lines, i + 1, fence);
+      if (closer >= 0) i = closer;
+      continue;
+    }
+
+    const closer = findMatchingFence(lines, i + 1, fence);
+    if (closer < 0) {
+      out.malformed.push({
+        filePath,
+        headerLine,
+        reason: "unclosed fence — end of output reached before matching closer",
+      });
+      break;
+    }
+    const body = lines.slice(i + 1, closer).join("\n");
+    out.files[filePath] = body;
+    i = closer;
+  }
+
+  return out;
+}
+
+function findMatchingFence(
+  lines: string[],
+  startIdx: number,
+  fence: string,
+): number {
+  const closer = new RegExp(`^\\s*${fence}\\s*$`);
+  for (let j = startIdx; j < lines.length; j++) {
+    if (closer.test(lines[j])) return j;
+  }
+  return -1;
+}
+
+function isUnsafePath(filePath: string): boolean {
+  if (filePath.includes("..")) return true;
+  if (/^[\\/]/.test(filePath)) return true;
+  if (/^[A-Za-z]:[\\/]/.test(filePath)) return true;
+  return false;
+}
+
+function parseFileOutput(raw: string): Record<string, string> {
+  return parseFileOutputRobust(raw).files;
+}
+
+function validateCodegenFileOutput(raw: string): void {
+  const parsed = parseFileOutputRobust(raw);
+  if (parsed.headerCount === 0) return;
+
+  const parsedCount = Object.keys(parsed.files).length;
+  if (parsed.malformed.length > 0 || parsedCount < parsed.headerCount) {
+    const reasons = parsed.malformed
+      .map((m) => `${m.filePath}@L${m.headerLine}: ${m.reason}`)
+      .slice(0, 5)
+      .join("; ");
+    throw new Error(
+      `Incomplete file output detected: parsed ${parsedCount}/${parsed.headerCount} file block(s). ` +
+        `Refusing to write partial content.${reasons ? " Issues: " + reasons : ""}`,
+    );
+  }
+}
+
+function parseFileBlocksFromContent(
+  raw: string,
+  _outputDir: string,
+): { filePath: string; fileContent: string }[] {
+  const parsed = parseFileOutput(raw);
+  return Object.entries(parsed).map(([filePath, fileContent]) => ({
+    filePath,
+    fileContent,
+  }));
+}
+
+const WORKER_TSC_VERIFY_PREFIX = "## TypeScript errors in task files";
+
+function isWorkerTscVerifyError(verifyErrors: string): boolean {
+  return verifyErrors.includes(WORKER_TSC_VERIFY_PREFIX);
+}
+
+/**
+ * Extract exported names from TypeScript source for building export maps.
+ * Catches: export function/const/class/type/interface/enum, export { }, export default.
+ */
+function extractExportNames(source: string): string[] {
+  const names = new Set<string>();
+
+  const namedExportRe =
+    /export\s+(?:async\s+)?(?:function|const|let|var|class|type|interface|enum)\s+(\w+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = namedExportRe.exec(source)) !== null) {
+    names.add(m[1]);
+  }
+
+  const braceExportRe = /export\s*\{([^}]+)\}/g;
+  while ((m = braceExportRe.exec(source)) !== null) {
+    for (const item of m[1].split(",")) {
+      const cleaned = item.replace(/\s+as\s+\w+/, "").trim();
+      if (cleaned && /^\w+$/.test(cleaned)) names.add(cleaned);
+    }
+  }
+
+  if (/export\s+default\s/.test(source)) names.add("default");
+
+  return [...names];
 }
 
 function escapeRegex(raw: string): string {
@@ -254,11 +1257,225 @@ function matchesTaskPathHint(filePath: string, hint: string): boolean {
   return p.startsWith(`${h}/`);
 }
 
+function normalizeTaskFileHints(taskFiles: unknown): string[] {
+  if (!taskFiles) return [];
+  if (Array.isArray(taskFiles)) {
+    return taskFiles.filter((f): f is string => typeof f === "string");
+  }
+  if (typeof taskFiles !== "object") return [];
+  const record = taskFiles as Record<string, unknown>;
+  const grouped = ["creates", "modifies", "reads"]
+    .flatMap((k) => (Array.isArray(record[k]) ? (record[k] as unknown[]) : []))
+    .filter((f): f is string => typeof f === "string");
+  return grouped;
+}
+
+function getTaskFilePlanBuckets(taskFiles: unknown): {
+  creates: string[];
+  modifies: string[];
+  reads: string[];
+} {
+  if (!taskFiles || typeof taskFiles !== "object" || Array.isArray(taskFiles)) {
+    return { creates: [], modifies: [], reads: [] };
+  }
+  const record = taskFiles as Record<string, unknown>;
+  const readBucket = (key: "creates" | "modifies" | "reads"): string[] =>
+    Array.isArray(record[key])
+      ? (record[key] as unknown[]).filter(
+          (f): f is string => typeof f === "string",
+        )
+      : [];
+  return {
+    creates: readBucket("creates"),
+    modifies: readBucket("modifies"),
+    reads: readBucket("reads"),
+  };
+}
+
+function formatTaskFileHints(taskFiles: unknown): string {
+  if (!taskFiles) return "";
+  if (Array.isArray(taskFiles)) {
+    const rows = taskFiles.filter((f): f is string => typeof f === "string");
+    if (rows.length === 0) return "";
+    return `\nKey files to create/modify:\n${rows.map((f) => `- ${f}`).join("\n")}`;
+  }
+  if (typeof taskFiles !== "object") return "";
+  const record = taskFiles as Record<string, unknown>;
+  const creates = Array.isArray(record.creates)
+    ? (record.creates as unknown[]).filter(
+        (f): f is string => typeof f === "string",
+      )
+    : [];
+  const modifies = Array.isArray(record.modifies)
+    ? (record.modifies as unknown[]).filter(
+        (f): f is string => typeof f === "string",
+      )
+    : [];
+  const reads = Array.isArray(record.reads)
+    ? (record.reads as unknown[]).filter(
+        (f): f is string => typeof f === "string",
+      )
+    : [];
+  const lines: string[] = [];
+  if (creates.length > 0)
+    lines.push(`Creates:\n${creates.map((f) => `- ${f}`).join("\n")}`);
+  if (modifies.length > 0)
+    lines.push(`Modifies:\n${modifies.map((f) => `- ${f}`).join("\n")}`);
+  if (reads.length > 0)
+    lines.push(`Reads:\n${reads.map((f) => `- ${f}`).join("\n")}`);
+  return lines.length > 0 ? `\nTask file plan:\n${lines.join("\n")}` : "";
+}
+
+function getRemainingPlannedCreates(
+  task: CodingTask,
+  writtenFiles: string[],
+): string[] {
+  const { creates } = getTaskFilePlanBuckets(task.files);
+  const writtenSet = new Set(
+    writtenFiles.map((file) => file.replace(/\\/g, "/")),
+  );
+  return creates.filter((file) => !writtenSet.has(file.replace(/\\/g, "/")));
+}
+
+function scoreGeneratedFileForTask(
+  file: GeneratedFile,
+  task: CodingTask,
+  workerRole: CodingAgentRole,
+): number {
+  const normalizedPath = file.path.replace(/\\/g, "/");
+  const hints = normalizeTaskFileHints(task.files).map((f) =>
+    f.replace(/\\/g, "/"),
+  );
+  let score = 0;
+
+  for (const hint of hints) {
+    if (normalizedPath === hint) {
+      score += 1000;
+      continue;
+    }
+    if (matchesTaskPathHint(normalizedPath, hint)) {
+      score += 700;
+    }
+  }
+
+  if (file.role === workerRole) score += 240;
+
+  const basename = path.posix.basename(normalizedPath);
+  if (
+    normalizedPath === "frontend/src/api/client.ts" ||
+    normalizedPath === "frontend/src/router.tsx" ||
+    normalizedPath === "frontend/src/main.tsx" ||
+    normalizedPath === "backend/src/app.ts" ||
+    normalizedPath === "backend/src/server.ts" ||
+    normalizedPath === "backend/src/api/modules/index.ts" ||
+    normalizedPath === "packages/shared/src/index.ts" ||
+    normalizedPath === "API_CONTRACTS.json" ||
+    normalizedPath === "SCAFFOLD_SPEC.md"
+  ) {
+    score += 140;
+  }
+
+  if (basename === "index.ts" || basename === "index.tsx") score += 40;
+  if (file.exports && file.exports.length > 0) score += 20;
+
+  return score;
+}
+
+function buildGeneratedFileRegistryListing(
+  state: WorkerState,
+  task: CodingTask,
+  limit = 30,
+): string {
+  const ranked = state.fileRegistrySnapshot
+    .map((file, index) => ({
+      file,
+      index,
+      score: scoreGeneratedFileForTask(file, task, state.role),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return b.index - a.index;
+    })
+    .slice(0, limit)
+    .map(({ file }) => {
+      const exportsNote =
+        file.exports && file.exports.length > 0
+          ? ` | exports: ${file.exports.slice(0, 8).join(", ")}`
+          : "";
+      return `- ${file.path} (${file.role}): ${file.summary}${exportsNote}`;
+    });
+
+  return ranked.join("\n");
+}
+
+function scoreCandidatePathForTask(
+  normalizedPath: string,
+  task: CodingTask,
+  workerRole: CodingAgentRole,
+  registryMeta?: GeneratedFile,
+): number {
+  if (registryMeta) {
+    return scoreGeneratedFileForTask(registryMeta, task, workerRole);
+  }
+
+  const hints = normalizeTaskFileHints(task.files).map((f) =>
+    f.replace(/\\/g, "/"),
+  );
+  let score = 0;
+
+  for (const hint of hints) {
+    if (normalizedPath === hint) {
+      score += 1000;
+      continue;
+    }
+    if (matchesTaskPathHint(normalizedPath, hint)) {
+      score += 700;
+    }
+  }
+
+  if (
+    (workerRole === "frontend" && normalizedPath.startsWith("frontend/src/")) ||
+    (workerRole === "backend" && normalizedPath.startsWith("backend/src/")) ||
+    (workerRole === "architect" &&
+      (normalizedPath.startsWith("packages/shared/") ||
+        normalizedPath.endsWith("SCAFFOLD_SPEC.md") ||
+        normalizedPath.endsWith("DEPENDENCY_PLAN.md"))) ||
+    (workerRole === "test" &&
+      (normalizedPath.includes("/e2e/") ||
+        normalizedPath.includes(".spec.") ||
+        normalizedPath.endsWith("playwright.config.ts")))
+  ) {
+    score += 240;
+  }
+
+  const basename = path.posix.basename(normalizedPath);
+  if (
+    normalizedPath === "frontend/src/api/client.ts" ||
+    normalizedPath === "frontend/src/router.tsx" ||
+    normalizedPath === "frontend/src/main.tsx" ||
+    normalizedPath === "backend/src/app.ts" ||
+    normalizedPath === "backend/src/server.ts" ||
+    normalizedPath === "backend/src/api/modules/index.ts" ||
+    normalizedPath === "packages/shared/src/index.ts" ||
+    normalizedPath === "API_CONTRACTS.json" ||
+    normalizedPath === "SCAFFOLD_SPEC.md" ||
+    normalizedPath === "DEPENDENCY_PLAN.md"
+  ) {
+    score += 140;
+  }
+
+  if (basename === "index.ts" || basename === "index.tsx") score += 40;
+
+  return score;
+}
+
 async function buildRelevantFileContext(
   state: WorkerState,
   task: CodingTask,
 ): Promise<string> {
-  const hints = (task.files ?? []).map((f) => f.replace(/\\/g, "/"));
+  const hints = normalizeTaskFileHints(task.files).map((f) =>
+    f.replace(/\\/g, "/"),
+  );
   const candidates = new Set<string>();
 
   // 1) Direct hint matches from current registry.
@@ -276,7 +1493,33 @@ async function buildRelevantFileContext(
     if (f.role === state.role) candidates.add(f.path.replace(/\\/g, "/"));
   }
 
-  // 3) Always include key shared contract roots if present.
+  // 3) Dynamically discover shared/frontend/backend source files so agents
+  //    see the current scaffold layout and don't hallucinate old paths.
+  try {
+    const sharedFiles = await listFiles("packages/shared/src", state.outputDir);
+    for (const f of sharedFiles) {
+      if (/\.(ts|tsx)$/.test(f)) candidates.add(f.replace(/\\/g, "/"));
+    }
+  } catch {
+    // listFiles may throw if the directory doesn't exist
+  }
+  try {
+    const frontendFiles = await listFiles("frontend/src", state.outputDir);
+    for (const f of frontendFiles) {
+      if (/\.(ts|tsx|css)$/.test(f)) candidates.add(f.replace(/\\/g, "/"));
+    }
+  } catch {
+    // non-M-tier layouts may not have frontend/
+  }
+  try {
+    const backendFiles = await listFiles("backend/src", state.outputDir);
+    for (const f of backendFiles) {
+      if (/\.(ts|tsx)$/.test(f)) candidates.add(f.replace(/\\/g, "/"));
+    }
+  } catch {
+    // non-M-tier layouts may not have backend/
+  }
+  // Also add flat-layout shared files (non-src/) and key app files.
   [
     "packages/shared/schemas/auth.ts",
     "packages/shared/schemas/tasks.ts",
@@ -284,8 +1527,17 @@ async function buildRelevantFileContext(
     "packages/shared/types/auth.ts",
     "packages/shared/types/tasks.ts",
     "packages/shared/types/users.ts",
-    "packages/shared/src/contracts/auth.ts",
-    "packages/shared/src/contracts/tasks.ts",
+    "packages/shared/src/index.ts",
+    "frontend/package.json",
+    "frontend/vite.config.ts",
+    "frontend/tsconfig.json",
+    "frontend/src/main.tsx",
+    "frontend/src/router.tsx",
+    "frontend/src/api/client.ts",
+    "backend/package.json",
+    "backend/src/app.ts",
+    "backend/src/server.ts",
+    "backend/src/api/modules/index.ts",
     "apps/web/src/lib/apiClient.ts",
     "apps/web/lib/api/auth.client.ts",
     "apps/api/src/routes/auth.ts",
@@ -294,12 +1546,87 @@ async function buildRelevantFileContext(
     "DEPENDENCY_PLAN.md",
   ].forEach((p) => candidates.add(p));
 
+  // RALPH Phase 4: prepend session context summary when context rotation is active
+  const contextPreamble: string[] = [];
+  if (state.ralphConfig.enabled && state.contextRotationNeeded) {
+    const sessionCtx = await fsRead(
+      ".ralph/session-context.md",
+      state.outputDir,
+    );
+    if (
+      !sessionCtx.startsWith("FILE_NOT_FOUND") &&
+      !sessionCtx.startsWith("REJECTED")
+    ) {
+      contextPreamble.push(
+        `## Prior session context (context rotation active)\n${sessionCtx.slice(0, 2000)}`,
+      );
+    }
+  }
+
+  // Build export map from key files so agents know exactly what is available
+  const exportMapFiles = [
+    "packages/shared/src/index.ts",
+    "frontend/src/api/client.ts",
+    "frontend/src/router.tsx",
+    "frontend/src/main.tsx",
+    "apps/web/src/lib/api.ts",
+    "apps/web/src/lib/apiClient.ts",
+    "apps/web/src/lib/auth.ts",
+    "apps/web/src/contexts/AuthContext.tsx",
+    "apps/web/src/App.tsx",
+  ];
+  const exportMapLines: string[] = [];
+  for (const emf of exportMapFiles) {
+    const emContent = await fsRead(emf, state.outputDir);
+    if (
+      emContent.startsWith("FILE_NOT_FOUND") ||
+      emContent.startsWith("REJECTED")
+    )
+      continue;
+    const exports = extractExportNames(emContent);
+    if (exports.length > 0) {
+      exportMapLines.push(`- \`${emf}\`: ${exports.join(", ")}`);
+    }
+  }
+  if (exportMapLines.length > 0) {
+    contextPreamble.push(
+      `## Available exports (ONLY import what is listed here)\n${exportMapLines.join("\n")}`,
+    );
+  }
+
   // Read up to a bounded set to control context size.
-  const selected = [...candidates].slice(0, 18);
+  // When rotation is active, reduce the file limit to leave room for session context.
+  const fileLimit = state.contextRotationNeeded ? 12 : 18;
+  const registryByPath = new Map(
+    state.fileRegistrySnapshot.map((file) => [
+      file.path.replace(/\\/g, "/"),
+      file,
+    ]),
+  );
+  const selected = [...candidates]
+    .map((candidate, index) => ({
+      candidate,
+      index,
+      score: scoreCandidatePathForTask(
+        candidate,
+        task,
+        state.role,
+        registryByPath.get(candidate),
+      ),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.index - b.index;
+    })
+    .slice(0, fileLimit)
+    .map(({ candidate }) => candidate);
   const chunks: string[] = [];
   for (const rel of selected) {
     const content = await fsRead(rel, state.outputDir);
-    if (content.startsWith("FILE_NOT_FOUND") || content.startsWith("REJECTED")) {
+    if (
+      content.startsWith("FILE_NOT_FOUND") ||
+      content.startsWith("REJECTED")
+    ) {
       continue;
     }
     const block =
@@ -309,25 +1636,112 @@ async function buildRelevantFileContext(
     chunks.push(`### ${rel}\n\`\`\`\n${block}\n\`\`\``);
   }
 
-  if (chunks.length === 0) return "";
-  return `## Relevant existing files (read before coding)\n${chunks.join("\n\n")}`;
+  const allChunks = [...contextPreamble, ...chunks];
+  if (allChunks.length === 0) return "";
+  return `## Relevant existing files (read before coding)\n${allChunks.join("\n\n")}`;
+}
+
+// ─── Dynamic sub-step parsing ───
+
+const PLAN_BLOCK_RE = /<plan>([\s\S]*?)<\/plan>/;
+
+function parsePlanBlock(content: string): TaskSubStep[] {
+  const match = PLAN_BLOCK_RE.exec(content);
+  if (!match) return [];
+
+  const planText = match[1].trim();
+  const lines = planText.split("\n").filter((l) => l.trim().length > 0);
+
+  return lines.map((line, idx) => {
+    const cleanLine = line.replace(/^\d+[\.\)]\s*/, "").trim();
+    const colonIdx = cleanLine.indexOf(":");
+    const action =
+      colonIdx > 0 ? cleanLine.slice(0, colonIdx).trim() : cleanLine;
+    const detail = colonIdx > 0 ? cleanLine.slice(colonIdx + 1).trim() : "";
+    return { step: idx + 1, action, detail };
+  });
+}
+
+function parseCodegenRoundStatus(content: string): "done" | "continue" | null {
+  const m = /STATUS:\s*(DONE|CONTINUE)/i.exec(content);
+  if (!m) return null;
+  return m[1].toUpperCase() === "DONE" ? "done" : "continue";
+}
+
+function parseTaskFilePlanFailureDetails(verifyErrors: string): {
+  missingCreates: string[];
+  unmodified: string[];
+} {
+  const parseList = (label: "missingCreates" | "unmodified"): string[] => {
+    const match = new RegExp(`${label}=\\[([^\\]]*)\\]`).exec(verifyErrors);
+    if (!match) return [];
+    return match[1]
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  };
+  return {
+    missingCreates: parseList("missingCreates"),
+    unmodified: parseList("unmodified"),
+  };
+}
+
+// ─── RALPH helpers ───
+
+/**
+ * Checks whether the LLM output contains the RALPH completion promise.
+ * When Ralph mode is disabled this is only informational (not enforced).
+ */
+export function extractCompletionPromise(content: string): {
+  found: boolean;
+  failed: boolean;
+  reason?: string;
+} {
+  if (content.includes(RALPH_COMPLETE_TOKEN)) {
+    return { found: true, failed: false };
+  }
+  const m = RALPH_FAILED_RE.exec(content);
+  if (m) {
+    return { found: true, failed: true, reason: m[1].trim() };
+  }
+  return { found: false, failed: false };
 }
 
 // ─── Node functions ───
 
-function pickNextTask(state: WorkerState) {
+async function pickNextTask(state: WorkerState) {
   const idx = state.currentTaskIndex;
   const total = state.tasks.length;
-  if (idx < total) {
-    console.log(`[Worker:${state.workerLabel}] Picking task ${idx + 1}/${total}: ${state.tasks[idx].title}`);
+  const currentTask = idx < total ? state.tasks[idx] : null;
+  if (currentTask) {
+    console.log(
+      `[Worker:${state.workerLabel}] Picking task ${idx + 1}/${total}: ${currentTask.title}`,
+    );
   } else {
     console.log(`[Worker:${state.workerLabel}] All ${total} tasks done.`);
   }
+
+  // Snapshot sha256 of the files the task plans to modify, so the post-gen
+  // verifier can tell the difference between "LLM actually edited the file"
+  // and "LLM said it would but didn't".
+  const modifiesSnapshot = currentTask
+    ? await snapshotModifiesFiles(currentTask, state.outputDir)
+    : {};
+
+  // Capture an on-disk rollback snapshot of everything the task plans to
+  // touch. If the task fails after partial writes, `taskFailed` restores
+  // the pre-task state — keeps a broken attempt from contaminating later
+  // tasks or subsequent retries.
+  if (currentTask) {
+    await snapshotTask(currentTask, state.outputDir);
+  }
+
   return {
     verifyErrors: "",
     fixAttempts: 0,
     currentTaskRetryCount: 0,
     currentTaskLastError: "",
+    currentTaskLastRawContent: "",
     currentTaskGeneratedFiles: [],
     currentTaskCostUsd: 0,
     currentTaskDurationMs: 0,
@@ -336,6 +1750,14 @@ function pickNextTask(state: WorkerState) {
       completionTokens: 0,
       totalTokens: 0,
     },
+    currentTaskModifiesSnapshot: modifiesSnapshot,
+    ...(currentTask
+      ? {
+          currentTaskId: currentTask.id,
+          currentTaskTitle: currentTask.title,
+          currentTaskPhase: currentTask.phase,
+        }
+      : {}),
   };
 }
 
@@ -345,11 +1767,33 @@ function shouldContinueOrEnd(state: WorkerState): string {
 }
 
 function routeAfterGenerate(state: WorkerState): string {
-  if (!state.currentTaskLastError) return "verify";
-  if (state.currentTaskRetryCount <= MAX_TASK_GENERATION_RETRIES) {
-    return "generate_code";
+  // Generation threw an exception — always retry up to the configured limit.
+  if (state.currentTaskLastError) {
+    const maxRetries = state.ralphConfig.enabled
+      ? state.ralphConfig.maxIterationsPerTask - 1
+      : MAX_TASK_GENERATION_RETRIES;
+    if (state.currentTaskRetryCount <= maxRetries) return "generate_code";
+    return "task_failed";
   }
-  return "task_failed";
+
+  // In Ralph mode: require the completion promise before accepting the output.
+  if (state.ralphConfig.enabled) {
+    const promise = extractCompletionPromise(
+      state.currentTaskLastRawContent ?? "",
+    );
+    if (promise.failed) {
+      // LLM explicitly signalled failure — escalate immediately.
+      return "task_failed";
+    }
+    if (!promise.found) {
+      // Promise absent — treat as incomplete and retry.
+      const maxRetries = state.ralphConfig.maxIterationsPerTask - 1;
+      if (state.currentTaskRetryCount <= maxRetries) return "generate_code";
+      return "task_failed";
+    }
+  }
+
+  return "verify";
 }
 
 async function generateCode(state: WorkerState) {
@@ -362,20 +1806,45 @@ async function generateCode(state: WorkerState) {
     );
 
     const contextParts: string[] = [];
+
+    // Always inject the convention card first so every worker has a concise
+    // cheat-sheet of project-specific architectural facts before reading anything else.
+    try {
+      const conventionCard = await buildProjectConventionCard(state.outputDir);
+      if (conventionCard) contextParts.push(conventionCard);
+    } catch {
+      // Non-fatal — missing card just means workers rely on context files alone.
+    }
+
     if (state.projectContext) {
-      contextParts.push(state.projectContext);
+      // Trim the (potentially huge) projectContext down to a task-relevant
+      // subset. Protections against info loss:
+      //   1. Always-keep whitelist (shared/common/conventions/…)
+      //   2. Force-include sections that mention task's FR/AC IDs
+      //   3. Trim-marker at the bottom telling the worker to use
+      //      read_file / grep if it needs details it doesn't see
+      // See: src/lib/langgraph/worker-context-trim.ts
+      const trimmed = trimProjectContextForTask(state.projectContext, {
+        task,
+        sessionId: state.sessionId,
+        label: state.workerLabel,
+      });
+      contextParts.push(trimmed.content);
+      if (trimmed.trimmed) {
+        console.log(
+          `[Worker:${state.workerLabel}] projectContext trimmed: ${trimmed.originalChars.toLocaleString()} -> ${trimmed.usedChars.toLocaleString()} chars (task=${task.id} "${task.title}")`,
+        );
+      }
+    }
+    // PrdSpec (PAGE-*/CMP-*) entries for this task — only useful for
+    // frontend/test workers, but cheap to include for others too when the
+    // task explicitly covers a page or component id.
+    const prdSpecBlock = pickPrdSpecEntriesForTask(task, state.prdSpec);
+    if (prdSpecBlock) {
+      contextParts.push(prdSpecBlock);
     }
     if (state.fileRegistrySnapshot.length > 0) {
-      const listing = state.fileRegistrySnapshot
-        .slice(0, 30)
-        .map((f) => {
-          const exportsNote =
-            f.exports && f.exports.length > 0
-              ? ` | exports: ${f.exports.slice(0, 8).join(", ")}`
-              : "";
-          return `- ${f.path} (${f.role}): ${f.summary}${exportsNote}`;
-        })
-        .join("\n");
+      const listing = buildGeneratedFileRegistryListing(state, task);
       contextParts.push(`## Already generated files\n${listing}`);
     }
 
@@ -405,9 +1874,31 @@ async function generateCode(state: WorkerState) {
 
     if (state.apiContractsSnapshot.length > 0) {
       const apis = state.apiContractsSnapshot
-        .map((a) => `- ${a.method} ${a.endpoint} (${a.service})`)
+        .map((a) => {
+          const parts = [
+            `- **${a.method} ${a.endpoint}** [auth: ${a.authType ?? "none"}]`,
+          ];
+          if (a.requestFields && a.requestFields !== "none") {
+            parts.push(`  - Request: \`${a.requestFields}\``);
+          }
+          if (a.responseFields && a.responseFields !== "none") {
+            parts.push(`  - Response: \`${a.responseFields}\``);
+          } else if (
+            a.schema &&
+            a.schema !== "extracted from source" &&
+            a.schema !== "extracted by regex"
+          ) {
+            parts.push(`  - Schema: ${a.schema}`);
+          }
+          if (a.description) {
+            parts.push(`  - ${a.description}`);
+          }
+          return parts.join("\n");
+        })
         .join("\n");
-      contextParts.push(`## Available API endpoints\n${apis}`);
+      contextParts.push(
+        `## Available API endpoints\n⚠️ Use ONLY these real endpoints. Do NOT use mock data or invent endpoints.\n${apis}`,
+      );
     }
 
     const relevantFilesContext = await buildRelevantFileContext(state, task);
@@ -420,10 +1911,7 @@ async function generateCode(state: WorkerState) {
       contextParts.push(versionConstraints);
     }
 
-    const fileHint =
-      task.files && task.files.length > 0
-        ? `\nKey files to create/modify:\n${task.files.map((f) => `- ${f}`).join("\n")}`
-        : "";
+    const fileHint = formatTaskFileHints(task.files);
 
     const messages: ChatMessage[] = [
       { role: "system", content: ROLE_PROMPTS[state.role] },
@@ -434,77 +1922,326 @@ async function generateCode(state: WorkerState) {
         content: `## Project Context\n${contextParts.join("\n\n")}`,
       });
     }
+
+    // Memory recall (Phase C-3): inject active failure-patterns matching
+    // the current task. Layer 2 only — Layer 3 (shadow) is trace-logged
+    // by recallAndPrepareInject but does NOT modify the prompt. The
+    // helper itself respects MEMORY_ENABLED / MEMORY_INJECT flags and
+    // never throws.
+    const memoryRecall = await recallAndPrepareInject({
+      agent: "worker_codegen",
+      role: state.role,
+      task: {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        files: Array.isArray(task.files) ? task.files : undefined,
+      },
+      projectRoot: state.outputDir,
+      kickoffId: state.sessionId,
+      layers: ["L1", "L2"],
+      tokenBudget: getInjectTokenBudgetForRole(state.role),
+    });
+    if (memoryRecall.block) {
+      messages.push({ role: "system", content: memoryRecall.block });
+    }
+    // Soft cite instruction — only when memory was actually injected so we
+    // don't spend tokens on instructions for an empty feature. Missing cites
+    // are fine; attribution falls back to "all injected" when none parse.
+    const citeHint =
+      memoryRecall.active.length > 0
+        ? `\n\nIf any record from the <memory-context> block above directly informed your code, declare it before the <plan> tag using:\n  <memory-cite ids="FP-xxx,FP-yyy" />\nList only ids you actually used. Citing is optional but helps the system credit useful patterns.`
+        : "";
+    const subStepsHint =
+      task.subSteps && task.subSteps.length > 0
+        ? `\n\nPre-defined sub-steps:\n${task.subSteps.map((s) => `${s.step}. ${s.action}: ${s.detail}`).join("\n")}`
+        : "";
+    const tddPlanHint =
+      task.tddPlan?.tests && task.tddPlan.tests.length > 0
+        ? `\n\nTDD seed tests this implementation must satisfy:\n${task.tddPlan.tests
+            .map(
+              (test) =>
+                `- ${test.id} [${test.priority}/${test.type}] ${test.file}\n  command: ${test.command}\n  RED: ${test.expectedRed}\n  GREEN: ${test.expectedGreen}\n  Write this test file before the production implementation when it is part of this task's file plan.`,
+            )
+            .join("\n")}`
+        : "";
+
+    const multiRoundInstruction = CODEGEN_MULTI_ROUND_ENABLED
+      ? `\n\nMULTI-ROUND OUTPUT MODE:\n- In this round, output at most ${CODEGEN_FILE_BATCH_SIZE} file block(s) using \`\`\`file:path\`\`\` format.\n- Prefer continuing with files not yet generated in this task.\n- However, if any previously generated file needs correction, completion, API wiring, import/export alignment, consistency fixes, or error fixes, you SHOULD rewrite that file in this round.\n- Do NOT preserve an incorrect earlier version just to avoid rewriting.\n- If more files are still needed for this task, end your response with: STATUS: CONTINUE\n- If task implementation is complete, end your response with: STATUS: DONE`
+      : "";
+
     messages.push({
       role: "user",
-      content: `## Task: ${task.title}\n\n${task.description}${fileHint}\n\nGenerate the complete code for this task.\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.`,
+      content: `## Task: ${task.title}\n\n${task.description}${fileHint}${subStepsHint}${tddPlanHint}\n\nFirst, output a brief implementation plan inside <plan> tags (one numbered step per line).\nThen generate code for this task.${multiRoundInstruction}${citeHint}\n\nBefore writing, read and follow existing file contracts in context (imports, exports, naming, and paths). Extend existing modules instead of creating duplicate paths when possible. When context is insufficient, use the available read-only tools (\`read_file\`, \`list_files\`, \`grep\`) to inspect the generated project before coding.\n\nACCEPTANCE CRITERIA:\n1. Every button has a real onClick handler that updates state or triggers navigation.\n2. Every form has onSubmit with validation logic.\n3. Every input/toggle/select is controlled with useState + onChange.\n4. Links navigate to real routes (React Router Link or useNavigate).\n5. Timer/counter/animation logic uses real useEffect + setInterval/setTimeout.\n6. If Design Tokens are in context, match every color, size, gap, padding, radius, and font exactly using Tailwind arbitrary values.\n7. [FRONTEND DATA RULE] If this task renders any list, table, card grid, or detail view that displays backend data: ALL data MUST be fetched from the real API endpoint via the API client. ZERO hardcoded arrays, ZERO mock objects, ZERO placeholder data. Use useEffect + loading/error state. Read \`frontend/src/api/client.ts\` with read_file before coding to get the correct method signatures.`,
     });
 
     const startMs = Date.now();
-    const response = await invokeCodegenOrOpenRouter(messages, {
-      temperature: 0.3,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      openRouterVariant: "codeGen",
-    });
-    const durationMs = Date.now() - startMs;
-
-    const content = response.choices[0]?.message?.content ?? "";
-    const costUsd = estimateCost(response.model, response.usage);
-    const usage = response.usage as
-      | {
-          prompt_tokens?: number;
-          completion_tokens?: number;
-          total_tokens?: number;
-          promptTokens?: number;
-          completionTokens?: number;
-          totalTokens?: number;
-        }
-      | undefined;
-    const promptTokens = usage?.prompt_tokens ?? usage?.promptTokens ?? 0;
-    const completionTokens =
-      usage?.completion_tokens ?? usage?.completionTokens ?? 0;
-    const totalTokens =
-      usage?.total_tokens ?? usage?.totalTokens ?? promptTokens + completionTokens;
-    const parsedFiles = parseFileOutput(content);
-
     const fsOpts =
       state.scaffoldProtectedPaths.length > 0
         ? { scaffoldProtectedPaths: state.scaffoldProtectedPaths }
         : undefined;
 
     const writtenFiles: string[] = [];
+    const writtenSet = new Set<string>();
     const newFileEntries: GeneratedFile[] = [];
-    for (const [fp, fc] of Object.entries(parsedFiles)) {
-      const msg = await fsWrite(fp, fc, state.outputDir, fsOpts);
-      if (msg.startsWith("SKIPPED_PROTECTED")) {
-        console.log(`[Worker:${state.workerLabel}] ${msg}`);
-        continue;
+    let totalCostUsd = 0;
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let totalTokens = 0;
+    let aggregateRawContent = "";
+    let rounds = 0;
+    let lastModel = "unknown";
+
+    const secondaryRecallCtx: SecondaryRecallContext | undefined =
+      memoryRecall.active.length > 0 || memoryRecall.shadow.length > 0
+        ? {
+            agent: "worker_codegen",
+            role: state.role,
+            task: {
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              files: Array.isArray(task.files) ? task.files : undefined,
+            },
+            projectRoot: state.outputDir,
+            kickoffId: state.sessionId,
+            layers: ["L1", "L2"],
+            primaryInjectedIds: memoryRecall.active.map((r) => r.id),
+            tokenBudget: getInjectTokenBudgetForRole(state.role),
+          }
+        : undefined;
+
+    // Snapshot the initial context length so we can trim round-accumulated
+    // messages (tool results, assistant file blocks) between multi-rounds.
+    // Without this, context grows from ~15 K → 80 K+ over 8 rounds.
+    const initialMessagesLength = messages.length;
+
+    while (rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS) {
+      rounds += 1;
+      const response = await runCodegenWorkerLoop(
+        messages,
+        state.outputDir,
+        state.sessionId,
+        state.workerLabel,
+        secondaryRecallCtx,
+      );
+      const content = response.content;
+      validateCodegenFileOutput(content);
+      const parsedFiles = parseFileOutput(content);
+      const roundStatus = parseCodegenRoundStatus(content);
+      totalCostUsd += response.costUsd;
+      promptTokens += response.promptTokens;
+      completionTokens += response.completionTokens;
+      totalTokens += response.totalTokens;
+      aggregateRawContent +=
+        `\n\n<!-- round:${rounds} model:${response.model} -->\n` +
+        response.rawContent;
+      lastModel = response.model;
+
+      // Parse cite tags emitted by the worker so attribution can credit
+      // the specific patterns the model claims it used. Best-effort: never
+      // throws, validates ids against the actual injected set so a
+      // hallucinated id can't poison scoring.
+      if (memoryRecall.active.length > 0) {
+        const citedIds = parseMemoryCites(content);
+        if (citedIds.length > 0) {
+          const allInjected = [
+            ...memoryRecall.active.map((r) => r.id),
+            ...response.secondaryInjectedIds,
+          ];
+          await recordMemoryCites({
+            traceRoot: state.outputDir,
+            agent: "worker_codegen",
+            kickoffId: state.sessionId,
+            taskId: task.id,
+            citedIds,
+            injectedIds: allInjected,
+          });
+        }
       }
-      writtenFiles.push(fp);
-      newFileEntries.push({
-        path: fp,
-        role: state.role,
-        summary: `Generated for task: ${task.title}`,
+
+      let roundWrites = 0;
+      for (const [fp, fc] of Object.entries(parsedFiles)) {
+        const msg = await fsWrite(fp, fc, state.outputDir, fsOpts);
+        if (msg.startsWith("SKIPPED_PROTECTED")) {
+          console.log(`[Worker:${state.workerLabel}] ${msg}`);
+          continue;
+        }
+        if (!writtenSet.has(fp)) {
+          writtenSet.add(fp);
+          writtenFiles.push(fp);
+        }
+        newFileEntries.push({
+          path: fp,
+          role: state.role,
+          summary: `Generated for task: ${task.title}`,
+        });
+        roundWrites += 1;
+      }
+
+      console.log(
+        `[Worker:${state.workerLabel}] codegen round ${rounds}/${CODEGEN_MULTI_ROUND_MAX_ROUNDS}: wrote ${roundWrites} file(s), status=${roundStatus ?? "implicit_done"}, model=${response.model}`,
+      );
+
+      const remainingCreates = getRemainingPlannedCreates(task, writtenFiles);
+      const forcedContinue =
+        CODEGEN_MULTI_ROUND_ENABLED &&
+        remainingCreates.length > 0 &&
+        rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS;
+      if (forcedContinue && roundStatus !== "continue") {
+        console.warn(
+          `[Worker:${state.workerLabel}] codegen round ${rounds}: file plan still missing ${remainingCreates.length} create(s); overriding ${roundStatus ?? "implicit_done"} -> continue.`,
+        );
+      }
+      const shouldContinue =
+        CODEGEN_MULTI_ROUND_ENABLED &&
+        (roundStatus === "continue" || forcedContinue) &&
+        rounds < CODEGEN_MULTI_ROUND_MAX_ROUNDS;
+      if (!shouldContinue) break;
+
+      const knownFiles = writtenFiles
+        .slice(-40)
+        .map((f) => `- ${f}`)
+        .join("\n");
+      // Compress messages accumulated during this round back to the initial
+      // context snapshot.  This prevents the prompt from growing linearly
+      // with the number of rounds (15 K → 86 K+).  All tool call results and
+      // large assistant file-block messages are dropped; the continuation
+      // message below re-injects the file list so the model retains awareness
+      // of what has already been written.
+      messages.splice(initialMessagesLength);
+      messages.push({
+        role: "user",
+        content: [
+          "Continue with the next batch of files for this SAME task.",
+          `Output at most ${CODEGEN_FILE_BATCH_SIZE} file block(s) in this round.`,
+          "Prefer files not yet generated in this task.",
+          "If any previously generated file is incomplete, inconsistent, miswired, or needs correction, rewrite it in this round.",
+          "Do not preserve an incorrect earlier version just to avoid rewriting.",
+          remainingCreates.length > 0
+            ? `You still MUST create these planned file(s) before finishing:\n${remainingCreates.map((file) => `- ${file}`).join("\n")}`
+            : "",
+          "End with STATUS: CONTINUE or STATUS: DONE.",
+          "",
+          knownFiles ? `Already generated files:\n${knownFiles}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
       });
     }
+    const durationMs = Date.now() - startMs;
 
     console.log(
-      `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (model=${response.model}, cost: $${costUsd.toFixed(4)})`,
+      `[Worker:${state.workerLabel}] Generated ${writtenFiles.length} files in ${(durationMs / 1000).toFixed(1)}s (rounds=${rounds}, model=${lastModel}, cost: $${totalCostUsd.toFixed(4)})`,
     );
+
+    // Migration-coverage check — fires per-task immediately after writes.
+    // If the worker touched a Sequelize model without a migration, log a
+    // warning and persist the gap to .ralph/migration-coverage.json so
+    // downstream self-heal can convert it into a repair task.
+    try {
+      const coverage = checkMigrationCoverage({ writtenFiles });
+      if (coverage.modelFilesTouched.length > 0 || coverage.migrationFilesTouched.length > 0) {
+        const ralphDir = path.join(state.outputDir, ".ralph");
+        await nodeFs.mkdir(ralphDir, { recursive: true });
+        const reportPath = path.join(ralphDir, "migration-coverage.json");
+        let report: {
+          version: number;
+          updatedAt: string;
+          tasks: Record<
+            string,
+            {
+              taskId: string;
+              taskTitle: string;
+              ok: boolean;
+              modelFilesTouched: string[];
+              migrationFilesTouched: string[];
+              gaps: { modelPath: string; modelName: string; instruction: string }[];
+              checkedAt: string;
+            }
+          >;
+        };
+        try {
+          const raw = await nodeFs.readFile(reportPath, "utf8");
+          report = JSON.parse(raw);
+          if (typeof report?.tasks !== "object" || report?.tasks === null) {
+            throw new Error("malformed");
+          }
+        } catch {
+          report = { version: 1, updatedAt: "", tasks: {} };
+        }
+        const checkedAt = new Date().toISOString();
+        report.tasks[task.id] = {
+          taskId: task.id,
+          taskTitle: task.title,
+          ok: coverage.ok,
+          modelFilesTouched: coverage.modelFilesTouched,
+          migrationFilesTouched: coverage.migrationFilesTouched,
+          gaps: coverage.gaps.map((g) => ({
+            ...g,
+            instruction: formatMigrationGapInstruction(g, task.id),
+          })),
+          checkedAt,
+        };
+        report.updatedAt = checkedAt;
+        await nodeFs.writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", "utf8");
+
+        if (!coverage.ok) {
+          console.warn(
+            `[Worker:${state.workerLabel}] Migration coverage gap: task "${task.id}" touched ${coverage.modelFilesTouched.length} model file(s) without writing a migration. ${coverage.gaps.length} gap(s) recorded in .ralph/migration-coverage.json.`,
+          );
+        }
+      }
+    } catch (e) {
+      console.warn(
+        `[Worker:${state.workerLabel}] Migration coverage check failed (continuing): ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+
+    // RALPH: check for missing promise and log a warning (enforcement happens in routeAfterGenerate)
+    if (state.ralphConfig.enabled) {
+      const promise = extractCompletionPromise(aggregateRawContent);
+      if (!promise.found) {
+        console.warn(
+          `[Worker:${state.workerLabel}] RALPH: completion promise absent for "${task.title}" (attempt ${attempt})`,
+        );
+      }
+    }
+
+    // Parse dynamic sub-steps from the LLM output
+    const dynamicSubSteps = parsePlanBlock(aggregateRawContent);
+    if (dynamicSubSteps.length > 0) {
+      console.log(
+        `[Worker:${state.workerLabel}] Parsed ${dynamicSubSteps.length} dynamic sub-step(s) for "${task.title}"`,
+      );
+    }
+
+    // RALPH Phase 4: accumulate context tokens for rotation detection
+    const contextRotationNeeded =
+      state.ralphConfig.enabled &&
+      state.ralphConfig.contextRotationThreshold > 0 &&
+      state.estimatedContextTokens + promptTokens >
+        state.ralphConfig.contextRotationThreshold * MAX_CONTEXT_TOKENS;
 
     return {
       generatedFiles: newFileEntries,
       currentTaskGeneratedFiles: writtenFiles,
-      currentTaskCostUsd: costUsd,
+      currentTaskCostUsd: totalCostUsd,
       currentTaskDurationMs: durationMs,
       currentTaskTokenUsage: {
         promptTokens,
         completionTokens,
         totalTokens,
       },
-      workerCostUsd: costUsd,
+      workerCostUsd: totalCostUsd,
       verifyErrors: "",
       fixAttempts: 0,
       currentTaskLastError: "",
+      currentTaskLastRawContent: aggregateRawContent,
+      currentTaskSubSteps: dynamicSubSteps,
+      // Accumulate for context-rotation tracking (additive reducer)
+      estimatedContextTokens: promptTokens,
+      contextRotationNeeded,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -515,6 +2252,7 @@ async function generateCode(state: WorkerState) {
     return {
       currentTaskRetryCount: retryCount,
       currentTaskLastError: message.slice(0, 2000),
+      currentTaskLastRawContent: "",
     };
   }
 }
@@ -609,7 +2347,8 @@ export function extractMissingPackages(tscOutput: string): string[] {
       : mod.split("/")[0];
     pkgs.add(pkg);
   }
-  const declRe = /Could not find a declaration file for module ['"]([^'"]+)['"]/g;
+  const declRe =
+    /Could not find a declaration file for module ['"]([^'"]+)['"]/g;
   while ((m = declRe.exec(tscOutput)) !== null) {
     const mod = m[1];
     if (mod.startsWith(".") || mod.startsWith("/")) continue;
@@ -633,7 +2372,7 @@ export function extractMissingPackages(tscOutput: string): string[] {
   ) {
     pkgs.add("@testing-library/jest-dom");
   }
-  return [...pkgs];
+  return [...pkgs].filter(isAutoInstallableNpmPackageName);
 }
 
 export async function installMissingDeps(
@@ -650,8 +2389,9 @@ export async function installMissingDeps(
         }
       : undefined;
 
-  const needsJestDom =
-    /toBeInTheDocument|toHaveTextContent|toBeVisible/.test(tscOutput);
+  const needsJestDom = /toBeInTheDocument|toHaveTextContent|toBeVisible/.test(
+    tscOutput,
+  );
 
   if (needsJestDom) {
     pkgs.push("@testing-library/jest-dom");
@@ -688,11 +2428,8 @@ export async function installMissingDeps(
   console.log(
     `[Verify] Installing ${unique.length} missing package(s): ${unique.join(", ")}`,
   );
-  await shellExec(
-    `npm install --save ${unique.join(" ")} 2>&1 | tail -5`,
-    outputDir,
-    { timeout: 60_000 },
-  );
+  const pm = await detectPackageManager(outputDir);
+  await shellExec(buildAddCommand(pm, unique), outputDir, { timeout: 60_000 });
 }
 
 export async function findBestTsconfigForFiles(
@@ -714,11 +2451,7 @@ export async function findBestTsconfigForFiles(
           .split("/")
           .slice(0, -1)
           .reduce((prefix, part, i) => {
-            if (
-              taskFiles.every(
-                (f) => f.split("/")[i] === part,
-              )
-            ) {
+            if (taskFiles.every((f) => f.split("/")[i] === part)) {
               return prefix ? `${prefix}/${part}` : part;
             }
             return prefix;
@@ -728,7 +2461,10 @@ export async function findBestTsconfigForFiles(
   for (let i = parts.length; i >= 1; i--) {
     const candidate = parts.slice(0, i).join("/") + "/tsconfig.json";
     const content = await fsRead(candidate, outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
       return candidate;
     }
   }
@@ -736,18 +2472,23 @@ export async function findBestTsconfigForFiles(
   return null;
 }
 
-// ─── Lightweight verify node (full tsc deferred to phase verify) ───
+// ─── Verify node: file presence/safety only; project `tsc` runs in supervisor phase verify ───
 
 async function verifyCode(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
 
-  const taskFiles = state.generatedFiles
-    .filter((f) => f.role === state.role)
-    .map((f) => f.path);
+  // Scope to the current task's outputs. Phase-level verify (Supervisor) still
+  // handles cross-task integration after all workers finish.
+  const taskFiles =
+    state.currentTaskGeneratedFiles.length > 0
+      ? state.currentTaskGeneratedFiles
+      : state.generatedFiles
+          .filter((f) => f.role === state.role)
+          .map((f) => f.path);
 
   if (taskFiles.length === 0) {
     console.log(
-      `[Worker:${state.workerLabel}] LightCheck: no files generated for "${task.title}" — marking as warning`,
+      `[Worker:${state.workerLabel}] Verify: no files generated for "${task.title}" — marking as warning`,
     );
     return {
       verifyErrors: `No files generated for task: ${task.title}`,
@@ -769,27 +2510,12 @@ async function verifyCode(state: WorkerState) {
       issues.push(`File not found after write: ${filePath}`);
       continue;
     }
-    if (content.trim().length < 10) {
-      issues.push(`File appears empty: ${filePath} (${content.length} chars)`);
-      continue;
-    }
-
-    const trimmed = content.trimEnd();
-    if (
-      trimmed.endsWith(",") ||
-      trimmed.endsWith("(") ||
-      trimmed.endsWith("{")
-    ) {
-      issues.push(
-        `File may be truncated: ${filePath} (ends with '${trimmed.slice(-1)}')`,
-      );
-    }
   }
 
   if (issues.length > 0) {
     const errorMsg = issues.join("\n");
     console.log(
-      `[Worker:${state.workerLabel}] LightCheck FAILED for "${task.title}":\n${errorMsg}`,
+      `[Worker:${state.workerLabel}] Verify FAILED (pre-tsc) for "${task.title}":\n${errorMsg}`,
     );
     return {
       verifyErrors: errorMsg,
@@ -797,22 +2523,485 @@ async function verifyCode(state: WorkerState) {
     };
   }
 
-  console.log(
-    `[Worker:${state.workerLabel}] LightCheck PASSED for "${task.title}" (${taskFiles.length} file(s))`,
+  // P0-B: task file-plan completeness. If the task promised to create file
+  // `A.ts` or modify `B.ts` and neither shows up in the generated-files list
+  // (and the `modifies` hash is unchanged), this run is incomplete. Surface
+  // a structured error so `routeAfterVerify` can route back to `task_fix`.
+  const planResult = await verifyTaskFilePlan(
+    task,
+    state.currentTaskGeneratedFiles,
+    state.currentTaskModifiesSnapshot ?? {},
+    state.outputDir,
   );
+  if (!planResult.passed) {
+    const msg = formatUnfulfilledMessage(planResult);
+    console.log(
+      `[Worker:${state.workerLabel}] Verify FAILED (file plan) for "${task.title}": ${msg}`,
+    );
+    getRepairEmitter(state.sessionId)({
+      stage: "worker-verify",
+      event: "task_plan_unfulfilled",
+      taskId: task.id,
+      files: [...planResult.missingCreates, ...planResult.unmodified],
+      details: {
+        missingCreates: planResult.missingCreates,
+        unmodified: planResult.unmodified,
+        fixAttempts: state.fixAttempts,
+      },
+    });
+    return {
+      verifyErrors: msg,
+      fixAttempts: state.fixAttempts,
+    };
+  }
+
+  const tsFiles = taskFiles.filter((f) => /\.(ts|tsx)$/.test(f));
+  if (tsFiles.length === 0) {
+    console.log(
+      `[Worker:${state.workerLabel}] No TypeScript files in task — skip compile check for "${task.title}"`,
+    );
+    return { verifyErrors: "", fixAttempts: state.fixAttempts };
+  }
+
+  console.log(
+    `[Worker:${state.workerLabel}] Task output OK for "${task.title}" (${tsFiles.length} TS file(s)) — per-task tsc disabled; project-wide tsc runs in supervisor verify.`,
+  );
+
   return { verifyErrors: "", fixAttempts: state.fixAttempts };
 }
 
-function taskDone(state: WorkerState) {
+function isWorkerFixEligibleError(verifyErrors: string): boolean {
+  if (!verifyErrors) return false;
+  if (isWorkerTscVerifyError(verifyErrors)) return true;
+  if (TASK_FILE_PLAN_UNFULFILLED_REGEX.test(verifyErrors)) return true;
+  return false;
+}
+
+function routeAfterVerify(state: WorkerState): string {
+  if (!state.verifyErrors) return "task_done";
+  // P0-C: file-plan failures (TASK_FILE_PLAN_UNFULFILLED) are now fixable
+  // alongside TypeScript errors. Other verify errors still fall through to
+  // `task_done` with warnings (unchanged legacy behaviour).
+  if (!isWorkerFixEligibleError(state.verifyErrors)) return "task_done";
+  const cfg = getWorkerTscFixConfig();
+  const isFilePlan = TASK_FILE_PLAN_UNFULFILLED_REGEX.test(state.verifyErrors);
+  const tscMaxFix = state.ralphConfig.enabled
+    ? Math.min(
+        state.ralphConfig.maxIterationsPerTask,
+        cfg.maxFixAttemptsRalphCap,
+      )
+    : cfg.maxFixAttempts;
+  // P2: file-plan unfulfilled gets its own floor so it ALWAYS gets at
+  // least N targeted fix attempts (default 2), even when ralph mode caps
+  // tsc fixes at 1. A task that promised but didn't write a file should
+  // never silently slip through with `fixAttempts: 0`.
+  const maxFix = isFilePlan
+    ? Math.max(tscMaxFix, cfg.filePlanMinAttempts)
+    : tscMaxFix;
+  if (state.fixAttempts >= maxFix) {
+    console.log(
+      `[Worker:${state.workerLabel}] Per-task ${isFilePlan ? "file-plan" : "tsc"} fix: max attempts (${maxFix}) reached, continuing with warnings.`,
+    );
+    return "task_done";
+  }
+  return "task_fix";
+}
+
+function logCodeFixErrorDetail(
+  workerLabel: string,
+  taskId: string,
+  taskTitle: string,
+  verifyErrors: string,
+): void {
+  const body = verifyErrors
+    .replace(new RegExp(`^${WORKER_TSC_VERIFY_PREFIX}\\s*`, "m"), "")
+    .trim();
+  const lines = body.split("\n").filter((l) => l.length > 0);
+  console.log(
+    `[Worker:${workerLabel}] codeFix: task=${taskId} "${taskTitle.slice(0, 80)}" — ` +
+      `repairing ${lines.length} tsc error line(s) (per-task TypeScript check).`,
+  );
+  console.log(
+    `[Worker:${workerLabel}] codeFix: tsc detail (first 4000 chars):\n${body.slice(0, 4000)}`,
+  );
+}
+
+async function taskFix(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
-  console.log(`[Worker:${state.workerLabel}] Task done: "${task.title}" (${state.currentTaskIndex + 1}/${state.tasks.length})`);
+  const attempt = state.fixAttempts + 1;
+  const cfg = getWorkerTscFixConfig();
+  const isFilePlanFix = TASK_FILE_PLAN_UNFULFILLED_REGEX.test(
+    state.verifyErrors,
+  );
+  const fixKind = isFilePlanFix ? "file-plan" : "tsc";
+  console.log(
+    `[Worker:${state.workerLabel}] Per-task ${fixKind} fix attempt ${attempt} for "${task.title}"...`,
+  );
+  console.log(
+    `[Worker:${state.workerLabel}] codeFix env: WORKER_TSC_FIX_MAX_ATTEMPTS=${cfg.maxFixAttempts}, WORKER_TSC_FIX_MAX_ATTEMPTS_RALPH_CAP=${cfg.maxFixAttemptsRalphCap}, WORKER_TSC_ERROR_CONTEXT_MAX_CHARS=${cfg.errorContextMaxChars}`,
+  );
+
+  if (!isFilePlanFix) {
+    logCodeFixErrorDetail(
+      state.workerLabel,
+      task.id,
+      task.title,
+      state.verifyErrors,
+    );
+  } else {
+    console.log(
+      `[Worker:${state.workerLabel}] codeFix: task=${task.id} — file-plan unfulfilled, asking LLM to produce the missing artefacts.`,
+    );
+  }
+
+  const filePlanDetails = isFilePlanFix
+    ? parseTaskFilePlanFailureDetails(state.verifyErrors)
+    : { missingCreates: [], unmodified: [] };
+  const planBuckets = getTaskFilePlanBuckets(task.files);
+  const taskFiles = isFilePlanFix
+    ? [
+        ...new Set([
+          ...state.currentTaskGeneratedFiles,
+          ...filePlanDetails.unmodified,
+          ...planBuckets.modifies,
+          ...planBuckets.reads,
+        ]),
+      ]
+    : state.currentTaskGeneratedFiles;
+  // For file-plan fixes, we explicitly handle the case of "no generated files
+  // yet" — the fix is literally to produce them. Only short-circuit when we
+  // have neither files nor a task plan to satisfy.
+  if (taskFiles.length === 0 && !isFilePlanFix) {
+    console.warn(
+      `[Worker:${state.workerLabel}] codeFix: skip LLM — no currentTaskGeneratedFiles for task ${task.id}.`,
+    );
+    return { fixAttempts: attempt, verifyErrors: state.verifyErrors };
+  }
+
+  console.log(
+    `[Worker:${state.workerLabel}] codeFix: task files in scope (${taskFiles.length}): ${taskFiles.slice(0, 12).join(", ")}${taskFiles.length > 12 ? " …" : ""}`,
+  );
+  if (isFilePlanFix) {
+    console.log(
+      `[Worker:${state.workerLabel}] codeFix: missing creates (${filePlanDetails.missingCreates.length}): ${filePlanDetails.missingCreates.slice(0, 12).join(", ")}${filePlanDetails.missingCreates.length > 12 ? " …" : ""}`,
+    );
+  }
+
+  const alreadyRead = new Set<string>();
+  const fileContents: string[] = [];
+
+  for (const filePath of taskFiles.slice(0, 8)) {
+    alreadyRead.add(filePath);
+    const content = await fsRead(filePath, state.outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      fileContents.push(
+        `### ${filePath}\n\`\`\`\n${content.slice(0, 3000)}\n\`\`\``,
+      );
+    }
+  }
+
+  const errorFilePattern = /([^\s:(]+\.(?:tsx?|jsx?|json))\(/g;
+  const mentionedInErrors = new Set<string>();
+  let em: RegExpExecArray | null;
+  while ((em = errorFilePattern.exec(state.verifyErrors)) !== null) {
+    const f = em[1].replace(/\\/g, "/");
+    if (!f.includes("node_modules")) mentionedInErrors.add(f);
+  }
+  for (const ef of [...mentionedInErrors].slice(0, 4)) {
+    if (alreadyRead.has(ef)) continue;
+    alreadyRead.add(ef);
+    const content = await fsRead(ef, state.outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      fileContents.push(
+        `### ${ef} (referenced in errors — read-only context)\n\`\`\`\n${content.slice(0, 1500)}\n\`\`\``,
+      );
+    }
+  }
+
+  const configFiles = await inferRelatedConfigFiles(
+    state.verifyErrors,
+    state.outputDir,
+    taskFiles,
+  );
+  for (const cf of configFiles.slice(0, 3)) {
+    if (alreadyRead.has(cf)) continue;
+    alreadyRead.add(cf);
+    const content = await fsRead(cf, state.outputDir);
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
+      fileContents.push(`### ${cf}\n\`\`\`\n${content.slice(0, 1500)}\n\`\`\``);
+    }
+  }
+
+  const versionConstraints = await buildVersionConstraints(state.outputDir);
+
+  const overrideModelChainRaw = process.env.CODEFIX_MODEL_CHAIN?.trim() ?? "";
+  const overrideModelChain = overrideModelChainRaw
+    .split(/[,\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const codeFixChain =
+    overrideModelChain.length > 0
+      ? resolveModelChain(overrideModelChain, resolveModel)
+      : resolveModelChain(MODEL_CONFIG.codeFix ?? "gpt-4o", resolveModel);
+  if (overrideModelChain.length > 0) {
+    console.log(
+      `[Worker:${state.workerLabel}] codeFix: using CODEFIX_MODEL_CHAIN override (${overrideModelChainRaw})`,
+    );
+  }
+  console.log(
+    `[Worker:${state.workerLabel}] codeFix: model chain (fallback order): ${codeFixChain.join(" -> ")}`,
+  );
+  const ctxPaths = [
+    ...[...mentionedInErrors].slice(0, 4),
+    ...configFiles.slice(0, 3),
+  ].filter((p, i, a) => a.indexOf(p) === i);
+  if (ctxPaths.length > 0) {
+    console.log(
+      `[Worker:${state.workerLabel}] codeFix: extra context paths: ${ctxPaths.join(", ")}`,
+    );
+  }
+
+  const filePlanInstruction = isFilePlanFix
+    ? [
+        "You are completing an incomplete coding task. The previous attempt did NOT",
+        "produce every file the task promised. Your job is to EMIT THE MISSING FILES",
+        "and/or MODIFY the files that should have been edited, so the task plan is",
+        "fully satisfied.",
+        "",
+        "Output ONLY the required file(s) using ```file:path/to/file``` blocks.",
+        "For a `missingCreates` entry, write the full new file from scratch.",
+        "For an `unmodified` entry, read its current contents from the context below",
+        "and emit the full updated file (never diffs).",
+        "Do NOT drop functionality that already exists in other files.",
+        "Do NOT add explanations outside the file blocks.",
+      ].join("\n")
+    : [
+        "You are a TypeScript fix specialist. Fix the errors shown below.",
+        "Output ONLY the corrected file(s) using ```file:path/to/file``` blocks.",
+        "Do NOT remove existing functionality. Only fix the errors.",
+        "Do NOT add explanations or markdown outside the file blocks.",
+        "Files marked '(referenced in errors — read-only context)' are for reference only; do NOT rewrite them.",
+      ].join("\n");
+
+  const userHeader = isFilePlanFix
+    ? `## Task file plan not yet fulfilled (attempt ${attempt})`
+    : `## Errors (attempt ${attempt})`;
+
+  const filePlanBlock = isFilePlanFix
+    ? [
+        "### Task metadata",
+        `- id: ${task.id}`,
+        `- title: ${task.title}`,
+        task.description ? `- description: ${task.description}` : "",
+        filePlanDetails.missingCreates.length > 0
+          ? `- missingCreates:\n${filePlanDetails.missingCreates.map((file) => `  - ${file}`).join("\n")}`
+          : "",
+        filePlanDetails.unmodified.length > 0
+          ? `- unmodified:\n${filePlanDetails.unmodified.map((file) => `  - ${file}`).join("\n")}`
+          : "",
+        formatTaskFileHints(task.files),
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
+
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: filePlanInstruction,
+    },
+    {
+      role: "user",
+      content: [
+        userHeader,
+        "```",
+        state.verifyErrors.slice(0, cfg.errorContextMaxChars),
+        "```",
+        "",
+        filePlanBlock,
+        "",
+        versionConstraints
+          ? `## Installed package versions (use these APIs)\n${versionConstraints}\n`
+          : "",
+        "## Current file contents",
+        ...fileContents,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  ];
+
+  try {
+    const response = await chatCompletionWithFallback(messages, codeFixChain, {
+      temperature: 0.2,
+      max_tokens: MAX_OUTPUT_TOKENS,
+    });
+
+    const content = response.choices[0]?.message?.content ?? "";
+    const costUsd = estimateCost(response.model, response.usage);
+    const usage = getResponseUsageCounts(response);
+    recordCodingSessionLlmUsage({
+      sessionId: state.sessionId,
+      stage: "worker_codefix",
+      label: state.workerLabel,
+      model: response.model,
+      costUsd,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.totalTokens,
+    });
+
+    const fixedFiles = parseFileBlocksFromContent(content, state.outputDir);
+    if (fixedFiles.length === 0) {
+      console.warn(
+        `[Worker:${state.workerLabel}] codeFix: model=${response.model} returned no file: code blocks — nothing written.`,
+      );
+    } else {
+      const paths = fixedFiles.map((f) => f.filePath);
+      console.log(
+        `[Worker:${state.workerLabel}] codeFix: applying patches to ${fixedFiles.length} file(s): ${paths.join(", ")}`,
+      );
+    }
+    for (const { filePath, fileContent } of fixedFiles) {
+      await fsWrite(filePath, fileContent, state.outputDir, {
+        scaffoldProtectedPaths: state.scaffoldProtectedPaths,
+      });
+    }
+
+    const mergedTaskFiles = [
+      ...new Set([
+        ...state.currentTaskGeneratedFiles,
+        ...fixedFiles.map((f) => f.filePath),
+      ]),
+    ];
+
+    console.log(
+      `[Worker:${state.workerLabel}] codeFix: done attempt ${attempt} — wrote ${fixedFiles.length} file(s), model=${response.model}, cost=$${costUsd.toFixed(4)}; will re-run tsc in verify.`,
+    );
+
+    return {
+      fixAttempts: attempt,
+      verifyErrors: "",
+      currentTaskGeneratedFiles: mergedTaskFiles,
+      currentTaskCostUsd: state.currentTaskCostUsd + costUsd,
+      workerCostUsd: costUsd,
+    };
+  } catch (e) {
+    console.warn(
+      `[Worker:${state.workerLabel}] Per-task tsc fix failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+    return { fixAttempts: attempt, verifyErrors: state.verifyErrors };
+  }
+}
+
+async function taskDone(state: WorkerState) {
+  const task = state.tasks[state.currentTaskIndex];
+  console.log(
+    `[Worker:${state.workerLabel}] Task done: "${task.title}" (${state.currentTaskIndex + 1}/${state.tasks.length})`,
+  );
   const filesForTask = state.currentTaskGeneratedFiles;
+
+  // Discard the rollback snapshot — task was accepted, its changes are the
+  // new source of truth.
+  await discardTaskSnapshot(task, state.outputDir);
+  getRepairEmitter(state.sessionId)({
+    stage: "task",
+    event: "snapshot_cleaned",
+    taskId: task.id,
+  });
+
+  // ── RALPH Phase 4: context rotation — write session-context.md when threshold hit ──
+  if (state.ralphConfig.enabled && state.contextRotationNeeded) {
+    const tracker = new ProgressTracker(state.outputDir);
+    const completedTasks = state.taskResults;
+    const recentFiles = state.generatedFiles
+      .slice(-20)
+      .map((f) => `- ${f.path} (${f.role}): ${f.summary}`)
+      .join("\n");
+    const contextSummary = [
+      `# Session Context (auto-generated for context rotation)`,
+      `> Worker: ${state.workerLabel} | Role: ${state.role}`,
+      `> Rotation triggered at ~${state.estimatedContextTokens.toLocaleString()} context tokens`,
+      ``,
+      `## Tasks completed so far (${completedTasks.length})`,
+      completedTasks
+        .map(
+          (r) =>
+            `- ${r.taskId}: ${r.status} (${r.generatedFiles.length} files)`,
+        )
+        .join("\n"),
+      ``,
+      `## Recently generated files (last 20)`,
+      recentFiles,
+    ].join("\n");
+    try {
+      await tracker.writeSessionContext(contextSummary);
+      console.log(
+        `[Worker:${state.workerLabel}] RALPH: context rotation triggered — session-context.md written.`,
+      );
+    } catch (e) {
+      console.warn(
+        `[Worker:${state.workerLabel}] RALPH: failed to write session context: ${e}`,
+      );
+    }
+  }
+
+  // ── RALPH Phase 3: persist progress + optional git commit ──────────────────
+  let commitHash: string | undefined;
+  if (state.ralphConfig.enabled) {
+    const tracker = new ProgressTracker(state.outputDir);
+    try {
+      if (state.ralphConfig.enableGitCommits) {
+        // Ensure git is initialised (no-op if already a repo)
+        await shellExec("git init", state.outputDir, { timeout: 10_000 });
+        // Stage all generated files for this task
+        if (filesForTask.length > 0) {
+          const filePaths = filesForTask.map((f) => `"${f}"`).join(" ");
+          await shellExec(`git add ${filePaths}`, state.outputDir, {
+            timeout: 15_000,
+          });
+        }
+        const msg = `feat(agent): complete ${task.id}: ${task.title.slice(0, 72)}`;
+        const commitOut = await shellExec(
+          `git commit -m "${msg.replace(/"/g, "'")}" --allow-empty`,
+          state.outputDir,
+          { timeout: 20_000 },
+        );
+        const commitOutText = (
+          commitOut.stdout ||
+          commitOut.stderr ||
+          ""
+        ).trim();
+        const hashMatch = /\[[\w/]+ ([a-f0-9]{7,})\]/.exec(commitOutText);
+        commitHash = hashMatch?.[1];
+        if (commitHash) {
+          console.log(
+            `[Worker:${state.workerLabel}] RALPH: committed ${task.id} → ${commitHash}`,
+          );
+        }
+      }
+      await tracker.markComplete(task.id, filesForTask, commitHash);
+      await tracker.addCost(state.currentTaskCostUsd);
+    } catch (e) {
+      // Progress tracking / git errors must never abort the pipeline
+      console.warn(
+        `[Worker:${state.workerLabel}] RALPH progress write failed: ${e}`,
+      );
+    }
+  }
 
   const result: TaskResult = {
     taskId: task.id,
-    status: state.verifyErrors
-      ? "completed_with_warnings"
-      : "completed",
+    status: state.verifyErrors ? "completed_with_warnings" : "completed",
     generatedFiles: filesForTask,
     costUsd: state.currentTaskCostUsd,
     durationMs: state.currentTaskDurationMs,
@@ -820,8 +3009,12 @@ function taskDone(state: WorkerState) {
     verifyPassed: !state.verifyErrors,
     fixCycles: state.fixAttempts,
     warnings: state.verifyErrors
-      ? [state.verifyErrors.slice(0, 500)]
+      ? [state.verifyErrors.slice(0, 8000)]
       : undefined,
+    subSteps:
+      state.currentTaskSubSteps.length > 0
+        ? state.currentTaskSubSteps
+        : undefined,
   };
 
   return {
@@ -840,10 +3033,12 @@ function taskDone(state: WorkerState) {
     },
     currentTaskRetryCount: 0,
     currentTaskLastError: "",
+    currentTaskLastRawContent: "",
+    currentTaskSubSteps: [],
   };
 }
 
-function taskFailed(state: WorkerState) {
+async function taskFailed(state: WorkerState) {
   const task = state.tasks[state.currentTaskIndex];
   const failureMsg =
     state.currentTaskLastError ||
@@ -851,6 +3046,49 @@ function taskFailed(state: WorkerState) {
   console.warn(
     `[Worker:${state.workerLabel}] Task failed after retries: "${task.title}" (${state.currentTaskRetryCount}/${MAX_TASK_GENERATION_RETRIES + 1})`,
   );
+
+  // Roll everything the task touched back to its pre-task state. This
+  // guarantees a partial failure never leaves broken half-files behind to
+  // break later tasks or downstream verify passes.
+  try {
+    const rollback = await restoreTask(task, state.outputDir);
+    getRepairEmitter(state.sessionId)({
+      stage: "task",
+      event: "snapshot_restored",
+      taskId: task.id,
+      files: [
+        ...rollback.restored,
+        ...rollback.deleted.map((f) => `deleted:${f}`),
+      ],
+      details: {
+        restored: rollback.restored.length,
+        deleted: rollback.deleted.length,
+        skipped: rollback.skipped.length,
+      },
+    });
+  } catch (err) {
+    console.warn(
+      `[Worker:${state.workerLabel}] Task snapshot restore failed:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  // ── RALPH Phase 3: persist failure in progress files ───────────────────────
+  if (state.ralphConfig.enabled) {
+    const tracker = new ProgressTracker(state.outputDir);
+    try {
+      await tracker.markFailed(task.id, failureMsg);
+      await tracker.recordError(
+        task.id,
+        state.currentTaskRetryCount,
+        failureMsg,
+      );
+    } catch (e) {
+      console.warn(
+        `[Worker:${state.workerLabel}] RALPH progress write failed: ${e}`,
+      );
+    }
+  }
 
   const result: TaskResult = {
     taskId: task.id,
@@ -880,6 +3118,7 @@ function taskFailed(state: WorkerState) {
     },
     currentTaskRetryCount: 0,
     currentTaskLastError: "",
+    currentTaskLastRawContent: "",
   };
 }
 
@@ -946,7 +3185,10 @@ export async function inferRelatedConfigFiles(
   const found: string[] = [];
   for (const candidate of candidates) {
     const content = await fsRead(candidate, outputDir);
-    if (!content.startsWith("FILE_NOT_FOUND") && !content.startsWith("REJECTED")) {
+    if (
+      !content.startsWith("FILE_NOT_FOUND") &&
+      !content.startsWith("REJECTED")
+    ) {
       found.push(candidate);
     }
   }
@@ -964,6 +3206,7 @@ export function createWorkerSubGraph() {
     .addNode("pick_next_task", pickNextTask)
     .addNode("generate_code", generateCode)
     .addNode("verify", verifyCode)
+    .addNode("task_fix", taskFix)
     .addNode("task_done", taskDone)
     .addNode("task_failed", taskFailed)
 
@@ -977,7 +3220,12 @@ export function createWorkerSubGraph() {
       verify: "verify",
       task_failed: "task_failed",
     })
-    .addEdge("verify", "task_done")
+    .addConditionalEdges("verify", routeAfterVerify, {
+      task_done: "task_done",
+      task_fix: "task_fix",
+      task_failed: "task_failed",
+    })
+    .addEdge("task_fix", "verify")
     .addEdge("task_done", "pick_next_task")
     .addEdge("task_failed", "pick_next_task");
 

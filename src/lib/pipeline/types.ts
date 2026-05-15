@@ -1,3 +1,6 @@
+export type { RalphConfig } from "@/lib/ralph";
+export { DEFAULT_RALPH_CONFIG } from "@/lib/ralph";
+
 export type PipelineStepId =
   | "intent"
   | "prd"
@@ -45,10 +48,20 @@ export interface PipelineRun {
 }
 
 export interface PipelineEvent {
-  type: "step_start" | "step_complete" | "step_error" | "pipeline_complete";
+  type:
+    | "step_start"
+    | "step_complete"
+    | "step_error"
+    | "pipeline_complete"
+    | "step_stream";
   runId: string;
   stepId: PipelineStepId;
-  data: Partial<StepResult>;
+  data: Partial<StepResult> & {
+    /** Streaming chunk text (only for step_stream events) */
+    chunk?: string;
+    /** Whether the chunk is a thinking/reasoning token or main content */
+    chunkType?: "thinking" | "content";
+  };
 }
 
 export type KickoffTaskExecutionKind = "ai_autonomous" | "human_confirm_after";
@@ -66,6 +79,12 @@ export interface TaskTokenEstimate {
   estimatedCostUsd: number;
 }
 
+export interface TaskFilePlan {
+  creates: string[];
+  modifies: string[];
+  reads: string[];
+}
+
 export interface KickoffWorkItem {
   id: string;
   phase: string;
@@ -73,7 +92,7 @@ export interface KickoffWorkItem {
   description: string;
   estimatedHours: number;
   executionKind: KickoffTaskExecutionKind;
-  files?: string[];
+  files?: string[] | TaskFilePlan;
   dependencies?: string[];
   priority?: "P0" | "P1" | "P2";
   subSteps?: TaskSubStep[];
@@ -81,15 +100,29 @@ export interface KickoffWorkItem {
   acceptanceCriteria?: string[];
   /** PRD requirement IDs this task implements (AC-*, FR-*), for coverage gates. */
   coversRequirementIds?: string[];
+  /** TDD seed plan consumed by future Test Writer / Runtime Executor gates. */
+  tddPlan?: {
+    tests: Array<{
+      id: string;
+      type:
+        | "api-contract"
+        | "frontend-service"
+        | "route-smoke"
+        | "runtime-smoke"
+        | "e2e"
+        | string;
+      priority: "P0" | "P1" | "P2";
+      file: string;
+      command: string;
+      expectedRed: string;
+      expectedGreen: string;
+    }>;
+  };
 }
 
 // ─── Multi-Agent Coding Session ───
 
-export type CodingAgentRole =
-  | "architect"
-  | "frontend"
-  | "backend"
-  | "test";
+export type CodingAgentRole = "architect" | "frontend" | "backend" | "test";
 
 export type CodingTaskStatus =
   | "pending"
@@ -205,10 +238,18 @@ export interface CodingSessionEvent {
     | "integration_verify_start"
     | "integration_verify_result"
     | "integration_fix_result"
+    | "e2e_verify_start"
+    | "e2e_verify_result"
+    | "agent_task_substeps"
     | "session_complete"
     | "session_error";
   sessionId: string;
   agentId?: string;
   taskId?: string;
   data: Record<string, unknown>;
+}
+
+export interface SupplementaryTask extends CodingTask {
+  isSupplementary: true;
+  gapDescription: string;
 }

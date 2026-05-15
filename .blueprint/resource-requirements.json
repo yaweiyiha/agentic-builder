@@ -1,0 +1,12 @@
+[
+  {
+    "envKey": "COINGECKO_API_KEY",
+    "label": "CoinGecko API Key",
+    "description": "Used to fetch CEX price deviation, volume anomalies, and community sentiment scores for SPRI scoring engine.",
+    "category": "other",
+    "required": true,
+    "example": "CG-...",
+    "docsUrl": "https://www.coingecko.com/en/api/pricing",
+    "value": "G-kTrbYVt6dvB6JozyNfZY7w95"
+  }
+]

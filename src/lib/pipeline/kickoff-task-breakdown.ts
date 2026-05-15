@@ -9,9 +9,26 @@ export function parseKickoffTaskBreakdownFromMetadata(
   return tb.filter(isKickoffWorkItem);
 }
 
+export function isKickoffTaskBreakdownConfirmed(
+  metadata: Record<string, unknown> | undefined,
+): boolean {
+  if (!metadata) return false;
+  return metadata.taskBreakdownConfirmed === true;
+}
+
 function isKickoffWorkItem(x: unknown): x is KickoffWorkItem {
   if (!x || typeof x !== "object") return false;
   const o = x as Record<string, unknown>;
+  const isStringArray = (v: unknown): v is string[] =>
+    Array.isArray(v) && v.every((item) => typeof item === "string");
+  const filesOk =
+    o.files === undefined ||
+    isStringArray(o.files) ||
+    (typeof o.files === "object" &&
+      o.files !== null &&
+      isStringArray((o.files as Record<string, unknown>).creates) &&
+      isStringArray((o.files as Record<string, unknown>).modifies) &&
+      isStringArray((o.files as Record<string, unknown>).reads));
   const coversOk =
     o.coversRequirementIds === undefined ||
     (Array.isArray(o.coversRequirementIds) &&
@@ -24,6 +41,7 @@ function isKickoffWorkItem(x: unknown): x is KickoffWorkItem {
     typeof o.estimatedHours === "number" &&
     (o.executionKind === "ai_autonomous" ||
       o.executionKind === "human_confirm_after") &&
+    filesOk &&
     coversOk
   );
 }

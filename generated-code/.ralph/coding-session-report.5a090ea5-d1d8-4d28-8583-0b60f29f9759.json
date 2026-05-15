@@ -1,0 +1,1736 @@
+{
+  "sessionId": "5a090ea5-d1d8-4d28-8583-0b60f29f9759",
+  "startedAt": "2026-04-21T08:28:10.134Z",
+  "endedAt": "2026-04-21T09:23:26.698Z",
+  "status": "fail",
+  "terminalSummary": "Integration verify gate failed.\nIntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nMost repeated action: read_file:frontend/src/components/Projects/ProjectMembersList.tsx × 4\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/components/Modals/TaskModal.tsx(160,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/components/Projects/ProjectMembersList.tsx(42,14): error TS18048: 'a.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(42,40): error TS18048: 'b.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(159,20): error TS18048: 'member.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(167,20): error TS18048: 'member.user' is possibly 'undefined'.\nsrc/views/ForgotPasswordPage.tsx(29,24): error TS2344: Type 'ForgotPasswordFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'ForgotPasswordFormValues'.\nsrc/views/LoginPage.tsx(22,24): error TS2344: Type 'LoginFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'LoginFormValues'.\nsrc/views/SettingsPage.tsx(67,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/SignUpPage.tsx(24,24): error TS2344: Type 'SignUpFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'SignUpFormValues'.\nsrc/views/TaskDetailPage.tsx(80,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(94,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(114,14): error TS2345: Argument of type 'TaskQueryState' is not assignable to parameter of type '(prev: TaskQueryState) => TaskQueryState'.\n  Type 'TaskQueryState' provides no match for the signature '(prev: TaskQueryState): TaskQueryState'.\nsrc/views/TasksListPage.tsx(123,14): error TS2345: Argument of type 'TaskQueryState' is not assignable to parameter of type '(prev: TaskQueryState) => TaskQueryState'.\n  Type 'TaskQueryState' provides no match for the signature '(prev: TaskQueryState): TaskQueryState'.\nsrc/views/TasksLis\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/components/Modals/TaskModal.tsx\u001b[0m:\u001b[93m160\u001b[0m:\u001b[93m12\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType '() => void' is not assignable to type 'void'.\n\n\u001b[7m160\u001b[0m     return (): void => {\n\u001b[7m   \u001b[0m \u001b[91m           ~~~~~~~~~~~~~\u001b[0m\n\n  \u001b[96msrc/components/Modals/TaskModal.tsx\u001b[0m:\u001b[93m160\u001b[0m:\u001b[93m12\u001b[0m\n    \u001b[7m160\u001b[0m     return (): void => {\n    \u001b[7m   \u001b[0m \u001b[96m           ~~~~~~~~~~~~~\u001b[0m\n    Did you mean to call this expression?\n\n\u001b[96msrc/components/Projects/ProjectMembersList.tsx\u001b[0m:\u001b[93m42\u001b[0m:\u001b[93m14\u001b",
+  "fatalError": "Integration verify gate failed.\nIntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nMost repeated action: read_file:frontend/src/components/Projects/ProjectMembersList.tsx × 4\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/components/Modals/TaskModal.tsx(160,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/components/Projects/ProjectMembersList.tsx(42,14): error TS18048: 'a.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(42,40): error TS18048: 'b.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(159,20): error TS18048: 'member.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(167,20): error TS18048: 'member.user' is possibly 'undefined'.\nsrc/views/ForgotPasswordPage.tsx(29,24): error TS2344: Type 'ForgotPasswordFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'ForgotPasswordFormValues'.\nsrc/views/LoginPage.tsx(22,24): error TS2344: Type 'LoginFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'LoginFormValues'.\nsrc/views/SettingsPage.tsx(67,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/SignUpPage.tsx(24,24): error TS2344: Type 'SignUpFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'SignUpFormValues'.\nsrc/views/TaskDetailPage.tsx(80,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(94,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(114,14): error TS2345: Argument of type 'TaskQueryState' is not assignable to parameter of type '(prev: TaskQueryState) => TaskQueryState'.\n  Type 'TaskQueryState' provides no match for the signature '(prev: TaskQueryState): TaskQueryState'.\nsrc/views/TasksListPage.tsx(123,14): error TS2345: Argument of type 'TaskQueryState' is not assignable to parameter of type '(prev: TaskQueryState) => TaskQueryState'.\n  Type 'TaskQueryState' provides no match for the signature '(prev: TaskQueryState): TaskQueryState'.\nsrc/views/TasksLis\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/components/Modals/TaskModal.tsx\u001b[0m:\u001b[93m160\u001b[0m:\u001b[93m12\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType '() => void' is not assignable to type 'void'.\n\n\u001b[7m160\u001b[0m     return (): void => {\n\u001b[7m   \u001b[0m \u001b[91m           ~~~~~~~~~~~~~\u001b[0m\n\n  \u001b[96msrc/components/Modals/TaskModal.tsx\u001b[0m:\u001b[93m160\u001b[0m:\u001b[93m12\u001b[0m\n    \u001b[7m160\u001b[0m     return (): void => {\n    \u001b[7m   \u001b[0m \u001b[96m           ~~~~~~~~~~~~~\u001b[0m\n    Did you mean to call this expression?\n\n\u001b[96msrc/components/Projects/ProjectMembersList.tsx\u001b[0m:\u001b[93m42\u001b[0m:\u001b[93m14\u001b",
+  "score": {
+    "score": 46,
+    "grade": "F",
+    "reasons": [
+      "Run status is fail.",
+      "Integration verification still has blocking errors.",
+      "Context truncation happened 6 time(s).",
+      "Task plan/file-plan mismatches happened 3 time(s)."
+    ]
+  },
+  "gateErrors": {
+    "integrationErrors": "IntegrationVerifyFix stalled without making code changes.\nNo mutation for 18 consecutive iteration(s).\nMost repeated action: read_file:frontend/src/components/Projects/ProjectMembersList.tsx × 4\nAborting instead of spending more iterations rereading the same files.\n\nFinal scoped validation gates failed:\n\nbackend_tsc: pass\n\nfrontend_tsc failed:\nsrc/components/Modals/TaskModal.tsx(160,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/components/Projects/ProjectMembersList.tsx(42,14): error TS18048: 'a.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(42,40): error TS18048: 'b.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(159,20): error TS18048: 'member.user' is possibly 'undefined'.\nsrc/components/Projects/ProjectMembersList.tsx(167,20): error TS18048: 'member.user' is possibly 'undefined'.\nsrc/views/ForgotPasswordPage.tsx(29,24): error TS2344: Type 'ForgotPasswordFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'ForgotPasswordFormValues'.\nsrc/views/LoginPage.tsx(22,24): error TS2344: Type 'LoginFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'LoginFormValues'.\nsrc/views/SettingsPage.tsx(67,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/SignUpPage.tsx(24,24): error TS2344: Type 'SignUpFormValues' does not satisfy the constraint 'FormValues'.\n  Index signature for type 'string' is missing in type 'SignUpFormValues'.\nsrc/views/TaskDetailPage.tsx(80,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(94,12): error TS2322: Type '() => void' is not assignable to type 'void'.\nsrc/views/TasksListPage.tsx(114,14): error TS2345: Argument of type 'TaskQueryState' is not assignable to parameter of type '(prev: TaskQueryState) => TaskQueryState'.\n  Type 'TaskQueryState' provides no match for the signature '(prev: TaskQueryState): TaskQueryState'.\nsrc/views/TasksListPage.tsx(123,14): error TS2345: Argument of type 'TaskQueryState' is not assignable to parameter of type '(prev: TaskQueryState) => TaskQueryState'.\n  Type 'TaskQueryState' provides no match for the signature '(prev: TaskQueryState): TaskQueryState'.\nsrc/views/TasksLis\n\nfrontend_build failed:\n> frontend@0.0.0 build /Users/57block/code/AgenticBuilder/generated-code/frontend\n> tsc -b && vite build\n\n\u001b[96msrc/components/Modals/TaskModal.tsx\u001b[0m:\u001b[93m160\u001b[0m:\u001b[93m12\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType '() => void' is not assignable to type 'void'.\n\n\u001b[7m160\u001b[0m     return (): void => {\n\u001b[7m   \u001b[0m \u001b[91m           ~~~~~~~~~~~~~\u001b[0m\n\n  \u001b[96msrc/components/Modals/TaskModal.tsx\u001b[0m:\u001b[93m160\u001b[0m:\u001b[93m12\u001b[0m\n    \u001b[7m160\u001b[0m     return (): void => {\n    \u001b[7m   \u001b[0m \u001b[96m           ~~~~~~~~~~~~~\u001b[0m\n    Did you mean to call this expression?\n\n\u001b[96msrc/components/Projects/ProjectMembersList.tsx\u001b[0m:\u001b[93m42\u001b[0m:\u001b[93m14\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS18048: \u001b[0m'a.user' is possibly 'undefined'.\n\n\u001b[7m42\u001b[0m       return a.user.name.localeCompare(b.user.name);\n\u001b[7m  \u001b[0m \u001b[91m             ~~~~~~\u001b[0m\n\n\u001b[96msrc/components/Projects/ProjectMembersList.tsx\u001b[0m:\u001b[93m42\u001b[0m:\u001b[93m40\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS18048: \u001b[0m'b.user' is possibly 'undefined'.\n\n\u001b[7m42\u001b[0m       return a.user.name.localeCompare(b.user.name);\n\u001b[7m  \u001b[0m \u001b[91m                                       ~~~~~~\u001b[0m\n\n\u001b[96msrc/components/Projects/ProjectMembersList.tsx\u001b[0m:\u001b[93m159\u001b[0m:\u001b[93m20\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS18048: \u001b[0m'member.user' is possibly 'undefined'.\n\n\u001b[7m159\u001b[0m                   {member.user.name}\n\u001b[7m   \u001b[0m \u001b[91m                   ~~~~~~~~~~~\u001b[0m\n\n\u001b[96msrc/components/Projects/ProjectMembersList.tsx\u001b[0m:\u001b[93m167\u001b[0m:\u001b[93m20\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS18048: \u001b[0m'member.user' is possibly 'undefined'.\n\n\u001b[7m167\u001b[0m                   {member.user.email} · {member.role} · {member.status}\n\u001b[7m   \u001b[0m \u001b[91m                   ~~~~~~",
+    "runtimeVerifyErrors": "",
+    "e2eVerifyErrors": ""
+  },
+  "taskResults": [
+    {
+      "id": "T-001",
+      "title": "Setup database models and validation schemas",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-TA01",
+        "FR-PR01",
+        "AC-01",
+        "AC-05",
+        "AC-11"
+      ],
+      "generatedFiles": [
+        "docker-compose.yml",
+        ".env",
+        "backend/src/models/User.ts",
+        "backend/src/models/Project.ts",
+        "backend/src/models/ProjectMember.ts",
+        "backend/src/models/Task.ts",
+        "backend/src/models/PasswordResetToken.ts",
+        "backend/src/models/index.ts",
+        "backend/src/validation/auth.ts",
+        "backend/src/validation/task.ts",
+        "backend/src/validation/project.ts",
+        "backend/src/database/migrations/001-initial-schema.js"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-002",
+      "title": "Setup API contracts and frontend client",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-TA01",
+        "FR-TA02",
+        "FR-PR01",
+        "AC-02"
+      ],
+      "generatedFiles": [
+        "frontend/src/types/models.ts",
+        "frontend/src/types/api.ts",
+        "frontend/src/api/client.ts",
+        "frontend/src/api/auth.ts",
+        "frontend/src/api/tasks.ts",
+        "frontend/src/api/projects.ts",
+        "frontend/src/utils/apiError.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-003",
+      "title": "Implement authentication and user management APIs",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU03",
+        "FR-AU04",
+        "FR-AU05",
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-14"
+      ],
+      "generatedFiles": [
+        "backend/src/utils/jwt.ts",
+        "backend/src/utils/password.ts",
+        "backend/src/middleware/auth.ts",
+        "backend/src/api/modules/auth/auth.service.ts",
+        "backend/src/api/modules/auth/auth.controller.ts",
+        "backend/src/api/modules/auth/auth.routes.ts",
+        "backend/src/api/modules/users/users.service.ts",
+        "backend/src/api/modules/users/users.controller.ts",
+        "backend/src/api/modules/users/users.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-004",
+      "title": "Implement task management APIs",
+      "coversRequirementIds": [
+        "FR-TA01",
+        "FR-TA02",
+        "FR-TA03",
+        "FR-TA04",
+        "FR-TA05",
+        "FR-TA06",
+        "FR-TA07",
+        "FR-TA08",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/tasks/tasks.service.ts",
+        "backend/src/api/modules/tasks/tasks.controller.ts",
+        "backend/src/api/modules/tasks/tasks.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-005",
+      "title": "Implement project management and collaboration APIs",
+      "coversRequirementIds": [
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "FR-PR05",
+        "AC-11",
+        "AC-12",
+        "AC-13"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/projects/projects.service.ts",
+        "backend/src/api/modules/projects/projects.controller.ts",
+        "backend/src/api/modules/projects/projects.routes.ts",
+        "backend/src/api/modules/index.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-006",
+      "title": "Create app shell and navigation layout",
+      "coversRequirementIds": [
+        "FR-AU03",
+        "AC-15"
+      ],
+      "generatedFiles": [
+        "frontend/src/utils/auth.ts",
+        "frontend/src/contexts/AuthContext.tsx",
+        "frontend/src/hooks/useAuth.ts",
+        "frontend/src/components/Layout/AppHeader.tsx",
+        "frontend/src/components/Layout/Sidebar.tsx",
+        "frontend/src/components/Layout/AuthLayout.tsx",
+        "frontend/src/components/Layout/PublicLayout.tsx",
+        "frontend/src/App.tsx",
+        "frontend/src/providers/AppProviders.tsx",
+        "frontend/src/router.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-007",
+      "title": "Implement landing and authentication pages",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "FR-AU04",
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/UI/Button.tsx",
+        "frontend/src/components/UI/Input.tsx",
+        "frontend/src/hooks/useForm.ts",
+        "frontend/src/components/Auth/AuthCard.tsx",
+        "frontend/src/views/LandingPage.tsx",
+        "frontend/src/views/LoginPage.tsx",
+        "frontend/src/views/SignUpPage.tsx",
+        "frontend/src/views/ForgotPasswordPage.tsx",
+        "frontend/src/App.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-008",
+      "title": "Implement dashboard page with task summaries",
+      "coversRequirementIds": [
+        "FR-DA01",
+        "FR-DA02",
+        "FR-DA03",
+        "AC-04"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useDashboardData.ts",
+        "frontend/src/components/Dashboard/SummaryCard.tsx",
+        "frontend/src/components/Dashboard/TaskSummaryList.tsx",
+        "frontend/src/components/Dashboard/QuickAddTask.tsx",
+        "frontend/src/views/DashboardPage.tsx",
+        "frontend/src/App.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-009",
+      "title": "Implement tasks list and detail pages",
+      "coversRequirementIds": [
+        "FR-TA05",
+        "FR-TA06",
+        "FR-TA07",
+        "FR-TA08",
+        "FR-TA03",
+        "FR-TA04",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-16"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useTasks.ts",
+        "frontend/src/components/UI/SearchInput.tsx",
+        "frontend/src/components/UI/FilterDropdown.tsx",
+        "frontend/src/components/Tasks/TaskFilters.tsx",
+        "frontend/src/components/Tasks/TaskRow.tsx",
+        "frontend/src/components/Tasks/TaskTable.tsx",
+        "frontend/src/views/TasksListPage.tsx",
+        "frontend/src/views/TaskDetailPage.tsx",
+        "frontend/src/App.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-010",
+      "title": "Implement projects list and detail pages",
+      "coversRequirementIds": [
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR03",
+        "FR-PR04",
+        "FR-PR05",
+        "AC-11",
+        "AC-12",
+        "AC-13"
+      ],
+      "generatedFiles": [
+        "frontend/src/hooks/useProjects.ts",
+        "frontend/src/components/Projects/ProjectCard.tsx",
+        "frontend/src/components/Projects/ProjectMembersList.tsx",
+        "frontend/src/components/Projects/ProjectTasksList.tsx",
+        "frontend/src/views/ProjectsListPage.tsx",
+        "frontend/src/views/ProjectDetailPage.tsx",
+        "frontend/src/App.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-011",
+      "title": "Implement task and project modals",
+      "coversRequirementIds": [
+        "FR-TA01",
+        "FR-TA02",
+        "FR-PR01",
+        "FR-PR02",
+        "FR-PR04",
+        "AC-05",
+        "AC-16"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/UI/Modal.tsx",
+        "frontend/src/hooks/useModal.ts",
+        "frontend/src/components/UI/Select.tsx",
+        "frontend/src/components/UI/DatePicker.tsx",
+        "frontend/src/components/Modals/TaskModal.tsx",
+        "frontend/src/components/Modals/ProjectModal.tsx",
+        "frontend/src/components/Modals/InviteMemberModal.tsx",
+        "frontend/src/components/Modals/DeleteConfirmationModal.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-012",
+      "title": "Implement settings page and 404 page",
+      "coversRequirementIds": [
+        "FR-AU05",
+        "FR-SE01",
+        "FR-SE03",
+        "AC-14"
+      ],
+      "generatedFiles": [
+        "frontend/src/components/Settings/ProfileSettings.tsx",
+        "frontend/src/components/Settings/NotificationSettings.tsx",
+        "frontend/src/views/SettingsPage.tsx",
+        "frontend/src/views/NotFoundPage.tsx",
+        "frontend/src/App.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-013",
+      "title": "Implement overdue task highlighting in UI components",
+      "coversRequirementIds": [
+        "FR-SE02"
+      ],
+      "generatedFiles": [
+        "frontend/src/utils/dateHelpers.ts",
+        "frontend/src/components/OverdueIndicator.tsx",
+        "frontend/src/views/DashboardPage.tsx",
+        "frontend/src/views/TaskDetailPage.tsx",
+        "frontend/src/views/TasksListPage.tsx",
+        "frontend/src/components/TaskCard.tsx"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-001",
+      "title": "Set up Playwright E2E harness",
+      "coversRequirementIds": [],
+      "generatedFiles": [
+        "frontend/playwright.config.ts",
+        "frontend/package.json",
+        "frontend/tests/e2e/utils.ts",
+        "frontend/tests/e2e/fixtures.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-E2E-002",
+      "title": "Implement PRD browser journeys",
+      "coversRequirementIds": [
+        "FR-AU01",
+        "FR-AU02",
+        "PAGE-003",
+        "PAGE-002",
+        "PAGE-005",
+        "FR-TA01",
+        "FR-TA02",
+        "FR-TA03",
+        "FR-TA04",
+        "PAGE-006",
+        "CMP-025",
+        "FR-DA01",
+        "FR-DA02",
+        "FR-DA03",
+        "CMP-018",
+        "CMP-019",
+        "FR-PR01",
+        "FR-PR04",
+        "FR-PR05",
+        "PAGE-008",
+        "PAGE-009",
+        "CMP-033",
+        "CMP-037",
+        "FR-TA06",
+        "FR-TA07",
+        "FR-TA08",
+        "CMP-022",
+        "CMP-023",
+        "FR-TA05",
+        "PAGE-007",
+        "CMP-029",
+        "FR-AU05",
+        "FR-SE01",
+        "FR-SE03",
+        "PAGE-010",
+        "CMP-041",
+        "FR-AU04",
+        "FR-AU03",
+        "PAGE-004",
+        "CMP-007"
+      ],
+      "generatedFiles": [
+        "frontend/tests/e2e/generated/e2e-001-user-registration-and-first-login.spec.ts",
+        "frontend/tests/e2e/generated/e2e-002-create-and-manage-task-lifecycle.spec.ts",
+        "frontend/tests/e2e/generated/e2e-003-dashboard-summary-and-navigation.spec.ts",
+        "frontend/tests/e2e/generated/e2e-004-project-creation-and-member-management.spec.ts",
+        "frontend/tests/e2e/generated/e2e-005-task-filtering-and-search.spec.ts",
+        "frontend/tests/e2e/generated/e2e-006-task-detail-view-and-editing.spec.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-REPAIR-BACKEND",
+      "title": "Backfill uncovered features (backend): US-01, US-02, US-03, US-04 …+2",
+      "coversRequirementIds": [
+        "US-01",
+        "US-02",
+        "US-03",
+        "US-04",
+        "US-05",
+        "US-06"
+      ],
+      "generatedFiles": [
+        "backend/src/api/modules/tasks/tasks.service.ts"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "T-REPAIR-FRONTEND",
+      "title": "Backfill uncovered features (frontend): IC-01, IC-02, IC-03, IC-04 …+36",
+      "coversRequirementIds": [
+        "IC-01",
+        "IC-02",
+        "IC-03",
+        "IC-04",
+        "IC-05",
+        "IC-06",
+        "IC-07",
+        "IC-08",
+        "IC-09",
+        "IC-10",
+        "IC-11",
+        "IC-12",
+        "IC-13",
+        "IC-14",
+        "IC-15",
+        "IC-16",
+        "IC-17",
+        "IC-18",
+        "IC-19",
+        "IC-20",
+        "IC-21",
+        "IC-22",
+        "IC-23",
+        "IC-24",
+        "IC-25",
+        "IC-26",
+        "IC-27",
+        "IC-28",
+        "IC-29",
+        "IC-30",
+        "IC-31",
+        "IC-32",
+        "IC-33",
+        "IC-34",
+        "IC-35",
+        "IC-36",
+        "IC-37",
+        "IC-38",
+        "IC-39",
+        "IC-40"
+      ],
+      "generatedFiles": [
+        "frontend/src/views/DashboardPage.tsx",
+        "frontend/src/views/NotFoundPage.tsx",
+        "frontend/src/views/TasksListPage.tsx",
+        "frontend/src/views/TaskDetailPage.tsx",
+        "frontend/src/views/ProjectsListPage.tsx",
+        "frontend/src/views/ProjectDetailPage.tsx",
+        "frontend/src/views/SettingsPage.tsx",
+        "frontend/src/components/Layout/AppHeader.tsx"
+      ],
+      "status": "completed"
+    }
+  ],
+  "fileRegistryCount": 141,
+  "modelUsage": [
+    {
+      "model": "openai/gpt-5.3-codex-20260224",
+      "calls": 171,
+      "costUsd": 0,
+      "promptTokens": 3184691,
+      "completionTokens": 201553,
+      "totalTokens": 3386244,
+      "stages": [
+        "worker_codegen:Architect",
+        "worker_codegen:Test Engineer",
+        "worker_codegen:Backend Dev",
+        "phase_verify_fix",
+        "worker_codegen:Frontend Dev",
+        "integration_verify_fix",
+        "worker_codegen:Audit Backfill (backend)",
+        "worker_codegen:Audit Backfill (frontend)"
+      ]
+    },
+    {
+      "model": "anthropic/claude-4-sonnet-20250522",
+      "calls": 2,
+      "costUsd": 0,
+      "promptTokens": 13566,
+      "completionTokens": 5385,
+      "totalTokens": 18951,
+      "stages": [
+        "generate_api_contracts",
+        "extract_real_contracts"
+      ]
+    }
+  ],
+  "repairSummary": {
+    "totalEvents": 83,
+    "byStage": {
+      "coverage-gate": 9,
+      "architect-triage": 3,
+      "task": 40,
+      "worker-context": 6,
+      "worker-verify": 3,
+      "post-gen-audit": 15,
+      "integration-gate": 7
+    },
+    "byEvent": {
+      "repair_start": 3,
+      "repair_done": 3,
+      "repair_final_state": 3,
+      "task_forced_to_llm": 3,
+      "snapshot_cleaned": 40,
+      "doc_truncated": 6,
+      "task_plan_unfulfilled": 3,
+      "audit_start": 4,
+      "uncovered_detected": 3,
+      "repair_dispatch_start": 2,
+      "repair_dispatch_role_done": 3,
+      "repair_dispatch_done": 2,
+      "stagnation_warning": 7,
+      "audit_clean": 1
+    }
+  },
+  "finalAudit": {
+    "passed": true,
+    "entries": [
+      {
+        "id": "AC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-003",
+          "T-007"
+        ],
+        "evidence": [
+          "PRD.md:622 (AC-01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:40 (AC-01)"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-007"
+        ],
+        "evidence": [
+          "PRD.md:623 (AC-02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:72 (AC-02)"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-007"
+        ],
+        "evidence": [
+          "PRD.md:624 (AC-03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:108 (AC-03)"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008"
+        ],
+        "evidence": [
+          "PRD.md:625 (AC-04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:273 (AC-04)"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-004",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:626 (AC-05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:40 (AC-05)"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:627 (AC-06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (AC-06)"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:628 (AC-07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (AC-07)"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:629 (AC-08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (AC-08)"
+        ]
+      },
+      {
+        "id": "AC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:630 (AC-09)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (AC-09)"
+        ]
+      },
+      {
+        "id": "AC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009"
+        ],
+        "evidence": [
+          "PRD.md:631 (AC-10)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (AC-10)"
+        ]
+      },
+      {
+        "id": "AC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:632 (AC-11)",
+          "TASK_BREAKDOWN_ORIGINAL.md:40 (AC-11)"
+        ]
+      },
+      {
+        "id": "AC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:633 (AC-12)",
+          "TASK_BREAKDOWN_ORIGINAL.md:173 (AC-12)"
+        ]
+      },
+      {
+        "id": "AC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:634 (AC-13)",
+          "TASK_BREAKDOWN_ORIGINAL.md:173 (AC-13)"
+        ]
+      },
+      {
+        "id": "AC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-012"
+        ],
+        "evidence": [
+          "PRD.md:635 (AC-14)",
+          "TASK_BREAKDOWN_ORIGINAL.md:108 (AC-14)"
+        ]
+      },
+      {
+        "id": "AC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-006"
+        ],
+        "evidence": [
+          "PRD.md:636 (AC-15)",
+          "TASK_BREAKDOWN_ORIGINAL.md:206 (AC-15)"
+        ]
+      },
+      {
+        "id": "AC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-009",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:637 (AC-16)",
+          "TASK_BREAKDOWN_ORIGINAL.md:310 (AC-16)"
+        ]
+      },
+      {
+        "id": "FR-AU01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-003",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:32 (FR-AU01)",
+          "PRD_E2E_SPEC.json:24 (FR-AU01)",
+          "PRD_E2E_SPEC.md:8 (FR-AU01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:40 (FR-AU01)",
+          "frontend/tests/e2e/generated/e2e-001-user-registration-and-first-login.spec.ts:4 (FR-AU01)"
+        ]
+      },
+      {
+        "id": "FR-AU02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-003",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:33 (FR-AU02)",
+          "PRD_E2E_SPEC.json:25 (FR-AU02)",
+          "PRD_E2E_SPEC.md:8 (FR-AU02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:72 (FR-AU02)",
+          "frontend/tests/e2e/generated/e2e-001-user-registration-and-first-login.spec.ts:4 (FR-AU02)"
+        ]
+      },
+      {
+        "id": "FR-AU03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-006",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:34 (FR-AU03)",
+          "PRD_E2E_SPEC.json:313 (FR-AU03)",
+          "PRD_E2E_SPEC.md:78 (FR-AU03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:108 (FR-AU03)"
+        ]
+      },
+      {
+        "id": "FR-AU04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-007",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:35 (FR-AU04)",
+          "PRD_E2E_SPEC.json:312 (FR-AU04)",
+          "PRD_E2E_SPEC.md:78 (FR-AU04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:108 (FR-AU04)"
+        ]
+      },
+      {
+        "id": "FR-AU05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-003",
+          "T-012",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:36 (FR-AU05)",
+          "PRD_E2E_SPEC.json:272 (FR-AU05)",
+          "PRD_E2E_SPEC.md:68 (FR-AU05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:108 (FR-AU05)"
+        ]
+      },
+      {
+        "id": "FR-DA01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:39 (FR-DA01)",
+          "PRD_E2E_SPEC.json:107 (FR-DA01)",
+          "PRD_E2E_SPEC.md:28 (FR-DA01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:273 (FR-DA01)",
+          "frontend/tests/e2e/generated/e2e-003-dashboard-summary-and-navigation.spec.ts:10 (FR-DA01)"
+        ]
+      },
+      {
+        "id": "FR-DA02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:40 (FR-DA02)",
+          "PRD_E2E_SPEC.json:108 (FR-DA02)",
+          "PRD_E2E_SPEC.md:28 (FR-DA02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:273 (FR-DA02)",
+          "frontend/tests/e2e/generated/e2e-003-dashboard-summary-and-navigation.spec.ts:10 (FR-DA02)"
+        ]
+      },
+      {
+        "id": "FR-DA03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-008",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:41 (FR-DA03)",
+          "PRD_E2E_SPEC.json:109 (FR-DA03)",
+          "PRD_E2E_SPEC.md:28 (FR-DA03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:273 (FR-DA03)",
+          "frontend/tests/e2e/generated/e2e-003-dashboard-summary-and-navigation.spec.ts:10 (FR-DA03)"
+        ]
+      },
+      {
+        "id": "FR-PR01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-005",
+          "T-010",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:54 (FR-PR01)",
+          "PRD_E2E_SPEC.json:148 (FR-PR01)",
+          "PRD_E2E_SPEC.md:38 (FR-PR01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:40 (FR-PR01)",
+          "frontend/tests/e2e/generated/e2e-004-project-creation-and-member-management.spec.ts:4 (FR-PR01)"
+        ]
+      },
+      {
+        "id": "FR-PR02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-011"
+        ],
+        "evidence": [
+          "PRD.md:55 (FR-PR02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:173 (FR-PR02)"
+        ]
+      },
+      {
+        "id": "FR-PR03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010"
+        ],
+        "evidence": [
+          "PRD.md:56 (FR-PR03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:173 (FR-PR03)"
+        ]
+      },
+      {
+        "id": "FR-PR04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:57 (FR-PR04)",
+          "PRD_E2E_SPEC.json:149 (FR-PR04)",
+          "PRD_E2E_SPEC.md:38 (FR-PR04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:173 (FR-PR04)",
+          "frontend/tests/e2e/generated/e2e-004-project-creation-and-member-management.spec.ts:4 (FR-PR04)"
+        ]
+      },
+      {
+        "id": "FR-PR05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-005",
+          "T-010",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:58 (FR-PR05)",
+          "PRD_E2E_SPEC.json:150 (FR-PR05)",
+          "PRD_E2E_SPEC.md:38 (FR-PR05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:173 (FR-PR05)",
+          "frontend/tests/e2e/generated/e2e-004-project-creation-and-member-management.spec.ts:4 (FR-PR05)"
+        ]
+      },
+      {
+        "id": "FR-SE01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-012",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:61 (FR-SE01)",
+          "PRD_E2E_SPEC.json:273 (FR-SE01)",
+          "PRD_E2E_SPEC.md:68 (FR-SE01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:411 (FR-SE01)"
+        ]
+      },
+      {
+        "id": "FR-SE02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 2 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-013"
+        ],
+        "evidence": [
+          "PRD.md:62 (FR-SE02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:416 (FR-SE02)"
+        ]
+      },
+      {
+        "id": "FR-SE03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 4 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-012",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:63 (FR-SE03)",
+          "PRD_E2E_SPEC.json:274 (FR-SE03)",
+          "PRD_E2E_SPEC.md:68 (FR-SE03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:411 (FR-SE03)"
+        ]
+      },
+      {
+        "id": "FR-TA01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-001",
+          "T-002",
+          "T-004",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:44 (FR-TA01)",
+          "PRD_E2E_SPEC.json:60 (FR-TA01)",
+          "PRD_E2E_SPEC.md:17 (FR-TA01)",
+          "TASK_BREAKDOWN_ORIGINAL.md:40 (FR-TA01)",
+          "frontend/tests/e2e/generated/e2e-002-create-and-manage-task-lifecycle.spec.ts:9 (FR-TA01)"
+        ]
+      },
+      {
+        "id": "FR-TA02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-002",
+          "T-004",
+          "T-011",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:45 (FR-TA02)",
+          "PRD_E2E_SPEC.json:61 (FR-TA02)",
+          "PRD_E2E_SPEC.md:17 (FR-TA02)",
+          "TASK_BREAKDOWN_ORIGINAL.md:72 (FR-TA02)",
+          "frontend/tests/e2e/generated/e2e-002-create-and-manage-task-lifecycle.spec.ts:9 (FR-TA02)"
+        ]
+      },
+      {
+        "id": "FR-TA03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:46 (FR-TA03)",
+          "PRD_E2E_SPEC.json:62 (FR-TA03)",
+          "PRD_E2E_SPEC.md:17 (FR-TA03)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (FR-TA03)",
+          "frontend/tests/e2e/generated/e2e-002-create-and-manage-task-lifecycle.spec.ts:9 (FR-TA03)"
+        ]
+      },
+      {
+        "id": "FR-TA04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:47 (FR-TA04)",
+          "PRD_E2E_SPEC.json:63 (FR-TA04)",
+          "PRD_E2E_SPEC.md:17 (FR-TA04)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (FR-TA04)",
+          "frontend/tests/e2e/generated/e2e-002-create-and-manage-task-lifecycle.spec.ts:9 (FR-TA04)"
+        ]
+      },
+      {
+        "id": "FR-TA05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:48 (FR-TA05)",
+          "PRD_E2E_SPEC.json:233 (FR-TA05)",
+          "PRD_E2E_SPEC.md:58 (FR-TA05)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (FR-TA05)",
+          "frontend/tests/e2e/generated/e2e-006-task-detail-view-and-editing.spec.ts:10 (FR-TA05)"
+        ]
+      },
+      {
+        "id": "FR-TA06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:49 (FR-TA06)",
+          "PRD_E2E_SPEC.json:191 (FR-TA06)",
+          "PRD_E2E_SPEC.md:48 (FR-TA06)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (FR-TA06)",
+          "frontend/tests/e2e/generated/e2e-005-task-filtering-and-search.spec.ts:10 (FR-TA06)"
+        ]
+      },
+      {
+        "id": "FR-TA07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:50 (FR-TA07)",
+          "PRD_E2E_SPEC.json:192 (FR-TA07)",
+          "PRD_E2E_SPEC.md:48 (FR-TA07)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (FR-TA07)",
+          "frontend/tests/e2e/generated/e2e-005-task-filtering-and-search.spec.ts:10 (FR-TA07)"
+        ]
+      },
+      {
+        "id": "FR-TA08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 5 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-004",
+          "T-009",
+          "T-E2E-002"
+        ],
+        "evidence": [
+          "PRD.md:51 (FR-TA08)",
+          "PRD_E2E_SPEC.json:193 (FR-TA08)",
+          "PRD_E2E_SPEC.md:48 (FR-TA08)",
+          "TASK_BREAKDOWN_ORIGINAL.md:140 (FR-TA08)",
+          "frontend/tests/e2e/generated/e2e-005-task-filtering-and-search.spec.ts:10 (FR-TA08)"
+        ]
+      },
+      {
+        "id": "IC-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:567 (IC-01)"
+        ]
+      },
+      {
+        "id": "IC-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:568 (IC-02)"
+        ]
+      },
+      {
+        "id": "IC-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:569 (IC-03)"
+        ]
+      },
+      {
+        "id": "IC-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:570 (IC-04)"
+        ]
+      },
+      {
+        "id": "IC-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:571 (IC-05)"
+        ]
+      },
+      {
+        "id": "IC-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:572 (IC-06)"
+        ]
+      },
+      {
+        "id": "IC-07",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:573 (IC-07)"
+        ]
+      },
+      {
+        "id": "IC-08",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:574 (IC-08)"
+        ]
+      },
+      {
+        "id": "IC-09",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:575 (IC-09)"
+        ]
+      },
+      {
+        "id": "IC-10",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:576 (IC-10)"
+        ]
+      },
+      {
+        "id": "IC-11",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:577 (IC-11)"
+        ]
+      },
+      {
+        "id": "IC-12",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:578 (IC-12)"
+        ]
+      },
+      {
+        "id": "IC-13",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:579 (IC-13)"
+        ]
+      },
+      {
+        "id": "IC-14",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:580 (IC-14)"
+        ]
+      },
+      {
+        "id": "IC-15",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:581 (IC-15)"
+        ]
+      },
+      {
+        "id": "IC-16",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:582 (IC-16)"
+        ]
+      },
+      {
+        "id": "IC-17",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:583 (IC-17)"
+        ]
+      },
+      {
+        "id": "IC-18",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:584 (IC-18)"
+        ]
+      },
+      {
+        "id": "IC-19",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:585 (IC-19)"
+        ]
+      },
+      {
+        "id": "IC-20",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:586 (IC-20)"
+        ]
+      },
+      {
+        "id": "IC-21",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:587 (IC-21)"
+        ]
+      },
+      {
+        "id": "IC-22",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:588 (IC-22)"
+        ]
+      },
+      {
+        "id": "IC-23",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:589 (IC-23)"
+        ]
+      },
+      {
+        "id": "IC-24",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:590 (IC-24)"
+        ]
+      },
+      {
+        "id": "IC-25",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:591 (IC-25)"
+        ]
+      },
+      {
+        "id": "IC-26",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:592 (IC-26)"
+        ]
+      },
+      {
+        "id": "IC-27",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:593 (IC-27)"
+        ]
+      },
+      {
+        "id": "IC-28",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:594 (IC-28)"
+        ]
+      },
+      {
+        "id": "IC-29",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:595 (IC-29)"
+        ]
+      },
+      {
+        "id": "IC-30",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:596 (IC-30)"
+        ]
+      },
+      {
+        "id": "IC-31",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:597 (IC-31)"
+        ]
+      },
+      {
+        "id": "IC-32",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:598 (IC-32)"
+        ]
+      },
+      {
+        "id": "IC-33",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:599 (IC-33)"
+        ]
+      },
+      {
+        "id": "IC-34",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:600 (IC-34)"
+        ]
+      },
+      {
+        "id": "IC-35",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:601 (IC-35)"
+        ]
+      },
+      {
+        "id": "IC-36",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:602 (IC-36)"
+        ]
+      },
+      {
+        "id": "IC-37",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:603 (IC-37)"
+        ]
+      },
+      {
+        "id": "IC-38",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:604 (IC-38)"
+        ]
+      },
+      {
+        "id": "IC-39",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:605 (IC-39)"
+        ]
+      },
+      {
+        "id": "IC-40",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-FRONTEND"
+        ],
+        "evidence": [
+          "PRD.md:606 (IC-40)"
+        ]
+      },
+      {
+        "id": "US-01",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:611 (US-01)"
+        ]
+      },
+      {
+        "id": "US-02",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:612 (US-02)"
+        ]
+      },
+      {
+        "id": "US-03",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:613 (US-03)"
+        ]
+      },
+      {
+        "id": "US-04",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:614 (US-04)"
+        ]
+      },
+      {
+        "id": "US-05",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:615 (US-05)"
+        ]
+      },
+      {
+        "id": "US-06",
+        "verdict": "implemented",
+        "layer": "l2",
+        "reason": "Found 1 anchor match(es) in generated code.",
+        "coveringTaskIds": [
+          "T-REPAIR-BACKEND"
+        ],
+        "evidence": [
+          "PRD.md:616 (US-06)"
+        ]
+      }
+    ],
+    "uncovered": []
+  },
+  "suggestions": [
+    "Reduce context loss: improve section selection / budget allocation so critical PRD and implementation context is not truncated.",
+    "Tighten task-to-file planning: the worker should either write the planned files or immediately repair the missing file-plan deltas.",
+    "Improve final integration convergence: prioritize the highest-signal failing gate first and keep stagnation detection enabled to avoid read-only loops."
+  ]
+}

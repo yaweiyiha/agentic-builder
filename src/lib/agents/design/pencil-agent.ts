@@ -456,7 +456,7 @@ export function toDesignTokensMarkdown(parsed: ParsedDesign): string {
 // ── Prompt ──
 
 const SYSTEM_PROMPT = `You are an expert UI designer working with Pencil (.pen design tool).
-Your task: create high-quality dark-theme design screens.
+Your task: create high-quality  design screens.
 
 You MUST respond with **valid JSON only** — no markdown, no prose, no fences.
 
@@ -532,13 +532,6 @@ Do NOT use image generation operations.
 - thickness can be { "top": n, "right": n, "bottom": n, "left": n } or any subset.
 - NEVER use "stroke": "#color" or "strokeWidth" — these are INVALID and will cause errors.
 
-## Design Standards
-- Dark theme: backgrounds #0F172A / #1E293B / #334155, text #F1F5F9 / #94A3B8 / #64748B
-- 8px grid: 4, 8, 12, 16, 24, 32, 48
-- Font sizes: 12, 14, 16, 20, 24, 32
-- Accent: #6366F1 (indigo), #3B82F6 (blue), #10B981 (emerald), #F59E0B (amber)
-- Corner radius: 4, 8, 12, 16
-- Professional SaaS dashboard aesthetic
 `;
 
 const MAX_PRD_CHARS = 28_000;
@@ -581,7 +574,7 @@ function buildUserPrompt(
   sections.push(
     `---\n\n## Your task`,
     `Create ALL primary screens from the PRD as separate top-level frames (1440×900).`,
-    `- Nest real UI: timer readout, buttons, inputs, links, labels — match PRD and CMP list.`,
+    `- Nest real UI: cards, tables, forms, buttons, inputs, navigation, links, labels — match PRD and CMP list.`,
     `- Text nodes: use "content" for labels, never "text".`,
     `- Separate screens horizontally so they do not overlap.`,
     `Respond with valid JSON only.`,
@@ -629,13 +622,19 @@ export class PencilDesignAgent {
       "userMessage:",
       userPrompt.length,
     );
-    const maxTokens = 50000;
+    const maxTokens = (() => {
+      const raw = process.env.PENCIL_BATCH_JSON_MAX_TOKENS;
+      const parsed =
+        raw !== undefined && raw !== "" ? Number.parseInt(raw, 10) : Number.NaN;
+      const n = Number.isNaN(parsed) ? 96000 : parsed;
+      return Math.min(128_000, Math.max(8_000, n));
+    })();
     console.log(
       "[PencilAgent] Calling LLM (json_object mode, model:",
       model,
       ", max_tokens:",
       maxTokens,
-      ")...",
+      "env PENCIL_BATCH_JSON_MAX_TOKENS optional)...",
     );
 
     const messages: ChatMessage[] = [
@@ -800,9 +799,9 @@ export class PencilDesignAgent {
       content: returnContent,
       model: llmRes.model,
       usage: {
-        promptTokens: usage.prompt_tokens,
-        completionTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens,
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens: usage.total_tokens,
       },
       costUsd,
       durationMs,
@@ -855,7 +854,7 @@ export async function generatePencilDesignContent(
   const llmRes = await chatCompletion(messages, {
     model,
     temperature: 0.6,
-    max_tokens: 16384,
+    max_tokens: 49152,
     response_format: { type: "json_object" },
   });
 
@@ -889,9 +888,9 @@ export async function generatePencilDesignContent(
     content: returnContent,
     model: llmRes.model,
     usage: {
-      promptTokens: usage.prompt_tokens,
-      completionTokens: usage.completion_tokens,
-      totalTokens: usage.total_tokens,
+      prompt_tokens: usage.prompt_tokens,
+      completion_tokens: usage.completion_tokens,
+      total_tokens: usage.total_tokens,
     },
     costUsd,
     durationMs,

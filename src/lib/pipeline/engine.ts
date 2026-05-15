@@ -11,6 +11,7 @@ import {
   runPrdSpecGate,
   runQaCoverageGate,
   runTaskCoverageGate,
+  runPhaseRequirementGate,
 } from "@/lib/pipeline/gates";
 import {
   PMAgent,
@@ -23,7 +24,9 @@ import {
   QAAgent,
   VerifierAgent,
   classifyProject,
+  normalizeProjectTier,
 } from "@/lib/agents";
+import { persistTrdArtifactsFromContent } from "@/lib/agents/architect/persist-trd-artifacts";
 import type { AgentResult } from "@/lib/agents";
 import type { ProjectTier, ProjectClassification } from "@/lib/agents";
 import type {
@@ -31,14 +34,47 @@ import type {
   PipelineStepId,
   StepResult,
   PipelineEvent,
+  RalphConfig,
 } from "./types";
+import { DEFAULT_RALPH_CONFIG } from "./types";
 import {
   resolveCodeOutputRoot,
+  removePreviousDesignDocs,
   writeCodegenFileMap,
   buildGitInitInstructions,
 } from "./code-output";
 import { runKickoffIntegrations } from "./kickoff-integrations";
 import { buildTaskBreakdownFromDocuments } from "./kickoff-task-breakdown.server";
+import {
+  copyDesignReferencesToOutput,
+  formatDesignReferencesPromptBlock,
+} from "./design-references";
+import {
+  createRepairEmitter,
+  createJsonlRepairSink,
+  consoleRepairSink,
+  repairTaskCoverage,
+  repairMissingBackendPhase,
+} from "./self-heal";
+import { AttemptTracker } from "./self-heal/attempt-tracker";
+import { escalateRepairCircuit } from "./self-heal/escalate-repair-circuit";
+import { missingIdsScopeKey } from "./self-heal/attempt-tracker";
+import {
+  runEvidenceGate,
+  evidenceFromPrdSpecGate,
+  evidenceFromGateReport,
+  evidenceFromRulesValidation,
+  evidenceFromDagValidation,
+} from "./gates";
+import {
+  recallPrdContext,
+  recallDesignContext,
+} from "@/lib/memory/preparation-recall";
+import {
+  parseMemoryCites,
+  recordMemoryCites,
+  stripMemoryCites,
+} from "@/lib/memory/cite";
 
 type EventHandler = (event: PipelineEvent) => void;
 
@@ -55,6 +91,20 @@ export interface ExecutePipelineOptions {
    * via the parallel-generate API after user confirms the PRD.
    */
   pauseAfterPrd?: boolean;
+  /**
+   * RALPH loop configuration.
+   * When enabled: tasks loop until external verification passes, progress is
+   * persisted to .ralph/, and each completed task is git-committed.
+   * Defaults to disabled for backward compatibility.
+   */
+  ralph?: Partial<RalphConfig>;
+  /**
+   * When set, skip all other steps and only re-run the PRD step using this
+   * edit instruction applied to the existing PRD content.
+   */
+  prdEditInstruction?: string;
+  /** The existing PRD markdown to be edited. Required when prdEditInstruction is set. */
+  existingPrd?: string;
 }
 
 /**
@@ -76,8 +126,7 @@ function stepsForTier(tier: ProjectTier) {
   };
 }
 
-export const STATIC_PRD_RELATIVE_PATH = path.join(".blueprint", "PRD.md");
-const STATIC_DESIGN_RELATIVE_PATH = path.join(".blueprint", "DESIGN.md");
+const STATIC_DESIGN_RELATIVE_PATH = path.join(".blueprint", "DESIGN.html");
 
 const FAST_MODE_DESIGN_FALLBACK = `## Design specification (fast mode)
 
@@ -157,31 +206,36 @@ export class PipelineEngine {
 
     // ── Classify project complexity (lightweight LLM call, ~200 tokens) ──
     let classification: ProjectClassification | null = null;
-    let tier: ProjectTier = "L";
+    let tier: ProjectTier = "M";
     try {
       classification = await classifyProject(run.featureBrief);
-      tier = classification.tier;
+      tier = normalizeProjectTier(classification.tier);
       run.totalCostUsd += classification.costUsd;
+
+      // Persist classification into the intent step metadata so it is
+      // accessible downstream (e.g. runKickoffStep → phase-requirement gate).
+      run.steps.intent = {
+        ...run.steps.intent,
+        metadata: {
+          ...(run.steps.intent?.metadata ?? {}),
+          classification: {
+            tier: classification.tier,
+            type: classification.type,
+            needsBackend: classification.needsBackend,
+            needsDatabase: classification.needsDatabase,
+            reasoning: classification.reasoning,
+          },
+        },
+      };
 
       this.emit({
         type: "step_complete",
         runId: run.id,
         stepId: "intent",
-        data: {
-          ...run.steps.intent,
-          metadata: {
-            classification: {
-              tier: classification.tier,
-              type: classification.type,
-              needsBackend: classification.needsBackend,
-              needsDatabase: classification.needsDatabase,
-              reasoning: classification.reasoning,
-            },
-          },
-        },
+        data: { ...run.steps.intent },
       });
     } catch {
-      tier = "L";
+      tier = normalizeProjectTier("M");
     }
 
     const plan = stepsForTier(tier);
@@ -189,27 +243,127 @@ export class PipelineEngine {
     // ── PRD (tier-aware prompt) ──
     const pmAgent = new PMAgent(tier);
 
-    let staticPrd = await this.readStaticPrd();
-    if (staticPrd === null && fast) {
-      const outputDocs = await this.readExistingDocsFromOutput(outputRoot);
-      staticPrd = outputDocs.prd;
-    }
-    if (staticPrd !== null) {
-      run = this.applyStaticPrdStep(run, staticPrd);
-    } else {
+    // ── Edit-only mode: re-run only the PRD step using the edit instruction ──
+    if (options.prdEditInstruction && options.existingPrd) {
+      const editInstruction = options.prdEditInstruction;
+      const existingPrd = options.existingPrd;
       run = await this.executeStep(run, "prd", () =>
-        pmAgent.generatePRD(run.featureBrief, undefined, run.sessionId),
+        pmAgent.generatePRDEditStreaming(
+          existingPrd,
+          editInstruction,
+          (chunk, chunkType) => {
+            this.emit({
+              type: "step_stream",
+              runId: run.id,
+              stepId: "prd",
+              data: { chunk, chunkType },
+            });
+          },
+          run.sessionId,
+        ),
       );
       if (run.status === "failed") return run;
+
+      run = this.attachPrdSpecGateToPrdStep(run);
+
+      // Edit-only mode always pauses — emit done immediately
+      this.emit({
+        type: "pipeline_complete",
+        runId: run.id,
+        stepId: "prd",
+        data: { status: "completed", metadata: { pausedAfterPrd: true } },
+      });
+      run.status = "completed";
+      run.currentStep = null;
+      run.updatedAt = new Date().toISOString();
+      return run;
     }
 
+    // ── Imported PRD shortcut ────────────────────────────────────────────
+    // The PRD-import API writes `.blueprint/PRD.md` directly. When that
+    // file exists with non-empty content, use it as the PRD step's output
+    // and skip the LLM call entirely — otherwise the PM agent would
+    // hallucinate a fresh PRD that overrides the user's upload. The
+    // structured spec extractor still runs against the imported content,
+    // so downstream domain.rules wiring keeps working.
+    const importedPrdContent = await this.readImportedPrd(outputRoot);
+    if (importedPrdContent) {
+      run = await this.executeStep(run, "prd", async () => ({
+        content: importedPrdContent,
+        model: "imported",
+        costUsd: 0,
+        durationMs: 0,
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      }));
+      if (run.status === "failed") return run;
+      const prdStep = run.steps.prd;
+      if (prdStep) {
+        run.steps.prd = {
+          ...prdStep,
+          metadata: {
+            ...(prdStep.metadata ?? {}),
+            source: "imported",
+            importedFrom: ".blueprint/PRD.md",
+          },
+        };
+      }
+    } else {
+      // Recall PRD-pattern memory (L1, cross-project) and inject as
+      // additionalContext. When MEMORY_PRD_INJECT is off the recall still
+      // runs (trace-only) but contextChunk is empty.
+      const prdRecall = await recallPrdContext({
+        sessionId: run.sessionId,
+        featureBrief: run.featureBrief,
+        tier,
+        projectType: classification?.type,
+      });
+      const prdAdditionalContext = prdRecall.contextChunk || undefined;
+
+      run = await this.executeStep(run, "prd", () =>
+        pmAgent.generatePRDStreaming(
+          run.featureBrief,
+          (chunk, chunkType) => {
+            this.emit({
+              type: "step_stream",
+              runId: run.id,
+              stepId: "prd",
+              data: { chunk, chunkType },
+            });
+          },
+          prdAdditionalContext,
+          run.sessionId,
+        ),
+      );
+      if (run.status === "failed") return run;
+
+      // Parse & log cites; strip the `<memory-cite />` tag from the
+      // persisted PRD content so it never leaks into downstream agents
+      // or the user-visible document.
+      const prdContent = run.steps.prd?.content ?? "";
+      if (prdRecall.active.length > 0 && prdContent) {
+        const cited = parseMemoryCites(prdContent);
+        if (cited.length > 0) {
+          await recordMemoryCites({
+            traceRoot: process.cwd(),
+            agent: "pm",
+            kickoffId: run.sessionId,
+            citedIds: cited,
+            injectedIds: prdRecall.active.map((r) => r.id),
+          });
+        }
+        const stripped = stripMemoryCites(prdContent);
+        if (stripped !== prdContent && run.steps.prd) {
+          run.steps.prd = { ...run.steps.prd, content: stripped };
+        }
+      }
+
+      run = this.attachPrdSpecGateToPrdStep(run);
+      run = await this.attachPrdStructuredSpec(run);
+      this.emitPrdStepCompleteRefresh(run);
+    }
     run = this.attachPrdSpecGateToPrdStep(run);
-    run = await this.attachPrdStructuredSpec(run);
-    this.emitPrdStepCompleteRefresh(run);
 
-    const prdContent = run.steps.prd?.content ?? "";
-
-    // Pause after PRD for user review/refinement (HITL gate)
+    // Pause after PRD — emit done immediately, skip async spec extraction
     if (options.pauseAfterPrd) {
       this.emit({
         type: "pipeline_complete",
@@ -235,6 +389,12 @@ export class PipelineEngine {
       run.updatedAt = new Date().toISOString();
       return run;
     }
+
+    // Full pipeline: extract structured spec before continuing
+    run = await this.attachPrdStructuredSpec(run);
+    this.emitPrdStepCompleteRefresh(run);
+
+    const prdContent = run.steps.prd?.content ?? "";
 
     if (fast) {
       const existingDocs = await this.readExistingDocsFromOutput(outputRoot);
@@ -321,10 +481,23 @@ export class PipelineEngine {
       });
     } else {
       if (plan.needsTrd) {
+        // Prior PRD step may have attached a structured PrdSpec with an
+        // optional `domain` section. Forward it so TRDAgent can inject
+        // PRD-provided rules as authoritative source for §7.
+        const prdMetadata = run.steps.prd?.metadata as
+          | { prdSpec?: PrdSpec }
+          | undefined;
+        const prdSpec = prdMetadata?.prdSpec ?? null;
         run = await this.executeStep(run, "trd", () =>
-          this.trdAgent.generateTRD(prdContent, undefined, run.sessionId),
+          this.trdAgent.generateTRD(
+            prdContent,
+            undefined,
+            run.sessionId,
+            prdSpec,
+          ),
         );
         if (run.status === "failed") return run;
+        await this.persistTrdArtifacts(run);
       } else {
         run = this.emitStubCompleted(
           run,
@@ -376,10 +549,42 @@ export class PipelineEngine {
       }
 
       // ── Design Spec (always run) ──
+      const designRecall = await recallDesignContext({
+        sessionId: run.sessionId,
+        featureBrief: run.featureBrief,
+        tier,
+        projectType: classification?.type,
+        prdContent,
+      });
+      const designAdditionalContext = designRecall.contextChunk || undefined;
+
       run = await this.executeStep(run, "design", () =>
-        this.designAgent.generateDesign(prdContent, undefined, run.sessionId),
+        this.designAgent.generateDesign(
+          prdContent,
+          designAdditionalContext,
+          run.sessionId,
+        ),
       );
       if (run.status === "failed") return run;
+
+      // Parse cite tags emitted by the design agent (best-effort)
+      const designContent = run.steps.design?.content ?? "";
+      if (designRecall.active.length > 0 && designContent) {
+        const cited = parseMemoryCites(designContent);
+        if (cited.length > 0) {
+          await recordMemoryCites({
+            traceRoot: process.cwd(),
+            agent: "design",
+            kickoffId: run.sessionId,
+            citedIds: cited,
+            injectedIds: designRecall.active.map((r) => r.id),
+          });
+        }
+        const stripped = stripMemoryCites(designContent);
+        if (stripped !== designContent && run.steps.design) {
+          run.steps.design = { ...run.steps.design, content: stripped };
+        }
+      }
 
       // ── Pencil (disabled — preserved for future re-enable) ──
       // const designContent = run.steps.design?.content ?? "";
@@ -420,7 +625,23 @@ export class PipelineEngine {
     if (fast) {
       fileMap = this.buildPrdOnlyKickoffFileMap(prdContent);
     } else {
-      fileMap = { "PRD.md": prdContent };
+      fileMap = {};
+      if (prdContent) fileMap["PRD.md"] = prdContent;
+      if (run.steps.trd?.content && !run.steps.trd.metadata?.skipped)
+        fileMap["TRD.md"] = run.steps.trd.content;
+      if (
+        run.steps.sysdesign?.content &&
+        !run.steps.sysdesign.metadata?.skipped
+      )
+        fileMap["SystemDesign.md"] = run.steps.sysdesign.content;
+      if (
+        run.steps.implguide?.content &&
+        !run.steps.implguide.metadata?.skipped
+      )
+        fileMap["ImplementationGuide.md"] = run.steps.implguide.content;
+      if (run.steps.design?.content && !run.steps.design.metadata?.skipped)
+        fileMap["DesignSpec.md"] = run.steps.design.content;
+      if (Object.keys(fileMap).length === 0) fileMap["PRD.md"] = "(empty)";
     }
     run = this.emitStubCompleted(run, "mockup", "Mockup step disabled.", {
       skipped: true,
@@ -431,14 +652,12 @@ export class PipelineEngine {
     const designSpecContent = run.steps.design?.content ?? "";
 
     // ── QA ──
-    if (fast || !plan.needsQa) {
+    if (!plan.needsQa) {
       run = this.emitStubCompleted(
         run,
         "qa",
-        fast
-          ? "QA skipped in quick start (assumed passed)."
-          : `QA not required for Tier ${tier} project.`,
-        { skipped: true, ...(fast ? {} : { reason: "tier_skip", tier }) },
+        `QA not required for Tier ${tier} project.`,
+        { skipped: true, reason: "tier_skip", tier },
       );
     } else {
       run = await this.executeStep(run, "qa", () =>
@@ -453,14 +672,12 @@ export class PipelineEngine {
     }
 
     // ── Verify ──
-    if (fast || !plan.needsVerify) {
+    if (!plan.needsVerify) {
       run = this.emitStubCompleted(
         run,
         "verify",
-        fast
-          ? "Verification skipped in quick start (assumed passed)."
-          : `Verification not required for Tier ${tier} project.`,
-        { skipped: true, ...(fast ? {} : { reason: "tier_skip", tier }) },
+        `Verification not required for Tier ${tier} project.`,
+        { skipped: true, reason: "tier_skip", tier },
       );
     } else {
       run = await this.executeStep(run, "verify", () =>
@@ -505,7 +722,6 @@ export class PipelineEngine {
     run.updatedAt = new Date().toISOString();
 
     const fileMap: Record<string, string> = {};
-    if (run.steps.prd?.content) fileMap["PRD.md"] = run.steps.prd.content;
     if (run.steps.trd?.content && !run.steps.trd.metadata?.skipped)
       fileMap["TRD.md"] = run.steps.trd.content;
     if (run.steps.sysdesign?.content && !run.steps.sysdesign.metadata?.skipped)
@@ -518,15 +734,17 @@ export class PipelineEngine {
       fileMap["PencilDesign.md"] = run.steps.pencil.content;
 
     if (Object.keys(fileMap).length === 0) {
-      fileMap["PRD.md"] = "(empty)";
+      fileMap["README.md"] =
+        "# Generated Project\n\nAuto-generated by Agentic Builder.";
     }
 
-    const tierFromMeta =
+    const tierFromMeta = normalizeProjectTier(
       (
         run.steps.intent?.metadata?.classification as
           | { tier?: ProjectTier }
           | undefined
-      )?.tier ?? "L";
+      )?.tier ?? "M",
+    );
 
     run = await this.runKickoffStep(run, fileMap, outputRoot, tierFromMeta);
 
@@ -551,7 +769,7 @@ export class PipelineEngine {
     run: PipelineRun,
     fileMap: Record<string, string>,
     outputRoot: string,
-    tier: ProjectTier = "L",
+    tier: ProjectTier = "M",
   ): Promise<PipelineRun> {
     run.currentStep = "kickoff";
     this.emit({
@@ -580,6 +798,7 @@ export class PipelineEngine {
     }
 
     try {
+      await removePreviousDesignDocs(outputRoot);
       const { written, errors } = await writeCodegenFileMap(
         outputRoot,
         fileMap,
@@ -594,10 +813,61 @@ export class PipelineEngine {
       const prdSpec =
         (run.steps.prd?.metadata?.prdSpec as PrdSpec | undefined) ?? null;
 
+      // Persist the structured PRD spec to a sidecar so the coding API (a
+      // separate HTTP request) can pick it up and forward it to the frontend
+      // worker. Without this, PAGE-*/CMP-* context never reaches code-gen.
+      if (prdSpec) {
+        try {
+          const blueprintDir = path.join(outputRoot, ".blueprint");
+          await fs.mkdir(blueprintDir, { recursive: true });
+          await fs.writeFile(
+            path.join(blueprintDir, "PRD_SPEC.json"),
+            JSON.stringify(prdSpec, null, 2),
+            "utf-8",
+          );
+        } catch (e) {
+          console.warn(
+            `[Engine] Failed to persist .blueprint/PRD_SPEC.json (ignored):`,
+            e instanceof Error ? e.message : e,
+          );
+        }
+      }
+
+      // Mirror user-uploaded design references into the output tree so coding
+      // workers (and downstream tooling / manual inspection) can consult the
+      // files from inside the generated project. Safe no-op when no uploads.
+      let designReferenceEntries: Awaited<
+        ReturnType<typeof copyDesignReferencesToOutput>
+      > = [];
+      try {
+        designReferenceEntries = await copyDesignReferencesToOutput(
+          process.cwd(),
+          outputRoot,
+        );
+        if (designReferenceEntries.length > 0) {
+          console.log(
+            `[Engine] Copied ${designReferenceEntries.length} design reference(s) to <output>/.design-references/`,
+          );
+        }
+      } catch (e) {
+        console.warn(
+          "[Engine] Failed to copy design references (ignored):",
+          e instanceof Error ? e.message : e,
+        );
+      }
+      const designReferencesBlock = formatDesignReferencesPromptBlock(
+        designReferenceEntries,
+      );
+
       const {
         tasks: taskBreakdown,
         costUsd: tbCost,
         durationMs: tbDuration,
+        model: tbModel,
+        parseFailed: taskBreakdownParseFailed,
+        parseError: taskBreakdownParseError,
+        rawOutput: taskBreakdownRawOutput,
+        droppedFromTruncation: taskBreakdownDroppedFromTruncation,
       } = await buildTaskBreakdownFromDocuments({
         prd: prdBody,
         trd: trdBody || undefined,
@@ -607,6 +877,7 @@ export class PipelineEngine {
         prdSpec,
         sessionId: run.sessionId,
         tier,
+        designReferencesBlock: designReferencesBlock || undefined,
       });
 
       const { markdown: integrationMd, metadata: integrationMeta } =
@@ -623,10 +894,106 @@ export class PipelineEngine {
         (run.steps.prd?.metadata?.prdRequirementIndex as
           | PrdRequirementIndex
           | undefined) ?? extractPrdRequirementIndex(prdBody);
-      const taskCoverageGate = runTaskCoverageGate(
+      let taskCoverageGate = runTaskCoverageGate(
         prdIndexForTasks,
         taskBreakdown,
       );
+
+      // P0 self-heal: if the gate failed, try to synthesise supplementary
+      // tasks that cover the missing PRD requirement IDs. Non-fatal on
+      // exhaustion; the UI still shows a warning, but the pipeline proceeds.
+      const coverageRepairEmitter = createRepairEmitter([
+        createJsonlRepairSink(outputRoot),
+        consoleRepairSink,
+      ]);
+      const repairAttemptTracker = new AttemptTracker({
+        outputDir: outputRoot,
+      });
+      await repairAttemptTracker.load();
+
+      // Surface task-breakdown truncation honestly. The Coverage Gate
+      // self-heal below will still try to cover the missing PRD ids with
+      // supplementary tasks, but the telemetry here tells us the root cause
+      // so we can tune token limits / model choice.
+      if (
+        typeof taskBreakdownDroppedFromTruncation === "number" &&
+        taskBreakdownDroppedFromTruncation > 0
+      ) {
+        coverageRepairEmitter({
+          stage: "task-breakdown",
+          event: "truncation_detected",
+          details: {
+            recovered: taskBreakdown.length,
+            dropped: taskBreakdownDroppedFromTruncation,
+            rawLength: taskBreakdownRawOutput?.length ?? 0,
+          },
+        });
+      }
+      let coverageRepairSummary: {
+        attempts: number;
+        added: number;
+        finalMissing: string[];
+        costUsd: number;
+      } | null = null;
+      let finalTaskBreakdown = taskBreakdown;
+
+      if (!taskCoverageGate.passed && taskCoverageGate.missingIds.length > 0) {
+        try {
+          const repairResult = await repairTaskCoverage({
+            missingIds: taskCoverageGate.missingIds,
+            existingTasks: taskBreakdown,
+            prd: prdBody,
+            trd: trdBody || undefined,
+            sysDesign: sysDesignBody || undefined,
+            implGuide: implGuideBody || undefined,
+            prdSpec,
+            tier,
+            sessionId: run.sessionId,
+            emitter: coverageRepairEmitter,
+            attemptTracker: repairAttemptTracker,
+          });
+          finalTaskBreakdown = repairResult.tasks;
+          taskCoverageGate = runTaskCoverageGate(
+            prdIndexForTasks,
+            finalTaskBreakdown,
+          );
+          coverageRepairSummary = {
+            attempts: repairResult.attempts,
+            added: repairResult.added.length,
+            finalMissing: repairResult.finalMissing,
+            costUsd: repairResult.costUsd,
+          };
+          if (repairResult.circuitOpen) {
+            await escalateRepairCircuit({
+              scope: {
+                stage: "coverage-gate",
+                scopeKey: missingIdsScopeKey(taskCoverageGate.missingIds),
+              },
+              tracker: repairAttemptTracker,
+              outputDir: outputRoot,
+              emitter: coverageRepairEmitter,
+              sessionId: run.sessionId,
+              reason:
+                "Task-coverage repair circuit opened — the same missing-id set has been retried 3+ times without progress.",
+            });
+          }
+        } catch (repairErr) {
+          console.warn(
+            `[Engine] Coverage Gate self-heal threw:`,
+            repairErr instanceof Error ? repairErr.message : repairErr,
+          );
+          coverageRepairEmitter({
+            stage: "coverage-gate",
+            event: "repair_loop_error",
+            details: {
+              error:
+                repairErr instanceof Error
+                  ? repairErr.message
+                  : String(repairErr),
+            },
+          });
+        }
+      }
 
       let coverageWarningBlock = "";
       if (!taskCoverageGate.passed && taskCoverageGate.missingIds.length > 0) {
@@ -638,6 +1005,9 @@ export class PipelineEngine {
           taskCoverageGate.missingIds.length > 10
             ? `\n- ...and ${taskCoverageGate.missingIds.length - 10} more`
             : "";
+        const repairLine = coverageRepairSummary
+          ? `_Self-heal ran ${coverageRepairSummary.attempts} attempt(s), added ${coverageRepairSummary.added} task(s); ${coverageRepairSummary.finalMissing.length} id(s) remain._`
+          : "";
         coverageWarningBlock = [
           "",
           "### Coverage Gate Warning",
@@ -646,15 +1016,151 @@ export class PipelineEngine {
           "",
           missingList + moreCount,
           "",
+          repairLine,
+          "",
           "These requirements may not be implemented. Consider adding tasks that reference these IDs,",
           "or verify the task breakdown covers them implicitly.",
+        ]
+          .filter(Boolean)
+          .join("\n");
+      } else if (coverageRepairSummary && coverageRepairSummary.added > 0) {
+        coverageWarningBlock = [
+          "",
+          "### Coverage Gate self-heal",
+          "",
+          `Added **${coverageRepairSummary.added}** supplementary task(s) across ${coverageRepairSummary.attempts} attempt(s) — all PRD requirement IDs now referenced.`,
         ].join("\n");
       }
 
+      // P0 phase requirement gate + self-heal. Guarantees that a full-stack
+      // project has at least one Backend Services-class task. Without this,
+      // PRDs that depend on APIs / data layer silently ship with zero backend
+      // code generated. Non-fatal: worst case we insert a synthetic task.
+      let phaseGateReport = runPhaseRequirementGate({
+        tier,
+        tasks: finalTaskBreakdown,
+        needsBackend: (
+          run.steps.intent?.metadata?.classification as
+            | { needsBackend?: boolean }
+            | undefined
+        )?.needsBackend,
+      });
+      let phaseRepairSummary: {
+        addedByLlm: number;
+        synthetic: boolean;
+        costUsd: number;
+      } | null = null;
+      if (!phaseGateReport.passed) {
+        try {
+          const phaseResult = await repairMissingBackendPhase({
+            existingTasks: finalTaskBreakdown,
+            prd: prdBody,
+            trd: trdBody || undefined,
+            sysDesign: sysDesignBody || undefined,
+            implGuide: implGuideBody || undefined,
+            prdSpec,
+            tier,
+            uncoveredIds: taskCoverageGate.missingIds,
+            sessionId: run.sessionId,
+            emitter: coverageRepairEmitter,
+            attemptTracker: repairAttemptTracker,
+          });
+          finalTaskBreakdown = phaseResult.tasks;
+          phaseGateReport = runPhaseRequirementGate({
+            tier,
+            tasks: finalTaskBreakdown,
+            needsBackend: (
+              run.steps.intent?.metadata?.classification as
+                | { needsBackend?: boolean }
+                | undefined
+            )?.needsBackend,
+          });
+          phaseRepairSummary = {
+            addedByLlm: phaseResult.addedByLlm.length,
+            synthetic: phaseResult.synthetic !== null,
+            costUsd: phaseResult.costUsd,
+          };
+          if (phaseResult.circuitOpen) {
+            await escalateRepairCircuit({
+              scope: { stage: "phase-gate", scopeKey: "backend" },
+              tracker: repairAttemptTracker,
+              outputDir: outputRoot,
+              emitter: coverageRepairEmitter,
+              sessionId: run.sessionId,
+              reason:
+                "Backend phase repair circuit opened — synthesised tasks did not actually close the backend gap.",
+            });
+          }
+          // After phase-repair we may have covered new ids too — refresh the
+          // coverage gate so the warning block reflects reality.
+          taskCoverageGate = runTaskCoverageGate(
+            prdIndexForTasks,
+            finalTaskBreakdown,
+          );
+        } catch (phaseErr) {
+          console.warn(
+            `[Engine] Phase gate self-heal threw:`,
+            phaseErr instanceof Error ? phaseErr.message : phaseErr,
+          );
+          coverageRepairEmitter({
+            stage: "phase-gate",
+            event: "repair_loop_error",
+            details: {
+              error:
+                phaseErr instanceof Error ? phaseErr.message : String(phaseErr),
+            },
+          });
+        }
+      }
+
+      // Evidence-gate evaluation for task-breakdown — telemetry only during
+      // Phase B rollout. The pipeline does NOT block on this verdict yet;
+      // the existing coverage-warning block continues to drive UX.
+      try {
+        const taskBreakdownEvidence = [
+          evidenceFromGateReport(taskCoverageGate),
+          evidenceFromGateReport(phaseGateReport),
+        ];
+        const tbEvidenceReport = runEvidenceGate(
+          "task-breakdown",
+          taskBreakdownEvidence,
+        );
+        coverageRepairEmitter({
+          stage: "task-breakdown",
+          event: "evidence_gate_evaluated",
+          details: {
+            passed: tbEvidenceReport.passed,
+            missingRequirements: tbEvidenceReport.missingRequirements,
+            evidenceCount: taskBreakdownEvidence.length,
+          },
+        });
+      } catch (evidenceErr) {
+        console.warn(
+          `[Engine] task-breakdown evidence gate threw (non-fatal):`,
+          evidenceErr instanceof Error ? evidenceErr.message : evidenceErr,
+        );
+      }
+
       const tbSummary =
-        taskBreakdown.length > 0
-          ? `Task breakdown generated: **${taskBreakdown.length}** coding tasks (see sub-tab).`
-          : "Task breakdown could not be generated from documents.";
+        finalTaskBreakdown.length > 0
+          ? `Task breakdown generated: **${finalTaskBreakdown.length}** coding tasks (see sub-tab).`
+          : taskBreakdownParseFailed
+            ? "Task breakdown generation returned non-JSON output and could not be parsed."
+            : "Task breakdown could not be generated from documents.";
+      const tbParseWarning = taskBreakdownParseFailed
+        ? [
+            "",
+            "### Task Breakdown Parse Warning",
+            "",
+            "- The model output was not valid JSON for task breakdown.",
+            "- You can retry **kick-off only** from the Kick-off panel without changing previous preparation artifacts.",
+            taskBreakdownParseError
+              ? `- Parse error: \`${taskBreakdownParseError}\``
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : "";
       const summary = [
         "## Project kick-off",
         "",
@@ -668,6 +1174,7 @@ export class PipelineEngine {
         errors.length
           ? `#### Path warnings\n\n${errors.map((e) => `- ${e}`).join("\n")}`
           : "",
+        tbParseWarning,
         integrationMd,
         coverageWarningBlock,
       ]
@@ -676,7 +1183,7 @@ export class PipelineEngine {
 
       const stepResult = this.buildStepResult("kickoff", "completed", {
         content: summary,
-        model: "kickoff",
+        model: tbModel || "kickoff",
         costUsd: tbCost,
         durationMs: tbDuration,
         tokenUsage: {
@@ -691,9 +1198,18 @@ export class PipelineEngine {
           errors,
           fileCount: written.length,
           integrations: integrationMeta,
-          taskBreakdown,
+          taskBreakdown: finalTaskBreakdown,
+          taskBreakdownParseFailed,
+          ...(taskBreakdownRawOutput ? { taskBreakdownRawOutput } : {}),
+          ...(taskBreakdownParseError ? { taskBreakdownParseError } : {}),
           taskBreakdownSimulated: false,
+          taskBreakdownConfirmed: finalTaskBreakdown.length === 0,
           taskCoverageGate,
+          ...(coverageRepairSummary
+            ? { coverageRepair: coverageRepairSummary }
+            : {}),
+          phaseRequirementGate: phaseGateReport,
+          ...(phaseRepairSummary ? { phaseRepair: phaseRepairSummary } : {}),
         },
       });
 
@@ -731,12 +1247,18 @@ export class PipelineEngine {
     const prd = run.steps.prd;
     if (!prd?.content || prd.status !== "completed") return run;
     const gate = runPrdSpecGate(prd.content);
+    const prdEvidence = [evidenceFromPrdSpecGate(gate)];
+    const prdEvidenceReport = runEvidenceGate("prd", prdEvidence);
     run.steps.prd = {
       ...prd,
       metadata: {
         ...prd.metadata,
         prdRequirementIndex: gate.index,
         prdSpecGate: { passed: gate.passed, warnings: gate.warnings },
+        evidenceGate: {
+          passed: prdEvidenceReport.passed,
+          missingRequirements: prdEvidenceReport.missingRequirements,
+        },
       },
     };
     return run;
@@ -746,6 +1268,114 @@ export class PipelineEngine {
    * LLM-based structured PRD extraction. Attaches `prdSpec` to `steps.prd.metadata`.
    * Non-blocking — errors are logged but never fail the pipeline.
    */
+  /**
+   * After TRD generation succeeds, parse the response for fenced code
+   * blocks emitted under §6 / §7 and persist them. Delegates the I/O to
+   * persistTrdArtifactsFromContent (shared with the parallel-generate
+   * route) and just enriches step.metadata so the UI can surface the
+   * outcome.
+   *
+   * Best-effort: a missing/malformed block degrades to "no shared schema"
+   * (downstream codegen falls back to per-worker types) rather than
+   * failing the step.
+   */
+  private async persistTrdArtifacts(run: PipelineRun): Promise<void> {
+    const trd = run.steps.trd;
+    if (!trd?.content || trd.status !== "completed") return;
+    if (trd.metadata?.skipped) return;
+
+    const blueprintDir = path.resolve(process.cwd(), ".blueprint");
+
+    let result;
+    try {
+      result = await persistTrdArtifactsFromContent(trd.content, blueprintDir);
+    } catch (err) {
+      console.warn(
+        "[Pipeline] TRD artifact persistence failed:",
+        err instanceof Error ? err.message : err,
+      );
+      return;
+    }
+
+    const writtenRel: {
+      schemaTs?: string;
+      rulesYaml?: string;
+      pipelineDagYaml?: string;
+    } = {};
+    if (result.written.schemaTs) {
+      writtenRel.schemaTs = path.relative(
+        process.cwd(),
+        result.written.schemaTs,
+      );
+    }
+    if (result.written.rulesYaml) {
+      writtenRel.rulesYaml = path.relative(
+        process.cwd(),
+        result.written.rulesYaml,
+      );
+    }
+    if (result.written.pipelineDagYaml) {
+      writtenRel.pipelineDagYaml = path.relative(
+        process.cwd(),
+        result.written.pipelineDagYaml,
+      );
+    }
+
+    if (result.rulesValidation && !result.rulesValidation.ok) {
+      console.warn(
+        `[Pipeline] business-rules.dsl.yaml has ${result.rulesValidation.warnings.length} warning(s):`,
+        result.rulesValidation.warnings
+          .map((w) => `${w.code}: ${w.message}`)
+          .join("; "),
+      );
+    }
+    if (result.dagValidation && !result.dagValidation.ok) {
+      console.warn(
+        `[Pipeline] pipeline-dag.yaml has ${result.dagValidation.warnings.length} warning(s):`,
+        result.dagValidation.warnings
+          .map((w) => `${w.code}: ${w.message}`)
+          .join("; "),
+      );
+    }
+
+    // Evidence-gate for TRD — both validators must pass. Telemetry-only
+    // during Phase B rollout; the metadata block lets the UI surface the
+    // verdict without altering pipeline flow.
+    let trdEvidenceVerdict:
+      | { passed: boolean; missingRequirements: string[] }
+      | undefined;
+    if (result.rulesValidation && result.dagValidation) {
+      const evidence = [
+        evidenceFromRulesValidation(result.rulesValidation),
+        evidenceFromDagValidation(result.dagValidation),
+      ];
+      const report = runEvidenceGate("trd", evidence);
+      trdEvidenceVerdict = {
+        passed: report.passed,
+        missingRequirements: report.missingRequirements,
+      };
+    }
+
+    run.steps.trd = {
+      ...trd,
+      metadata: {
+        ...trd.metadata,
+        artifacts: {
+          ...writtenRel,
+          unknownPaths: result.artifacts.unknown.map((u) => u.path),
+          malformed: result.artifacts.malformed,
+          ...(result.rulesValidation
+            ? { rulesValidation: result.rulesValidation }
+            : {}),
+          ...(result.dagValidation
+            ? { dagValidation: result.dagValidation }
+            : {}),
+        },
+        ...(trdEvidenceVerdict ? { evidenceGate: trdEvidenceVerdict } : {}),
+      },
+    };
+  }
+
   private async attachPrdStructuredSpec(
     run: PipelineRun,
   ): Promise<PipelineRun> {
@@ -802,9 +1432,20 @@ export class PipelineEngine {
         | PrdRequirementIndex
         | undefined) ?? extractPrdRequirementIndex(prdContent);
     const gate = runQaCoverageGate(prdIndex, qa.content);
+    // QA evidence is currently single-validator (qa-ac-coverage); the
+    // verifier-agent evidence is captured elsewhere when it runs.
+    const qaEvidence = [evidenceFromGateReport(gate)];
+    const qaEvidenceReport = runEvidenceGate("qa", qaEvidence);
     run.steps.qa = {
       ...qa,
-      metadata: { ...qa.metadata, qaCoverageGate: gate },
+      metadata: {
+        ...qa.metadata,
+        qaCoverageGate: gate,
+        evidenceGate: {
+          passed: qaEvidenceReport.passed,
+          missingRequirements: qaEvidenceReport.missingRequirements,
+        },
+      },
     };
     return run;
   }
@@ -816,11 +1457,10 @@ export class PipelineEngine {
       "# Scaffold",
       "",
       "Generated via Agentic Builder quick path (PRD → kick-off only).",
-      "Implement the product from PRD.md.",
+      "Implement the product from the generated project.",
       "",
     ].join("\n");
     return {
-      "PRD.md": prdContent.trim().length > 0 ? prdContent : "# PRD\n\n(empty)",
       "README.md": readme,
     };
   }
@@ -894,7 +1534,11 @@ export class PipelineEngine {
         model: result.model,
         costUsd: result.costUsd,
         durationMs: result.durationMs,
-        tokenUsage: result.usage,
+        tokenUsage: {
+          promptTokens: result.usage.prompt_tokens,
+          completionTokens: result.usage.completion_tokens,
+          totalTokens: result.usage.total_tokens,
+        },
         traceId: result.traceId,
         metadata: {
           processTrace,
@@ -985,17 +1629,6 @@ export class PipelineEngine {
     this.onEvent?.(event);
   }
 
-  private async readStaticPrd(): Promise<string | null> {
-    const abs = path.join(this.projectRoot, STATIC_PRD_RELATIVE_PATH);
-    try {
-      const raw = await fs.readFile(abs, "utf-8");
-      const trimmed = raw.trim();
-      return trimmed.length > 0 ? raw : null;
-    } catch {
-      return null;
-    }
-  }
-
   private async readStaticDesign(): Promise<string> {
     const abs = path.join(this.projectRoot, STATIC_DESIGN_RELATIVE_PATH);
     try {
@@ -1011,6 +1644,31 @@ export class PipelineEngine {
    * In fast mode, try to read existing document files from the code output directory.
    * Supports common filename variations.
    */
+  /**
+   * Read the user-uploaded PRD written by `/api/agents/pipeline/prd-import`.
+   * Checks the project-scoped path first (`<outputRoot>/.blueprint/PRD.md`),
+   * then falls back to the legacy global path (`<projectRoot>/.blueprint/PRD.md`)
+   * for backward compatibility.
+   * Returns null when absent or whitespace-only.
+   */
+  private async readImportedPrd(outputRoot?: string): Promise<string | null> {
+    const candidates: string[] = [];
+    if (outputRoot) {
+      candidates.push(path.join(outputRoot, ".blueprint", "PRD.md"));
+    }
+    candidates.push(path.join(this.projectRoot, ".blueprint", "PRD.md"));
+
+    for (const filePath of candidates) {
+      try {
+        const raw = await fs.readFile(filePath, "utf-8");
+        if (raw.trim().length > 0) return raw;
+      } catch {
+        /* try next candidate */
+      }
+    }
+    return null;
+  }
+
   private async readExistingDocsFromOutput(outputRoot: string): Promise<{
     prd: string | null;
     trd: string | null;
@@ -1050,40 +1708,5 @@ export class PipelineEngine {
     ]);
 
     return { prd, trd, sysDesign, implGuide, designSpec };
-  }
-
-  private applyStaticPrdStep(run: PipelineRun, content: string): PipelineRun {
-    run.currentStep = "prd";
-    this.emit({
-      type: "step_start",
-      runId: run.id,
-      stepId: "prd",
-      data: { status: "running" },
-    });
-
-    const stepResult = this.buildStepResult("prd", "completed", {
-      content,
-      model: "static:.blueprint/PRD.md",
-      costUsd: 0,
-      durationMs: 0,
-      tokenUsage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      },
-      metadata: { source: "static-prd-file", path: STATIC_PRD_RELATIVE_PATH },
-    });
-
-    run.steps.prd = stepResult;
-    run.updatedAt = new Date().toISOString();
-
-    this.emit({
-      type: "step_complete",
-      runId: run.id,
-      stepId: "prd",
-      data: stepResult,
-    });
-
-    return run;
   }
 }

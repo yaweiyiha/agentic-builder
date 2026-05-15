@@ -8,6 +8,8 @@ import type {
   KickoffWorkItem,
 } from "@/lib/pipeline/types";
 
+import type { HumanDecisionOption } from "@/lib/pipeline/human-decision";
+
 export interface IntegrationVerifyState {
   status: "verifying" | "fixing" | "passed" | "failed";
   errors?: string;
@@ -15,6 +17,22 @@ export interface IntegrationVerifyState {
   fixAttempts: number;
   maxFixAttempts: number;
   filesFixed?: number;
+}
+
+export interface E2EVerifyState {
+  status: "verifying" | "fixing" | "passed" | "failed";
+  errors?: string;
+  errorCount?: number;
+  fixAttempts: number;
+  maxFixAttempts: number;
+}
+
+export interface PendingHumanDecision {
+  sessionId: string;
+  context: string;
+  options: HumanDecisionOption[];
+  /** ISO string — UI shows countdown */
+  expiresAt: string;
 }
 
 interface CodingState {
@@ -26,14 +44,41 @@ interface CodingState {
   totalCostUsd: number;
   error: string | null;
   integrationVerify: IntegrationVerifyState | null;
+  e2eVerify: E2EVerifyState | null;
+  /** Supervisor-level logs (phase verify, fix, install, etc.) */
+  supervisorLogs: AgentLogEntry[];
+  /** Set when integration_verify_fix is waiting for a human to pick an action. */
+  pendingHumanDecision: PendingHumanDecision | null;
 
   startCoding: (
     runId: string,
     tasks: KickoffWorkItem[],
     codeOutputDir: string,
     projectTier?: string,
+    prdContent?: string,
+  ) => void;
+  /** Re-run only the tasks that failed in the last session. */
+  retryFailedTasks: (
+    runId: string,
+    tasks: KickoffWorkItem[],
+    failedTaskIds: string[],
+    codeOutputDir: string,
+    projectTier?: string,
+    prdContent?: string,
+  ) => void;
+  retryIntegrationVerify: (
+    runId: string,
+    codeOutputDir: string,
+    projectTier?: string,
+  ) => void;
+  retryE2eVerify: (
+    runId: string,
+    codeOutputDir: string,
+    projectTier?: string,
   ) => void;
   selectAgent: (agentId: string | null) => void;
+  /** Called by the decision UI when the user picks an option. */
+  submitHumanDecision: (decisionId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -46,10 +91,29 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
   totalCostUsd: 0,
   error: null,
   integrationVerify: null,
+  e2eVerify: null,
+  gapAnalysis: null,
+  supervisorLogs: [],
+  pendingHumanDecision: null,
 
   selectAgent: (agentId) => set({ selectedAgentId: agentId }),
 
-  startCoding: (runId, taskItems, codeOutputDir, projectTier) => {
+  submitHumanDecision: async (decisionId: string) => {
+    const { sessionId, pendingHumanDecision } = get();
+    if (!sessionId || !pendingHumanDecision) return;
+    set({ pendingHumanDecision: null });
+    try {
+      await fetch("/api/agents/coding/decide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, decisionId }),
+      });
+    } catch (err) {
+      console.error("[coding-store] submitHumanDecision failed:", err);
+    }
+  },
+
+  startCoding: (runId, taskItems, codeOutputDir, projectTier, prdContent) => {
     set({
       status: "running",
       error: null,
@@ -59,12 +123,19 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       totalCostUsd: 0,
       sessionId: null,
       integrationVerify: null,
+      e2eVerify: null,
+      supervisorLogs: [],
+      pendingHumanDecision: null,
     });
+
+    // Clear the last-session checkpoint so the "Retry Failed Tasks" button
+    // doesn't show stale data while a fresh full run is in progress.
+    fetch("/api/agents/coding/checkpoint", { method: "DELETE" }).catch(() => {});
 
     fetch("/api/agents/coding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ runId, tasks: taskItems, codeOutputDir, projectTier }),
+      body: JSON.stringify({ runId, tasks: taskItems, codeOutputDir, projectTier, prd: prdContent }),
     })
       .then(async (resp) => {
         if (!resp.ok) {
@@ -73,6 +144,257 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
             status: "failed",
             error:
               (errData as { error?: string }).error || "Coding request failed",
+          });
+          return;
+        }
+
+        const reader = resp.body?.getReader();
+        if (!reader) {
+          set({ status: "failed", error: "No response body" });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const payload = JSON.parse(line.slice(6));
+              handleCodingEvent(payload, set, get);
+            } catch {
+              /* skip */
+            }
+          }
+        }
+
+        if (buffer.startsWith("data: ")) {
+          try {
+            handleCodingEvent(JSON.parse(buffer.slice(6)), set, get);
+          } catch {
+            /* skip */
+          }
+        }
+
+        const state = get();
+        if (state.status === "running") set({ status: "completed" });
+      })
+      .catch((err) => {
+        set({
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      });
+  },
+
+  retryFailedTasks: (runId, tasks, failedTaskIds, codeOutputDir, projectTier, prdContent) => {
+    set({
+      status: "running",
+      error: null,
+      agents: [],
+      tasks: [],
+      selectedAgentId: null,
+      totalCostUsd: 0,
+      sessionId: null,
+      integrationVerify: null,
+      e2eVerify: null,
+      supervisorLogs: [],
+      pendingHumanDecision: null,
+    });
+
+    fetch("/api/agents/coding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId,
+        tasks,
+        codeOutputDir,
+        projectTier,
+        prd: prdContent,
+        retryFailedTaskIds: failedTaskIds,
+      }),
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          set({
+            status: "failed",
+            error: (errData as { error?: string }).error || "Retry failed",
+          });
+          return;
+        }
+
+        const reader = resp.body?.getReader();
+        if (!reader) {
+          set({ status: "failed", error: "No response body" });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const payload = JSON.parse(line.slice(6));
+              handleCodingEvent(payload, set, get);
+            } catch {
+              /* skip */
+            }
+          }
+        }
+
+        if (buffer.startsWith("data: ")) {
+          try {
+            handleCodingEvent(JSON.parse(buffer.slice(6)), set, get);
+          } catch {
+            /* skip */
+          }
+        }
+
+        const state = get();
+        if (state.status === "running") set({ status: "completed" });
+      })
+      .catch((err) => {
+        set({
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      });
+  },
+
+  retryIntegrationVerify: (runId, codeOutputDir, projectTier) => {
+    const current = get();
+    if (current.status === "running") return;
+
+    set({
+      status: "running",
+      error: null,
+      integrationVerify: {
+        status: "verifying",
+        fixAttempts: 0,
+        maxFixAttempts: current.integrationVerify?.maxFixAttempts ?? 3,
+      },
+      e2eVerify: null,
+    });
+
+    fetch("/api/agents/coding/retry-integration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId,
+        tasks: current.tasks,
+        codeOutputDir,
+        projectTier,
+      }),
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          set({
+            status: "failed",
+            error:
+              (errData as { error?: string }).error ||
+              "Integration retry request failed",
+          });
+          return;
+        }
+
+        const reader = resp.body?.getReader();
+        if (!reader) {
+          set({ status: "failed", error: "No response body" });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const payload = JSON.parse(line.slice(6));
+              handleCodingEvent(payload, set, get);
+            } catch {
+              /* skip */
+            }
+          }
+        }
+
+        if (buffer.startsWith("data: ")) {
+          try {
+            handleCodingEvent(JSON.parse(buffer.slice(6)), set, get);
+          } catch {
+            /* skip */
+          }
+        }
+
+        const state = get();
+        if (state.status === "running") set({ status: "completed" });
+      })
+      .catch((err) => {
+        set({
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      });
+  },
+
+  retryE2eVerify: (runId, codeOutputDir, projectTier) => {
+    const current = get();
+    if (current.status === "running") return;
+
+    set({
+      status: "running",
+      error: null,
+      e2eVerify: {
+        status: "verifying",
+        fixAttempts: 0,
+        maxFixAttempts: current.e2eVerify?.maxFixAttempts ?? 3,
+      },
+    });
+
+    fetch("/api/agents/coding/retry-e2e", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId,
+        tasks: current.tasks,
+        codeOutputDir,
+        projectTier,
+      }),
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          set({
+            status: "failed",
+            error:
+              (errData as { error?: string }).error ||
+              "E2E retry request failed",
           });
           return;
         }
@@ -134,6 +456,9 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
       totalCostUsd: 0,
       error: null,
       integrationVerify: null,
+      e2eVerify: null,
+      supervisorLogs: [],
+      pendingHumanDecision: null,
     });
   },
 }));
@@ -451,6 +776,18 @@ function handleCodingEvent(
     return;
   }
 
+  if (type === "agent_task_substeps") {
+    const taskId = payload.taskId;
+    if (!taskId || !payload.data?.subSteps) return;
+    const subSteps = payload.data.subSteps as CodingTask["subSteps"];
+    const tasks = get().tasks.map((t) => {
+      if (t.id !== taskId) return t;
+      return { ...t, subSteps };
+    });
+    set({ tasks });
+    return;
+  }
+
   if (type === "agent_completed") {
     const agents = get().agents.map((a) => {
       if (a.id !== payload.agentId) return a;
@@ -551,6 +888,16 @@ function handleCodingEvent(
     return;
   }
 
+  if (type === "supervisor_log") {
+    const entry: AgentLogEntry = {
+      timestamp: new Date().toISOString(),
+      type: "info",
+      message: (payload.data?.message as string) ?? "",
+    };
+    set({ supervisorLogs: [...get().supervisorLogs, entry] });
+    return;
+  }
+
   if (type === "integration_fix_result") {
     const attempt = (payload.data?.attempt as number) ?? 0;
     const filesFixed = payload.data?.filesFixed as number | undefined;
@@ -565,6 +912,75 @@ function handleCodingEvent(
         errorCount: undefined,
       },
     });
+    return;
+  }
+
+  if (type === "e2e_verify_start") {
+    set({
+      e2eVerify: {
+        status: "verifying",
+        fixAttempts: 0,
+        maxFixAttempts: 3,
+      },
+    });
+    return;
+  }
+
+  if (type === "e2e_verify_result") {
+    const passed = payload.data?.passed as boolean;
+    const errors = payload.data?.errors as string | undefined;
+    const errorCount = payload.data?.errorCount as number | undefined;
+    const fixAttempts = (payload.data?.fixAttempts as number) ?? 0;
+    const maxFixAttempts = (payload.data?.maxFixAttempts as number) ?? 3;
+
+    if (passed) {
+      set({
+        e2eVerify: {
+          status: "passed",
+          fixAttempts,
+          maxFixAttempts,
+        },
+      });
+      return;
+    }
+
+    const atMax = fixAttempts >= maxFixAttempts;
+    set({
+      e2eVerify: {
+        status: atMax ? "failed" : "fixing",
+        errors,
+        errorCount,
+        fixAttempts,
+        maxFixAttempts,
+      },
+    });
+    return;
+  }
+
+  // Handle repair_event from the supervisor's self-heal channel.
+  // Currently we only surface the human_decision_needed sub-event; all other
+  // repair events are silently dropped (they go to .ralph/repair-log.jsonl).
+  if (type === "repair_event") {
+    const repairEvent = payload.data?.event as string | undefined;
+    if (repairEvent === "human_decision_needed") {
+      const details = payload.data?.details as Record<string, unknown> | undefined;
+      const sessionId = payload.sessionId ?? get().sessionId;
+      if (sessionId) {
+        set({
+          pendingHumanDecision: {
+            sessionId,
+            context: (details?.context as string) ?? "",
+            options: (details?.options as HumanDecisionOption[]) ?? [],
+            expiresAt: new Date(
+              Date.now() + ((details?.timeoutMs as number) ?? 5 * 60 * 1000),
+            ).toISOString(),
+          },
+        });
+      }
+    }
+    if (repairEvent === "human_decision_received") {
+      set({ pendingHumanDecision: null });
+    }
     return;
   }
 }

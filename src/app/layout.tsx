@@ -14,11 +14,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className="font-sans antialiased min-h-screen bg-[var(--background)] text-[var(--foreground)]"
-      >
+      <body className="antialiased min-h-screen bg-(--background) text-(--foreground) flex" suppressHydrationWarning>
         <AppNav />
-        {children}
+        <div className="flex-1 min-w-0 flex flex-col pl-60 overflow-hidden">
+          {children}
+        </div>
       </body>
     </html>
   );

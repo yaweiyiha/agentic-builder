@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-05-14T22:56:30.426Z",
+  "sessionId": "fa1b0eeb-ced6-4702-8738-3c9d7e90df8a",
+  "appliedOptionalFeatures": [],
+  "declaredEnvKeys": [
+    "COINGECKO_API_KEY"
+  ],
+  "findings": [],
+  "byRule": {},
+  "bySeverity": {},
+  "hasError": false,
+  "clean": true,
+  "disabledRules": [
+    {
+      "ruleId": "external-id-vs-db-pk",
+      "reason": "no auth-* optional scaffold applied — no external user id to resolve."
+    },
+    {
+      "ruleId": "llm-client-abstraction",
+      "reason": "no LLM_* bundle declared on resource requirements — abstraction rule N/A."
+    }
+  ]
+}

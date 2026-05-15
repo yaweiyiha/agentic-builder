@@ -1,5 +1,9 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import {
+  docGenerationThinking,
+  resolveDocMaxTokens,
+} from "../shared/doc-agent-settings";
 
 const SYSTEM_PROMPT = `You are the Global Verifier Agent for 57Blocks Agentic Builder Pod.
 
@@ -58,7 +62,11 @@ export class VerifierAgent extends BaseAgent {
       systemPrompt: SYSTEM_PROMPT,
       defaultModel: MODEL_CONFIG.verify,
       temperature: 0.2,
-      maxTokens: 8192,
+      maxTokens: resolveDocMaxTokens("VERIFY_DOC_MAX_TOKENS", {
+        deepseek: 24576,
+        openrouter: 8192,
+      }),
+      thinking: docGenerationThinking(),
     });
   }
 

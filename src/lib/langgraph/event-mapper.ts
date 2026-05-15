@@ -1,5 +1,15 @@
-import type { CodingSessionEvent } from "@/lib/pipeline/types";
-import type { PhaseResult, TaskResult, GeneratedFile } from "./state";
+/**
+ * EventMapper: translates raw LangGraph stream chunks into typed SSE events
+ * understood by coding-store.ts.
+ *
+ * LangGraph streams chunks as [namespace[], updates] where:
+ *   - namespace = [] for top-level supervisor updates
+ *   - namespace = ["be_worker"] or ["be_worker:uuid"] for worker subgraph updates
+ *   - updates = { nodeName: nodeReturnValue } for the current step
+ */
+
+import type { CodingTask } from "@/lib/pipeline/types";
+import type { RepairEvent } from "@/lib/pipeline/self-heal";
 
 export type ErrorCategory =
   | "client_disconnect"
@@ -8,762 +18,702 @@ export type ErrorCategory =
   | "graph_error"
   | "unknown";
 
-// Mirror supervisor's worker allocation logic so we can pre-create agents
-// with the exact same labels the supervisor will use.
-const ENABLE_PHASE_INCREMENTAL_CONTEXT_SYNC =
-  process.env.BLUEPRINT_INCREMENTAL_CONTEXT_SYNC !== "0";
+type EventMapperOptions = Record<string, never>;
 
-function computeWorkerCount(role: string, taskCount: number): number {
-  if (role === "architect" || role === "test") return 1;
-  if (
-    ENABLE_PHASE_INCREMENTAL_CONTEXT_SYNC &&
-    (role === "backend" || role === "frontend")
-  ) {
-    return 1;
-  }
-  if (taskCount <= 3) return 1;
-  if (taskCount <= 8) return 2;
-  return 3;
+// ─── Internal tracker per worker subgraph instance ───
+
+interface WorkerTracker {
+  agentId: string;
+  role: string;
+  label: string;
+  lastKnownTaskId: string | null;
 }
 
-function distributeToChunks<T>(items: T[], chunks: number): T[][] {
-  if (chunks <= 1) return [items];
-  const result: T[][] = Array.from({ length: chunks }, () => []);
-  items.forEach((item, i) => result[i % chunks].push(item));
-  return result.filter((c) => c.length > 0);
+// ─── Typed SSE event (matches coding-store.ts IncomingPayload) ───
+
+interface SseEvent {
+  type: string;
+  sessionId?: string;
+  agentId?: string;
+  taskId?: string;
+  data?: Record<string, unknown>;
 }
 
-function buildWorkerLabel(base: string, index: number, total: number): string {
-  if (total <= 1) return base;
-  return `${base} #${index + 1}`;
+// ─── Extracted task result from node update ───
+
+interface ExtractedTaskResult {
+  taskId: string;
+  status?: string;
+  generatedFiles?: string[];
+  costUsd?: number;
+  fixCycles?: number;
+  warnings?: unknown[];
+  tokenUsage?: unknown;
+  subSteps?: unknown[];
 }
 
-/**
- * Tracks incremental state changes emitted by graph.stream({ streamMode: "updates" })
- * and maps them to CodingSessionEvent objects compatible with the existing frontend.
- */
 export class EventMapper {
-  private sessionId: string;
-  private agentRegistry = new Map<string, { id: string; role: string; label: string }>();
-  private emittedTaskStarts = new Set<string>();
-  private emittedTaskCompletes = new Set<string>();
-  private emittedAgentCreations = new Set<string>();
-  private completedAgents = new Set<string>();
-  private agentCounter = 0;
-  private taskMap = new Map<string, { id: string; title: string }>();
-  private taskIdToAgentId = new Map<string, string>();
-  private roleToAgentIds = new Map<string, string[]>();
-  private nsRoleMap = new Map<string, string>();
-  private namespaceAgentMap = new Map<string, string>();
-  private agentCurrentTaskId = new Map<string, string>();
-  private integrationFixAttemptCount = 0;
+  private readonly sessionId: string;
+  /** map from namespace-key → worker tracker */
+  private readonly workers = new Map<string, WorkerTracker>();
 
-  constructor(sessionId: string) {
+  /** counts per parent-node base name, for numbering parallel instances */
+  private readonly instanceCounts = new Map<string, number>();
+
+  /** workers for which we've already emitted agent_completed */
+  private readonly completedWorkers = new Set<string>();
+
+  /** tasks for which we've already emitted agent_task_start */
+  private readonly startedTasks = new Set<string>();
+
+  /** how many integration fix passes we've seen */
+  private integrationFixAttempts = 0;
+
+  /** true once integration_verify_start has been emitted */
+  private integrationVerifyStartEmitted = false;
+  /** true once e2e_verify_start has been emitted */
+  private e2eVerifyStartEmitted = false;
+
+  constructor(sessionId: string, _options: EventMapperOptions = {}) {
     this.sessionId = sessionId;
   }
 
-  mapChunk(chunk: [string[], Record<string, unknown>]): CodingSessionEvent[] {
-    const [namespace, nodeUpdates] = chunk;
-    const events: CodingSessionEvent[] = [];
+  // ─── Public API ────────────────────────────────────────────────────────────
 
-    for (const [nodeName, update] of Object.entries(nodeUpdates)) {
-      if (!update || typeof update !== "object") continue;
-      const u = update as Record<string, unknown>;
-
-      if (nodeName === "classify_tasks") {
-        events.push(...this.handleClassify(u));
-      } else if (nodeName === "architect_phase") {
-        events.push(...this.handleSinglePhaseComplete(u));
-      } else if (nodeName === "scaffold_verify") {
-        events.push(...this.handleScaffoldVerify(u));
-      } else if (nodeName === "scaffold_fix") {
-        events.push(...this.handleScaffoldFix(u));
-      } else if (nodeName === "dispatch_gate") {
-        events.push(...this.emitPhaseWorkingStatus(["backend"]));
-      } else if (nodeName === "generate_api_contracts") {
-        const architectIds = this.roleToAgentIds.get("architect");
-        const agentId = architectIds?.[0];
-        if (agentId) {
-          events.push({
-            type: "agent_log" as CodingSessionEvent["type"],
-            sessionId: this.sessionId,
-            agentId,
-            data: { message: "API contract generated. Starting backend development..." },
-          });
-        }
-      } else if (nodeName === "test_phase") {
-        events.push(...this.handleSinglePhaseComplete(u));
-      } else if (nodeName === "parallel_worker") {
-        events.push(...this.handleParallelWorkerComplete(u, namespace));
-      } else if (nodeName === "be_worker") {
-        events.push(...this.handleParallelWorkerComplete(u, namespace));
-        events.push(...this.emitPhaseWorkingStatus(["frontend"]));
-      } else if (nodeName === "fe_worker") {
-        events.push(...this.handleParallelWorkerComplete(u, namespace));
-        events.push(...this.emitPhaseWorkingStatus(["test"]));
-      } else if (nodeName === "extract_real_contracts") {
-        // silent
-      } else if (nodeName === "sync_deps") {
-        events.push({
-          type: "integration_verify_start" as CodingSessionEvent["type"],
-          sessionId: this.sessionId,
-          data: {},
-        });
-      } else if (nodeName === "fe_dispatch_gate") {
-        events.push(...this.emitPhaseWorkingStatus(["frontend"]));
-      } else if (nodeName === "generate_code") {
-        events.push(...this.handleGenerateCode(u, namespace));
-      } else if (nodeName === "verify") {
-        events.push(...this.handleVerify(u, namespace));
-      } else if (nodeName === "fix_errors") {
-        events.push(...this.handleFixErrors(u, namespace));
-      } else if (nodeName === "task_done") {
-        events.push(...this.handleTaskDone(u, namespace));
-      } else if (nodeName === "integration_verify") {
-        events.push(...this.handleIntegrationVerify(u));
-      } else if (nodeName === "integration_fix") {
-        events.push(...this.handleIntegrationFix(u));
-      } else if (nodeName === "summary") {
-        events.push(this.buildSessionComplete());
-      }
-    }
-
-    return events;
-  }
-
-  buildSessionStart(
-    tasks: { id: string; phase: string; title: string; assignedAgentId: string | null }[],
-  ): CodingSessionEvent {
+  buildSessionStart(tasks: CodingTask[]): SseEvent {
     return {
       type: "session_start",
       sessionId: this.sessionId,
-      data: { taskCount: tasks.length, tasks },
+      data: { tasks },
     };
   }
 
-  buildSessionComplete(): CodingSessionEvent {
-    return {
-      type: "session_complete",
-      sessionId: this.sessionId,
-      data: {},
-    };
+  buildSessionComplete(): SseEvent {
+    return { type: "session_complete", sessionId: this.sessionId };
   }
 
-  buildSessionError(
-    error: string,
-    errorCategory: ErrorCategory = "unknown",
-  ): CodingSessionEvent {
+  buildSessionError(message: string, category: ErrorCategory): SseEvent {
     return {
       type: "session_error",
       sessionId: this.sessionId,
-      data: { error, errorCategory },
+      data: { error: message, errorCategory: category },
     };
   }
 
-  private getOrCreateAgent(role: string, label: string): string {
-    const key = `${role}:${label}`;
-    if (!this.agentRegistry.has(key)) {
-      const id = `agent-${++this.agentCounter}`;
-      this.agentRegistry.set(key, { id, role, label });
-    }
-    return this.agentRegistry.get(key)!.id;
-  }
-
-  private getNewAgentCreatedEvents(): CodingSessionEvent[] {
-    const events: CodingSessionEvent[] = [];
-    for (const a of this.agentRegistry.values()) {
-      if (!this.emittedAgentCreations.has(a.id)) {
-        this.emittedAgentCreations.add(a.id);
-        events.push({
-          type: "agent_created" as const,
-          sessionId: this.sessionId,
-          agentId: a.id,
-          data: { role: a.role, label: a.label },
-        });
-      }
-    }
-    return events;
-  }
-
-  private detectRoleFromNamespace(namespace: string[]): string | null {
-    const joined = namespace.join(",");
-    if (joined.includes("architect_phase")) return "architect";
-    if (joined.includes("backend_phase")) return "backend";
-    if (joined.includes("frontend_phase")) return "frontend";
-    if (joined.includes("test_phase")) return "test";
-    return null;
-  }
-
-  private resolveAgentIdForNamespace(namespace: string[]): string | null {
-    const nsKey = namespace.join(",");
-    const existing = this.namespaceAgentMap.get(nsKey);
-    if (existing) return existing;
-
-    const role = this.detectRoleFromNamespace(namespace);
-    if (!role) return null;
-
-    const candidateIds = this.roleToAgentIds.get(role) ?? [];
-    if (candidateIds.length === 0) return null;
-
-    const assignedForRole = new Set(
-      [...this.namespaceAgentMap.values()].filter((id) =>
-        candidateIds.includes(id),
-      ),
-    );
-    const resolved =
-      candidateIds.find((id) => !assignedForRole.has(id)) ?? candidateIds[0];
-    this.namespaceAgentMap.set(nsKey, resolved);
-    return resolved;
+  /**
+   * Wrap a self-heal `RepairEvent` for the SSE channel.
+   * The front-end can render these in a dedicated "self-heal log" panel.
+   */
+  buildRepairEvent(event: RepairEvent): SseEvent {
+    return {
+      type: "repair_event",
+      sessionId: this.sessionId,
+      taskId: event.taskId,
+      data: event as unknown as Record<string, unknown>,
+    };
   }
 
   /**
-   * Pre-create agents with labels that exactly match supervisor's dispatch,
-   * and build precise taskId → agentId mappings.
+   * Translate one LangGraph stream chunk into zero or more SSE events.
+   * Returns an empty array for chunks that produce no meaningful events.
    */
-  private handleClassify(u: Record<string, unknown>): CodingSessionEvent[] {
-    const events: CodingSessionEvent[] = [];
-    const assignments: { agentId: string; taskIds: string[] }[] = [];
+  mapChunk(chunk: [string[], Record<string, unknown>]): SseEvent[] {
+    const [ns, updates] = chunk;
+    const events: SseEvent[] = [];
 
-    const roles: { key: string; role: string; labelBase: string }[] = [
-      { key: "architectTasks", role: "architect", labelBase: "Architect" },
-      { key: "backendTasks", role: "backend", labelBase: "Backend Dev" },
-      { key: "frontendTasks", role: "frontend", labelBase: "Frontend Dev" },
-      { key: "testTasks", role: "test", labelBase: "Test Engineer" },
-    ];
-
-    for (const { key, role, labelBase } of roles) {
-      const tasks = u[key] as Array<{ id: string; title: string }> | undefined;
-      if (!tasks || tasks.length === 0) continue;
-
-      for (const t of tasks) {
-        this.taskMap.set(t.id, { id: t.id, title: t.title });
-      }
-
-      const workerCount = computeWorkerCount(role, tasks.length);
-      const chunks = distributeToChunks(tasks, workerCount);
-
-      const agentIds: string[] = [];
-      for (let i = 0; i < chunks.length; i++) {
-        const label = buildWorkerLabel(labelBase, i, chunks.length);
-        const agentId = this.getOrCreateAgent(role, label);
-        agentIds.push(agentId);
-
-        const taskIds = chunks[i].map((t) => t.id);
-        for (const tid of taskIds) {
-          this.taskIdToAgentId.set(tid, agentId);
-        }
-        assignments.push({ agentId, taskIds });
-      }
-      this.roleToAgentIds.set(role, agentIds);
-    }
-
-    events.push(...this.getNewAgentCreatedEvents());
-
-    if (assignments.length > 0) {
-      events.push({
-        type: "tasks_assigned" as CodingSessionEvent["type"],
-        sessionId: this.sessionId,
-        data: { assignments },
-      });
-    }
-
-    const architectIds = this.roleToAgentIds.get("architect");
-    if (architectIds && architectIds.length > 0) {
-      const firstArchTask = (u["architectTasks"] as Array<{ id: string; title: string }> | undefined)?.[0];
-      if (firstArchTask?.id) {
-        this.agentCurrentTaskId.set(architectIds[0], firstArchTask.id);
-      }
-      events.push({
-        type: "agent_task_start" as CodingSessionEvent["type"],
-        sessionId: this.sessionId,
-        agentId: architectIds[0],
-        taskId: firstArchTask?.id,
-        data: { title: firstArchTask?.title ?? "Architect phase" },
-      });
+    if (ns.length === 0) {
+      this.handleSupervisorUpdate(updates, events);
+    } else {
+      // Use the full joined namespace as a stable identity for this worker instance.
+      const nsKey = ns.join("|");
+      // The first segment names the parent supervisor node (e.g. "be_worker:abc123").
+      const parentNode = ns[0] ?? "";
+      this.handleWorkerUpdate(nsKey, parentNode, updates, events);
     }
 
     return events;
   }
 
-  private handleSinglePhaseComplete(
-    u: Record<string, unknown>,
-  ): CodingSessionEvent[] {
-    const events: CodingSessionEvent[] = [];
-    const phaseResults = u.phaseResults as PhaseResult[] | undefined;
-    if (!phaseResults) return events;
+  // ─── Supervisor node → human-readable log line ────────────────────────────
 
-    for (const pr of phaseResults) {
-      const agentId = this.getOrCreateAgent(pr.role, pr.workerLabel);
-      events.push(...this.getNewAgentCreatedEvents());
+  private buildSupervisorLogMessage(
+    nodeName: string,
+    update: Record<string, unknown>,
+  ): string | null {
+    const errorLines = (text: string) =>
+      text
+        .split("\n")
+        .filter((l) => l.includes("error TS") || l.includes("[CONVENTION]"))
+        .length;
 
-      const taskIds = pr.taskResults.map((tr) => tr.taskId);
-      if (taskIds.length > 0) {
-        for (const tid of taskIds) {
-          this.taskIdToAgentId.set(tid, agentId);
+    switch (nodeName) {
+      case "classify_tasks": {
+        const arch = Array.isArray(update.architectTasks)
+          ? update.architectTasks.length
+          : 0;
+        const be = Array.isArray(update.backendTasks)
+          ? update.backendTasks.length
+          : 0;
+        const fe = Array.isArray(update.frontendTasks)
+          ? update.frontendTasks.length
+          : 0;
+        const te = Array.isArray(update.testTasks)
+          ? update.testTasks.length
+          : 0;
+        return `Tasks assigned — Architect: ${arch}, Backend: ${be}, Frontend: ${fe}, Test: ${te}`;
+      }
+      case "architect_phase":
+        return "Architect phase complete";
+      case "dispatch_gate":
+        return "Dispatching backend and frontend workers...";
+      case "dependency_baseline":
+        return "Dependency baseline planned (DEPENDENCY_PLAN.md written)";
+      case "generate_api_contracts":
+        return "API contracts generated";
+      case "generate_service_skeletons":
+        return "Service skeletons generated (step removed — no-op)";
+      case "scaffold_verify": {
+        const errors = update.scaffoldErrors as string | undefined;
+        if (!errors) return "Scaffold verify: passed";
+        return `Scaffold verify: ${errorLines(errors)} error(s) found`;
+      }
+      case "scaffold_fix": {
+        const files = Array.isArray(update.fileRegistry)
+          ? update.fileRegistry.length
+          : 0;
+        return `Scaffold fix: wrote ${files} file(s)`;
+      }
+      case "be_phase_verify": {
+        const errors = update.scaffoldErrors as string | undefined;
+        const iters = update.scaffoldFixAttempts as number | undefined;
+        if (!errors)
+          return `Backend verify+fix: passed${iters ? ` (${iters} iteration(s))` : ""}`;
+        return `Backend verify+fix: ${errorLines(errors)} error(s) remaining after ${iters ?? 0} iteration(s)`;
+      }
+      case "fe_phase_verify": {
+        const errors = update.scaffoldErrors as string | undefined;
+        const iters = update.scaffoldFixAttempts as number | undefined;
+        if (!errors)
+          return `Frontend verify+fix: passed${iters ? ` (${iters} iteration(s))` : ""}`;
+        return `Frontend verify+fix: ${errorLines(errors)} error(s) remaining after ${iters ?? 0} iteration(s)`;
+      }
+      case "sync_deps":
+        return "Dependencies synced";
+      case "be_worker":
+        return "Backend worker phase complete";
+      case "fe_worker":
+        return "Frontend worker phase complete";
+      // integration_verify is now the merged agentic verify+fix node
+      case "integration_verify": {
+        const errors = update.integrationErrors as string | undefined;
+        const iters = update.integrationFixAttempts as number | undefined;
+        const iterStr = iters !== undefined ? ` (${iters} iteration(s))` : "";
+        if (!errors) return `Integration verify+fix: passed${iterStr}`;
+        return `Integration verify+fix: ${errorLines(errors)} error(s) remaining${iterStr}`;
+      }
+      case "runtime_verify": {
+        const errors = update.runtimeVerifyErrors as string | undefined;
+        const attempts = update.runtimeVerifyAttempts as number | undefined;
+        if (!errors) {
+          return `Runtime verify: passed${attempts ? ` (attempt ${attempts})` : ""}`;
         }
+        return `Runtime verify: failed${attempts ? ` (attempt ${attempts})` : ""}`;
+      }
+      case "e2e_verify": {
+        const errors = update.e2eVerifyErrors as string | undefined;
+        const attempts = update.e2eVerifyAttempts as number | undefined;
+        if (!errors) {
+          return `E2E verify: passed${attempts ? ` (attempt ${attempts})` : ""}`;
+        }
+        return `E2E verify: failed${attempts ? ` (attempt ${attempts})` : ""}`;
+      }
+      default:
+        return null;
+    }
+  }
+
+  // ─── Supervisor-level updates (ns = []) ────────────────────────────────────
+
+  private handleSupervisorUpdate(
+    updates: Record<string, unknown>,
+    events: SseEvent[],
+  ): void {
+    // classify_tasks → tasks_assigned ----------------------------------------
+    const classified = updates.classify_tasks as
+      | Record<string, unknown>
+      | undefined;
+    if (classified) {
+      const assignments: { agentId: string; taskIds: string[] }[] = [];
+
+      const addGroup = (tasks: unknown, roleId: string) => {
+        if (!Array.isArray(tasks) || tasks.length === 0) return;
+        assignments.push({
+          agentId: `supervisor-${roleId}`,
+          taskIds: tasks
+            .map((t) =>
+              typeof t === "object" && t !== null
+                ? (t as Record<string, unknown>).id
+                : null,
+            )
+            .filter((id): id is string => typeof id === "string"),
+        });
+      };
+
+      addGroup(classified.architectTasks, "architect");
+      addGroup(classified.backendTasks, "backend");
+      addGroup(classified.frontendTasks, "frontend");
+      addGroup(classified.testTasks, "test");
+
+      if (assignments.length > 0) {
         events.push({
-          type: "tasks_assigned" as CodingSessionEvent["type"],
+          type: "tasks_assigned",
           sessionId: this.sessionId,
-          data: { assignments: [{ agentId, taskIds }] },
+          data: { assignments },
+        });
+      }
+    }
+
+    // Phase nodes finishing → agent_completed for their workers ---------------
+    const phaseNodes = [
+      "be_worker",
+      "fe_worker",
+      "architect_phase",
+    ] as const;
+    for (const phaseNode of phaseNodes) {
+      const phaseResult = updates[phaseNode] as
+        | Record<string, unknown>
+        | undefined;
+      if (phaseResult && Array.isArray(phaseResult.phaseResults)) {
+        // Emit task-level events for prebuilt scaffold (architect tasks completed without LLM)
+        if (phaseNode === "architect_phase") {
+          this.emitArchitectTaskEvents(phaseResult, events);
+        }
+
+        for (const [nsKey, worker] of this.workers) {
+          if (
+            !this.completedWorkers.has(nsKey) &&
+            this.matchesPhaseNode(nsKey, phaseNode)
+          ) {
+            this.completedWorkers.add(nsKey);
+            events.push({
+              type: "agent_completed",
+              sessionId: this.sessionId,
+              agentId: worker.agentId,
+              data: { status: "completed" },
+            });
+          }
+        }
+      }
+    }
+
+    // integration_verify → merged agentic verify+fix result ------------------
+    const verifyUpdate = updates.integration_verify as
+      | Record<string, unknown>
+      | undefined;
+    if (verifyUpdate !== undefined) {
+      if (!this.integrationVerifyStartEmitted) {
+        this.integrationVerifyStartEmitted = true;
+        events.push({
+          type: "integration_verify_start",
+          sessionId: this.sessionId,
         });
       }
 
-      for (const tr of pr.taskResults) {
-        const taskTitle = this.taskMap.get(tr.taskId)?.title ?? tr.taskId;
+      if (typeof verifyUpdate.integrationErrors === "string") {
+        const errors = verifyUpdate.integrationErrors;
+        const passed = errors === "";
+        const errorLineCount = passed
+          ? 0
+          : errors
+              .split("\n")
+              .filter(
+                (l) => l.includes("error TS") || l.includes("[CONVENTION]"),
+              ).length;
+        const iterations =
+          typeof verifyUpdate.integrationFixAttempts === "number"
+            ? verifyUpdate.integrationFixAttempts
+            : this.integrationFixAttempts;
 
-        if (!this.emittedTaskStarts.has(tr.taskId)) {
-          this.emittedTaskStarts.add(tr.taskId);
-          this.agentCurrentTaskId.set(agentId, tr.taskId);
-          events.push({
-            type: "agent_task_start" as CodingSessionEvent["type"],
-            sessionId: this.sessionId,
-            agentId,
-            taskId: tr.taskId,
-            data: { title: taskTitle },
-          });
-        }
+        events.push({
+          type: "integration_verify_result",
+          sessionId: this.sessionId,
+          data: {
+            passed,
+            errors: passed ? undefined : errors,
+            errorCount: errorLineCount > 0 ? errorLineCount : undefined,
+            fixAttempts: iterations,
+            maxFixAttempts: 80,
+          },
+        });
+      }
+    }
 
-        if (!this.emittedTaskCompletes.has(tr.taskId)) {
-          this.emittedTaskCompletes.add(tr.taskId);
-          this.agentCurrentTaskId.delete(agentId);
-          events.push({
-            type: "agent_task_complete",
-            sessionId: this.sessionId,
-            agentId,
-            taskId: tr.taskId,
-            data: {
-              filesGenerated: tr.generatedFiles,
-              modifiedFiles: tr.generatedFiles,
-              costUsd: tr.costUsd,
-              durationMs: tr.durationMs,
-              tokenUsage: tr.tokenUsage,
-              verifyPassed: tr.verifyPassed,
-              fixCycles: tr.fixCycles,
-              status: tr.status,
-              verifyErrors: tr.warnings?.[0],
-            },
-          });
-        }
+    const e2eUpdate = updates.e2e_verify as Record<string, unknown> | undefined;
+    if (e2eUpdate !== undefined) {
+      if (!this.e2eVerifyStartEmitted) {
+        this.e2eVerifyStartEmitted = true;
+        events.push({
+          type: "e2e_verify_start",
+          sessionId: this.sessionId,
+        });
       }
 
-      this.completedAgents.add(agentId);
-      events.push({
-        type: "agent_completed",
-        sessionId: this.sessionId,
-        agentId,
-        data: {
-          status: "completed",
-          completed: pr.taskResults.filter((t) => t.status !== "failed").length,
-          failed: pr.taskResults.filter((t) => t.status === "failed").length,
-        },
-      });
-    }
-
-    return events;
-  }
-
-  private handleParallelWorkerComplete(
-    u: Record<string, unknown>,
-    _namespace: string[],
-  ): CodingSessionEvent[] {
-    return this.handleSinglePhaseComplete(u);
-  }
-
-  private handleGenerateCode(
-    u: Record<string, unknown>,
-    namespace: string[],
-  ): CodingSessionEvent[] {
-    const events: CodingSessionEvent[] = [];
-    const nsKey = namespace.join(",");
-    const files = u.generatedFiles as GeneratedFile[] | undefined;
-    const generationError =
-      typeof u.currentTaskLastError === "string" ? u.currentTaskLastError.trim() : "";
-    const retryCount =
-      typeof u.currentTaskRetryCount === "number" ? u.currentTaskRetryCount : 0;
-    if (files?.[0]?.role && !this.nsRoleMap.has(nsKey)) {
-      this.nsRoleMap.set(nsKey, files[0].role);
-    }
-    const agentId = this.resolveAgentIdForNamespace(namespace);
-    const taskId = agentId ? this.agentCurrentTaskId.get(agentId) : undefined;
-    const tsFileCount =
-      files?.filter((file) => /\.(ts|tsx)$/.test(file.path)).length ?? 0;
-
-    if (!agentId || !taskId) return events;
-
-    if (generationError) {
-      const maxAttempts = 3;
-      const retryMessage =
-        retryCount >= maxAttempts
-          ? `Task generation failed · reached max retries (${retryCount}/${maxAttempts})`
-          : `Task generation failed · retry ${retryCount}/${maxAttempts}`;
-      events.push({
-        type: "agent_task_progress",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          stage: "fixing",
-          fixAttempt: retryCount,
-          errorPreview: generationError.slice(0, 200),
-        },
-      });
-      events.push({
-        type: "agent_log",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          logType: "task_fix",
-          message: retryMessage,
-          details: generationError.slice(0, 2000),
-        },
-      });
-      return events;
-    }
-
-    if (tsFileCount === 0) return events;
-
-    events.push({
-      type: "agent_task_progress",
-      sessionId: this.sessionId,
-      agentId,
-      taskId,
-      data: {
-        stage: "verifying",
-        tsFileCount,
-      },
-    });
-    events.push({
-      type: "agent_log",
-      sessionId: this.sessionId,
-      agentId,
-      taskId,
-      data: {
-        logType: "task_verify",
-        message: `Verify started · ${tsFileCount} TS files`,
-      },
-    });
-
-    return events;
-  }
-
-  private handleVerify(
-    u: Record<string, unknown>,
-    namespace: string[],
-  ): CodingSessionEvent[] {
-    const agentId = this.resolveAgentIdForNamespace(namespace);
-    const taskId = agentId ? this.agentCurrentTaskId.get(agentId) : undefined;
-    if (!agentId || !taskId) return [];
-
-    const verifyErrors =
-      typeof u.verifyErrors === "string" ? u.verifyErrors.trim() : "";
-    const fixAttempts =
-      typeof u.fixAttempts === "number" ? u.fixAttempts : 0;
-
-    if (verifyErrors) {
-      const attempt = fixAttempts + 1;
-      return [
-        {
-          type: "agent_task_progress",
+      if (typeof e2eUpdate.e2eVerifyErrors === "string") {
+        const errors = e2eUpdate.e2eVerifyErrors;
+        const passed = errors === "";
+        const attempts =
+          typeof e2eUpdate.e2eVerifyAttempts === "number"
+            ? e2eUpdate.e2eVerifyAttempts
+            : 0;
+        events.push({
+          type: "e2e_verify_result",
           sessionId: this.sessionId,
-          agentId,
-          taskId,
           data: {
-            stage: "fixing",
-            fixAttempt: attempt,
-            verifyErrors: verifyErrors.slice(0, 2000),
-            errorPreview: verifyErrors.slice(0, 200),
+            passed,
+            errors: passed ? undefined : errors,
+            errorCount: passed
+              ? 0
+              : errors.split("\n").filter((line) => line.trim().length > 0)
+                  .length,
+            fixAttempts: attempts,
+            maxFixAttempts: 3,
           },
-        },
-        {
-          type: "agent_log",
-          sessionId: this.sessionId,
-          agentId,
-          taskId,
-          data: {
-            logType: "task_verify",
-            message: `Verify FAILED · attempt ${attempt}/3`,
-            details: verifyErrors.slice(0, 2000),
-          },
-        },
-      ];
+        });
+      }
     }
 
-    return [
-      {
-        type: "agent_task_progress",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          stage: "verifying",
-          verifyPassed: true,
-        },
-      },
-      {
-        type: "agent_log",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          logType: "task_verify",
-          message: "Verify passed.",
-        },
-      },
-    ];
+    // supervisor_log — emit a human-readable log line for every supervisor node
+    for (const [nodeName, nodeUpdate] of Object.entries(updates)) {
+      const message = this.buildSupervisorLogMessage(
+        nodeName,
+        typeof nodeUpdate === "object" && nodeUpdate !== null
+          ? (nodeUpdate as Record<string, unknown>)
+          : {},
+      );
+      if (message) {
+        events.push({
+          type: "supervisor_log",
+          sessionId: this.sessionId,
+          data: { message, nodeName },
+        });
+      }
+    }
   }
 
-  private handleFixErrors(
-    u: Record<string, unknown>,
-    namespace: string[],
-  ): CodingSessionEvent[] {
-    const agentId = this.resolveAgentIdForNamespace(namespace);
-    const taskId = agentId ? this.agentCurrentTaskId.get(agentId) : undefined;
-    if (!agentId || !taskId) return [];
+  // ─── Worker subgraph updates (ns ≠ []) ────────────────────────────────────
 
-    const fixAttempt =
-      typeof u.fixAttempts === "number" ? u.fixAttempts : undefined;
-    const generatedFiles = (u.generatedFiles as GeneratedFile[] | undefined) ?? [];
-    const details = generatedFiles.length
-      ? generatedFiles.map((file) => `Updated: ${file.path}`).join("\n")
-      : undefined;
+  private handleWorkerUpdate(
+    nsKey: string,
+    parentNode: string,
+    updates: Record<string, unknown>,
+    events: SseEvent[],
+  ): void {
+    // Lazily create a tracker the first time we see this worker instance.
+    if (!this.workers.has(nsKey)) {
+      // Strip any LangGraph UUID suffix (e.g. "be_worker:abc123" → "be_worker")
+      const baseNode = parentNode.split(":")[0] ?? parentNode;
+      const idx = this.instanceCounts.get(baseNode) ?? 0;
+      this.instanceCounts.set(baseNode, idx + 1);
 
-    return [
-      {
-        type: "agent_task_progress",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          stage: "fixing",
-          fixAttempt,
-        },
-      },
-      {
-        type: "agent_log",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          logType: "task_fix",
-          message: "Fix applied · regenerating affected files",
-          details,
-        },
-      },
-      {
-        type: "agent_log",
-        sessionId: this.sessionId,
-        agentId,
-        taskId,
-        data: {
-          message: "Re-running verify...",
-        },
-      },
-    ];
-  }
+      const role = this.inferRole(baseNode);
+      const label = this.inferLabel(baseNode, idx);
+      const agentId = `agent-${baseNode}-${idx}`;
 
-  /**
-   * Handle real-time task completion events from worker subgraphs.
-   * Uses taskIdToAgentId for precise agent attribution.
-   */
-  private handleTaskDone(
-    u: Record<string, unknown>,
-    namespace: string[],
-  ): CodingSessionEvent[] {
-    const events: CodingSessionEvent[] = [];
-    const taskResults = u.taskResults as TaskResult[] | undefined;
-    const nextIndex = u.currentTaskIndex as number | undefined;
+      this.workers.set(nsKey, { agentId, role, label, lastKnownTaskId: null });
 
-    if (!taskResults || taskResults.length === 0) return events;
-
-    const completedResult = taskResults[0];
-    const { taskId } = completedResult;
-    const agentId = this.taskIdToAgentId.get(taskId);
-    if (!agentId) return events;
-    this.namespaceAgentMap.set(namespace.join(","), agentId);
-
-    if (this.completedAgents.has(agentId)) return events;
-
-    const taskTitle = this.taskMap.get(taskId)?.title ?? taskId;
-
-    if (!this.emittedTaskStarts.has(taskId)) {
-      this.emittedTaskStarts.add(taskId);
       events.push({
-        type: "agent_task_start",
+        type: "agent_created",
         sessionId: this.sessionId,
         agentId,
-        taskId,
-        data: { title: taskTitle },
+        data: { role, label },
       });
     }
 
-    if (!this.emittedTaskCompletes.has(taskId)) {
-      this.emittedTaskCompletes.add(taskId);
-      this.agentCurrentTaskId.delete(agentId);
-      if (completedResult.status === "failed") {
+    const worker = this.workers.get(nsKey)!;
+
+    // pick_next_task fired → emit agent_task_start for the upcoming task ------
+    const pickUpdate = updates.pick_next_task as
+      | Record<string, unknown>
+      | undefined;
+    if (pickUpdate) {
+      const taskId = pickUpdate.currentTaskId as string | undefined;
+      const title = pickUpdate.currentTaskTitle as string | undefined;
+      const phase = pickUpdate.currentTaskPhase as string | undefined;
+      if (taskId && !this.startedTasks.has(taskId)) {
+        this.startedTasks.add(taskId);
+        worker.lastKnownTaskId = taskId;
+        events.push({
+          type: "agent_task_start",
+          sessionId: this.sessionId,
+          agentId: worker.agentId,
+          taskId,
+          data: { title: title ?? taskId, phase: phase ?? worker.role },
+        });
+      }
+    }
+
+    // generate_code fired → log progress ------------------------------------
+    const genUpdate = updates.generate_code as
+      | Record<string, unknown>
+      | undefined;
+    if (genUpdate) {
+      const fileCount = Array.isArray(genUpdate.currentTaskGeneratedFiles)
+        ? genUpdate.currentTaskGeneratedFiles.length
+        : 0;
+      events.push({
+        type: "agent_log",
+        sessionId: this.sessionId,
+        agentId: worker.agentId,
+        taskId: worker.lastKnownTaskId ?? undefined,
+        data: {
+          logType: "info",
+          message:
+            fileCount > 0
+              ? `Generated ${fileCount} file(s)`
+              : "Generating code…",
+        },
+      });
+    }
+
+    // verify fired → task progress ------------------------------------------
+    const verifyUpdate = updates.verify as Record<string, unknown> | undefined;
+    if (verifyUpdate && worker.lastKnownTaskId) {
+      const hasErrors =
+        typeof verifyUpdate.verifyErrors === "string" &&
+        verifyUpdate.verifyErrors !== "";
+      const errText =
+        typeof verifyUpdate.verifyErrors === "string"
+          ? verifyUpdate.verifyErrors
+          : "";
+      const tscFixPending =
+        hasErrors && errText.includes("## TypeScript errors in task files");
+      events.push({
+        type: "agent_task_progress",
+        sessionId: this.sessionId,
+        agentId: worker.agentId,
+        taskId: worker.lastKnownTaskId,
+        data: {
+          stage: tscFixPending ? ("fixing" as const) : ("verifying" as const),
+          verifyErrors: hasErrors ? verifyUpdate.verifyErrors : undefined,
+        },
+      });
+    }
+
+    // generate_code sub-steps → emit sub-steps event -------------------------
+    if (genUpdate) {
+      const subSteps = genUpdate.currentTaskSubSteps as
+        | Array<Record<string, unknown>>
+        | undefined;
+      if (subSteps && subSteps.length > 0 && worker.lastKnownTaskId) {
+        events.push({
+          type: "agent_task_substeps",
+          sessionId: this.sessionId,
+          agentId: worker.agentId,
+          taskId: worker.lastKnownTaskId,
+          data: { subSteps },
+        });
+      }
+    }
+
+    // task_done → complete (start already emitted by pick_next_task) ---------
+    const doneUpdate = updates.task_done as Record<string, unknown> | undefined;
+    if (doneUpdate) {
+      for (const result of this.extractTaskResults(doneUpdate)) {
+        worker.lastKnownTaskId = result.taskId;
+
+        if (!this.startedTasks.has(result.taskId)) {
+          this.startedTasks.add(result.taskId);
+          events.push({
+            type: "agent_task_start",
+            sessionId: this.sessionId,
+            agentId: worker.agentId,
+            taskId: result.taskId,
+            data: { title: result.taskId, phase: worker.role },
+          });
+        }
+
+        events.push({
+          type: "agent_task_complete",
+          sessionId: this.sessionId,
+          agentId: worker.agentId,
+          taskId: result.taskId,
+          data: {
+            status: result.status ?? "completed",
+            filesGenerated: result.generatedFiles ?? [],
+            modifiedFiles: result.generatedFiles ?? [],
+            costUsd: result.costUsd ?? 0,
+            fixCycles: result.fixCycles ?? 0,
+            verifyErrors:
+              Array.isArray(result.warnings) && result.warnings.length > 0
+                ? String(result.warnings[0])
+                : undefined,
+            tokenUsage: result.tokenUsage,
+            subSteps: result.subSteps,
+          },
+        });
+      }
+    }
+
+    // task_failed → error (start already emitted by pick_next_task) ----------
+    const failUpdate = updates.task_failed as
+      | Record<string, unknown>
+      | undefined;
+    if (failUpdate) {
+      for (const result of this.extractTaskResults(failUpdate)) {
+        worker.lastKnownTaskId = result.taskId;
+
+        if (!this.startedTasks.has(result.taskId)) {
+          this.startedTasks.add(result.taskId);
+          events.push({
+            type: "agent_task_start",
+            sessionId: this.sessionId,
+            agentId: worker.agentId,
+            taskId: result.taskId,
+            data: { title: result.taskId, phase: worker.role },
+          });
+        }
+
         events.push({
           type: "agent_task_error",
           sessionId: this.sessionId,
-          agentId,
-          taskId,
+          agentId: worker.agentId,
+          taskId: result.taskId,
           data: {
-            error: completedResult.warnings?.[0] ?? "Task failed after retries",
-            retryCount: completedResult.fixCycles,
+            error:
+              Array.isArray(result.warnings) &&
+              result.warnings.length > 0 &&
+              result.warnings[0] != null
+                ? String(result.warnings[0])
+                : "Task generation failed",
           },
         });
-      } else {
+      }
+    }
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  /**
+   * Emit task-level start + complete events for architect phase tasks
+   * (e.g. prebuilt scaffold tasks that skip LLM and complete instantly).
+   */
+  private emitArchitectTaskEvents(
+    phaseResult: Record<string, unknown>,
+    events: SseEvent[],
+  ): void {
+    const phaseResults = phaseResult.phaseResults as Array<
+      Record<string, unknown>
+    >;
+    const agentId = "agent-architect-0";
+
+    if (!this.workers.has("architect_phase")) {
+      this.workers.set("architect_phase", {
+        agentId,
+        role: "architect",
+        label: "Architect",
+        lastKnownTaskId: null,
+      });
+      events.push({
+        type: "agent_created",
+        sessionId: this.sessionId,
+        agentId,
+        data: { role: "architect", label: "Architect" },
+      });
+    }
+
+    for (const pr of phaseResults) {
+      if (!Array.isArray(pr.taskResults)) continue;
+      for (const tr of pr.taskResults) {
+        if (typeof tr !== "object" || tr === null) continue;
+        const rec = tr as Record<string, unknown>;
+        const taskId = rec.taskId as string | undefined;
+        if (!taskId) continue;
+
+        if (!this.startedTasks.has(taskId)) {
+          this.startedTasks.add(taskId);
+          events.push({
+            type: "agent_task_start",
+            sessionId: this.sessionId,
+            agentId,
+            taskId,
+            data: { title: taskId, phase: "Scaffolding" },
+          });
+        }
+
         events.push({
           type: "agent_task_complete",
           sessionId: this.sessionId,
           agentId,
           taskId,
           data: {
-            filesGenerated: completedResult.generatedFiles,
-            modifiedFiles: completedResult.generatedFiles,
-            costUsd: completedResult.costUsd,
-            durationMs: completedResult.durationMs,
-            tokenUsage: completedResult.tokenUsage,
-            verifyPassed: completedResult.verifyPassed,
-            fixCycles: completedResult.fixCycles,
-            status: completedResult.status,
-            verifyErrors: completedResult.warnings?.[0],
+            status: rec.status ?? "completed",
+            filesGenerated: Array.isArray(rec.generatedFiles)
+              ? rec.generatedFiles
+              : [],
+            modifiedFiles: [],
+            costUsd: typeof rec.costUsd === "number" ? rec.costUsd : 0,
+            fixCycles: 0,
+            verifyErrors:
+              Array.isArray(rec.warnings) && rec.warnings.length > 0
+                ? String(rec.warnings[0])
+                : undefined,
           },
         });
       }
     }
+  }
 
-    if (nextIndex !== undefined) {
-      const allAgentTasks = [...this.taskIdToAgentId.entries()]
-        .filter(([, aid]) => aid === agentId)
-        .map(([tid]) => tid);
+  /** True when a worker namespace key belongs to the given phase node. */
+  private matchesPhaseNode(nsKey: string, phaseNode: string): boolean {
+    return (
+      nsKey === phaseNode ||
+      nsKey.startsWith(`${phaseNode}:`) ||
+      nsKey.startsWith(`${phaseNode}|`)
+    );
+  }
 
-      if (nextIndex < allAgentTasks.length) {
-        const nextTaskId = allAgentTasks[nextIndex];
-        const nextTitle = this.taskMap.get(nextTaskId)?.title ?? nextTaskId;
-        if (!this.emittedTaskStarts.has(nextTaskId)) {
-          this.emittedTaskStarts.add(nextTaskId);
-          this.agentCurrentTaskId.set(agentId, nextTaskId);
-          events.push({
-            type: "agent_task_start",
-            sessionId: this.sessionId,
-            agentId,
-            taskId: nextTaskId,
-            data: { title: nextTitle },
-          });
-        }
-      }
+  /** Extract task results array from a node's update object. */
+  private extractTaskResults(
+    update: Record<string, unknown>,
+  ): ExtractedTaskResult[] {
+    if (!Array.isArray(update.taskResults)) return [];
+
+    const results: ExtractedTaskResult[] = [];
+    for (const r of update.taskResults) {
+      if (typeof r !== "object" || r === null) continue;
+      const rec = r as Record<string, unknown>;
+      if (typeof rec.taskId !== "string") continue;
+      results.push({
+        taskId: rec.taskId,
+        status: typeof rec.status === "string" ? rec.status : undefined,
+        generatedFiles: Array.isArray(rec.generatedFiles)
+          ? (rec.generatedFiles as string[])
+          : [],
+        costUsd: typeof rec.costUsd === "number" ? rec.costUsd : 0,
+        fixCycles: typeof rec.fixCycles === "number" ? rec.fixCycles : 0,
+        warnings: Array.isArray(rec.warnings) ? rec.warnings : undefined,
+        tokenUsage: rec.tokenUsage,
+        subSteps: Array.isArray(rec.subSteps) ? rec.subSteps : undefined,
+      });
     }
-
-    return events;
+    return results;
   }
 
-  /**
-   * Phase transition hint — use agent_log only. Do NOT emit agent_task_start without
-   * a real taskId: the store would create a phantom task that never completes.
-   */
-  private emitPhaseWorkingStatus(roles: string[]): CodingSessionEvent[] {
-    const events: CodingSessionEvent[] = [];
-    for (const role of roles) {
-      const agentIds = this.roleToAgentIds.get(role);
-      if (!agentIds) continue;
-      for (const agentId of agentIds) {
-        if (this.completedAgents.has(agentId)) continue;
-        events.push({
-          type: "agent_log" as CodingSessionEvent["type"],
-          sessionId: this.sessionId,
-          agentId,
-          data: { message: `Starting ${role} phase...` },
-        });
-      }
-    }
-    return events;
+  private inferRole(baseNode: string): string {
+    if (baseNode === "architect_phase" || baseNode.startsWith("architect"))
+      return "architect";
+    if (baseNode === "fe_worker" || baseNode.startsWith("fe_"))
+      return "frontend";
+    if (baseNode === "be_worker" || baseNode.startsWith("be_"))
+      return "backend";
+    return "backend";
   }
 
-  private handleScaffoldVerify(u: Record<string, unknown>): CodingSessionEvent[] {
-    const errors = u.scaffoldErrors as string | undefined;
-    const architectIds = this.roleToAgentIds.get("architect");
-    const agentId = architectIds?.[0];
-    if (!agentId) return [];
-
-    if (errors) {
-      return [{
-        type: "agent_log" as CodingSessionEvent["type"],
-        sessionId: this.sessionId,
-        agentId,
-        data: { message: `Scaffold build failed, attempting auto-fix...` },
-      }];
-    }
-
-    return [{
-      type: "agent_log" as CodingSessionEvent["type"],
-      sessionId: this.sessionId,
-      agentId,
-      data: {
-        message: `Scaffold phase complete. Dependency install runs at final integration verify.`,
-      },
-    }];
-  }
-
-  private handleScaffoldFix(u: Record<string, unknown>): CodingSessionEvent[] {
-    const attempt = u.scaffoldFixAttempts as number | undefined;
-    const architectIds = this.roleToAgentIds.get("architect");
-    const agentId = architectIds?.[0];
-    if (!agentId) return [];
-
-    return [{
-      type: "agent_log" as CodingSessionEvent["type"],
-      sessionId: this.sessionId,
-      agentId,
-      data: { message: `Scaffold fix attempt ${attempt ?? "?"}: applied corrections.` },
-    }];
-  }
-
-  private handleIntegrationVerify(
-    u: Record<string, unknown>,
-  ): CodingSessionEvent[] {
-    const errors =
-      typeof u.integrationErrors === "string"
-        ? u.integrationErrors.trim()
-        : "";
-    const errorCount = errors
-      ? errors.split("\n").filter((l) => l.includes("error TS")).length
-      : 0;
-
-    return [
-      {
-        type: "integration_verify_result" as CodingSessionEvent["type"],
-        sessionId: this.sessionId,
-        data: {
-          passed: !errors,
-          errors: errors ? errors.slice(0, 2000) : undefined,
-          errorCount,
-          fixAttempts: this.integrationFixAttemptCount,
-          maxFixAttempts: 3,
-        },
-      },
-    ];
-  }
-
-  private handleIntegrationFix(
-    u: Record<string, unknown>,
-  ): CodingSessionEvent[] {
-    this.integrationFixAttemptCount =
-      typeof u.integrationFixAttempts === "number"
-        ? u.integrationFixAttempts
-        : this.integrationFixAttemptCount + 1;
-    const filesFixed = Array.isArray(u.fileRegistry)
-      ? (u.fileRegistry as unknown[]).length
-      : 0;
-
-    return [
-      {
-        type: "integration_fix_result" as CodingSessionEvent["type"],
-        sessionId: this.sessionId,
-        data: {
-          attempt: this.integrationFixAttemptCount,
-          filesFixed,
-        },
-      },
-    ];
+  private inferLabel(baseNode: string, idx: number): string {
+    const suffix = idx === 0 ? "" : ` #${idx + 1}`;
+    if (baseNode === "architect_phase") return "Architect";
+    if (baseNode === "be_worker") return `Backend Dev${suffix}`;
+    if (baseNode === "fe_worker") return `Frontend Dev${suffix}`;
+    return `Worker${suffix}`;
   }
 }

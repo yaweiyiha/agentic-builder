@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-05-14T22:56:33.927Z",
+  "sessionId": "fa1b0eeb-ced6-4702-8738-3c9d7e90df8a",
+  "ran": true,
+  "workspaces": [
+    {
+      "workspace": "backend",
+      "skipped": false,
+      "exitCode": 0,
+      "diagnosticCount": 0
+    },
+    {
+      "workspace": "frontend",
+      "skipped": false,
+      "exitCode": 0,
+      "diagnosticCount": 0
+    }
+  ],
+  "tasks": []
+}

@@ -15,12 +15,43 @@ const MAX_BUFFER = 5 * 1024 * 1024;
 const ALLOWED_COMMANDS = [
   "tsc",
   "npx tsc",
+  "npx ts-fix",
+  "npx --no-install ts-fix",
+  "npx prisma",
+  "npx playwright",
+  // npm
   "npm install",
   "npm run build",
   "npm run dev",
   "npm run test",
   "npm run lint",
   "npm install &&",
+  "npm add",
+  // pnpm
+  "pnpm install",
+  "pnpm run build",
+  "pnpm run dev",
+  "pnpm run test",
+  "pnpm run e2e",
+  "pnpm run lint",
+  // npm e2e (mirrors pnpm/yarn)
+  "npm run e2e",
+  // yarn e2e
+  "yarn run e2e",
+  "pnpm exec playwright",
+  "pnpm exec tsc",
+  "pnpm install &&",
+  "pnpm add",
+  "pnpm approve-builds",
+  // yarn
+  "yarn install",
+  "yarn run build",
+  "yarn run dev",
+  "yarn run test",
+  "yarn run lint",
+  "yarn install &&",
+  "yarn add",
+  // shell utilities
   "ls",
   "cat",
   "head",
@@ -28,6 +59,16 @@ const ALLOWED_COMMANDS = [
   "find",
   "wc",
   "node -e",
+  // tsx: used for backend smoke test (npx tsx --eval)
+  "npx tsx",
+  "tsx",
+  // RALPH: git operations for per-task commits
+  "git init",
+  "git add",
+  "git commit",
+  "git status",
+  "git log",
+  "git rev-parse",
 ];
 
 function isSafeCommand(cmd: string): boolean {
@@ -116,10 +157,16 @@ export async function fsRead(
   }
 }
 
+export type ShellExecOptions = {
+  timeout?: number;
+  /** Merged over process.env (e.g. DATABASE_URL for `prisma generate` when .env is not loaded). */
+  env?: Record<string, string>;
+};
+
 export async function shellExec(
   command: string,
   cwd: string,
-  options?: { timeout?: number },
+  options?: ShellExecOptions,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   if (!isSafeCommand(command)) {
     return {
@@ -130,11 +177,16 @@ export async function shellExec(
   }
 
   const timeout = options?.timeout ?? SHELL_TIMEOUT_MS;
+  const childEnv =
+    options?.env && Object.keys(options.env).length > 0
+      ? { ...process.env, ...options.env }
+      : process.env;
   try {
     const { stdout, stderr } = await execFileAsync("bash", ["-c", command], {
       cwd,
       maxBuffer: MAX_BUFFER,
       timeout,
+      env: childEnv,
     });
     return { stdout, stderr, exitCode: 0 };
   } catch (e) {
@@ -149,6 +201,52 @@ export async function shellExec(
       exitCode: typeof err.code === "number" ? err.code : 1,
     };
   }
+}
+
+/**
+ * Run `npx prisma generate` with merged env (no bash). Prisma's get-config WASM
+ * needs a valid DATABASE_URL when the schema uses env("DATABASE_URL"); passing
+ * env through `bash -c` can still fail P1012 in some environments.
+ */
+export async function execPrismaGenerate(
+  cwd: string,
+  extraEnv: Record<string, string>,
+  options?: { timeout?: number },
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const timeout = options?.timeout ?? 90_000;
+  const env = { ...process.env, ...extraEnv } as NodeJS.ProcessEnv;
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      "npx",
+      ["prisma", "generate"],
+      {
+        cwd,
+        maxBuffer: MAX_BUFFER,
+        timeout,
+        env,
+      },
+    );
+    return { stdout, stderr, exitCode: 0 };
+  } catch (e) {
+    const err = e as {
+      stdout?: string;
+      stderr?: string;
+      code?: number | string;
+    };
+    return {
+      stdout: err.stdout ?? "",
+      stderr: err.stderr ?? (e instanceof Error ? e.message : String(e)),
+      exitCode: typeof err.code === "number" ? err.code : 1,
+    };
+  }
+}
+
+/** Workspace / path-alias specifiers that must not be passed to pnpm/npm add. */
+export function isAutoInstallableNpmPackageName(pkg: string): boolean {
+  if (!pkg || pkg.includes("@/")) return false;
+  if (pkg.startsWith("@shared/")) return false;
+  if (pkg.startsWith("@project/")) return false;
+  return true;
 }
 
 export async function listFiles(
@@ -182,4 +280,70 @@ export async function listFiles(
 
   await walk(abs);
   return results;
+}
+
+/**
+ * Detect which package manager the project at outputDir uses.
+ * Checks for pnpm-workspace.yaml / pnpm-lock.yaml → 'pnpm'
+ *         yarn.lock → 'yarn'
+ *         otherwise → 'npm'
+ */
+export async function detectPackageManager(
+  outputDir: string,
+): Promise<"pnpm" | "yarn" | "npm"> {
+  const abs = path.resolve(outputDir);
+  try {
+    const raw = await fs.readFile(path.join(abs, "package.json"), "utf-8");
+    const pkg = JSON.parse(raw) as { packageManager?: string };
+    const pm = (pkg.packageManager ?? "").toLowerCase();
+    if (pm.startsWith("pnpm@")) return "pnpm";
+    if (pm.startsWith("yarn@")) return "yarn";
+    if (pm.startsWith("npm@")) return "npm";
+  } catch {
+    // ignore malformed or missing package.json
+  }
+  for (const lockFile of ["pnpm-workspace.yaml", "pnpm-lock.yaml"]) {
+    try {
+      await fs.access(path.join(abs, lockFile));
+      return "pnpm";
+    } catch {
+      // not found
+    }
+  }
+  try {
+    await fs.access(path.join(abs, "yarn.lock"));
+    return "yarn";
+  } catch {
+    return "npm";
+  }
+}
+
+/**
+ * Return the correct "install" command for the given package manager.
+ * For pnpm/yarn/npm workspaces, always install from root.
+ */
+export function buildInstallCommand(pm: "pnpm" | "yarn" | "npm"): string {
+  if (pm === "pnpm") return "pnpm install --prefer-offline 2>&1 | tail -30";
+  if (pm === "yarn") return "yarn install --prefer-offline 2>&1 | tail -30";
+  return "npm install --prefer-offline 2>&1 | tail -30";
+}
+
+/**
+ * Return the correct "add package" command for the given package manager.
+ * For pnpm, an optional `filter` selects the workspace package.
+ */
+export function buildAddCommand(
+  pm: "pnpm" | "yarn" | "npm",
+  pkgs: string[],
+  opts?: { filter?: string; dev?: boolean },
+): string {
+  const devFlag = opts?.dev ? (pm === "yarn" ? " --dev" : " --save-dev") : "";
+  if (pm === "pnpm") {
+    const filter = opts?.filter ? ` --filter ${opts.filter}` : "";
+    return `pnpm add${filter}${devFlag} ${pkgs.join(" ")} 2>&1 | tail -15`;
+  }
+  if (pm === "yarn")
+    return `yarn add${devFlag} ${pkgs.join(" ")} 2>&1 | tail -15`;
+  const saveFlag = opts?.dev ? "--save-dev" : "--save";
+  return `npm install ${saveFlag} ${pkgs.join(" ")} 2>&1 | tail -15`;
 }

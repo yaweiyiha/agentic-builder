@@ -18,12 +18,21 @@ import GenerationPlanPanel, {
 import PrdSpecWireframesSection, {
   parsePrdStepMetadata,
 } from "@/components/PrdSpecWireframesSection";
+import DocReviewPanel from "@/components/DocReviewPanel";
+import PencilEditPanel from "@/components/PencilEditPanel";
+import {
+  PrepStyleChatTranscript,
+  type PrepDocChatMsg,
+} from "@/components/PrepStyleChatPanel";
 import Loading from "@/components/Loading";
+import ImportPrdDialog from "@/components/ImportPrdDialog";
+import DesignReferencesDialog from "@/components/DesignReferencesDialog";
 import type { PipelineStepId, StepResult } from "@/lib/pipeline/types";
 import type { ProjectTier } from "@/lib/agents/project-classifier";
 import { DEBUG_SAMPLE_KICKOFF_TASKS } from "@/lib/pipeline/debug-sample-tasks";
 import { DEBUG_CRITICAL_ILLNESS_KICKOFF_TASKS } from "@/lib/pipeline/debug-critical-illness-tasks";
 import { parseKickoffTaskBreakdownFromMetadata } from "@/lib/pipeline/kickoff-task-breakdown";
+import { isKickoffTaskBreakdownConfirmed } from "@/lib/pipeline/kickoff-task-breakdown";
 import {
   isContinueCommand,
   isRegenerateCommand,
@@ -32,6 +41,10 @@ import {
   defaultSelectedParallelDocIds,
   parallelDocBlueprintsForTier,
 } from "@/lib/pipeline/parallel-doc-plan";
+import {
+  defaultDesignStyleId,
+  type DesignStyleId,
+} from "@/lib/pipeline/design-style-presets";
 import { MODEL_CONFIG, primaryModel } from "@/lib/model-config";
 import { resolveModel } from "@/lib/openrouter";
 
@@ -56,6 +69,8 @@ const TOP_PHASES: { id: TopPhase; label: string }[] = [
   { id: "preview", label: "Preview" },
 ];
 
+const DEFAULT_CODE_OUTPUT_DIR = "generated-code";
+
 const PREP_STEP_IDS = new Set(PREP_STEPS.map((s) => s.id));
 
 function phaseForStep(stepId: PipelineStepId): TopPhase {
@@ -79,6 +94,8 @@ export default function PipelinePage() {
     error,
     codeOutputDir,
     fastFromPrd,
+    streamingContent,
+    streamingThinking,
     setCodeOutputDir,
     setFastFromPrd,
     startPipeline,
@@ -86,12 +103,35 @@ export default function PipelinePage() {
     reset,
   } = usePipelineStore();
 
+  const importedPrd = usePipelineStore((s) => s.importedPrd);
+  const refreshImportedPrdStatus = usePipelineStore(
+    (s) => s.refreshImportedPrdStatus,
+  );
+  const clearImportedPrd = usePipelineStore((s) => s.clearImportedPrd);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const designReferences = usePipelineStore((s) => s.designReferences);
+  const refreshDesignReferences = usePipelineStore(
+    (s) => s.refreshDesignReferences,
+  );
+  const clearDesignReferences = usePipelineStore(
+    (s) => s.clearDesignReferences,
+  );
+  const [designReferencesDialogOpen, setDesignReferencesDialogOpen] =
+    useState(false);
+
+  useEffect(() => {
+    void refreshImportedPrdStatus();
+    void refreshDesignReferences();
+  }, [refreshImportedPrdStatus, refreshDesignReferences]);
+
   const [featureBrief, setFeatureBrief] = useState("");
   const [activeOverridePhase, setActiveOverridePhase] = useState<
     "coding" | "preview" | null
   >(null);
   const codingStatus = useCodingStore((s) => s.status);
   const startCoding = useCodingStore((s) => s.startCoding);
+  const retryE2eVerify = useCodingStore((s) => s.retryE2eVerify);
 
   const [prdConfirmed, setPrdConfirmed] = useState(false);
   const [genPhase, setGenPhase] = useState<
@@ -115,6 +155,18 @@ export default function PipelinePage() {
   const [selectedParallelDocIds, setSelectedParallelDocIds] = useState<
     PipelineStepId[]
   >([]);
+  const [designStyleId, setDesignStyleId] =
+    useState<DesignStyleId>(defaultDesignStyleId);
+  const [styleReferenceImage, setStyleReferenceImage] = useState<string | null>(
+    null,
+  );
+  const [prepDocChatHistory, setPrepDocChatHistory] = useState<
+    PrepDocChatMsg[]
+  >([]);
+  /** False after a Design Spec is generated until the user explicitly confirms it (unlocks Pencil). */
+  const [designSpecConfirmed, setDesignSpecConfirmed] = useState(true);
+  /** False after Pencil output exists until the user confirms before kick-off. */
+  const [pencilOutputConfirmed, setPencilOutputConfirmed] = useState(true);
   const lastRunBriefRef = useRef("");
 
   const activePhase: TopPhase = activeOverridePhase ?? phaseForStep(activeTab);
@@ -131,7 +183,7 @@ export default function PipelinePage() {
         reasoning: string;
       }
     | undefined;
-  const projectTier = (classification?.tier ?? "L") as ProjectTier;
+  const projectTier = (classification?.tier ?? "M") as ProjectTier;
 
   const visiblePrepTabs = useMemo(() => {
     const intentTab = PREP_STEPS[0];
@@ -198,15 +250,20 @@ export default function PipelinePage() {
       : prepSubTab;
 
   const handlePhaseClick = (phase: TopPhase) => {
+    console.log("[PipelinePage] handlePhaseClick called", { phase, activePhase, activeTab, prepSubTab, effectivePrepSub });
     if (phase === "coding" || phase === "preview") {
+      console.log("[PipelinePage] setting activeOverridePhase to", phase);
       setActiveOverridePhase(phase);
       return;
     }
     setActiveOverridePhase(null);
     if (phase === "preparation") {
+      console.log("[PipelinePage] setting activeTab to effectivePrepSub:", effectivePrepSub);
       setActiveTab(effectivePrepSub);
     } else {
-      setActiveTab(stepIdForPhase(phase));
+      const nextTab = stepIdForPhase(phase);
+      console.log("[PipelinePage] setting activeTab to stepIdForPhase:", nextTab);
+      setActiveTab(nextTab);
     }
   };
 
@@ -217,25 +274,35 @@ export default function PipelinePage() {
 
   const { updateSteps, runKickoff } = usePipelineStore();
 
-  const handleToggleParallelDoc = useCallback((id: PipelineStepId) => {
-    setSelectedParallelDocIds((prev) => {
-      const cls = usePipelineStore.getState().steps.intent?.metadata
-        ?.classification as { tier?: ProjectTier } | undefined;
-      const tier = (cls?.tier ?? "L") as ProjectTier;
-      const order = parallelDocBlueprintsForTier(tier).map((b) => b.id);
-      const sel = new Set(prev);
-      if (sel.has(id)) sel.delete(id);
-      else sel.add(id);
-      return order.filter((x) => sel.has(x));
-    });
-  }, []);
+  const handleToggleParallelDoc = useCallback(
+    (id: PipelineStepId) => {
+      if (id === "pencil" && !designSpecConfirmed) return;
+      setSelectedParallelDocIds((prev) => {
+        const cls = usePipelineStore.getState().steps.intent?.metadata
+          ?.classification as { tier?: ProjectTier } | undefined;
+        const tier = (cls?.tier ?? "M") as ProjectTier;
+        const order = parallelDocBlueprintsForTier(tier).map((b) => b.id);
+        const sel = new Set(prev);
+        if (sel.has(id)) sel.delete(id);
+        else sel.add(id);
+        return order.filter((x) => sel.has(x));
+      });
+    },
+    [designSpecConfirmed],
+  );
 
   const handlePrdConfirm = useCallback(
     (finalPrd: string) => {
       const cls = usePipelineStore.getState().steps.intent?.metadata
         ?.classification as { tier?: ProjectTier } | undefined;
-      const t = (cls?.tier ?? "L") as ProjectTier;
+      const t = (cls?.tier ?? "M") as ProjectTier;
+      const quick = usePipelineStore.getState().fastFromPrd;
       setSelectedParallelDocIds(defaultSelectedParallelDocIds(t));
+      setDesignStyleId(defaultDesignStyleId());
+      setStyleReferenceImage(null);
+      setPrepDocChatHistory([]);
+      setDesignSpecConfirmed(true);
+      setPencilOutputConfirmed(true);
       setPrdConfirmed(true);
       setConfirmedPrd(finalPrd);
       setGenPhase("planning");
@@ -257,6 +324,7 @@ export default function PipelinePage() {
     setGenPhase("idle");
     setSelectedParallelDocIds([]);
     setPrdChatHistory([]);
+    setPrepDocChatHistory([]);
     setStartGenNonce(0);
     setParallelGenResults(null);
     setParallelGenLive(null);
@@ -267,14 +335,35 @@ export default function PipelinePage() {
 
   const handleParallelStreamFinished = useCallback(
     (results: Record<string, ParallelDocResult>) => {
-      setParallelGenResults(results);
+      setParallelGenResults((prev) => ({ ...prev, ...results }));
       setGenPhase("awaiting_kickoff");
+      if (results.design?.content?.trim()) {
+        setDesignSpecConfirmed(false);
+      }
+      if (results.pencil?.content?.trim()) {
+        setPencilOutputConfirmed(false);
+      }
+    },
+    [],
+  );
+
+  const handleDocContentSaved = useCallback(
+    (docId: string, newContent: string) => {
+      setParallelGenResults((prev) => {
+        if (!prev) return prev;
+        const existing = prev[docId];
+        if (!existing) return prev;
+        return { ...prev, [docId]: { ...existing, content: newContent } };
+      });
     },
     [],
   );
 
   const handleGenerationComplete = useCallback(
     (results: Record<string, ParallelDocResult>) => {
+      if (!designSpecConfirmed || !pencilOutputConfirmed) {
+        return;
+      }
       setGenPhase("done");
       const stepUpdates: Partial<Record<PipelineStepId, StepResult>> = {};
       for (const [docId, result] of Object.entries(results)) {
@@ -321,7 +410,7 @@ export default function PipelinePage() {
         runKickoff();
       }, 300);
     },
-    [updateSteps, runKickoff],
+    [updateSteps, runKickoff, designSpecConfirmed, pencilOutputConfirmed],
   );
 
   const handleSkipToKickoff = useCallback(async () => {
@@ -374,6 +463,39 @@ export default function PipelinePage() {
     }
   }, [isRunning, codeOutputDir, updateSteps, runKickoff]);
 
+  const handleLoadSnapshot = useCallback(async () => {
+    if (isRunning) return;
+    try {
+      const resp = await fetch("/api/agents/load-pipeline-snapshot");
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        console.error(
+          "Load snapshot failed:",
+          (err as { error?: string }).error,
+        );
+        return;
+      }
+      const { snapshot } = (await resp.json()) as {
+        snapshot: {
+          featureBrief: string;
+          codeOutputDir: string;
+          totalCostUsd: number;
+          steps: Record<PipelineStepId, StepResult | null>;
+        };
+      };
+      const stepUpdates: Partial<Record<PipelineStepId, StepResult>> = {};
+      for (const [key, val] of Object.entries(snapshot.steps)) {
+        if (val) stepUpdates[key as PipelineStepId] = val;
+      }
+      updateSteps(stepUpdates);
+      if (snapshot.codeOutputDir) setCodeOutputDir(snapshot.codeOutputDir);
+      setActiveTab("kickoff");
+      setActiveOverridePhase(null);
+    } catch (err) {
+      console.error("Load snapshot failed:", err);
+    }
+  }, [isRunning, updateSteps, setCodeOutputDir, setActiveTab]);
+
   const handleDebugCodingAgents = useCallback(() => {
     if (isRunning || codingStatus === "running") return;
     const runId = `debug-coding-${Date.now()}`;
@@ -387,6 +509,13 @@ export default function PipelinePage() {
     setActiveOverridePhase("coding");
     startCoding(runId, DEBUG_CRITICAL_ILLNESS_KICKOFF_TASKS, codeOutputDir);
   }, [isRunning, codingStatus, codeOutputDir, startCoding]);
+
+  const handleDebugE2eVerify = useCallback(() => {
+    if (isRunning || codingStatus === "running") return;
+    const runId = `debug-e2e-${Date.now()}`;
+    setActiveOverridePhase("coding");
+    retryE2eVerify(runId, codeOutputDir, projectTier);
+  }, [isRunning, codingStatus, codeOutputDir, projectTier, retryE2eVerify]);
 
   const displayedStepId: PipelineStepId =
     activePhase === "preparation" ? effectivePrepSub : activeTab;
@@ -404,6 +533,8 @@ export default function PipelinePage() {
       genPhase === "generating" ||
       genPhase === "awaiting_kickoff") &&
     !isRunning;
+
+  const showDocPlanWorkspace = showGenerationPlan;
 
   useEffect(() => {
     if (showPrdReview && prdResult?.content) {
@@ -448,12 +579,16 @@ export default function PipelinePage() {
   const kickoffTasks = steps.kickoff
     ? parseKickoffTaskBreakdownFromMetadata(steps.kickoff.metadata)
     : [];
+  const kickoffTasksConfirmed = isKickoffTaskBreakdownConfirmed(
+    steps.kickoff?.metadata as Record<string, unknown> | undefined,
+  );
   const kickoffAwaitingCodingContinue =
     displayedStepId === "kickoff" &&
     steps.kickoff?.status === "completed" &&
     !activeOverridePhase &&
     codingStatus === "idle" &&
-    kickoffTasks.length > 0;
+    kickoffTasks.length > 0 &&
+    kickoffTasksConfirmed;
 
   const commandBarGateActive =
     showPrdReview || showGenerationPlan || kickoffAwaitingCodingContinue;
@@ -473,12 +608,22 @@ export default function PipelinePage() {
           st.kickoff?.metadata,
         );
         if (tasks.length > 0) {
+          const confirmed = isKickoffTaskBreakdownConfirmed(
+            st.kickoff?.metadata as Record<string, unknown> | undefined,
+          );
+          if (!confirmed) return;
           if (!isContinueCommand(raw)) return;
           const runId =
             typeof st.kickoff.metadata?.runId === "string"
               ? st.kickoff.metadata.runId
               : "run-" + Date.now();
-          startCoding(runId, tasks, codeOutputDir);
+          startCoding(
+            runId,
+            tasks,
+            codeOutputDir,
+            undefined,
+            steps.prd?.content,
+          );
           setActiveOverridePhase("coding");
           setFeatureBrief("");
           return;
@@ -609,6 +754,9 @@ export default function PipelinePage() {
     (sum, s) => sum + (s?.tokenUsage?.totalTokens ?? 0),
     0,
   );
+
+  const kickoffBlockedByConfirmations =
+    !designSpecConfirmed || !pencilOutputConfirmed;
 
   const currentStageModel = useMemo(() => {
     if (activePhase === "coding") {
@@ -843,25 +991,39 @@ export default function PipelinePage() {
           />
         ) : showGenerationPlan ? (
           <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-6">
-            {/* Always mounted to drive SSE + state syncing */}
-            <GenerationPlanPanel
-              tier={projectTier}
-              prdContent={confirmedPrd || prdResult?.content || ""}
-              sessionId={steps.intent?.timestamp ?? "session"}
-              selectedParallelDocIds={selectedParallelDocIds}
-              onToggleParallelDoc={handleToggleParallelDoc}
-              startGenerationNonce={startGenNonce}
-              onBusyChange={setParallelGenBusy}
-              onGenerationStreamFinished={handleParallelStreamFinished}
-              prdMetadata={
-                prdResult?.metadata as Record<string, unknown> | undefined
-              }
-              codeOutputDir={codeOutputDir}
-              showPlanTable={genPhase === "planning"}
-              showProgressList={false}
-              showPrdSpecSection={false}
-              onParallelStateChange={setParallelGenLive}
-            />
+            {showDocPlanWorkspace && (
+              <>
+                {prepDocChatHistory.length > 0 && genPhase === "planning" && (
+                  <PrepStyleChatTranscript messages={prepDocChatHistory} />
+                )}
+                <GenerationPlanPanel
+                  tier={projectTier}
+                  prdContent={confirmedPrd || prdResult?.content || ""}
+                  sessionId={steps.intent?.timestamp ?? "session"}
+                  selectedParallelDocIds={selectedParallelDocIds}
+                  onToggleParallelDoc={handleToggleParallelDoc}
+                  startGenerationNonce={startGenNonce}
+                  onBusyChange={setParallelGenBusy}
+                  onGenerationStreamFinished={handleParallelStreamFinished}
+                  prdMetadata={
+                    prdResult?.metadata as Record<string, unknown> | undefined
+                  }
+                  codeOutputDir={codeOutputDir}
+                  showPlanTable={genPhase === "planning"}
+                  showProgressList={false}
+                  showPrdSpecSection={false}
+                  onParallelStateChange={setParallelGenLive}
+                  designStyleId={designStyleId}
+                  onDesignStyleChange={setDesignStyleId}
+                  allowPencilSelection={designSpecConfirmed}
+                  mergedDesignSpecForPencil={
+                    parallelGenResults?.design?.content ?? null
+                  }
+                  styleReferenceImage={styleReferenceImage}
+                  onStyleReferenceImageChange={setStyleReferenceImage}
+                />
+              </>
+            )}
             {/* After generation starts: show per-tab content, no plan table */}
             {(genPhase === "generating" || genPhase === "awaiting_kickoff") && (
               <>
@@ -878,6 +1040,9 @@ export default function PipelinePage() {
                   prdResult={prdResult}
                   steps={steps}
                   selectedParallelDocIds={selectedParallelDocIds}
+                  codeOutputDir={codeOutputDir}
+                  onDocContentSaved={handleDocContentSaved}
+                  designStyleId={designStyleId}
                 />
               </>
             )}
@@ -891,9 +1056,16 @@ export default function PipelinePage() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.15 }}
             >
-              {activeResult?.status === "running" && (
+              {activeResult?.status === "running" &&
+              displayedStepId === "prd" &&
+              (streamingContent || streamingThinking) ? (
+                <PrdStreamingPanel
+                  thinking={streamingThinking}
+                  content={streamingContent}
+                />
+              ) : activeResult?.status === "running" ? (
                 <RunningState stepId={displayedStepId} />
-              )}
+              ) : null}
               {activeResult?.status === "completed" &&
                 displayedStepId === "kickoff" && (
                   <KickoffStepPanel
@@ -923,6 +1095,67 @@ export default function PipelinePage() {
       {/* ─── Bottom Command Bar ─── */}
       {activePhase !== "coding" && activePhase !== "preview" && (
         <div className="flex flex-shrink-0 flex-col items-center gap-2.5 border-t border-zinc-200 px-6 pb-5 pt-3">
+          {importedPrd?.exists && (
+            <div className="flex w-full max-w-[760px] items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-[11.5px] text-emerald-800">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                <span className="truncate">
+                  Using imported PRD — PM generation will be skipped on the next
+                  run
+                  {importedPrd.updatedAt
+                    ? ` (updated ${new Date(importedPrd.updatedAt).toLocaleString()})`
+                    : ""}
+                  .
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImportDialogOpen(true)}
+                  className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+                >
+                  View / Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void clearImportedPrd()}
+                  className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+          {designReferences.length > 0 && (
+            <div className="flex w-full max-w-[760px] items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[11.5px] text-indigo-800">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                <span className="truncate">
+                  {designReferences.length} design reference
+                  {designReferences.length === 1 ? "" : "s"} attached — will be
+                  copied to{" "}
+                  <code className="font-mono">.design-references/</code> and
+                  injected into code-gen context.
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDesignReferencesDialogOpen(true)}
+                  className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-50"
+                >
+                  View / Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void clearDesignReferences()}
+                  className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-50"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
           <form
             onSubmit={handleCommandSubmit}
             className={`flex w-full max-w-[760px] gap-2.5 ${showPrdReview ? "items-end" : "items-center"}`}
@@ -945,9 +1178,7 @@ export default function PipelinePage() {
                           stiffness: 420,
                           damping: 28,
                         }}
-                        disabled={
-                          isRunning || prdRefining || parallelGenBusy
-                        }
+                        disabled={isRunning || prdRefining || parallelGenBusy}
                         onClick={() => void processCommandBarInput("continue")}
                         className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -989,8 +1220,44 @@ export default function PipelinePage() {
                       Generate documents
                     </motion.button>
                   )}
-                  {showGenerationPlan &&
-                    genPhase === "awaiting_kickoff" && (
+                  {showGenerationPlan && genPhase === "awaiting_kickoff" && (
+                    <>
+                      {parallelGenResults?.design?.content &&
+                        !designSpecConfirmed && (
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 28,
+                            }}
+                            disabled={parallelGenBusy || prdRefining}
+                            onClick={() => setDesignSpecConfirmed(true)}
+                            className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-950 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Confirm Design Spec
+                          </motion.button>
+                        )}
+                      {parallelGenResults?.pencil?.content &&
+                        !pencilOutputConfirmed && (
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 28,
+                            }}
+                            disabled={parallelGenBusy || prdRefining}
+                            onClick={() => setPencilOutputConfirmed(true)}
+                            className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2.5 text-xs font-semibold text-indigo-950 shadow-sm transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Confirm Pencil output
+                          </motion.button>
+                        )}
                       <motion.button
                         type="button"
                         whileHover={{ scale: 1.02 }}
@@ -1003,14 +1270,16 @@ export default function PipelinePage() {
                         disabled={
                           !parallelGenResults ||
                           parallelGenBusy ||
-                          prdRefining
+                          prdRefining ||
+                          kickoffBlockedByConfirmations
                         }
                         onClick={() => void processCommandBarInput("continue")}
                         className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Run kick-off
                       </motion.button>
-                    )}
+                    </>
+                  )}
                   {kickoffAwaitingCodingContinue && (
                     <motion.button
                       type="button"
@@ -1227,7 +1496,83 @@ export default function PipelinePage() {
           </form>
 
           {/* Debug shortcuts */}
-          <div className="flex items-center gap-4 text-[11px] text-zinc-400">
+          <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-400">
+            <button
+              type="button"
+              onClick={() => setImportDialogOpen(true)}
+              disabled={isRunning}
+              className={`flex items-center gap-1 transition-colors disabled:opacity-40 ${
+                importedPrd?.exists
+                  ? "text-emerald-600 hover:text-emerald-700"
+                  : "hover:text-zinc-600"
+              }`}
+              title="Import an existing PRD to skip the PM step"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="18" x2="12" y2="12" />
+                <polyline points="9 15 12 12 15 15" />
+              </svg>
+              {importedPrd?.exists ? "Imported PRD (active)" : "Import PRD"}
+            </button>
+            <span className="text-zinc-200">&middot;</span>
+            <button
+              type="button"
+              onClick={() => setDesignReferencesDialogOpen(true)}
+              disabled={isRunning}
+              className={`flex items-center gap-1 transition-colors disabled:opacity-40 ${
+                designReferences.length > 0
+                  ? "text-indigo-600 hover:text-indigo-700"
+                  : "hover:text-zinc-600"
+              }`}
+              title="Upload screenshots that coding agents will use as visual references"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              {designReferences.length > 0
+                ? `Design refs (${designReferences.length})`
+                : "Design refs"}
+            </button>
+            <span className="text-zinc-200">&middot;</span>
+            <button
+              type="button"
+              onClick={handleLoadSnapshot}
+              disabled={isRunning}
+              className="flex items-center gap-1 transition-colors hover:text-emerald-600 disabled:opacity-40"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Load Snapshot
+            </button>
+            <span className="text-zinc-200">&middot;</span>
             <button
               type="button"
               onClick={handleSkipToKickoff}
@@ -1286,6 +1631,26 @@ export default function PipelinePage() {
               </svg>
               Debug Coding · Critical Illness
             </button>
+            <span className="text-zinc-200">&middot;</span>
+            <button
+              type="button"
+              onClick={handleDebugE2eVerify}
+              disabled={isRunning || codingStatus === "running"}
+              className="flex items-center gap-1 text-purple-400 transition-colors hover:text-purple-600 disabled:opacity-40"
+              title={`Skip coding — run E2E verify directly against ${codeOutputDir}`}
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Debug E2E Verify
+            </button>
           </div>
 
           {error && (
@@ -1295,6 +1660,15 @@ export default function PipelinePage() {
           )}
         </div>
       )}
+
+      <ImportPrdDialog
+        isOpen={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+      />
+      <DesignReferencesDialog
+        isOpen={designReferencesDialogOpen}
+        onClose={() => setDesignReferencesDialogOpen(false)}
+      />
     </div>
   );
 }
@@ -1385,7 +1759,7 @@ function ParallelGenSummaryStrip({ live }: { live: ParallelGenLiveSnapshot }) {
       )}
       {live.totalTokens > 0 && (
         <span className="tabular-nums">
-          {live.totalTokens.toLocaleString()} tokens
+          {live.totalTokens?.toLocaleString()} tokens
         </span>
       )}
       {live.totalCostUsd > 0 && (
@@ -1415,6 +1789,9 @@ function ParallelGenerationTabBody({
   prdResult,
   steps,
   selectedParallelDocIds,
+  codeOutputDir,
+  onDocContentSaved,
+  designStyleId,
 }: {
   stepId: PipelineStepId;
   live: ParallelGenLiveSnapshot | null;
@@ -1423,6 +1800,9 @@ function ParallelGenerationTabBody({
   prdResult: StepResult | null;
   steps: Record<PipelineStepId, StepResult | null>;
   selectedParallelDocIds: PipelineStepId[];
+  codeOutputDir?: string;
+  onDocContentSaved?: (docId: string, newContent: string) => void;
+  designStyleId: DesignStyleId;
 }) {
   const resultFor = (id: PipelineStepId): ParallelDocResult | undefined =>
     live?.docResults[id] ?? fallbackResults?.[id];
@@ -1518,28 +1898,38 @@ function ParallelGenerationTabBody({
   if (st === "completed" && res?.content) {
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl border border-zinc-200/90 bg-white p-7 shadow-[0_4px_24px_-4px_rgba(15,23,42,0.08)]">
-          <div className="flex flex-wrap gap-4 text-[11px] text-zinc-500">
-            {res.tokens > 0 && (
-              <span className="tabular-nums">
-                {res.tokens.toLocaleString()} tok
-              </span>
-            )}
-            {res.costUsd !== undefined && res.costUsd > 0 && (
-              <span className="tabular-nums text-emerald-700">
-                ${res.costUsd.toFixed(4)}
-              </span>
-            )}
-            {res.durationMs !== undefined && res.durationMs > 0 && (
-              <span className="tabular-nums">
-                {(res.durationMs / 1000).toFixed(1)}s
-              </span>
-            )}
-          </div>
-          <div className="prose prose-sm prose-zinc mt-4 max-w-none">
-            <MarkdownRenderer content={res.content} />
-          </div>
+        <div className="flex flex-wrap gap-4 text-[11px] text-zinc-500 px-1">
+          {res.tokens > 0 && (
+            <span className="tabular-nums">
+              {res.tokens?.toLocaleString()} tok
+            </span>
+          )}
+          {res.costUsd !== undefined && res.costUsd > 0 && (
+            <span className="tabular-nums text-emerald-700">
+              ${res.costUsd.toFixed(4)}
+            </span>
+          )}
+          {res.durationMs !== undefined && res.durationMs > 0 && (
+            <span className="tabular-nums">
+              {(res.durationMs / 1000).toFixed(1)}s
+            </span>
+          )}
         </div>
+        <DocReviewPanel
+          docId={stepId}
+          docLabel={label}
+          content={res.content}
+          codeOutputDir={codeOutputDir}
+          onContentSaved={onDocContentSaved}
+        />
+        {stepId === "pencil" && (
+          <PencilEditPanel
+            content={res.content}
+            codeOutputDir={codeOutputDir}
+            prdContent={confirmedPrd}
+            designStyleId={designStyleId}
+          />
+        )}
         {res.artifactUrls && res.artifactUrls.length > 0 && (
           <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-[12px] text-zinc-700">
             <p className="font-semibold text-zinc-900">Artifacts</p>
@@ -1736,6 +2126,26 @@ function MetaBadge({
   );
 }
 
+function OutputDirectoryField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const apply = () => {
+    onChange(draft);
+  };
+}
+
 /* ─── Running State ─── */
 function RunningState({ stepId }: { stepId: PipelineStepId }) {
   const labels: Record<string, string> = {
@@ -1760,6 +2170,92 @@ function RunningState({ stepId }: { stepId: PipelineStepId }) {
         </span>
       </div>
       <Loading size="md" text="" />
+    </div>
+  );
+}
+
+/* ─── PRD Streaming Panel (live thinking chain + content) ─── */
+function PrdStreamingPanel({
+  thinking,
+  content,
+}: {
+  thinking: string;
+  content: string;
+}) {
+  const [thinkingOpen, setThinkingOpen] = useState(true);
+  const contentEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    contentEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [content, thinking]);
+
+  return (
+    <div className="space-y-3">
+      {thinking && (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 overflow-hidden">
+          <button
+            onClick={() => setThinkingOpen((o) => !o)}
+            className="flex w-full items-center justify-between px-4 py-2.5 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-[12px] font-semibold text-zinc-600">
+                思维链 · Thinking
+              </span>
+              <span className="text-[10px] text-zinc-400">
+                {thinking.length?.toLocaleString()} chars
+              </span>
+            </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`text-zinc-400 transition-transform ${thinkingOpen ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {thinkingOpen && (
+            <div className="max-h-[240px] overflow-y-auto border-t border-zinc-200 px-4 py-3 font-mono text-[11px] leading-relaxed text-zinc-500 whitespace-pre-wrap [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
+              {thinking}
+            </div>
+          )}
+        </div>
+      )}
+
+      {content && (
+        <div className="rounded-2xl border border-zinc-200/90 bg-white shadow-[0_4px_24px_-4px_rgba(15,23,42,0.08)]">
+          <div className="flex items-center gap-2 border-b border-zinc-100 px-6 py-3">
+            <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+            <span className="text-[12px] font-semibold text-zinc-600">
+              PRD · Generating…
+            </span>
+          </div>
+          <div className="prose prose-sm prose-zinc max-w-none px-7 py-5">
+            <MarkdownRenderer content={content} />
+          </div>
+        </div>
+      )}
+
+      {!content && !thinking && (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-zinc-900 animate-pulse" />
+          <span className="text-sm font-medium text-zinc-700">
+            PRD Generation agent is generating...
+          </span>
+        </div>
+      )}
+
+      <div ref={contentEndRef} />
     </div>
   );
 }
@@ -1824,7 +2320,7 @@ function CompletedStepContent({ result }: { result: StepResult }) {
           <span className="flex items-center gap-1.5">
             <span className="text-zinc-400">#</span>
             <span className="text-zinc-600">
-              {result.tokenUsage.totalTokens.toLocaleString("en-US")} tokens
+              {result.tokenUsage?.totalTokens?.toLocaleString?.("en-US")} tokens
             </span>
           </span>
         )}

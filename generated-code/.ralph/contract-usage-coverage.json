@@ -1,0 +1,440 @@
+{
+  "policy": "prune",
+  "totals": {
+    "contractEntries": 26,
+    "frontendCalls": 0,
+    "consistent": 0,
+    "surplus": 0,
+    "frontendWiringMissing": 17,
+    "contractGap": 0,
+    "frontendRogue": 0,
+    "adminSkipped": 9
+  },
+  "classifications": [
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/auth/login",
+        "audience": "user",
+        "prdJustification": "User is logged in"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/auth/logout",
+        "audience": "user",
+        "prdJustification": "User is logged in"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/auth/session",
+        "audience": "user",
+        "prdJustification": "User is logged in"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/dashboard/summary",
+        "audience": "user",
+        "prdJustification": "Open monitor page | target: /monitor | assert: Affected stablecoin card shows Rapid Mover pill"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:dashboard"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/dashboard/trend",
+        "audience": "user",
+        "prdJustification": "GET /api/dashboard/trend?range=24h|7d|30d returns multi-coin series and risk bands for FR-MD03"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:dashboard"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/dashboard/alerts",
+        "audience": "user",
+        "prdJustification": "Inspect alerts feed | target: Latest rapid mover entry | assert: Entry shows stablecoin, variable, delta, severity, and timestamp"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:dashboard"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/stablecoins/:symbol",
+        "audience": "user",
+        "prdJustification": "GET /api/stablecoins/:symbol returns the full detail payload including score composition, drivers, review state, and freshness for FR-SD01–08"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:stablecoins"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/stablecoins/:symbol/trend",
+        "audience": "user",
+        "prdJustification": "GET /api/stablecoins/:symbol returns the full detail payload including score composition, drivers, review state, and freshness for FR-SD01–08"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:stablecoins"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/stablecoins/:symbol/variables",
+        "audience": "user",
+        "prdJustification": "GET /api/stablecoins/:symbol/variables returns all 9 variables with raw values, normalized scores, source metadata, and rule summaries for FR-SD06 and AC-04"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:stablecoins"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/stablecoins/:symbol/alerts",
+        "audience": "user",
+        "prdJustification": "Open alert details | target: Alert Feed Item Link | assert: Browser navigates to /stablecoins/:symbol with related alert context visible"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:stablecoins"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/reviews/queue",
+        "audience": "user",
+        "prdJustification": "Review workflow | `/api/reviews` | `GET /queue`"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:reviews"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/reviews/:id",
+        "audience": "user",
+        "prdJustification": "Review workflow | `/api/reviews` | `GET /:id`"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:reviews"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/reviews/:id/approve",
+        "audience": "user",
+        "prdJustification": "Review workflow | `/api/reviews` | `POST /:id/approve`"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:reviews"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/reviews/:id/reject",
+        "audience": "user",
+        "prdJustification": "Review workflow | `/api/reviews` | `POST /:id/reject`"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:reviews"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/reviews/:id/edit-and-approve",
+        "audience": "user",
+        "prdJustification": "Review workflow | `/api/reviews` | `POST /:id/edit-and-approve`"
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:reviews"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/scoring/run",
+        "audience": "admin",
+        "prdJustification": "Scoring | `/api/scoring` | `POST /run`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/scoring/latest",
+        "audience": "admin",
+        "prdJustification": "Scoring | `/api/scoring` | `GET /latest`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/scoring/history",
+        "audience": "admin",
+        "prdJustification": "Scoring | `/api/scoring` | `GET /history`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/config/weights",
+        "audience": "admin",
+        "prdJustification": "Configuration | `/api/config` | `GET /weights`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "PUT",
+        "endpoint": "/api/config/weights",
+        "audience": "admin",
+        "prdJustification": "Configuration | `/api/config` | `PUT /weights`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/config/settings",
+        "audience": "admin",
+        "prdJustification": "Configuration | `/api/config` | `GET /settings`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/system/health",
+        "audience": "admin",
+        "prdJustification": "Health / ops | `/api/system` | `GET /health`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/system/ready",
+        "audience": "admin",
+        "prdJustification": "Health / ops | `/api/system` | `GET /ready`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "admin-audience-skipped",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/system/version",
+        "audience": "admin",
+        "prdJustification": "Health / ops | `/api/system` | `GET /version`"
+      },
+      "prdJustified": true,
+      "reason": "audience=admin — internal endpoint, frontend call coverage is not required"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "GET",
+        "endpoint": "/api/auth/me",
+        "audience": "user",
+        "prdJustification": "BASELINE — implicit infrastructure for any authenticated backend (login/refresh/logout/me). Not enumerated in PRD prose but required for every user flow that hits a bearer-guarded route."
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    },
+    {
+      "case": "frontend-wiring-missing",
+      "contract": {
+        "method": "POST",
+        "endpoint": "/api/auth/refresh",
+        "audience": "user",
+        "prdJustification": "BASELINE — implicit infrastructure for any authenticated backend (login/refresh/logout/me). Not enumerated in PRD prose but required for every user flow that hits a bearer-guarded route."
+      },
+      "prdJustified": true,
+      "reason": "prd-keyword-hit:auth"
+    }
+  ],
+  "pendingRepairTasks": [
+    {
+      "id": "wire-post-/api/auth/login",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call POST /api/auth/login from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/auth/login",
+      "method": "POST"
+    },
+    {
+      "id": "wire-post-/api/auth/logout",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call POST /api/auth/logout from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/auth/logout",
+      "method": "POST"
+    },
+    {
+      "id": "wire-get-/api/auth/session",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/auth/session from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/auth/session",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/dashboard/summary",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/dashboard/summary from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/dashboard/summary",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/dashboard/trend",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/dashboard/trend from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/dashboard/trend",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/dashboard/alerts",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/dashboard/alerts from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/dashboard/alerts",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/stablecoins/:symbol",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/stablecoins/:symbol from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/stablecoins/:symbol",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/stablecoins/:symbol/trend",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/stablecoins/:symbol/trend from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/stablecoins/:symbol/trend",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/stablecoins/:symbol/variables",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/stablecoins/:symbol/variables from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/stablecoins/:symbol/variables",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/stablecoins/:symbol/alerts",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/stablecoins/:symbol/alerts from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/stablecoins/:symbol/alerts",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/reviews/queue",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/reviews/queue from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/reviews/queue",
+      "method": "GET"
+    },
+    {
+      "id": "wire-get-/api/reviews/:id",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/reviews/:id from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/reviews/:id",
+      "method": "GET"
+    },
+    {
+      "id": "wire-post-/api/reviews/:id/approve",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call POST /api/reviews/:id/approve from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/reviews/:id/approve",
+      "method": "POST"
+    },
+    {
+      "id": "wire-post-/api/reviews/:id/reject",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call POST /api/reviews/:id/reject from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/reviews/:id/reject",
+      "method": "POST"
+    },
+    {
+      "id": "wire-post-/api/reviews/:id/edit-and-approve",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call POST /api/reviews/:id/edit-and-approve from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/reviews/:id/edit-and-approve",
+      "method": "POST"
+    },
+    {
+      "id": "wire-get-/api/auth/me",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call GET /api/auth/me from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/auth/me",
+      "method": "GET"
+    },
+    {
+      "id": "wire-post-/api/auth/refresh",
+      "case": "frontend-wiring-missing",
+      "role": "frontend",
+      "directive": "Wire up frontend to call POST /api/auth/refresh from the appropriate page/component (PRD describes this flow). Use the canonical apiClient. Do NOT alter API_CONTRACTS.json — it is correct.",
+      "endpoint": "/api/auth/refresh",
+      "method": "POST"
+    }
+  ],
+  "pruned": []
+}

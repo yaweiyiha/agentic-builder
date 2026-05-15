@@ -1,5 +1,9 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import {
+  docGenerationThinking,
+  resolveDocMaxTokens,
+} from "../shared/doc-agent-settings";
 
 const SYSTEM_PROMPT = `You are a senior Engineering Lead Agent producing an Implementation Guide.
 
@@ -54,7 +58,11 @@ export class ImplGuideAgent extends BaseAgent {
       systemPrompt: SYSTEM_PROMPT,
       defaultModel: MODEL_CONFIG.implguide,
       temperature: 0.4,
-      maxTokens: 16384,
+      maxTokens: resolveDocMaxTokens("IMPLGUIDE_DOC_MAX_TOKENS", {
+        deepseek: 49152,
+        openrouter: 16384,
+      }),
+      thinking: docGenerationThinking(),
     });
   }
 

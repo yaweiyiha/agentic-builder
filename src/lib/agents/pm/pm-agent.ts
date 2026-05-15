@@ -1,5 +1,7 @@
 import { BaseAgent } from "../shared/base-agent";
 import { MODEL_CONFIG } from "@/lib/model-config";
+import { resolveDocMaxTokens } from "../shared/doc-agent-settings";
+
 import type { ProjectTier } from "../shared/project-classifier";
 
 // ─── Tier S: Simple tool / single-page app ───
@@ -26,10 +28,10 @@ Even the smallest project MUST still specify **every screen’s layout**, **what
 
 List **every** distinct page, route, modal, drawer, or full-screen state (including dedicated empty/error states if they are separate views).
 
-### 3.1 [Page Name] (e.g. "Main Timer View", "Settings Panel")
+### 3.1 [Page Name] (e.g. "Dashboard Overview", "Settings Panel")
 - **URL / Route**: (e.g. \`/\`, \`/settings\`)
 - **Purpose**: one sentence
-- **Layout regions** (top → bottom or left → right): ordered bullets naming each region and what it contains (e.g. "Header: title + settings icon", "Body: timer readout", "Footer: primary actions").
+- **Layout regions** (top → bottom or left → right): ordered bullets naming each region and what it contains (e.g. "Header: title + primary action", "Body: content grid or list", "Sidebar: filters and secondary actions").
 - **On-screen inventory**: bullet list of **every** visible control or widget (buttons, inputs, toggles, sliders, links, lists, tabs, etc.).
 - **Key non-interactive elements**: static labels, decorative graphics, read-only text (brief).
 
@@ -42,8 +44,8 @@ One **consolidated table** for **all** interactive components on **all** pages. 
 
 | ID | Page | Component | Type | User interaction | Effect (feedback + outcome) |
 |----|------|-----------|------|------------------|-----------------------------|
-| IC-01 | Main | Start | Button | Click / tap | Timer starts; button label switches; optional sound/haptic |
-| IC-02 | Settings | Work duration | Number input | Type, blur, arrow keys | Value clamped; inline validation message if invalid |
+| IC-01 | Dashboard | Create Item | Button | Click / tap | Modal opens; button shows pressed state; draft form becomes available |
+| IC-02 | Settings | Display Name | Text input | Type, blur | Value updates locally; inline validation appears if invalid |
 
 Column rules:
 - **User interaction**: exact trigger (click, hover, focus, keyboard shortcut, drag, \`change\` event, etc.).
@@ -56,7 +58,7 @@ Include a **Mermaid** diagram showing how screens/states connect (primary naviga
 \`\`\`mermaid
 flowchart LR
   Home[Home] --> Settings[Settings]
-  Home --> Session[Focus session]
+  Home --> Detail[Item detail]
 \`\`\`
 
 Adapt nodes/edges to this product. Use \`flowchart\` or \`graph\`.
@@ -75,6 +77,7 @@ Adapt nodes/edges to this product. Use \`flowchart\` or \`graph\`.
 (Browser support, performance targets, accessibility. 2–4 bullets.)
 
 ## Rules
+- **Output MUST be valid Markdown.** Use ATX headings (\`#\`, \`##\`, \`###\`), fenced code blocks (\`\`\`), and Markdown tables throughout. Do NOT output plain text, JSON, XML, or any other format.
 - This is a SIMPLE project. Do NOT invent backend services, databases, authentication, microservices, or deployment infrastructure unless the user explicitly asks for them.
 - Do NOT add enterprise-only sections (personas, RACI, etc.).
 - **Never omit** layout regions, on-screen inventory, the interactive-components table, or the Mermaid diagram — even for a single-page app.
@@ -179,6 +182,7 @@ Each row: one control; **User interaction** = trigger; **Effect** = UI feedback 
 (Key entities and their relationships, described briefly.)
 
 ## Rules
+- **Output MUST be valid Markdown.** Use ATX headings (\`#\`, \`##\`, \`###\`), fenced code blocks (\`\`\`), and Markdown tables throughout. Do NOT output plain text, JSON, XML, or any other format.
 - Be proportional to the project scope. Don't over-engineer.
 - Every feature gets a unique ID (FR-XX##).
 - The Pages & Screens section is CRITICAL — list every distinct page with layout regions, on-screen inventory, interactions, and states.
@@ -362,6 +366,7 @@ Rules: **User interaction** = exact trigger; **Effect** = immediate feedback + d
 (External systems, APIs, third-party services, or teams required.)
 
 ## Rules
+- **Output MUST be valid Markdown.** Use ATX headings (\`#\`, \`##\`, \`###\`), fenced code blocks (\`\`\`), and Markdown tables throughout. Do NOT output plain text, JSON, XML, or any other format.
 - Be specific and actionable — no vague hand-waving.
 - Every feature requirement gets a unique ID (FR-XX##).
 - Every user story gets a unique ID (US-##).
@@ -383,10 +388,42 @@ const TIER_PROMPTS: Record<ProjectTier, string> = {
 };
 
 const TIER_MAX_TOKENS: Record<ProjectTier, number> = {
-  S: 6144,
-  M: 12288,
-  L: 24576,
+  S: resolveDocMaxTokens("PRD_DOC_MAX_TOKENS", {
+    deepseek: 32768,
+    openrouter: 6144,
+  }),
+  M: resolveDocMaxTokens("PRD_DOC_MAX_TOKENS", {
+    deepseek: 65536,
+    openrouter: 12288,
+  }),
+  L: resolveDocMaxTokens("PRD_DOC_MAX_TOKENS", {
+    deepseek: 65536,
+    openrouter: 24576,
+  }),
 };
+
+const TIER_FULL_NAMES: Record<ProjectTier, string> = {
+  S: "Simple (single-page / micro-tool)",
+  M: "Standard (full-stack application)",
+  L: "Enterprise (complex platform)",
+};
+
+/**
+ * Injects a tier badge line immediately after the first top-level heading
+ * in the PRD markdown.  Idempotent — skips injection if the badge is already
+ * present (e.g. on a re-edit flow).
+ */
+function injectTierBadge(content: string, tier: ProjectTier): string {
+  const badge = `\n> **Project Tier: ${tier}** — ${TIER_FULL_NAMES[tier]}\n`;
+  if (content.includes(`**Project Tier: ${tier}**`)) return content;
+  const lines = content.split("\n");
+  const headingIdx = lines.findIndex((l) => l.startsWith("# "));
+  if (headingIdx >= 0) {
+    lines.splice(headingIdx + 1, 0, badge);
+    return lines.join("\n");
+  }
+  return badge + content;
+}
 
 export class PMAgent extends BaseAgent {
   private tier: ProjectTier;
@@ -399,6 +436,8 @@ export class PMAgent extends BaseAgent {
       defaultModel: MODEL_CONFIG.prd,
       temperature: 0.6,
       maxTokens: TIER_MAX_TOKENS[tier],
+      customChatCompletion: undefined,
+      customStreamRun: undefined,
     });
     this.tier = tier;
   }
@@ -415,11 +454,61 @@ export class PMAgent extends BaseAgent {
           ? "Generate a practical PRD for this application"
           : "Generate a comprehensive, enterprise-grade PRD for the following feature brief";
 
-    return this.run(
-      `${tierHint}:\n\n${featureBrief}`,
+    const result = await this.run(
+      `${tierHint}. **Your entire response must be formatted as valid Markdown** — use ATX headings, Markdown tables, and fenced code blocks exactly as specified in the output format. Do not output plain prose without structure.\n\n${featureBrief}`,
       additionalContext,
       "step-prd",
       sessionId,
     );
+    if (result.content) result.content = injectTierBadge(result.content, this.tier);
+    return result;
+  }
+
+  async generatePRDStreaming(
+    featureBrief: string,
+    onChunk: (chunk: string, type: "thinking" | "content") => void,
+    additionalContext?: string,
+    sessionId?: string,
+  ) {
+    const tierHint =
+      this.tier === "S"
+        ? "Generate a concise PRD for this simple project"
+        : this.tier === "M"
+          ? "Generate a practical PRD for this application"
+          : "Generate a comprehensive, enterprise-grade PRD for the following feature brief";
+
+    const userMsg = `${tierHint}. **Your entire response must be formatted as valid Markdown** — use ATX headings, Markdown tables, and fenced code blocks exactly as specified in the output format. Do not output plain prose without structure.\n\n${featureBrief}`;
+
+    const result = await this.streamRun(
+      userMsg,
+      onChunk,
+      additionalContext,
+      "step-prd",
+      sessionId,
+    );
+    if (result.content) result.content = injectTierBadge(result.content, this.tier);
+    return result;
+  }
+
+  /**
+   * Edit an existing PRD based on a user instruction.
+   * Streams the updated PRD using the same format as generatePRDStreaming.
+   */
+  async generatePRDEditStreaming(
+    existingPrd: string,
+    editInstruction: string,
+    onChunk: (chunk: string, type: "thinking" | "content") => void,
+    sessionId?: string,
+  ) {
+    const userMsg = `You are editing an existing PRD based on the user's instruction. **Output the COMPLETE updated PRD as valid Markdown** — preserve all sections not affected by the edit, and apply the requested changes precisely.\n\n## Existing PRD\n\n${existingPrd}\n\n## Edit Instruction\n\n${editInstruction}\n\nRespond with the full updated PRD only. No preamble or explanation.`;
+
+    const result = await this.streamRun(
+      userMsg,
+      onChunk,
+      undefined,
+      "step-prd",
+      sessionId,
+    );
+    return result;
   }
 }
